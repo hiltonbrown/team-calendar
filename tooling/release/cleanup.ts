@@ -18,7 +18,6 @@ import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
 import {
   assertXeroFixtureInfrastructureOwned,
   countXeroFixtureInfrastructure,
-  deleteXeroCleanupFixtures,
   deleteXeroFixtureInfrastructure,
   lockXeroFixtureInfrastructure,
 } from "./xero-fixture-cleanup.js";
@@ -89,8 +88,6 @@ const scopedTables = [
   "alternative_contacts",
   "availability_records",
   "xero_sync_cursors",
-  "xero_inactivity_classifications",
-  "xero_tenants",
   "xero_connections",
   "people",
   "locations",
@@ -248,7 +245,6 @@ if (mode === "--apply") {
   await database.$transaction(async (transaction) => {
     await lockXeroFixtureInfrastructure(transaction);
     await assertXeroFixtureInfrastructureOwned(transaction, manifest.owned);
-    await deleteXeroCleanupFixtures(transaction, manifest.owned);
     for (const table of scopedTables) {
       await transaction.$executeRawUnsafe(
         `DELETE FROM "${table}" WHERE ${scopedSql}`,

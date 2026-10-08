@@ -32,11 +32,40 @@ export interface ProviderWriteError {
 
 export type ProviderWriteCertainty = "definitive_failure" | "outcome_unknown";
 
+export interface ProviderMutationRequest {
+  body: string | null;
+  method: "POST" | "PUT" | "PATCH";
+  url: string;
+  xeroTenantId: string;
+}
+
+export interface XeroMutationIdentity {
+  firstDispatchedAt: Date;
+  idempotencyKey: string;
+  replayBefore: Date;
+  request: ProviderMutationRequest;
+}
+
+export interface PrepareLeaveMutationInput {
+  action: "create" | "approve" | "decline" | "withdraw";
+  clerkOrgId: string;
+  employeeId: string;
+  endsAt?: Date;
+  leaveTypeId?: string;
+  organisationId: string;
+  reason?: string;
+  remoteId?: string;
+  startsAt?: Date;
+  title?: string;
+  units?: number;
+}
+
 export interface SubmitLeaveInput {
   clerkOrgId: string;
   employeeId: string;
   endsAt: Date;
   leaveTypeId: string;
+  mutation?: XeroMutationIdentity;
   organisationId: string;
   startsAt: Date;
   title?: string;
@@ -63,6 +92,7 @@ export interface ProviderLeaveCandidate {
 export interface WithdrawLeaveInput {
   clerkOrgId: string;
   employeeId: string;
+  mutation?: XeroMutationIdentity;
   organisationId: string;
   remoteId: string;
 }
@@ -70,6 +100,7 @@ export interface WithdrawLeaveInput {
 export interface ApproveLeaveInput {
   clerkOrgId: string;
   employeeId: string;
+  mutation?: XeroMutationIdentity;
   organisationId: string;
   remoteId: string;
 }
@@ -77,6 +108,7 @@ export interface ApproveLeaveInput {
 export interface DeclineLeaveInput {
   clerkOrgId: string;
   employeeId: string;
+  mutation?: XeroMutationIdentity;
   organisationId: string;
   reason: string;
   remoteId: string;
@@ -93,6 +125,7 @@ export interface ExternalWritePort {
   findLeaveApplicationCandidates?: (input: {
     clerkOrgId: string;
     employeeId: string;
+    expectedXeroTenantId?: string;
     organisationId: string;
   }) => Promise<
     Result<
@@ -100,6 +133,9 @@ export interface ExternalWritePort {
       ProviderWriteError
     >
   >;
+  prepareLeaveMutation: (
+    input: PrepareLeaveMutationInput
+  ) => Promise<Result<ProviderMutationRequest, ProviderWriteError>>;
   resolveEmployeeId: (input: {
     personId: string;
     clerkOrgId: string;

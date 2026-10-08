@@ -18,6 +18,7 @@ class NotificationDispatchRollback extends Error {}
 
 export async function completeSubmitSideEffects(input: {
   actorUserId: string;
+  declineReason?: string | null;
   approvalRecipient?: { clerkUserId: string; personId: string } | null;
   attempt: OutboundOperationAttemptScope;
   claimedAt: Date;
@@ -51,20 +52,11 @@ export async function completeSubmitSideEffects(input: {
     });
   }
 
-  const notification =
-    input.attempt.action === "approve"
-      ? {
-          actionUrl: `/plans?recordId=${input.recordId}`,
-          body: "Your leave request has been approved.",
-          title: "Leave approved",
-          type: "leave_approved" as const,
-        }
-      : {
-          actionUrl: `/leave-approvals?recordId=${input.recordId}`,
-          body: "A leave request is ready for review.",
-          title: "Leave submitted for approval",
-          type: "leave_submitted" as const,
-        };
+  const notification = notificationForAction(
+    input.attempt.action,
+    input.recordId,
+    input.declineReason
+  );
   const recipient =
     input.approvalRecipient ?? (input.notifyManager ? input.manager : null);
   if (recipient) {
@@ -159,10 +151,14 @@ function checkpointWhere(
   action: string
 ) {
   return {
-    action:
-      input.attempt?.action === "approve"
-        ? action.replace("submit_", "approval_")
-        : action,
+    action: input.attempt?.action
+      ? action.replace(
+          "submit_",
+          input.attempt.action === "approve"
+            ? "approval_"
+            : `${input.attempt.action}_`
+        )
+      : action,
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
     resource_id: input.recordId,
@@ -188,4 +184,34 @@ function checkpointData(
 
 function failure(message: string): { error: { message: string }; ok: false } {
   return { error: { message }, ok: false };
+}
+
+function notificationForAction(
+  action: OutboundOperationAttemptScope["action"],
+  recordId: string,
+  declineReason?: string | null
+) {
+  switch (action) {
+    case "approve":
+      return {
+        actionUrl: `/plans?recordId=${recordId}`,
+        body: "Your leave request has been approved.",
+        title: "Leave approved",
+        type: "leave_approved" as const,
+      };
+    case "decline":
+      return {
+        actionUrl: `/plans?recordId=${recordId}`,
+        body: declineReason ?? "Your leave request has been declined.",
+        title: "Leave declined",
+        type: "leave_declined" as const,
+      };
+    default:
+      return {
+        actionUrl: `/leave-approvals?recordId=${recordId}`,
+        body: "A leave request has been withdrawn.",
+        title: "Leave withdrawn",
+        type: "leave_withdrawn" as const,
+      };
+  }
 }

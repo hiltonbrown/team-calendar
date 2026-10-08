@@ -13,7 +13,6 @@ const CURRENT_BALANCE_COPY = /Current Xero balance/;
 const CALENDAR_IMMEDIATE_COPY = /appears on calendars and feeds/;
 const LEAVE_INTENT_NAME = /Leave/;
 const AVAILABILITY_INTENT_NAME = /Availability/;
-
 const mocks = vi.hoisted(() => ({
   createRecordAction: vi.fn(),
   push: vi.fn(),
@@ -23,7 +22,6 @@ const mocks = vi.hoisted(() => ({
   submitForApprovalAction: vi.fn(),
   updateRecordAction: vi.fn(),
 }));
-
 class ResizeObserverMock {
   disconnect() {
     // No-op: the component under test does not react to resize callbacks.
@@ -35,9 +33,7 @@ class ResizeObserverMock {
     // No-op: the component under test does not react to resize callbacks.
   }
 }
-
 globalThis.ResizeObserver = ResizeObserverMock;
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mocks.push,
@@ -58,7 +54,6 @@ vi.mock("@/app/(authenticated)/plans/_actions", () => ({
   submitForApprovalAction: mocks.submitForApprovalAction,
   updateRecordAction: mocks.updateRecordAction,
 }));
-
 const people = [
   {
     email: "person@example.com",
@@ -66,7 +61,6 @@ const people = [
     label: "Test Person",
   },
 ];
-
 const initialRecord = {
   allDay: true,
   contactabilityStatus: "contactable" as const,
@@ -80,7 +74,6 @@ const initialRecord = {
   startsAt: "2026-05-04",
   startTime: "",
 };
-
 describe("new record modal form", () => {
   beforeEach(() => {
     cleanup();
@@ -98,7 +91,6 @@ describe("new record modal form", () => {
       },
     });
   });
-
   it("shows Save draft and Save and submit for connected leave", () => {
     render(
       <RecordForm
@@ -112,7 +104,6 @@ describe("new record modal form", () => {
         xeroConnectionState="connected"
       />
     );
-
     expect(
       screen
         .getByRole("radio", { name: LEAVE_INTENT_NAME })
@@ -126,7 +117,6 @@ describe("new record modal form", () => {
       screen.getByRole("button", { name: "Save and submit" })
     ).toBeDefined();
   });
-
   it("shows a single Save button for leave when Xero is disconnected", () => {
     render(
       <RecordForm
@@ -140,12 +130,10 @@ describe("new record modal form", () => {
         xeroConnectionState="not_connected"
       />
     );
-
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
     expect(screen.getByText(LOCAL_ONLY_COPY)).toBeDefined();
   });
-
   it("switches from leave to availability intent", () => {
     render(
       <RecordForm
@@ -159,11 +147,9 @@ describe("new record modal form", () => {
         xeroConnectionState="connected"
       />
     );
-
     fireEvent.click(
       screen.getByRole("radio", { name: AVAILABILITY_INTENT_NAME })
     );
-
     expect(
       screen
         .getByRole("radio", { name: AVAILABILITY_INTENT_NAME })
@@ -177,7 +163,6 @@ describe("new record modal form", () => {
     ).toBeNull();
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
   });
-
   it("shows a single Save button and no balance panel for local-only records", () => {
     render(
       <RecordForm
@@ -191,7 +176,6 @@ describe("new record modal form", () => {
         xeroConnectionState="connected"
       />
     );
-
     expect(
       screen
         .getByRole("radio", { name: AVAILABILITY_INTENT_NAME })
@@ -202,7 +186,6 @@ describe("new record modal form", () => {
     expect(screen.queryByText(CURRENT_BALANCE_COPY)).toBeNull();
     expect(screen.getByText(CALENDAR_IMMEDIATE_COPY)).toBeDefined();
   });
-
   it("keeps values and shows the Xero error after Save and submit", async () => {
     render(
       <RecordForm
@@ -216,11 +199,9 @@ describe("new record modal form", () => {
         xeroConnectionState="connected"
       />
     );
-
     fireEvent.click(screen.getByRole("button", { name: "Save and submit" }));
     await screen.findByText("Send leave to Xero?");
     fireEvent.click(screen.getByRole("button", { name: "Send to Xero" }));
-
     await waitFor(() => {
       expect(screen.getByText("Could not reach Xero.")).toBeDefined();
     });

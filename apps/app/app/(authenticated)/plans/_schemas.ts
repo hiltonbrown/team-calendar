@@ -37,7 +37,11 @@ export const planApprovalStatuses = [
   "xero_sync_failed",
 ] as const;
 
-export const planSourceTypes = ["manual", "team_calendar_leave"] as const;
+export const planSourceTypes = [
+  "manual",
+  "team_calendar_leave",
+  "xero_leave",
+] as const;
 
 const csvArray = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => {

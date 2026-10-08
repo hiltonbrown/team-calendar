@@ -1,45 +1,50 @@
-import { resolveXeroAccess } from "../oauth/credential-owner";
-import type { XeroTenantForWrite, XeroWriteResult } from "../write/types";
+import { resolveXeroAccess } from "../oauth/authorisation";
+import { verifyXeroProviderConnection } from "../oauth/provider-connection";
+import type {
+  XeroAccessContext,
+  XeroWriteError,
+  XeroWriteResult,
+} from "../write/types";
 import {
   classifyXeroFailure,
   mapXeroTransportError,
 } from "./classify-xero-failure";
-import { toResolvedXeroTenant } from "./resolved-tenant";
+import { toResolvedXeroConnection } from "./resolved-tenant";
+
+function isDefiniteAuthFailure(error: XeroWriteError): boolean {
+  return (
+    error.code === "auth_error" &&
+    error.httpStatus === 401 &&
+    (error.recoveryReason === undefined ||
+      error.recoveryReason === "reauthorise") &&
+    error.dispatchPhase !== "before_dispatch"
+  );
+}
 
 export async function executeWithXeroAuthRecovery<T>(
-  xeroTenant: XeroTenantForWrite,
-  operation: (currentTenant: XeroTenantForWrite) => Promise<XeroWriteResult<T>>,
+  xeroConnection: XeroAccessContext,
+  operation: (currentTenant: XeroAccessContext) => Promise<XeroWriteResult<T>>,
   isMutation = false
 ): Promise<XeroWriteResult<T>> {
   let first: XeroWriteResult<T>;
   try {
-    first = await operation(xeroTenant);
+    first = await operation(xeroConnection);
   } catch (error) {
     return { error: mapXeroTransportError(error, isMutation), ok: false };
   }
-  if (
-    first.ok ||
-    first.error.httpStatus !== 401 ||
-    first.error.recoveryReason === "update_permissions" ||
-    first.error.recoveryReason === "outcome_unknown" ||
-    first.error.dispatchPhase === "before_dispatch"
-  ) {
+  if (first.ok || !isDefiniteAuthFailure(first.error)) {
     return first;
   }
-
   const scope = {
-    capability: xeroTenant.capability,
-    clerkOrgId: xeroTenant.clerk_org_id,
-    organisationId: xeroTenant.organisation_id,
+    capability: xeroConnection.capability,
+    clerkOrgId: xeroConnection.clerk_org_id,
+    organisationId: xeroConnection.organisation_id,
   };
   const refreshed = await resolveXeroAccess({
     ...scope,
-    deadline: xeroTenant.deadline,
-    expectedBindingGeneration: xeroTenant.bindingGeneration,
-    forceRefresh: true,
-    previousAccessToken:
-      xeroTenant.tokenVersion === null ? xeroTenant.accessToken : undefined,
-    previousTokenVersion: xeroTenant.tokenVersion,
+    connectionId: xeroConnection.id,
+    deadline: xeroConnection.deadline,
+    previousAccessToken: xeroConnection.accessToken,
   });
   if (!refreshed.ok) {
     return {
@@ -56,9 +61,25 @@ export async function executeWithXeroAuthRecovery<T>(
       ok: false,
     };
   }
+  const current = toResolvedXeroConnection(scope, refreshed.value);
+  let second: XeroWriteResult<T>;
   try {
-    return await operation(toResolvedXeroTenant(scope, refreshed.value));
+    second = await operation(current);
   } catch (error) {
     return { error: mapXeroTransportError(error, isMutation), ok: false };
   }
+  if (!second.ok && isDefiniteAuthFailure(second.error)) {
+    const status = await verifyXeroProviderConnection(current, true);
+    if (status === "reconnect_required") {
+      return {
+        error: {
+          ...second.error,
+          message: "Reconnect Xero to continue.",
+          recoveryReason: "reauthorise",
+        },
+        ok: false,
+      };
+    }
+  }
+  return second;
 }

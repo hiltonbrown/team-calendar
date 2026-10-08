@@ -5,13 +5,8 @@ import { afterAll, describe, expect, test, vi } from "vitest";
 import { PrismaClient } from "./generated/client";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { scopedQuery } from "./src/tenant-query";
-import {
-  createWriteGuardedClient,
-  withDatabaseWriteGuard,
-} from "./src/write-guard";
 
 vi.mock("server-only", () => ({}));
-
 const fixture = allocateLiveTestFixture(
   "packages/database/live-rollback.integration.test.ts"
 );
@@ -24,11 +19,9 @@ const fixtureOrganisationId = (value: string): OrganisationId =>
 const database = new PrismaClient({
   adapter: new PrismaPg({ connectionString: databaseUrl }),
 });
-
 afterAll(async () => {
   await database.$disconnect();
 });
-
 describe("transaction-bound live tenant invariants", () => {
   test("proves two-key isolation and leaves no committed fixture", async () => {
     const clerkOrgA = fixture.tenants[0]?.clerkOrgId as string;
@@ -38,7 +31,6 @@ describe("transaction-bound live tenant invariants", () => {
     const teamA = fixture.id("team", 0);
     const teamB = fixture.id("team", 1);
     const rollback = new Error("ROLLBACK_RELEASE_FIXTURE");
-
     await expect(
       database.$transaction(async (transaction) => {
         await transaction.organisation.createMany({
@@ -96,14 +88,12 @@ describe("transaction-bound live tenant invariants", () => {
         throw rollback;
       })
     ).rejects.toBe(rollback);
-
     await expect(
       database.organisation.count({
         where: { clerk_org_id: { in: [clerkOrgA, clerkOrgB] } },
       })
     ).resolves.toBe(0);
   });
-
   test("enforces one Xero connection per Organisation and rolls back", async () => {
     if (!database) {
       throw new Error("Live database was not configured");
@@ -114,7 +104,6 @@ describe("transaction-bound live tenant invariants", () => {
     const secondConnectionId = fixture.id("connection", 1);
     const rollback = new Error("ROLLBACK_RELEASE_CONSTRAINT_FIXTURE");
     let failure: unknown;
-
     try {
       await database.$transaction(async (transaction) => {
         await transaction.organisation.create({
@@ -128,17 +117,19 @@ describe("transaction-bound live tenant invariants", () => {
         await transaction.xeroConnection.create({
           data: {
             clerk_org_id: clerkOrgId,
-            expires_at: new Date("2027-01-01T00:00:00.000Z"),
             id: firstConnectionId,
             organisation_id: organisationId,
+            payroll_region: "AU",
+            xero_tenant_id: fixture.id("provider-tenant", 0),
           },
         });
         await transaction.xeroConnection.create({
           data: {
             clerk_org_id: clerkOrgId,
-            expires_at: new Date("2027-01-01T00:00:00.000Z"),
             id: secondConnectionId,
             organisation_id: organisationId,
+            payroll_region: "AU",
+            xero_tenant_id: fixture.id("provider-tenant", 0),
           },
         });
         throw rollback;
@@ -146,7 +137,6 @@ describe("transaction-bound live tenant invariants", () => {
     } catch (error) {
       failure = error;
     }
-
     expect(failure).not.toBe(rollback);
     expect(failure).toMatchObject({ code: "P2002" });
     await expect(
@@ -164,7 +154,6 @@ describe("transaction-bound live tenant invariants", () => {
       })
     ).resolves.toBe(0);
   });
-
   test("enforces feed slug uniqueness within a Clerk Organisation and rolls back", async () => {
     if (!database) {
       throw new Error("Live database was not configured");
@@ -174,7 +163,6 @@ describe("transaction-bound live tenant invariants", () => {
     const feedIds = [fixture.id("feed", 0), fixture.id("feed", 1)];
     const rollback = new Error("ROLLBACK_RELEASE_FEED_FIXTURE");
     let failure: unknown;
-
     try {
       await database.$transaction(async (transaction) => {
         await transaction.organisation.create({
@@ -201,7 +189,6 @@ describe("transaction-bound live tenant invariants", () => {
     } catch (error) {
       failure = error;
     }
-
     expect(failure).not.toBe(rollback);
     expect(failure).toMatchObject({ code: "P2002" });
     await expect(
@@ -218,103 +205,5 @@ describe("transaction-bound live tenant invariants", () => {
         where: { clerk_org_id: clerkOrgId, id: organisationId },
       })
     ).resolves.toBe(0);
-  });
-});
-
-function ownedGuardOrganisation(index: 0 | 1) {
-  const tenant = fixture.tenants[index];
-  if (!tenant) {
-    throw new Error("Protected fixture tenant is unavailable");
-  }
-  return {
-    clerk_org_id: tenant.clerkOrgId,
-    country_code: "AU",
-    id: tenant.organisationId,
-    name: "Release guarded rollback fixture",
-  };
-}
-
-async function assertGuardOrganisationsAbsent() {
-  for (const index of [0, 1] as const) {
-    const data = ownedGuardOrganisation(index);
-    await expect(
-      database.organisation.count({
-        where: { clerk_org_id: data.clerk_org_id, id: data.id },
-      })
-    ).resolves.toBe(0);
-  }
-}
-
-describe("guarded live transaction rollback", () => {
-  const guarded = createWriteGuardedClient(database);
-
-  test("rolls back a direct write when final authority is revoked", async () => {
-    const data = ownedGuardOrganisation(0);
-    const denied = new Error("REVOKED_RELEASE_WRITE_AUTHORITY");
-    let checks = 0;
-    await expect(
-      withDatabaseWriteGuard(
-        async (transaction) => {
-          checks += 1;
-          if (checks === 2) {
-            await expect(
-              transaction.organisation.count({
-                where: { clerk_org_id: data.clerk_org_id, id: data.id },
-              })
-            ).resolves.toBe(1);
-            throw denied;
-          }
-        },
-        () => guarded.organisation.create({ data })
-      )
-    ).rejects.toBe(denied);
-    expect(checks).toBe(2);
-    await assertGuardOrganisationsAbsent();
-  });
-
-  test("keeps global and callback writes in one uncommitted transaction", async () => {
-    const first = ownedGuardOrganisation(0);
-    const second = ownedGuardOrganisation(1);
-    const denied = new Error("REVOKED_RELEASE_TRANSACTION_AUTHORITY");
-    let checks = 0;
-    await expect(
-      withDatabaseWriteGuard(
-        () => {
-          checks += 1;
-          return checks === 2 ? Promise.reject(denied) : Promise.resolve();
-        },
-        () =>
-          guarded.$transaction(
-            async (transaction) => {
-              await transaction.organisation.create({ data: first });
-              await guarded.organisation.create({ data: second });
-              for (const data of [first, second]) {
-                await expect(
-                  transaction.organisation.count({
-                    where: { clerk_org_id: data.clerk_org_id, id: data.id },
-                  })
-                ).resolves.toBe(1);
-              }
-              await assertGuardOrganisationsAbsent();
-            },
-            { timeout: 30_000 }
-          )
-      )
-    ).rejects.toBe(denied);
-    expect(checks).toBe(2);
-    await assertGuardOrganisationsAbsent();
-  });
-
-  test("rejects a lazy write first awaited after invocation closure", async () => {
-    const data = ownedGuardOrganisation(0);
-    const check = vi.fn(async () => undefined);
-    let pending: PromiseLike<unknown> | undefined;
-    await withDatabaseWriteGuard(check, () => {
-      pending = guarded.organisation.create({ data });
-      return Promise.resolve();
-    });
-    await expect(pending).rejects.toThrow("invocation has closed");
-    expect(check).not.toHaveBeenCalled();
-    await assertGuardOrganisationsAbsent();
   });
 });

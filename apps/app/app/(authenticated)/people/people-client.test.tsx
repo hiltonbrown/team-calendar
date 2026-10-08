@@ -11,10 +11,12 @@ import { type PeopleFilterInput, PeopleFilterSchema } from "./_schemas";
 import { PeopleClient } from "./people-client";
 
 interface TestNotificationEvent {
-  payload: { organisationId: string; [key: string]: unknown };
+  payload: {
+    organisationId: string;
+    [key: string]: unknown;
+  };
   type: string;
 }
-
 const mocks = vi.hoisted(() => ({
   dispatchManualSyncAction: vi.fn(),
   inviteClerkAccessCandidatesAction: vi.fn(),
@@ -26,39 +28,31 @@ const mocks = vi.hoisted(() => ({
     (listener: (event: TestNotificationEvent) => void) => () => undefined
   >(() => () => undefined),
 }));
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
 }));
-
 vi.mock("@repo/notifications/components/provider", () => ({
   useNotificationEvents: () => ({ subscribe: mocks.subscribe }),
 }));
-
 vi.mock("@/lib/url-state/use-filter-params", () => ({
   useFilterParams: () => [{}, mocks.setFilterParams],
 }));
-
 vi.mock("@/app/(authenticated)/sync/_actions", () => ({
   dispatchManualSyncAction: (input: unknown) =>
     mocks.dispatchManualSyncAction(input),
 }));
-
 vi.mock("./_actions", () => ({
   inviteClerkAccessCandidatesAction: (input: unknown) =>
     mocks.inviteClerkAccessCandidatesAction(input),
   loadClerkAccessCandidatesAction: (input: unknown) =>
     mocks.loadClerkAccessCandidatesAction(input),
 }));
-
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const xeroTenantId = "00000000-0000-4000-8000-000000000002";
+const connectionId = "00000000-0000-4000-8000-000000000002";
 const personId = "00000000-0000-4000-8000-000000000003";
 const teamId = "00000000-0000-4000-8000-000000000004";
 const JANE_DOE_PATTERN = /Jane Doe/;
-
 const defaultFilters: PeopleFilterInput = PeopleFilterSchema.parse({});
-
 const samplePerson: PersonListItem = {
   archivedAt: null,
   avatarUrl: null,
@@ -92,21 +86,19 @@ const samplePerson: PersonListItem = {
   xeroLinked: true,
   xeroSyncFailedCount: 0,
 };
-
 describe("PeopleClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   afterEach(() => {
     cleanup();
   });
-
   describe("notification subscription", () => {
     it("refreshes once on relevant sync run status changed event for this organisation", async () => {
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -116,31 +108,26 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       const listener = mocks.subscribe.mock.calls[0]?.[0];
       expect(listener).toBeDefined();
-
       if (!listener) {
         throw new Error(
           "Expected notification event listener to be registered"
         );
       }
-
       listener({
         payload: { organisationId },
         type: "sync.run_status_changed",
       });
-
       await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
     });
-
     it("ignores sync events for different organisations", () => {
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -150,29 +137,25 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       const listener = mocks.subscribe.mock.calls[0]?.[0];
       if (!listener) {
         throw new Error(
           "Expected notification event listener to be registered"
         );
       }
-
       listener({
         payload: { organisationId: "other-org-id" },
         type: "sync.run_status_changed",
       });
-
       expect(mocks.refresh).not.toHaveBeenCalled();
     });
-
     it("ignores unrelated event types for the same organisation", () => {
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -182,26 +165,21 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       const listener = mocks.subscribe.mock.calls[0]?.[0];
       if (!listener) {
         throw new Error(
           "Expected notification event listener to be registered"
         );
       }
-
       listener({
         payload: { organisationId },
         type: "leave.requested",
       });
-
       expect(mocks.refresh).not.toHaveBeenCalled();
     });
   });
-
   describe("manual sync action feedback", () => {
     it("displays success status and refreshes when sync completes successfully with record counts", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
@@ -215,10 +193,10 @@ describe("PeopleClient", () => {
           upserted: 5,
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -228,28 +206,23 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       const syncButton = screen.getByRole("button", { name: "Sync from Xero" });
       fireEvent.click(syncButton);
-
       await waitFor(() => {
         expect(mocks.dispatchManualSyncAction).toHaveBeenCalledWith({
+          connectionId,
           organisationId,
           runType: "people",
-          xeroTenantId,
         });
       });
-
       const banner = await screen.findByRole("status");
       expect(banner.textContent).toBe(
         "Sync succeeded — 5 fetched, 5 upserted."
       );
       expect(mocks.refresh).toHaveBeenCalledTimes(1);
     });
-
     it("displays error alert and refreshes when sync completes with partial failures", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
         ok: true,
@@ -262,10 +235,10 @@ describe("PeopleClient", () => {
           upserted: 3,
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -275,20 +248,16 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       const syncButton = screen.getByRole("button", { name: "Sync from Xero" });
       fireEvent.click(syncButton);
-
       const alert = await screen.findByRole("alert");
       expect(alert.textContent).toBe(
         "Sync partial_success — 5 fetched, 3 upserted, 2 failed."
       );
       expect(mocks.refresh).toHaveBeenCalledTimes(1);
     });
-
     it("displays region stub error summary message when present", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
         ok: true,
@@ -299,10 +268,10 @@ describe("PeopleClient", () => {
           status: "succeeded",
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -312,19 +281,15 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       fireEvent.click(screen.getByRole("button", { name: "Sync from Xero" }));
-
       const banner = await screen.findByRole("status");
       expect(banner.textContent).toBe(
         "NZ payroll employee reads are not yet available."
       );
       expect(mocks.refresh).toHaveBeenCalledTimes(1);
     });
-
     it("displays generic queued confirmation when no counts or errorSummary are returned", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
         ok: true,
@@ -333,10 +298,10 @@ describe("PeopleClient", () => {
           queued: true,
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -346,17 +311,13 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       fireEvent.click(screen.getByRole("button", { name: "Sync from Xero" }));
-
       const banner = await screen.findByRole("status");
       expect(banner.textContent).toBe("Sync queued.");
       expect(mocks.refresh).toHaveBeenCalledTimes(1);
     });
-
     it("displays specific error alerts when sync is not queued", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
         ok: true,
@@ -366,10 +327,10 @@ describe("PeopleClient", () => {
           reason: "tenant_sync_paused",
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -379,19 +340,15 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       fireEvent.click(screen.getByRole("button", { name: "Sync from Xero" }));
-
       const alert = await screen.findByRole("alert");
       expect(alert.textContent).toBe(
         "Resume Xero syncing before running this sync."
       );
       expect(mocks.refresh).not.toHaveBeenCalled();
     });
-
     it("displays error alert when action returns an error result", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
         error: {
@@ -400,10 +357,10 @@ describe("PeopleClient", () => {
         },
         ok: false,
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -413,27 +370,23 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       fireEvent.click(screen.getByRole("button", { name: "Sync from Xero" }));
-
       const alert = await screen.findByRole("alert");
       expect(alert.textContent).toBe(
         "Only admins and owners can manage sync health."
       );
       expect(mocks.refresh).not.toHaveBeenCalled();
     });
-
     it("displays error alert when action throws an exception", async () => {
       mocks.dispatchManualSyncAction.mockRejectedValueOnce(
         new Error("Network connection dropped")
       );
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -443,17 +396,13 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       fireEvent.click(screen.getByRole("button", { name: "Sync from Xero" }));
-
       const alert = await screen.findByRole("alert");
       expect(alert.textContent).toBe("Network connection dropped");
       expect(mocks.refresh).not.toHaveBeenCalled();
     });
-
     it("allows sync from empty state when no people exist", async () => {
       mocks.dispatchManualSyncAction.mockResolvedValueOnce({
         ok: true,
@@ -466,10 +415,10 @@ describe("PeopleClient", () => {
           upserted: 1,
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -479,10 +428,8 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={0}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       expect(screen.getByText("No people yet")).toBeDefined();
       const syncButtons = screen.getAllByRole("button", {
         name: "Sync from Xero",
@@ -492,17 +439,15 @@ describe("PeopleClient", () => {
         throw new Error("Expected at least one sync button");
       }
       fireEvent.click(firstButton);
-
       await waitFor(() => {
         expect(mocks.dispatchManualSyncAction).toHaveBeenCalledWith({
+          connectionId,
           organisationId,
           runType: "people",
-          xeroTenantId,
         });
       });
     });
   });
-
   describe("clerk access reconciliation modal", () => {
     it("opens dialog, loads candidate review, and sends invitations upon confirmation", async () => {
       mocks.loadClerkAccessCandidatesAction.mockResolvedValue({
@@ -553,7 +498,6 @@ describe("PeopleClient", () => {
           memberCount: 1,
         },
       });
-
       mocks.inviteClerkAccessCandidatesAction.mockResolvedValue({
         ok: true,
         value: {
@@ -565,11 +509,11 @@ describe("PeopleClient", () => {
           succeededCount: 1,
         },
       });
-
       render(
         <PeopleClient
           canIncludeArchived={true}
           canManageClerkAccess={true}
+          connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
           nextCursor={null}
@@ -579,50 +523,40 @@ describe("PeopleClient", () => {
           teams={[]}
           totalCount={1}
           xeroConnectionState="connected"
-          xeroTenantId={xeroTenantId}
         />
       );
-
       const reconcileBtn = screen.getByRole("button", {
         name: "Reconcile Clerk access",
       });
       fireEvent.click(reconcileBtn);
-
       await waitFor(() => {
         expect(mocks.loadClerkAccessCandidatesAction).toHaveBeenCalledWith({
           organisationId,
         });
       });
-
       expect(
         await screen.findByRole("heading", { name: "Reconcile Clerk access" })
       ).toBeDefined();
       expect(screen.getByText("Alice Smith")).toBeDefined();
       expect(screen.getByText("Bob Jones")).toBeDefined();
       expect(screen.getByText("duplicate email")).toBeDefined();
-
       const sendBtn = screen.getByRole("button", {
         name: "Send invitations & link",
       });
       fireEvent.click(sendBtn);
-
       await waitFor(() => {
         expect(mocks.inviteClerkAccessCandidatesAction).toHaveBeenCalledWith({
           organisationId,
         });
       });
-
       expect(await screen.findByText("Reconciliation completed")).toBeDefined();
       expect(screen.getByText("1 existing accounts linked")).toBeDefined();
       expect(screen.getByText("1 invitations sent")).toBeDefined();
-
       const doneBtn = screen.getByRole("button", { name: "Done" });
       fireEvent.click(doneBtn);
-
       expect(mocks.refresh).toHaveBeenCalled();
     });
   });
-
   it("keeps search primary and exposes a wrapping mobile profile path", () => {
     const filters = PeopleFilterSchema.parse({
       search: "Jane",
@@ -631,6 +565,7 @@ describe("PeopleClient", () => {
     render(
       <PeopleClient
         canIncludeArchived
+        connectionId={connectionId}
         filters={filters}
         locations={[]}
         nextCursor={null}
@@ -640,10 +575,8 @@ describe("PeopleClient", () => {
         teams={[{ id: teamId, name: "Engineering" }]}
         totalCount={1}
         xeroConnectionState="connected"
-        xeroTenantId={xeroTenantId}
       />
     );
-
     expect(screen.getByDisplayValue("Jane")).toBeDefined();
     expect(screen.getByText("More filters (1 active)")).toBeDefined();
     expect(screen.getByText("Team: Engineering")).toBeDefined();

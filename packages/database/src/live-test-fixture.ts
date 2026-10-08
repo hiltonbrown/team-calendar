@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { isLocalDatabase } from "./is-local-database";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
-
 export const LIVE_FIXTURE_SUITES = {
   "apps/app/app/(authenticated)/people/new/_actions.integration.test.ts": {
     tenants: 1,
@@ -32,96 +31,49 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: { plan_id: 3, plan_key: 3 },
     tenants: 2,
   },
-  "packages/database/xero-campaign.integration.test.ts": {
-    globalKeys: { campaign_domain: 1, provider_app: 1 },
-    tenants: 2,
+  "packages/database/xero-authorisation-locks.integration.test.ts": {
+    tenants: 0,
   },
-  "packages/database/xero-lifecycle-migration.integration.test.ts": {
-    globalKeys: {
-      cleanup_attempt: 12,
-      cleanup_request: 12,
-      credential_owner: 1,
-      oauth_attempt: 1,
-      provider_app: 2,
-      provider_connection: 1,
-      shared_store_namespace: 1,
-      tenant_binding: 1,
-    },
-    tenants: 3,
+  "packages/database/xero-simplification-schema.integration.test.ts": {
+    tenants: 2,
   },
   "packages/database/xero-tenancy.integration.test.ts": { tenants: 2 },
   "packages/feeds/index.integration.test.ts": { tenants: 3 },
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts":
-    { globalKeys: { campaign_domain: 1 }, tenants: 2 },
-  "packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts": {
-    globalKeys: {
-      campaign_domain: 1,
-      cleanup_attempt: 12,
-      cleanup_request: 12,
-      credential_owner: 2,
-      provider_app: 2,
-      provider_connection: 12,
-      tenant_binding: 1,
-    },
-    tenants: 2,
-  },
+    { globalKeys: {}, tenants: 2 },
   "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts": {
-    globalKeys: { campaign_domain: 1 },
+    globalKeys: {},
     tenants: 2,
   },
   "packages/jobs/src/handlers/sync-xero-leave-balances.integration.test.ts": {
-    globalKeys: { campaign_domain: 1 },
+    globalKeys: {},
     tenants: 4,
   },
   "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts": {
-    globalKeys: { campaign_domain: 1 },
+    globalKeys: {},
     tenants: 2,
   },
   "packages/jobs/src/handlers/sync-xero-people.integration.test.ts": {
-    globalKeys: { campaign_domain: 1 },
-    tenants: 2,
-  },
-  "packages/xero/src/oauth/connection-cleanup.integration.test.ts": {
-    globalKeys: {
-      campaign_domain: 1,
-      cleanup_attempt: 12,
-      cleanup_request: 12,
-      credential_owner: 2,
-      provider_app: 2,
-      provider_connection: 12,
-      tenant_binding: 1,
-    },
-    tenants: 2,
-  },
-  "packages/xero/src/oauth/credential-owner.integration.test.ts": {
-    globalKeys: {
-      campaign_domain: 1,
-      credential_owner: 1,
-      oauth_attempt: 1,
-      provider_app: 1,
-    },
+    globalKeys: {},
     tenants: 2,
   },
   "packages/xero/src/oauth/disconnect.integration.test.ts": {
-    globalKeys: { campaign_domain: 1, cleanup_attempt: 4, cleanup_request: 4 },
+    globalKeys: {},
     tenants: 2,
   },
-  "packages/xero/src/oauth/inactivity-report.integration.test.ts": {
-    globalKeys: { campaign_domain: 1, provider_app: 1 },
+  "packages/xero/src/oauth/provider-connection.integration.test.ts": {
     tenants: 2,
   },
   "packages/xero/src/oauth/service.integration.test.ts": {
-    globalKeys: { campaign_domain: 1, provider_app: 1 },
+    globalKeys: { authorisation: 1, provider_app: 1 },
     tenants: 2,
   },
   "packages/xero/src/rate-limit/shared-store.integration.test.ts": {
-    globalKeys: { campaign_domain: 1, shared_store_namespace: 1 },
+    globalKeys: { shared_store_namespace: 1 },
     tenants: 2,
   },
 } as const;
-
 export type LiveFixtureSuite = keyof typeof LIVE_FIXTURE_SUITES;
-
 const manifestSchema = z.object({
   active: z.literal(true),
   durableManifestConfirmed: z.literal(true),
@@ -134,27 +86,17 @@ const manifestSchema = z.object({
   runId: z.string().uuid(),
   version: z.literal(1),
 });
-
 export const LIVE_FIXTURE_GLOBAL_KEY_KINDS = [
   "plan_id",
   "plan_key",
   "stripe_event",
-  "credential_owner",
+  "authorisation",
   "provider_app",
-  "provider_connection",
-  "tenant_binding",
-  "oauth_attempt",
-  "cleanup_request",
-  "cleanup_attempt",
   "shared_store_namespace",
-  "campaign_domain",
 ] as const;
-
 export type GlobalKeyKind = (typeof LIVE_FIXTURE_GLOBAL_KEY_KINDS)[number];
-
 const globalKeyHasKind = (key: string, kind: GlobalKeyKind): boolean =>
   key.startsWith(`${kind}:`);
-
 export const selectOwnedGlobalKeyValues = (input: {
   candidates: readonly string[];
   kind: GlobalKeyKind;
@@ -167,22 +109,21 @@ export const selectOwnedGlobalKeyValues = (input: {
   );
   return input.candidates.filter((value) => ownedValues.has(value));
 };
-
 const suiteEntries = Object.entries(LIVE_FIXTURE_SUITES) as [
   LiveFixtureSuite,
-  { globalKeys?: Partial<Record<GlobalKeyKind, number>>; tenants: number },
+  {
+    globalKeys?: Partial<Record<GlobalKeyKind, number>>;
+    tenants: number;
+  },
 ][];
-
 export const REQUIRED_LIVE_FIXTURE_TENANT_SLOTS = suiteEntries.reduce(
   (total, [, allocation]) => total + allocation.tenants,
   0
 );
-
 export interface LiveFixtureTenant {
   clerkOrgId: string;
   organisationId: string;
 }
-
 export interface LiveTestFixture {
   globalKey: (kind: GlobalKeyKind, index?: number) => string;
   id: (kind: string, index?: number) => string;
@@ -191,12 +132,10 @@ export interface LiveTestFixture {
   suite: LiveFixtureSuite;
   tenants: readonly LiveFixtureTenant[];
 }
-
 const uuidFrom = (value: string): string => {
   const hex = createHash("sha256").update(value).digest("hex").slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
 };
-
 const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
   const suiteIndex = suiteEntries.findIndex(([name]) => name === suite);
   if (suiteIndex < 0) {
@@ -214,7 +153,6 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
     clerkOrgId: `org_test_local_${String(offset + index + 1).padStart(3, "0")}`,
     organisationId: uuidFrom(`local-tenant:${offset + index + 1}`),
   }));
-
   const globalOffset = (kind: GlobalKeyKind) =>
     suiteEntries
       .slice(0, suiteIndex)
@@ -222,7 +160,6 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
         (total, [, allocation]) => total + (allocation.globalKeys?.[kind] ?? 0),
         0
       );
-
   return {
     globalKey: (kind, index = 0) => {
       const suiteCount = suiteAllocation.globalKeys?.[kind] ?? 0;
@@ -230,16 +167,7 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
         throw new Error(`Suite does not own global key ${kind}:${index}`);
       }
       const slot = globalOffset(kind) + index + 1;
-      if (
-        kind === "plan_id" ||
-        kind === "credential_owner" ||
-        kind === "provider_connection" ||
-        kind === "tenant_binding" ||
-        kind === "oauth_attempt" ||
-        kind === "cleanup_request" ||
-        kind === "cleanup_attempt" ||
-        kind === "campaign_domain"
-      ) {
+      if (kind === "plan_id" || kind === "authorisation") {
         return uuidFrom(`local-${kind}:${slot}`);
       }
       if (kind === "plan_key") {
@@ -264,7 +192,6 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
     tenants,
   };
 };
-
 export const allocateLiveTestFixture = (
   suite: LiveFixtureSuite
 ): LiveTestFixture => {

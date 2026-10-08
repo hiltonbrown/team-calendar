@@ -20,13 +20,12 @@ const mocks = vi.hoisted(() => ({
   syncRunUpdateMany: vi.fn(),
   toPlainLanguageMessage: vi.fn(() => "Xero request failed"),
   toValidatedLeaveBalanceRawPayload: vi.fn((value: unknown) => value ?? null),
+  xeroConnectionFindFirst: vi.fn(),
+  xeroConnectionUpdateMany: vi.fn(),
   xeroSyncCursorCreate: vi.fn(),
   xeroSyncCursorFindFirst: vi.fn(),
   xeroSyncCursorUpdateMany: vi.fn(),
-  xeroTenantFindFirst: vi.fn(),
-  xeroTenantUpdateMany: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
@@ -47,14 +46,14 @@ vi.mock("@repo/database", () => ({
       findFirst: mocks.syncRunFindFirst,
       updateMany: mocks.syncRunUpdateMany,
     },
+    xeroConnection: {
+      findFirst: mocks.xeroConnectionFindFirst,
+      updateMany: mocks.xeroConnectionUpdateMany,
+    },
     xeroSyncCursor: {
       create: mocks.xeroSyncCursorCreate,
       findFirst: mocks.xeroSyncCursorFindFirst,
       updateMany: mocks.xeroSyncCursorUpdateMany,
-    },
-    xeroTenant: {
-      findFirst: mocks.xeroTenantFindFirst,
-      updateMany: mocks.xeroTenantUpdateMany,
     },
   },
   scopedTo: mocks.scopedTo,
@@ -81,69 +80,80 @@ vi.mock("@repo/xero", async () => ({
     if (!result?.ok) {
       return result;
     }
-    const tenant = await mocks.xeroTenantFindFirst.mock.results.at(-1)?.value;
+    const tenant =
+      await mocks.xeroConnectionFindFirst.mock.results.at(-1)?.value;
     return {
       ok: true,
       value: {
         ...result.value,
         accessToken: "fake-access",
-        bindingGeneration: scope.expectedBindingGeneration,
         capability: scope.capability,
+        connectionId: tenant.id,
         deadline: scope.deadline,
         payrollRegion: tenant.payroll_region,
-        tokenVersion: 1,
-        xeroTenantDatabaseId: tenant.id,
-        xeroTenantId: tenant.xero_tenant_id ?? "fake-tenant",
+        providerTenantId: tenant.xero_tenant_id ?? "fake-tenant",
       },
     };
   },
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
-  toResolvedXeroTenant: (scope, value) => ({
+  toResolvedXeroConnection: (scope, value) => ({
     ...value,
     clerk_org_id: scope.clerkOrgId,
-    id: value.xeroTenantDatabaseId,
+    id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
-    xero_tenant_id: value.xeroTenantId,
+    xero_tenant_id: value.providerTenantId,
   }),
   toValidatedLeaveBalanceRawPayload: mocks.toValidatedLeaveBalanceRawPayload,
 }));
-
 const { syncXeroLeaveBalances } = await import("./sync-xero-leave-balances");
-
 const CLERK_ORG_ID = "org_balances_lifecycle";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
-const XERO_TENANT_ID = "20000000-0000-4000-8000-000000000001";
-
+const XERO_CONNECTION_ID = "20000000-0000-4000-8000-000000000001";
+let connectionFixture: Record<string, unknown> = {};
+function mockConnection(overrides: Record<string, unknown>) {
+  connectionFixture = { ...connectionFixture, ...overrides };
+  mocks.xeroConnectionFindFirst.mockResolvedValue(connectionFixture);
+}
+function expectRosterUnchanged() {
+  expect(
+    mocks.xeroConnectionUpdateMany.mock.calls.filter(([call]) =>
+      Object.hasOwn(call.data, "balance_next_person_id")
+    )
+  ).toEqual([]);
+}
 function input() {
   return {
-    bindingGeneration: 1,
     clerkOrgId: CLERK_ORG_ID,
+    connectionId: XERO_CONNECTION_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
-    xeroTenantId: XERO_TENANT_ID,
   };
 }
-
 describe("leave balances sync run lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectionFixture = { balance_next_person_id: null };
     Object.assign(database, {
       $executeRaw: vi.fn(async () => 1),
       $queryRaw: vi.fn(async () => []),
       $transaction: vi.fn(async (callback) => callback(database)),
     });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
-    mocks.syncRunFindFirst.mockResolvedValue(null);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "running" }
+          : null
+      )
+    );
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.xeroTenantUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mocks.xeroConnectionUpdateMany.mockResolvedValue({ count: 1 });
+    mockConnection({
+      id: XERO_CONNECTION_ID,
       payroll_region: "AU",
       sync_paused_at: null,
-      xero_connection: {},
-      xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
     mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
@@ -165,10 +175,8 @@ describe("leave balances sync run lifecycle", () => {
       value: { failures: [], leaveBalances: [], rawResponses: [] },
     });
   });
-
   it("bases the duplicate-run guard on the heartbeat, not started_at", async () => {
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     expect(mocks.syncRunFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -178,14 +186,13 @@ describe("leave balances sync run lifecycle", () => {
           run_type: "leave_balances",
           status: "running",
           updated_at: { gte: expect.any(Date) },
-          xero_tenant_id: XERO_TENANT_ID,
+          xero_connection_id: XERO_CONNECTION_ID,
         }),
       })
     );
     const [guardCall] = mocks.syncRunFindFirst.mock.calls;
     expect(guardCall?.[0]?.where).not.toHaveProperty("started_at");
   });
-
   it("refreshes the run heartbeat while a long fetch is in flight", async () => {
     mocks.fetchLeaveBalancesForRegion.mockImplementation(
       async (_region, fetchInput) => {
@@ -197,9 +204,7 @@ describe("leave balances sync run lifecycle", () => {
         };
       }
     );
-
     await syncXeroLeaveBalances(input());
-
     const heartbeatCall = mocks.syncRunUpdateMany.mock.calls.find(
       ([call]) =>
         call?.where?.status === "running" &&
@@ -209,7 +214,6 @@ describe("leave balances sync run lifecycle", () => {
     );
     expect(heartbeatCall).toBeDefined();
   });
-
   it("upserts the derived record type for fetched balances", async () => {
     const employeeId = "60000000-0000-4000-8000-000000000001";
     mocks.personFindMany.mockResolvedValue([
@@ -236,9 +240,7 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
     expect(mocks.personFindFirst).not.toHaveBeenCalled();
@@ -259,7 +261,6 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("upserts a currency balance with a supported currency code", async () => {
     const employeeId = "60000000-0000-4000-8000-000000000005";
     mocks.personFindMany.mockResolvedValue([
@@ -286,9 +287,7 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("succeeded");
@@ -306,7 +305,6 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("rejects a currency balance without a supported currency code", async () => {
     const employeeId = "60000000-0000-4000-8000-000000000006";
     mocks.personFindMany.mockResolvedValue([
@@ -333,9 +331,7 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("partial_success");
@@ -348,7 +344,6 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("rejects an hours balance that carries a currency code", async () => {
     const employeeId = "60000000-0000-4000-8000-000000000007";
     mocks.personFindMany.mockResolvedValue([
@@ -375,9 +370,7 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("partial_success");
@@ -390,7 +383,6 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("uses the upfront people query for multiple balances", async () => {
     const people = [
       {
@@ -422,15 +414,12 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
     expect(mocks.personFindFirst).not.toHaveBeenCalled();
     expect(mocks.leaveBalanceUpsert).toHaveBeenCalledTimes(3);
   });
-
   it("records person_not_found when a balance has no scoped person", async () => {
     mocks.personFindMany.mockResolvedValue([]);
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
@@ -450,9 +439,7 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances(input());
-
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
     expect(mocks.personFindFirst).not.toHaveBeenCalled();
@@ -466,7 +453,6 @@ describe("leave balances sync run lifecycle", () => {
     );
     expect(mocks.leaveBalanceUpsert).not.toHaveBeenCalled();
   });
-
   it("pages 40 people on the first page and advances cursor and stale_since", async () => {
     // 41 people available (page size 40 + 1 probe)
     const people = Array.from({ length: 41 }, (_, i) => ({
@@ -474,8 +460,6 @@ describe("leave balances sync run lifecycle", () => {
       xero_employee_id: `emp_${i + 1}`,
     }));
     mocks.personFindMany.mockResolvedValue(people);
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
-    mocks.xeroSyncCursorCreate.mockResolvedValue({ id: "cursor_1" });
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
@@ -491,13 +475,10 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     // Queries with take: 41, orderBy: { id: "asc" }
     expect(mocks.personFindMany).toHaveBeenCalledWith(
@@ -519,20 +500,22 @@ describe("leave balances sync run lifecycle", () => {
         employeeIds: people.slice(0, 40).map((p) => p.xero_employee_id),
       })
     );
-    // Cursor created with 40th person's ID
-    expect(mocks.xeroSyncCursorCreate).toHaveBeenCalledWith(
+    // Roster continuation stored with 40th person's ID
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          balance_next_person_id: people[39]?.id,
+        }),
+        where: expect.objectContaining({
+          balance_next_person_id: null,
           clerk_org_id: CLERK_ORG_ID,
-          cursor_value: people[39]?.id,
-          entity_type: "leave_balances",
+          id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
-          xero_tenant_id: XERO_TENANT_ID,
         }),
       })
     );
     // Sets leave_balances_stale_since and updates last_leave_balances_sync_at
-    expect(mocks.xeroTenantUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           last_leave_balances_sync_at: expect.any(Date),
@@ -540,32 +523,27 @@ describe("leave balances sync run lifecycle", () => {
         }),
         where: expect.objectContaining({
           clerk_org_id: CLERK_ORG_ID,
-          id: XERO_TENANT_ID,
+          id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
       })
     );
   });
-
   it("pages a middle page and retains existing stale_since", async () => {
     const cursorPersonId = "50000000-0000-4000-8000-000000000040";
     const staleSince = new Date("2026-08-20T00:00:00Z");
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mockConnection({
+      id: XERO_CONNECTION_ID,
       leave_balances_stale_since: staleSince,
       payroll_region: "AU",
       sync_paused_at: null,
-      xero_connection: {},
-      xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
-    const cursorRecord = {
-      cursor_value: cursorPersonId,
-      id: "cursor_1",
-      updated_at: new Date(),
+    const continuation = {
+      balance_next_person_id: cursorPersonId,
     };
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(cursorRecord);
-    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 1 });
-
+    mockConnection({
+      balance_next_person_id: continuation.balance_next_person_id,
+    });
     const people = Array.from({ length: 41 }, (_, i) => ({
       id: `50000000-0000-4000-8000-${String(i + 41).padStart(12, "0")}`,
       xero_employee_id: `emp_${i + 41}`,
@@ -575,13 +553,10 @@ describe("leave balances sync run lifecycle", () => {
       ok: true,
       value: { failures: [], leaveBalances: [], rawResponses: [] },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     // Queries with id > cursorPersonId
     expect(mocks.personFindMany).toHaveBeenCalledWith(
@@ -594,21 +569,21 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
     // CAS cursor update
-    expect(mocks.xeroSyncCursorUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          cursor_value: people[39]?.id,
+          balance_next_person_id: people[39]?.id,
         }),
         where: expect.objectContaining({
-          cursor_value: cursorPersonId,
-          entity_type: "leave_balances",
-          id: "cursor_1",
-          xero_tenant_id: XERO_TENANT_ID,
+          balance_next_person_id: cursorPersonId,
+          clerk_org_id: CLERK_ORG_ID,
+          id: XERO_CONNECTION_ID,
+          organisation_id: ORGANISATION_ID,
         }),
       })
     );
     // Retains stale_since (does not overwrite)
-    expect(mocks.xeroTenantUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.not.objectContaining({
           leave_balances_stale_since: null,
@@ -616,17 +591,84 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
+  it("does not commit roster progress after its run has been superseded", async () => {
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "failed" }
+          : null
+      )
+    );
+    const result = await syncXeroLeaveBalances(input());
+    expect(result.ok && result.value.status).toBe("cancelled");
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.some(([call]) =>
+        Object.hasOwn(call.data, "balance_next_person_id")
+      )
+    ).toBe(false);
+  });
+  it("cannot clear a newer failed sweep after its final-page cursor commit", async () => {
+    mockConnection({
+      balance_next_person_id: "50000000-0000-4000-8000-000000000040",
+      balance_sweep_failed: false,
+      leave_balances_stale_since: new Date("2026-10-06T00:00:00Z"),
+    });
+    mocks.personFindMany.mockResolvedValue([]);
+    const newerFailure = new Date("2026-10-07T12:01:00Z");
+    let persistedStaleness: Date | null = null;
+    mocks.xeroConnectionUpdateMany.mockImplementation((call) => {
+      if (Object.hasOwn(call.data, "leave_balances_stale_since")) {
+        persistedStaleness = call.data.leave_balances_stale_since;
+      }
+      if (Object.hasOwn(call.data, "balance_next_person_id")) {
+        // Interpose the next sweep immediately after this page's atomic commit.
+        persistedStaleness = newerFailure;
+        mockConnection({
+          balance_next_person_id: "50000000-0000-4000-8000-000000000080",
+          balance_sweep_failed: true,
+          leave_balances_stale_since: newerFailure,
+        });
+      }
+      return Promise.resolve({ count: 1 });
+    });
+    await syncXeroLeaveBalances(input());
+    expect(persistedStaleness).toEqual(newerFailure);
+  });
+  it("keeps whole-roster staleness after a failed earlier page and a clean final page", async () => {
+    mockConnection({
+      balance_next_person_id: "50000000-0000-4000-8000-000000000040",
+      balance_sweep_failed: true,
+      leave_balances_stale_since: new Date("2026-10-06T00:00:00Z"),
+    });
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: { failures: [], leaveBalances: [], rawResponses: [] },
+    });
+    await syncXeroLeaveBalances(input());
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.some(
+        ([call]) => call.data.leave_balances_stale_since === null
+      )
+    ).toBe(false);
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          balance_next_person_id: null,
+          balance_sweep_failed: true,
+        }),
+      })
+    );
+  });
   it("completes cycle on final page, clearing cursor and stale_since", async () => {
     const cursorPersonId = "50000000-0000-4000-8000-000000000080";
-    const cursorRecord = {
-      cursor_value: cursorPersonId,
-      id: "cursor_1",
-      updated_at: new Date(),
+    const continuation = {
+      balance_next_person_id: cursorPersonId,
     };
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(cursorRecord);
-    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 1 });
-
+    mockConnection({
+      balance_next_person_id: continuation.balance_next_person_id,
+    });
     // Only 15 people follow (less than 40)
     const people = Array.from({ length: 15 }, (_, i) => ({
       id: `50000000-0000-4000-8000-${String(i + 81).padStart(12, "0")}`,
@@ -637,28 +679,25 @@ describe("leave balances sync run lifecycle", () => {
       ok: true,
       value: { failures: [], leaveBalances: [], rawResponses: [] },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     // Cursor cleared to null
-    expect(mocks.xeroSyncCursorUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          cursor_value: null,
-        }),
+        data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
-          cursor_value: cursorPersonId,
-          id: "cursor_1",
+          balance_next_person_id: cursorPersonId,
+          clerk_org_id: CLERK_ORG_ID,
+          id: XERO_CONNECTION_ID,
+          organisation_id: ORGANISATION_ID,
         }),
       })
     );
     // stale_since cleared to null
-    expect(mocks.xeroTenantUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           last_leave_balances_sync_at: expect.any(Date),
@@ -667,41 +706,36 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("handles wraparound / zero people after cursor by clearing cursor and stale_since", async () => {
     const cursorPersonId = "50000000-0000-4000-8000-000000000099";
-    const cursorRecord = {
-      cursor_value: cursorPersonId,
-      id: "cursor_1",
-      updated_at: new Date(),
+    const continuation = {
+      balance_next_person_id: cursorPersonId,
     };
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(cursorRecord);
-    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 1 });
-
+    mockConnection({
+      balance_next_person_id: continuation.balance_next_person_id,
+    });
     mocks.personFindMany.mockResolvedValue([]);
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: { failures: [], leaveBalances: [], rawResponses: [] },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
-    expect(mocks.xeroSyncCursorUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          cursor_value: null,
-        }),
+        data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
-          cursor_value: cursorPersonId,
+          balance_next_person_id: cursorPersonId,
+          clerk_org_id: CLERK_ORG_ID,
+          id: XERO_CONNECTION_ID,
+          organisation_id: ORGANISATION_ID,
         }),
       })
     );
-    expect(mocks.xeroTenantUpdateMany).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           leave_balances_stale_since: null,
@@ -709,17 +743,17 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("cancels the run when cursor compare-and-swap update loses a race", async () => {
-    const cursorRecord = {
-      cursor_value: "50000000-0000-4000-8000-000000000040",
-      id: "cursor_1",
-      updated_at: new Date(),
+    const continuation = {
+      balance_next_person_id: "50000000-0000-4000-8000-000000000040",
     };
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(cursorRecord);
+    mockConnection({
+      balance_next_person_id: continuation.balance_next_person_id,
+    });
     // updateMany returns count: 0 simulating CAS loss
-    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 0 });
-
+    mocks.xeroConnectionUpdateMany.mockImplementation(async ({ data }) => ({
+      count: Object.hasOwn(data, "balance_next_person_id") ? 0 : 1,
+    }));
     const people = Array.from({ length: 41 }, (_, i) => ({
       id: `50000000-0000-4000-8000-${String(i + 41).padStart(12, "0")}`,
       xero_employee_id: `emp_${i + 41}`,
@@ -729,13 +763,10 @@ describe("leave balances sync run lifecycle", () => {
       ok: true,
       value: { failures: [], leaveBalances: [], rawResponses: [] },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("cancelled");
@@ -752,14 +783,13 @@ describe("leave balances sync run lifecycle", () => {
       })
     );
   });
-
   it("does not advance cursor after a blanket failure", async () => {
-    const cursorRecord = {
-      cursor_value: null,
-      id: "cursor_1",
-      updated_at: new Date(),
+    const continuation = {
+      balance_next_person_id: null,
     };
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(cursorRecord);
+    mockConnection({
+      balance_next_person_id: continuation.balance_next_person_id,
+    });
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       error: {
         code: "rate_limit_error",
@@ -769,21 +799,18 @@ describe("leave balances sync run lifecycle", () => {
       },
       ok: false,
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
     }
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
+    expectRosterUnchanged();
   });
-
   it("fails and retries a per-employee operational incident without advancing canonical progress", async () => {
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
@@ -818,7 +845,8 @@ describe("leave balances sync run lifecycle", () => {
     );
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
-    expect(mocks.xeroTenantUpdateMany).not.toHaveBeenCalledWith(
+    expectRosterUnchanged();
+    expect(mocks.xeroConnectionUpdateMany).not.toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           last_leave_balances_sync_at: expect.any(Date),
@@ -827,15 +855,12 @@ describe("leave balances sync run lifecycle", () => {
     );
     expect(mocks.leaveBalanceUpsert).not.toHaveBeenCalled();
   });
-
   it("advances cursor after recorded employee-specific failures", async () => {
     const people = Array.from({ length: 41 }, (_, i) => ({
       id: `50000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
       xero_employee_id: `emp_${i + 1}`,
     }));
     mocks.personFindMany.mockResolvedValue(people);
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
-    mocks.xeroSyncCursorCreate.mockResolvedValue({ id: "cursor_1" });
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
@@ -849,13 +874,10 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("partial_success");
@@ -863,9 +885,74 @@ describe("leave balances sync run lifecycle", () => {
     }
     // Failed record is recorded before advancing cursor
     expect(mocks.failedRecordCreate).toHaveBeenCalled();
-    expect(mocks.xeroSyncCursorCreate).toHaveBeenCalled();
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.filter(([call]) =>
+        Object.hasOwn(call.data, "balance_next_person_id")
+      )
+    ).toHaveLength(1);
   });
-
+  it("isolates malformed employee responses while persisting healthy balances", async () => {
+    const people = Array.from({ length: 41 }, (_, index) => ({
+      id: `50000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      xero_employee_id: `60000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    }));
+    mocks.personFindMany.mockResolvedValue(people);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [
+          {
+            employeeId: people[0].xero_employee_id,
+            error: {
+              code: "validation_error",
+              message: "Xero returned invalid AU payroll leave balances.",
+              rawPayload: { Employees: [{ LeaveBalances: "malformed" }] },
+            },
+          },
+        ],
+        leaveBalances: [
+          {
+            balance: 12.5,
+            currencyCode: null,
+            employeeId: people[1].xero_employee_id,
+            leaveTypeId: "annual-leave",
+            leaveTypeName: "Annual Leave",
+            rawPayload: { LeaveType: "Annual Leave" },
+            unitType: "hours",
+          },
+        ],
+        rawResponses: [],
+      },
+    });
+    const result = await syncXeroLeaveBalances(input());
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        failed: 1,
+        hasMore: true,
+        status: "partial_success",
+        upserted: 1,
+      },
+    });
+    expect(mocks.leaveBalanceUpsert).toHaveBeenCalledTimes(1);
+    expect(mocks.failedRecordCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error_code: "validation_error",
+          source_id: people[0].xero_employee_id,
+        }),
+      })
+    );
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          balance_next_person_id: people[39].id,
+          balance_sweep_failed: true,
+          leave_balances_stale_since: expect.any(Date),
+        }),
+      })
+    );
+  });
   it("targeted person refresh bypasses shared cursor and does not alter tenant cycle timestamps", async () => {
     const personId = "50000000-0000-4000-8000-000000000099";
     const employeeId = "60000000-0000-4000-8000-000000000099";
@@ -890,38 +977,30 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       personId,
       triggerType: "manual",
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.xeroSyncCursorFindFirst).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
-    expect(mocks.xeroTenantUpdateMany).not.toHaveBeenCalled();
+    expectRosterUnchanged();
+    expect(mocks.xeroConnectionUpdateMany).not.toHaveBeenCalled();
     expect(mocks.leaveBalanceUpsert).toHaveBeenCalled();
   });
-
   it("syncs NZ balance page with 40 people, NZD currency balances, and advances cursor", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mockConnection({
+      id: XERO_CONNECTION_ID,
       payroll_region: "NZ",
       sync_paused_at: null,
-      xero_connection: {},
-      xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
-
     const people = Array.from({ length: 41 }, (_, i) => ({
       id: `50000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
       xero_employee_id: `60000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     }));
     mocks.personFindMany.mockResolvedValue(people);
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
-    mocks.xeroSyncCursorCreate.mockResolvedValue({ id: "cursor_nz_1" });
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
@@ -949,13 +1028,10 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("succeeded");
@@ -968,33 +1044,31 @@ describe("leave balances sync run lifecycle", () => {
         employeeIds: people.slice(0, 40).map((p) => p.xero_employee_id),
       })
     );
-    expect(mocks.xeroSyncCursorCreate).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          cursor_value: people[39]?.id,
-          entity_type: "leave_balances",
-          xero_tenant_id: XERO_TENANT_ID,
+          balance_next_person_id: people[39]?.id,
+        }),
+        where: expect.objectContaining({
+          balance_next_person_id: null,
+          clerk_org_id: CLERK_ORG_ID,
+          id: XERO_CONNECTION_ID,
+          organisation_id: ORGANISATION_ID,
         }),
       })
     );
   });
-
   it("syncs UK balance page with 40 people, hour and day units, null currency code, and advances cursor", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mockConnection({
+      id: XERO_CONNECTION_ID,
       payroll_region: "UK",
       sync_paused_at: null,
-      xero_connection: {},
-      xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
-
     const people = Array.from({ length: 41 }, (_, i) => ({
       id: `50000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
       xero_employee_id: `60000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     }));
     mocks.personFindMany.mockResolvedValue(people);
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
-    mocks.xeroSyncCursorCreate.mockResolvedValue({ id: "cursor_uk_1" });
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
@@ -1022,13 +1096,10 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("succeeded");
@@ -1041,24 +1112,25 @@ describe("leave balances sync run lifecycle", () => {
         employeeIds: people.slice(0, 40).map((p) => p.xero_employee_id),
       })
     );
-    expect(mocks.xeroSyncCursorCreate).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          cursor_value: people[39]?.id,
-          entity_type: "leave_balances",
-          xero_tenant_id: XERO_TENANT_ID,
+          balance_next_person_id: people[39]?.id,
+        }),
+        where: expect.objectContaining({
+          balance_next_person_id: null,
+          clerk_org_id: CLERK_ORG_ID,
+          id: XERO_CONNECTION_ID,
+          organisation_id: ORGANISATION_ID,
         }),
       })
     );
   });
-
   it("does not advance cursor after a blanket 403 permission error for regional tenant", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mockConnection({
+      id: XERO_CONNECTION_ID,
       payroll_region: "UK",
       sync_paused_at: null,
-      xero_connection: {},
-      xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
     mocks.personFindMany.mockResolvedValue([
       { id: "50000000-0000-4000-8000-000000000001", xero_employee_id: "emp_1" },
@@ -1072,28 +1144,23 @@ describe("leave balances sync run lifecycle", () => {
       },
       ok: false,
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("failed");
     }
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
+    expectRosterUnchanged();
   });
-
   it("does not advance cursor after a blanket network error", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mockConnection({
+      id: XERO_CONNECTION_ID,
       payroll_region: "NZ",
       sync_paused_at: null,
-      xero_connection: {},
-      xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
     mocks.personFindMany.mockResolvedValue([
       { id: "50000000-0000-4000-8000-000000000001", xero_employee_id: "emp_1" },
@@ -1106,29 +1173,24 @@ describe("leave balances sync run lifecycle", () => {
       },
       ok: false,
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
     }
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
+    expectRosterUnchanged();
   });
-
   it("advances cursor once for an employee who has multiple balance records", async () => {
     const employeeId = "60000000-0000-4000-8000-000000000001";
     const personId = "50000000-0000-4000-8000-000000000001";
     mocks.personFindMany.mockResolvedValue([
       { id: personId, xero_employee_id: employeeId },
     ]);
-    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
-    mocks.xeroSyncCursorCreate.mockResolvedValue({ id: "cursor_1" });
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
@@ -1165,13 +1227,10 @@ describe("leave balances sync run lifecycle", () => {
         rawResponses: [],
       },
     });
-
     const result = await syncXeroLeaveBalances({
-      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("succeeded");
@@ -1180,36 +1239,16 @@ describe("leave balances sync run lifecycle", () => {
     }
     expect(mocks.leaveBalanceUpsert).toHaveBeenCalledTimes(3);
     // Even with 3 balances for 1 person on a 1-person final page, cursor is updated to null (isLastPage)
-    expect(mocks.xeroSyncCursorCreate).toHaveBeenCalledWith(
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          cursor_value: null,
-          entity_type: "leave_balances",
+        data: expect.objectContaining({ balance_next_person_id: null }),
+        where: expect.objectContaining({
+          balance_next_person_id: null,
+          clerk_org_id: CLERK_ORG_ID,
+          id: XERO_CONNECTION_ID,
+          organisation_id: ORGANISATION_ID,
         }),
       })
     );
   });
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

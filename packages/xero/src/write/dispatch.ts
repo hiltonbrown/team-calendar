@@ -1,3 +1,4 @@
+import type { XeroMutationIdentity } from "@repo/core";
 import { executeWithXeroAuthRecovery } from "../adapter/auth-recovery";
 import {
   approveLeaveApplication as approveAuLeaveApplication,
@@ -25,17 +26,31 @@ import type {
   WithdrawLeaveApplicationInput,
   XeroWriteResult,
 } from "./types";
-
 export async function submitLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: SubmitLeaveApplicationInput
 ): Promise<
-  XeroWriteResult<{ rawResponse: unknown; xeroLeaveApplicationId: string }>
+  XeroWriteResult<{
+    rawResponse: unknown;
+    xeroLeaveApplicationId: string;
+  }>
 > {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    frozenInput.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await submitAuLeaveApplication(nextInput);
@@ -50,15 +65,30 @@ export async function submitLeaveApplicationForRegion(
     true
   );
 }
-
 export async function approveLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: ApproveLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    frozenInput.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await approveAuLeaveApplication(nextInput);
@@ -73,15 +103,30 @@ export async function approveLeaveApplicationForRegion(
     true
   );
 }
-
 export async function declineLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: DeclineLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    frozenInput.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await declineAuLeaveApplication(nextInput);
@@ -96,15 +141,30 @@ export async function declineLeaveApplicationForRegion(
     true
   );
 }
-
 export async function withdrawLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: WithdrawLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    frozenInput.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await withdrawAuLeaveApplication(nextInput);
@@ -119,7 +179,6 @@ export async function withdrawLeaveApplicationForRegion(
     true
   );
 }
-
 function unsupportedRegion(): XeroWriteResult<never> {
   return {
     error: {
@@ -128,4 +187,17 @@ function unsupportedRegion(): XeroWriteResult<never> {
     },
     ok: false,
   };
+}
+
+function snapshotMutation(
+  mutation?: XeroMutationIdentity
+): XeroMutationIdentity | undefined {
+  return mutation
+    ? {
+        firstDispatchedAt: new Date(mutation.firstDispatchedAt),
+        idempotencyKey: mutation.idempotencyKey,
+        replayBefore: new Date(mutation.replayBefore),
+        request: { ...mutation.request },
+      }
+    : undefined;
 }

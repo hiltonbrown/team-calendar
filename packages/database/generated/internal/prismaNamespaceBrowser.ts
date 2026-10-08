@@ -57,11 +57,8 @@ export const ModelName = {
   Location: 'Location',
   Person: 'Person',
   AlternativeContact: 'AlternativeContact',
+  XeroAuthorisation: 'XeroAuthorisation',
   XeroConnection: 'XeroConnection',
-  XeroCredentialOwner: 'XeroCredentialOwner',
-  XeroRefreshAttempt: 'XeroRefreshAttempt',
-  XeroProviderConnection: 'XeroProviderConnection',
-  XeroTenant: 'XeroTenant',
   XeroOAuthSession: 'XeroOAuthSession',
   XeroSyncCursor: 'XeroSyncCursor',
   AvailabilityRecord: 'AvailabilityRecord',
@@ -86,10 +83,7 @@ export const ModelName = {
   PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
   UsageCounter: 'UsageCounter',
-  StripeEvent: 'StripeEvent',
-  XeroCleanupRequest: 'XeroCleanupRequest',
-  XeroCleanupAttempt: 'XeroCleanupAttempt',
-  XeroInactivityClassification: 'XeroInactivityClassification'
+  StripeEvent: 'StripeEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -201,7 +195,6 @@ export const PersonScalarFieldEnum = {
   default_privacy_mode: 'default_privacy_mode',
   include_in_feeds_by_default: 'include_in_feeds_by_default',
   archived_at: 'archived_at',
-  xero_missing_since: 'xero_missing_since',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -227,120 +220,50 @@ export const AlternativeContactScalarFieldEnum = {
 export type AlternativeContactScalarFieldEnum = (typeof AlternativeContactScalarFieldEnum)[keyof typeof AlternativeContactScalarFieldEnum]
 
 
+export const XeroAuthorisationScalarFieldEnum = {
+  id: 'id',
+  provider_app_id: 'provider_app_id',
+  xero_user_id: 'xero_user_id',
+  access_token_encrypted: 'access_token_encrypted',
+  access_token_iv: 'access_token_iv',
+  access_token_auth_tag: 'access_token_auth_tag',
+  refresh_token_encrypted: 'refresh_token_encrypted',
+  refresh_token_iv: 'refresh_token_iv',
+  refresh_token_auth_tag: 'refresh_token_auth_tag',
+  token_key_version: 'token_key_version',
+  token_encrypted_at: 'token_encrypted_at',
+  access_token_expires_at: 'access_token_expires_at',
+  granted_scopes: 'granted_scopes',
+  status: 'status',
+  last_refreshed_at: 'last_refreshed_at',
+  last_refresh_error_code: 'last_refresh_error_code',
+  last_refresh_error_at: 'last_refresh_error_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroAuthorisationScalarFieldEnum = (typeof XeroAuthorisationScalarFieldEnum)[keyof typeof XeroAuthorisationScalarFieldEnum]
+
+
 export const XeroConnectionScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
+  xero_authorisation_id: 'xero_authorisation_id',
+  xero_tenant_id: 'xero_tenant_id',
+  remote_connection_id: 'remote_connection_id',
+  tenant_name: 'tenant_name',
+  tenant_type: 'tenant_type',
+  auth_event_id: 'auth_event_id',
+  payroll_region: 'payroll_region',
   status: 'status',
-  access_token_encrypted: 'access_token_encrypted',
-  access_token_iv: 'access_token_iv',
-  access_token_auth_tag: 'access_token_auth_tag',
-  refresh_token_encrypted: 'refresh_token_encrypted',
-  refresh_token_iv: 'refresh_token_iv',
-  refresh_token_auth_tag: 'refresh_token_auth_tag',
-  xero_authorisation_connection_id: 'xero_authorisation_connection_id',
-  token_key_version: 'token_key_version',
-  token_encrypted_at: 'token_encrypted_at',
-  expires_at: 'expires_at',
-  last_refreshed_at: 'last_refreshed_at',
+  sync_paused_at: 'sync_paused_at',
   last_connected_at: 'last_connected_at',
   last_disconnected_at: 'last_disconnected_at',
-  last_error_code: 'last_error_code',
-  last_error_message: 'last_error_message',
-  stale_since: 'stale_since',
-  revoked_at: 'revoked_at',
   disconnected_at: 'disconnected_at',
   disconnected_by_user_id: 'disconnected_by_user_id',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroConnectionScalarFieldEnum = (typeof XeroConnectionScalarFieldEnum)[keyof typeof XeroConnectionScalarFieldEnum]
-
-
-export const XeroCredentialOwnerScalarFieldEnum = {
-  id: 'id',
-  provider_app_id: 'provider_app_id',
-  xero_user_id: 'xero_user_id',
-  identity_evidence: 'identity_evidence',
-  access_token_encrypted: 'access_token_encrypted',
-  access_token_iv: 'access_token_iv',
-  access_token_auth_tag: 'access_token_auth_tag',
-  refresh_token_encrypted: 'refresh_token_encrypted',
-  refresh_token_iv: 'refresh_token_iv',
-  refresh_token_auth_tag: 'refresh_token_auth_tag',
-  token_key_version: 'token_key_version',
-  token_version: 'token_version',
-  last_refresh_attempt_id: 'last_refresh_attempt_id',
-  token_expires_at: 'token_expires_at',
-  granted_scopes: 'granted_scopes',
-  granted_scopes_known: 'granted_scopes_known',
-  usability: 'usability',
-  last_verified_at: 'last_verified_at',
-  last_adopted_at: 'last_adopted_at',
-  last_rotated_at: 'last_rotated_at',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroCredentialOwnerScalarFieldEnum = (typeof XeroCredentialOwnerScalarFieldEnum)[keyof typeof XeroCredentialOwnerScalarFieldEnum]
-
-
-export const XeroRefreshAttemptScalarFieldEnum = {
-  id: 'id',
-  xero_credential_owner_id: 'xero_credential_owner_id',
-  expected_token_version: 'expected_token_version',
-  dispatched_at: 'dispatched_at',
-  uncertain_since: 'uncertain_since',
-  recovery_deadline: 'recovery_deadline',
-  outcome: 'outcome',
-  recovery_token_encrypted: 'recovery_token_encrypted',
-  recovery_token_iv: 'recovery_token_iv',
-  recovery_token_auth_tag: 'recovery_token_auth_tag',
-  recovery_key_version: 'recovery_key_version',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroRefreshAttemptScalarFieldEnum = (typeof XeroRefreshAttemptScalarFieldEnum)[keyof typeof XeroRefreshAttemptScalarFieldEnum]
-
-
-export const XeroProviderConnectionScalarFieldEnum = {
-  id: 'id',
-  provider_app_id: 'provider_app_id',
-  remote_connection_id: 'remote_connection_id',
-  xero_tenant_id: 'xero_tenant_id',
-  tenant_type: 'tenant_type',
-  xero_credential_owner_id: 'xero_credential_owner_id',
-  auth_event_id: 'auth_event_id',
-  provider_created_at: 'provider_created_at',
-  provider_updated_at: 'provider_updated_at',
-  observed_at: 'observed_at',
-  observed_via: 'observed_via',
-  remote_status: 'remote_status',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroProviderConnectionScalarFieldEnum = (typeof XeroProviderConnectionScalarFieldEnum)[keyof typeof XeroProviderConnectionScalarFieldEnum]
-
-
-export const XeroTenantScalarFieldEnum = {
-  id: 'id',
-  clerk_org_id: 'clerk_org_id',
-  organisation_id: 'organisation_id',
-  xero_credential_owner_id: 'xero_credential_owner_id',
-  xero_provider_connection_id: 'xero_provider_connection_id',
-  xero_connection_id: 'xero_connection_id',
-  xero_tenant_id: 'xero_tenant_id',
-  provider_app_id: 'provider_app_id',
-  active_slot: 'active_slot',
-  binding_generation: 'binding_generation',
-  retired_at: 'retired_at',
-  retirement_reason: 'retirement_reason',
-  tenant_name: 'tenant_name',
-  payroll_region: 'payroll_region',
-  sync_paused_at: 'sync_paused_at',
+  last_error_code: 'last_error_code',
+  last_error_message: 'last_error_message',
   last_people_sync_at: 'last_people_sync_at',
   last_leave_records_sync_at: 'last_leave_records_sync_at',
   last_leave_balances_sync_at: 'last_leave_balances_sync_at',
@@ -351,11 +274,19 @@ export const XeroTenantScalarFieldEnum = {
   approval_state_stale_since: 'approval_state_stale_since',
   last_sync_error_code: 'last_sync_error_code',
   last_sync_error_message: 'last_sync_error_message',
+  initial_sync_requested_at: 'initial_sync_requested_at',
+  initial_sync_completed_at: 'initial_sync_completed_at',
+  last_full_people_sync_at: 'last_full_people_sync_at',
+  last_full_leave_records_sync_at: 'last_full_leave_records_sync_at',
+  balance_next_person_id: 'balance_next_person_id',
+  balance_sweep_failed: 'balance_sweep_failed',
+  leave_next_person_id: 'leave_next_person_id',
+  leave_sweep_failed: 'leave_sweep_failed',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
 
-export type XeroTenantScalarFieldEnum = (typeof XeroTenantScalarFieldEnum)[keyof typeof XeroTenantScalarFieldEnum]
+export type XeroConnectionScalarFieldEnum = (typeof XeroConnectionScalarFieldEnum)[keyof typeof XeroConnectionScalarFieldEnum]
 
 
 export const XeroOAuthSessionScalarFieldEnum = {
@@ -365,24 +296,15 @@ export const XeroOAuthSessionScalarFieldEnum = {
   created_by_user_id: 'created_by_user_id',
   status: 'status',
   return_to: 'return_to',
-  access_token_encrypted: 'access_token_encrypted',
-  access_token_iv: 'access_token_iv',
-  access_token_auth_tag: 'access_token_auth_tag',
-  refresh_token_encrypted: 'refresh_token_encrypted',
-  refresh_token_iv: 'refresh_token_iv',
-  refresh_token_auth_tag: 'refresh_token_auth_tag',
-  token_key_version: 'token_key_version',
-  token_encrypted_at: 'token_encrypted_at',
-  requested_scopes: 'requested_scopes',
-  intent_kind: 'intent_kind',
+  state_hash: 'state_hash',
   nonce_hash: 'nonce_hash',
-  token_exchange_status: 'token_exchange_status',
-  token_expires_at: 'token_expires_at',
+  callback_claimed_at: 'callback_claimed_at',
+  requested_scopes: 'requested_scopes',
+  xero_authorisation_id: 'xero_authorisation_id',
   available_tenants_json: 'available_tenants_json',
   selected_tenant_id: 'selected_tenant_id',
   selected_tenant_name: 'selected_tenant_name',
   selected_payroll_region: 'selected_payroll_region',
-  expected_binding_generation: 'expected_binding_generation',
   expires_at: 'expires_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
@@ -395,9 +317,9 @@ export const XeroSyncCursorScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
-  xero_tenant_id: 'xero_tenant_id',
+  xero_connection_id: 'xero_connection_id',
   entity_type: 'entity_type',
-  cursor_value: 'cursor_value',
+  modified_since: 'modified_since',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -458,6 +380,14 @@ export const OutboundOperationScalarFieldEnum = {
   availability_record_id: 'availability_record_id',
   action: 'action',
   status: 'status',
+  idempotency_key: 'idempotency_key',
+  request_xero_tenant_id: 'request_xero_tenant_id',
+  request_method: 'request_method',
+  request_url: 'request_url',
+  request_body_json: 'request_body_json',
+  request_reason: 'request_reason',
+  idempotency_first_dispatched_at: 'idempotency_first_dispatched_at',
+  idempotency_replay_before: 'idempotency_replay_before',
   request_fingerprint: 'request_fingerprint',
   request_employee_id: 'request_employee_id',
   request_leave_type_id: 'request_leave_type_id',
@@ -508,7 +438,7 @@ export const LeaveBalanceScalarFieldEnum = {
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
   person_id: 'person_id',
-  xero_tenant_id: 'xero_tenant_id',
+  xero_connection_id: 'xero_connection_id',
   leave_type_xero_id: 'leave_type_xero_id',
   leave_type_name: 'leave_type_name',
   record_type: 'record_type',
@@ -749,7 +679,7 @@ export const SyncRunScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
-  xero_tenant_id: 'xero_tenant_id',
+  xero_connection_id: 'xero_connection_id',
   status: 'status',
   run_type: 'run_type',
   trigger_type: 'trigger_type',
@@ -892,63 +822,6 @@ export const StripeEventScalarFieldEnum = {
 } as const
 
 export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[keyof typeof StripeEventScalarFieldEnum]
-
-
-export const XeroCleanupRequestScalarFieldEnum = {
-  id: 'id',
-  clerk_org_id: 'clerk_org_id',
-  organisation_id: 'organisation_id',
-  xero_tenant_id: 'xero_tenant_id',
-  binding_generation: 'binding_generation',
-  requested_by_user_id: 'requested_by_user_id',
-  destructive: 'destructive',
-  data_action_status: 'data_action_status',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroCleanupRequestScalarFieldEnum = (typeof XeroCleanupRequestScalarFieldEnum)[keyof typeof XeroCleanupRequestScalarFieldEnum]
-
-
-export const XeroCleanupAttemptScalarFieldEnum = {
-  id: 'id',
-  clerk_org_id: 'clerk_org_id',
-  organisation_id: 'organisation_id',
-  xero_cleanup_request_id: 'xero_cleanup_request_id',
-  provider_app_id: 'provider_app_id',
-  remote_connection_id: 'remote_connection_id',
-  expected_binding_generation: 'expected_binding_generation',
-  state: 'state',
-  lease_owner: 'lease_owner',
-  lease_expires_at: 'lease_expires_at',
-  dispatched_at: 'dispatched_at',
-  deadline_at: 'deadline_at',
-  next_attempt_at: 'next_attempt_at',
-  retry_count: 'retry_count',
-  outcome_reason: 'outcome_reason',
-  correlation_id: 'correlation_id',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroCleanupAttemptScalarFieldEnum = (typeof XeroCleanupAttemptScalarFieldEnum)[keyof typeof XeroCleanupAttemptScalarFieldEnum]
-
-
-export const XeroInactivityClassificationScalarFieldEnum = {
-  id: 'id',
-  clerk_org_id: 'clerk_org_id',
-  organisation_id: 'organisation_id',
-  xero_tenant_id: 'xero_tenant_id',
-  policy_version: 'policy_version',
-  kind: 'kind',
-  reason: 'reason',
-  review_status: 'review_status',
-  classified_at: 'classified_at',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type XeroInactivityClassificationScalarFieldEnum = (typeof XeroInactivityClassificationScalarFieldEnum)[keyof typeof XeroInactivityClassificationScalarFieldEnum]
 
 
 export const SortOrder = {

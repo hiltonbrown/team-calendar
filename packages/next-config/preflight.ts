@@ -19,7 +19,6 @@ export interface PreflightResult {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const POSITIVE_VERSION_REGEX = /^[1-9]\d*$/;
 const BASE64_REGEX = /^[a-zA-Z0-9+/]*={0,2}$/;
-const NAMESPACE_EPOCH_REGEX = /^[a-z0-9-]{1,32}$/;
 const validKeyVersion = z
   .string()
   .regex(POSITIVE_VERSION_REGEX)
@@ -257,12 +256,6 @@ export const runProductionPreflight = (
     checkPresent("XERO_CLIENT_ID");
     checkPresent("XERO_CLIENT_SECRET");
     if (
-      checkPresent("XERO_CREDENTIAL_DOMAIN_ID") &&
-      !z.string().uuid().safeParse(envVars.XERO_CREDENTIAL_DOMAIN_ID).success
-    ) {
-      errors.push("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
-    }
-    if (
       checkUrl("XERO_REDIRECT_URI") &&
       !envVars.XERO_REDIRECT_URI?.trim().startsWith("https://")
     ) {
@@ -278,17 +271,6 @@ export const runProductionPreflight = (
         .safeParse(envVars.XERO_APP_TIER).success
     ) {
       errors.push("XERO_APP_TIER must be a supported commercial tier");
-    }
-    if (
-      checkPresent("XERO_RATE_NAMESPACE_EPOCH") &&
-      !z
-        .string()
-        .regex(NAMESPACE_EPOCH_REGEX)
-        .safeParse(envVars.XERO_RATE_NAMESPACE_EPOCH).success
-    ) {
-      errors.push(
-        "XERO_RATE_NAMESPACE_EPOCH must contain 1 to 32 lowercase letters, digits or hyphens"
-      );
     }
     checkPresent("KV_REST_API_URL");
     checkPresent("KV_REST_API_TOKEN");

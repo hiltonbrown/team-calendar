@@ -37,10 +37,10 @@ export function deriveXeroStableSourceKey(input: {
   leaveTypeId: string;
   startsAt: Date;
   units: number;
-  xeroTenantId: string;
+  connectionId: string;
 }): string {
   return [
-    input.xeroTenantId,
+    input.connectionId,
     input.employeeId,
     input.leaveTypeId,
     input.startsAt.toISOString(),

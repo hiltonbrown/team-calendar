@@ -159,34 +159,3 @@ it("warns only once for an unset non-production tier", async () => {
   warn.mockRestore();
   vi.unstubAllEnvs();
 });
-
-describe("Xero remote cleanup mode", () => {
-  afterEach(() => vi.unstubAllEnvs());
-  it("defaults to report_only when absent", () => {
-    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", undefined);
-    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("report_only");
-  });
-  it("requires an explicit recognised rollout mode", () => {
-    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", "enabled");
-    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("enabled");
-    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", "automatic");
-    expect(() => keys()).toThrow();
-  });
-});
-
-describe("credential domain configuration", () => {
-  it("accepts only a UUID and retains report-only cleanup default", () => {
-    vi.stubEnv(
-      "XERO_CREDENTIAL_DOMAIN_ID",
-      "11111111-1111-4111-8111-111111111111"
-    );
-    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", undefined);
-    expect(keys().XERO_CREDENTIAL_DOMAIN_ID).toBe(
-      "11111111-1111-4111-8111-111111111111"
-    );
-    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("report_only");
-    vi.stubEnv("XERO_CREDENTIAL_DOMAIN_ID", "malformed");
-    expect(() => keys()).toThrow();
-    vi.unstubAllEnvs();
-  });
-});

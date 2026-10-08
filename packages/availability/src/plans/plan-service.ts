@@ -1,5 +1,4 @@
 import "server-only";
-
 import { randomUUID } from "node:crypto";
 import { getAvailabilityRecordLabel, type Result } from "@repo/core";
 import {
@@ -34,7 +33,6 @@ import {
   noUnresolvedSubmitOperationWhere,
   unclaimedOrExpiredXeroWriteWhere,
 } from "../xero-write-claim";
-
 export type EditableAction =
   | "archive"
   | "delete_draft"
@@ -45,25 +43,52 @@ export type EditableAction =
   | "submit_for_approval"
   | "view"
   | "withdraw";
-
 export type PlanServiceError =
-  | { code: "record_not_found"; message: string }
-  | { code: "not_authorised"; message: string }
-  | { code: "not_editable_xero_synced"; message: string }
-  | { code: "not_editable_after_submission"; message: string }
-  | { code: "not_editable_terminal_state"; message: string }
-  | { code: "not_editable_archived"; message: string }
-  | { code: "invalid_state_for_delete"; message: string }
-  | { code: "invalid_state_for_archive"; message: string }
-  | { code: "validation_error"; message: string }
-  | { code: "unknown_error"; message: string };
-
+  | {
+      code: "record_not_found";
+      message: string;
+    }
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "not_editable_xero_synced";
+      message: string;
+    }
+  | {
+      code: "not_editable_after_submission";
+      message: string;
+    }
+  | {
+      code: "not_editable_terminal_state";
+      message: string;
+    }
+  | {
+      code: "not_editable_archived";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_delete";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_archive";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    };
 const unresolvedSubmitError = (): PlanServiceError => ({
   code: "not_editable_after_submission",
   message:
     "Xero may have received this leave request. An administrator must resolve it before this record can be changed.",
 });
-
 export interface PlanRecord {
   allDay: boolean;
   approvalNote: string | null;
@@ -101,7 +126,6 @@ export interface PlanRecord {
   updatedAt: Date;
   xeroWriteError: string | null;
 }
-
 export interface BalanceChip {
   balanceAvailable: number | null;
   balanceUnavailableReason: "local_only" | "not_synced" | "not_xero_leave";
@@ -109,7 +133,6 @@ export interface BalanceChip {
   leaveBalanceUpdatedAt: Date | null;
   unit: leave_balance_unit | null;
 }
-
 export interface RecordListItem extends PlanRecord {
   balanceChip: BalanceChip | null;
 }
@@ -117,27 +140,29 @@ export interface PlanListPage {
   items: RecordListItem[];
   nextCursor: string | null;
   totalCount: number;
-  window: { from: Date | null; to: Date | null };
+  window: {
+    from: Date | null;
+    to: Date | null;
+  };
 }
-
 export interface RecordDetail extends RecordListItem {
   xeroWriteErrorMessage: string | null;
 }
-
 export interface PlanFilters {
   approvalStatus?: availability_approval_status[];
-  dateRange?: { from?: Date; to?: Date };
+  dateRange?: {
+    from?: Date;
+    to?: Date;
+  };
   includeArchived?: boolean;
   personId?: string[];
   recordType?: availability_record_type[];
   recordTypeCategory?: "all" | "local_only" | "xero_leave";
   sourceType?: availability_source_type[];
 }
-
 export interface RoleScopedInput {
   actingOrgRole?: string | null;
 }
-
 const RecordTypeSchema = z.enum(USER_CREATABLE_RECORD_TYPES);
 const ApprovalStatusSchema = z.enum([
   "draft",
@@ -161,7 +186,6 @@ const ContactabilitySchema = z.enum([
   "use_alternative_contact",
 ]);
 const PrivacyModeSchema = z.enum(["named", "masked", "private"]);
-
 const FiltersSchema = z.object({
   approvalStatus: z.array(ApprovalStatusSchema).optional(),
   dateRange: z
@@ -179,7 +203,6 @@ const FiltersSchema = z.object({
     .optional(),
   sourceType: z.array(SourceTypeSchema).optional(),
 });
-
 const CreateRecordSchema = z
   .object({
     allDay: z.boolean().default(true),
@@ -198,7 +221,6 @@ const CreateRecordSchema = z
     message: "End date must be after start date",
     path: ["endsAt"],
   });
-
 const UpdateRecordSchema = z.object({
   actingUserId: z.string().min(1),
   clerkOrgId: z.string().min(1),
@@ -223,14 +245,12 @@ const UpdateRecordSchema = z.object({
     ),
   recordId: z.string().uuid(),
 });
-
 const RecordActionSchema = z.object({
   actingUserId: z.string().min(1),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
 });
-
 export async function listMyRecords(input: {
   clerkOrgId: string;
   filters?: unknown;
@@ -241,7 +261,6 @@ export async function listMyRecords(input: {
   if (!parsedFilters.ok) {
     return parsedFilters;
   }
-
   try {
     const person = await resolvePersonForUser(
       input.clerkOrgId,
@@ -251,7 +270,6 @@ export async function listMyRecords(input: {
     if (!person) {
       return notAuthorised();
     }
-
     return listRecordsForScope({
       authorisedPersonIds: [person.id],
       clerkOrgId: input.clerkOrgId,
@@ -262,7 +280,6 @@ export async function listMyRecords(input: {
     return unknownError();
   }
 }
-
 export async function listTeamRecords(input: {
   actingOrgRole?: string | null;
   clerkOrgId: string;
@@ -274,7 +291,6 @@ export async function listTeamRecords(input: {
   if (!parsedFilters.ok) {
     return parsedFilters;
   }
-
   try {
     const filters = parsedFilters.value;
     if (isAdminOrOwner(input.actingOrgRole)) {
@@ -288,14 +304,12 @@ export async function listTeamRecords(input: {
     if (!input.managerPersonId) {
       return notAuthorised();
     }
-
     const reportIds = await managerScopePersonIds({
       actingPersonId: input.managerPersonId,
       clerkOrgId: input.clerkOrgId,
       excludeSelf: true,
       organisationId: input.organisationId,
     });
-
     return listRecordsForScope({
       authorisedPersonIds: reportIds,
       clerkOrgId: input.clerkOrgId,
@@ -306,7 +320,6 @@ export async function listTeamRecords(input: {
     return unknownError();
   }
 }
-
 export async function listMyRecordsPage(input: {
   allHistory?: boolean;
   clerkOrgId: string;
@@ -374,7 +387,6 @@ export async function listTeamRecordsPage(input: {
     return unknownError();
   }
 }
-
 export async function getRecord(input: {
   actingOrgRole?: string | null;
   actingUserId: string;
@@ -391,7 +403,6 @@ export async function getRecord(input: {
         input.actingUserId
       ),
     ]);
-
     if (!record) {
       return recordNotFound();
     }
@@ -404,7 +415,6 @@ export async function getRecord(input: {
     ) {
       return notAuthorised();
     }
-
     const xeroStateResult = await getXeroConnectionStateForScope(input);
     const xeroConnectionState = xeroStateResult.ok
       ? xeroStateResult.value.state
@@ -422,7 +432,6 @@ export async function getRecord(input: {
     return unknownError();
   }
 }
-
 export async function createRecord(
   input: z.infer<typeof CreateRecordSchema> & RoleScopedInput
 ): Promise<Result<PlanRecord, PlanServiceError>> {
@@ -430,7 +439,6 @@ export async function createRecord(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const [targetPerson, actingPerson, xeroStateResult, settingsResult] =
       await Promise.all([
@@ -470,7 +478,6 @@ export async function createRecord(
       ? xeroStateResult.value.state
       : "unavailable";
     const hasXero = xeroConnectionState !== "not_connected";
-
     if (!targetPerson) {
       return {
         error: { code: "record_not_found", message: "Person not found" },
@@ -486,7 +493,6 @@ export async function createRecord(
     ) {
       return notAuthorised();
     }
-
     const routing = routeRecord(parsed.data.recordType, hasXero);
     const privacyMode =
       parsed.data.privacyMode ??
@@ -502,7 +508,6 @@ export async function createRecord(
       stableSourceKey: id,
       startsAt: parsed.data.startsAt,
     });
-
     const record = await database.$transaction(async (tx) => {
       const created = await tx.availabilityRecord.create({
         data: {
@@ -529,7 +534,6 @@ export async function createRecord(
         },
         include: recordInclude,
       });
-
       await tx.auditEvent.create({
         data: {
           action: "availability_records.created",
@@ -546,16 +550,13 @@ export async function createRecord(
           resource_type: "availability_record",
         },
       });
-
       return created;
     });
-
     await materialisePlanPublication({
       availabilityRecordId: record.id,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-
     return {
       ok: true,
       value: toPlanRecord(record, deriveActions(record, hasXero)),
@@ -564,7 +565,6 @@ export async function createRecord(
     return unknownError();
   }
 }
-
 export async function updateRecord(
   input: z.infer<typeof UpdateRecordSchema> & RoleScopedInput
 ): Promise<Result<PlanRecord, PlanServiceError>> {
@@ -572,7 +572,6 @@ export async function updateRecord(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const [existing, actingPerson, xeroStateResult] = await Promise.all([
       loadScopedRecord(
@@ -606,7 +605,6 @@ export async function updateRecord(
       ? xeroStateResult.value.state
       : "unavailable";
     const hasXero = xeroConnectionState !== "not_connected";
-
     if (!existing) {
       return recordNotFound();
     }
@@ -628,12 +626,10 @@ export async function updateRecord(
     ) {
       return notAuthorised();
     }
-
     const editable = canEdit(existing, hasXero);
     if (!editable.ok) {
       return editable;
     }
-
     const { patch } = parsed.data;
     const nextStartsAt = patch.startsAt ?? existing.starts_at;
     const nextEndsAt = patch.endsAt ?? existing.ends_at;
@@ -666,7 +662,6 @@ export async function updateRecord(
       stableSourceKey: existing.id,
       startsAt: nextStartsAt,
     });
-
     await database.$transaction(async (tx) => {
       const updated = await tx.availabilityRecord.updateMany({
         data: {
@@ -710,7 +705,6 @@ export async function updateRecord(
       if (updated.count !== 1) {
         throw new ActiveXeroWriteConflictError();
       }
-
       await tx.auditEvent.create({
         data: {
           action: "availability_records.updated",
@@ -731,7 +725,6 @@ export async function updateRecord(
         },
       });
     });
-
     const updated = await loadScopedRecord(
       parsed.data.clerkOrgId,
       parsed.data.organisationId,
@@ -745,7 +738,6 @@ export async function updateRecord(
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-
     return {
       ok: true,
       value: toPlanRecord(updated, deriveActions(updated, hasXero)),
@@ -763,7 +755,6 @@ export async function updateRecord(
     return unknownError();
   }
 }
-
 export async function deleteDraftRecord(
   input: z.infer<typeof RecordActionSchema> & RoleScopedInput
 ): Promise<Result<void, PlanServiceError>> {
@@ -771,7 +762,6 @@ export async function deleteDraftRecord(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
     if (!existing.ok) {
@@ -798,7 +788,6 @@ export async function deleteDraftRecord(
         ok: false,
       };
     }
-
     await database.$transaction(async (tx) => {
       const deleted = await tx.availabilityRecord.deleteMany({
         where: {
@@ -820,7 +809,6 @@ export async function deleteDraftRecord(
         data: auditData(parsed.data, "availability_records.draft_deleted"),
       });
     });
-
     return { ok: true, value: undefined };
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
@@ -836,7 +824,6 @@ export async function deleteDraftRecord(
     return unknownError();
   }
 }
-
 export async function archiveRecord(
   input: z.infer<typeof RecordActionSchema> & RoleScopedInput
 ): Promise<Result<void, PlanServiceError>> {
@@ -844,7 +831,6 @@ export async function archiveRecord(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
     if (!existing.ok) {
@@ -884,7 +870,6 @@ export async function archiveRecord(
         ok: false,
       };
     }
-
     await database.$transaction(async (tx) => {
       const archived = await tx.availabilityRecord.updateMany({
         data: {
@@ -911,13 +896,11 @@ export async function archiveRecord(
         data: auditData(parsed.data, "availability_records.archived"),
       });
     });
-
     await materialisePlanPublication({
       availabilityRecordId: parsed.data.recordId,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-
     return { ok: true, value: undefined };
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
@@ -933,7 +916,6 @@ export async function archiveRecord(
     return unknownError();
   }
 }
-
 export async function restoreRecord(
   input: z.infer<typeof RecordActionSchema> & RoleScopedInput
 ): Promise<Result<void, PlanServiceError>> {
@@ -941,7 +923,6 @@ export async function restoreRecord(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
     if (!existing.ok) {
@@ -959,7 +940,6 @@ export async function restoreRecord(
         ok: false,
       };
     }
-
     await database.$transaction(async (tx) => {
       const restored = await tx.availabilityRecord.updateMany({
         data: {
@@ -985,13 +965,11 @@ export async function restoreRecord(
         data: auditData(parsed.data, "availability_records.restored"),
       });
     });
-
     await materialisePlanPublication({
       availabilityRecordId: parsed.data.recordId,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-
     return { ok: true, value: undefined };
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
@@ -1007,7 +985,6 @@ export async function restoreRecord(
     return unknownError();
   }
 }
-
 const personSelect = {
   email: true,
   first_name: true,
@@ -1016,12 +993,11 @@ const personSelect = {
   location_id: true,
   manager_person_id: true,
 } as const;
-
 const recordInclude = {
   outbound_operations: {
     select: { status: true },
     where: {
-      action: { in: ["submit", "approve"] },
+      action: { in: ["approve", "decline", "withdraw"] },
       status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
     },
   },
@@ -1029,10 +1005,8 @@ const recordInclude = {
     select: personSelect,
   },
 } satisfies Prisma.AvailabilityRecordInclude;
-
 type ScopedRecord = NonNullable<Awaited<ReturnType<typeof loadScopedRecord>>>;
 type SelectedPerson = ScopedRecord["person"];
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Page scope, filters, window and cursor must form one identical count/page predicate.
 async function listRecordsPageForScope(input: {
   allHistory?: boolean;
@@ -1072,11 +1046,7 @@ async function listRecordsPageForScope(input: {
   }
   const where: Prisma.AvailabilityRecordWhereInput = {
     ...scopedTo(input),
-    source_type: {
-      in: input.filters.sourceType?.length
-        ? [...input.filters.sourceType]
-        : ["manual", "team_calendar_leave"],
-    },
+    ...planSourceFilter(input),
     ...(input.filters.includeArchived ? {} : { archived_at: null }),
     ...(input.filters.approvalStatus?.length
       ? { approval_status: { in: input.filters.approvalStatus } }
@@ -1162,7 +1132,6 @@ async function listRecordsPageForScope(input: {
     },
   };
 }
-
 function balanceChipFromRow(
   record: ScopedRecord,
   balance:
@@ -1213,9 +1182,11 @@ function encodePlanCursor(record: ScopedRecord | undefined): string | null {
       ).toString("base64url")
     : null;
 }
-function decodePlanCursor(
-  value: string | null
-): { createdAt: Date; id: string; startsAt: Date } | null {
+function decodePlanCursor(value: string | null): {
+  createdAt: Date;
+  id: string;
+  startsAt: Date;
+} | null {
   if (!value) {
     return null;
   }
@@ -1232,7 +1203,6 @@ function decodePlanCursor(
     return null;
   }
 }
-
 async function listRecordsForScope({
   authorisedPersonIds,
   clerkOrgId,
@@ -1253,11 +1223,9 @@ async function listRecordsForScope({
         )
       : authorisedPersonIds;
   }
-
   if (personIds?.length === 0) {
     return { ok: true, value: [] };
   }
-
   const xeroStateResult = await getXeroConnectionStateForScope({
     clerkOrgId,
     organisationId,
@@ -1271,7 +1239,7 @@ async function listRecordsForScope({
     select: { id: true },
     where: {
       ...scopedTo({ clerkOrgId, organisationId }),
-      source_type: { in: ["manual", "team_calendar_leave"] },
+      ...planSourceFilter({ clerkOrgId, filters, organisationId }),
       ...(filters.includeArchived ? {} : { archived_at: null }),
       ...(filters.approvalStatus?.length
         ? { approval_status: { in: filters.approvalStatus } }
@@ -1280,17 +1248,6 @@ async function listRecordsForScope({
       ...(filters.recordType?.length
         ? { record_type: { in: [...filters.recordType] } }
         : recordTypeCategoryFilter(filters.recordTypeCategory)),
-      ...(filters.sourceType?.length
-        ? {
-            source_type: {
-              in: filters.sourceType.filter(
-                (sourceType) =>
-                  sourceType === "manual" ||
-                  sourceType === "team_calendar_leave"
-              ),
-            },
-          }
-        : {}),
       ...(filters.dateRange?.from
         ? { ends_at: { gte: filters.dateRange.from } }
         : {}),
@@ -1299,7 +1256,6 @@ async function listRecordsForScope({
         : {}),
     },
   });
-
   const loadedRecords = await Promise.all(
     records.map((record) =>
       loadScopedRecord(clerkOrgId, organisationId, record.id)
@@ -1310,10 +1266,8 @@ async function listRecordsForScope({
       .filter((record): record is ScopedRecord => record !== null)
       .map((record) => toRecordListItem(record, hasXero))
   );
-
   return { ok: true, value: items };
 }
-
 async function toRecordListItem(
   record: ScopedRecord,
   hasXero: boolean | null
@@ -1323,7 +1277,6 @@ async function toRecordListItem(
     balanceChip: await balanceChipForRecord(record),
   };
 }
-
 async function balanceChipForRecord(
   record: ScopedRecord
 ): Promise<BalanceChip | null> {
@@ -1339,7 +1292,6 @@ async function balanceChipForRecord(
       unit: null,
     };
   }
-
   const balance = await database.leaveBalance.findFirst({
     orderBy: { updated_at: "desc" },
     select: {
@@ -1357,7 +1309,6 @@ async function balanceChipForRecord(
       record_type: record.record_type,
     },
   });
-
   if (!balance) {
     return {
       balanceAvailable: null,
@@ -1367,7 +1318,6 @@ async function balanceChipForRecord(
       unit: null,
     };
   }
-
   return {
     balanceAvailable: Number(balance.balance),
     balanceUnavailableReason: "not_synced",
@@ -1376,7 +1326,6 @@ async function balanceChipForRecord(
     unit: balance.balance_unit,
   };
 }
-
 function loadScopedRecord(
   clerkOrgId: string,
   organisationId: string,
@@ -1390,7 +1339,6 @@ function loadScopedRecord(
     },
   });
 }
-
 async function loadAndAuthorise(
   input: z.infer<typeof RecordActionSchema>,
   actingOrgRole: string | null | undefined
@@ -1403,7 +1351,6 @@ async function loadAndAuthorise(
       input.actingUserId
     ),
   ]);
-
   if (!record) {
     return recordNotFound();
   }
@@ -1416,10 +1363,8 @@ async function loadAndAuthorise(
   ) {
     return notAuthorised();
   }
-
   return { ok: true, value: record };
 }
-
 function resolvePersonForUser(
   clerkOrgId: string,
   organisationId: string,
@@ -1434,7 +1379,6 @@ function resolvePersonForUser(
     },
   });
 }
-
 function toPlanRecord(
   record: ScopedRecord,
   editableActions: EditableAction[]
@@ -1477,7 +1421,6 @@ function toPlanRecord(
     xeroWriteError: record.xero_write_error,
   };
 }
-
 function deriveActions(
   record: ScopedRecord,
   hasXero: boolean | null
@@ -1491,18 +1434,15 @@ function deriveActions(
   if (record.archived_at && record.source_type === "manual") {
     return ["view", "restore"];
   }
-
   if (
     record.source_type === "manual" &&
     record.approval_status === "approved"
   ) {
     return ["edit", "archive"];
   }
-
   if (record.source_type !== "team_calendar_leave") {
     return ["view"];
   }
-
   switch (record.approval_status) {
     case "draft":
       return ["edit", "delete_draft", "submit_for_approval"];
@@ -1521,7 +1461,6 @@ function deriveActions(
       return ["view"];
   }
 }
-
 function canEdit(
   record: ScopedRecord,
   hasXero: boolean
@@ -1535,7 +1474,6 @@ function canEdit(
       ok: false,
     };
   }
-
   if (record.source_type === "manual") {
     if (record.archived_at) {
       return {
@@ -1548,7 +1486,6 @@ function canEdit(
     }
     return { ok: true, value: undefined };
   }
-
   if (
     record.approval_status === "draft" ||
     (record.approval_status === "xero_sync_failed" &&
@@ -1559,7 +1496,6 @@ function canEdit(
   ) {
     return { ok: true, value: undefined };
   }
-
   if (
     record.approval_status === "submitted" ||
     (record.approval_status === "approved" && hasXero)
@@ -1572,7 +1508,6 @@ function canEdit(
       ok: false,
     };
   }
-
   return {
     error: {
       code: "not_editable_terminal_state",
@@ -1581,7 +1516,6 @@ function canEdit(
     ok: false,
   };
 }
-
 function routeRecord(
   recordType: RecordType,
   hasXero: boolean
@@ -1597,7 +1531,6 @@ function routeRecord(
   }
   return { approvalStatus: "approved", sourceType: "team_calendar_leave" };
 }
-
 async function materialisePlanPublication(input: {
   availabilityRecordId: string;
   clerkOrgId: string;
@@ -1616,11 +1549,13 @@ async function materialisePlanPublication(input: {
     });
   }
 }
-
 function hasMaterialChange(
   existing: ScopedRecord,
   patch: z.infer<typeof UpdateRecordSchema>["patch"],
-  routing: { approvalStatus: string; sourceType: string }
+  routing: {
+    approvalStatus: string;
+    sourceType: string;
+  }
 ): boolean {
   return Boolean(
     (patch.allDay !== undefined && patch.allDay !== existing.all_day) ||
@@ -1636,17 +1571,48 @@ function hasMaterialChange(
       routing.sourceType !== existing.source_type
   );
 }
-
 function categoryChanged(first: RecordType, second: RecordType): boolean {
   return (
     (isLocalOnlyType(first) && isXeroLeaveType(second)) ||
     (isXeroLeaveType(first) && isLocalOnlyType(second))
   );
 }
-
+function planSourceFilter(input: {
+  clerkOrgId: string;
+  filters: PlanFilters;
+  organisationId: string;
+}): Prisma.AvailabilityRecordWhereInput {
+  const sourceTypes: availability_source_type[] = input.filters.sourceType
+    ?.length
+    ? input.filters.sourceType
+    : ["manual", "team_calendar_leave", "xero_leave"];
+  return {
+    source_type: { in: sourceTypes },
+    ...(sourceTypes.includes("xero_leave")
+      ? {
+          OR: [
+            { source_type: { in: ["manual", "team_calendar_leave"] } },
+            {
+              outbound_operations: {
+                some: {
+                  ...scopedTo(input),
+                  ...recordInclude.outbound_operations.where,
+                },
+              },
+              source_type: "xero_leave",
+            },
+          ],
+        }
+      : {}),
+  };
+}
 function recordTypeCategoryFilter(
   category: PlanFilters["recordTypeCategory"]
-): { record_type?: { in: RecordType[] } } {
+): {
+  record_type?: {
+    in: RecordType[];
+  };
+} {
   if (category === "local_only") {
     return {
       record_type: { in: USER_CREATABLE_RECORD_TYPES.filter(isLocalOnlyType) },
@@ -1659,7 +1625,6 @@ function recordTypeCategoryFilter(
   }
   return {};
 }
-
 function parseFilters(filters: unknown): Result<PlanFilters, PlanServiceError> {
   const parsed = FiltersSchema.safeParse(filters ?? {});
   if (!parsed.success) {
@@ -1667,7 +1632,6 @@ function parseFilters(filters: unknown): Result<PlanFilters, PlanServiceError> {
   }
   return { ok: true, value: parsed.data };
 }
-
 function canActOnPerson({
   actingOrgRole,
   actingPersonId,
@@ -1684,11 +1648,9 @@ function canActOnPerson({
       targetPerson.manager_person_id === actingPersonId)
   );
 }
-
 function isAdminOrOwner(role?: string | null): boolean {
   return role === "org:admin" || role === "org:owner";
 }
-
 function auditData(input: z.infer<typeof RecordActionSchema>, action: string) {
   return {
     action,
@@ -1700,7 +1662,6 @@ function auditData(input: z.infer<typeof RecordActionSchema>, action: string) {
     resource_type: "availability_record",
   };
 }
-
 function recordNotFound(): Result<never, PlanServiceError> {
   return {
     error: {
@@ -1710,7 +1671,6 @@ function recordNotFound(): Result<never, PlanServiceError> {
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, PlanServiceError> {
   return {
     error: {
@@ -1720,7 +1680,6 @@ function notAuthorised(): Result<never, PlanServiceError> {
     ok: false,
   };
 }
-
 function validationError(error: z.ZodError): Result<never, PlanServiceError> {
   return {
     error: {
@@ -1730,7 +1689,6 @@ function validationError(error: z.ZodError): Result<never, PlanServiceError> {
     ok: false,
   };
 }
-
 function unknownError(): Result<never, PlanServiceError> {
   return {
     error: {
@@ -1740,14 +1698,11 @@ function unknownError(): Result<never, PlanServiceError> {
     ok: false,
   };
 }
-
 function emptyToNull(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
-
 class ActiveXeroWriteConflictError extends Error {}
-
 function connectionActionGate(
   state: import("@repo/core").XeroConnectionDisplayState
 ): boolean | null {
@@ -1756,7 +1711,6 @@ function connectionActionGate(
   }
   return state === "not_connected" ? false : null;
 }
-
 function isLocalOnlyEdit(
   record: ScopedRecord | null,
   recordType?: RecordType
@@ -1766,7 +1720,6 @@ function isLocalOnlyEdit(
   }
   return isLocalOnlyType(recordType ?? record.record_type);
 }
-
 function failedPlanActions(
   action: availability_failed_action | null
 ): EditableAction[] {
@@ -1778,7 +1731,6 @@ function failedPlanActions(
   }
   return ["view"];
 }
-
 function approvedPlanActions(
   record: ScopedRecord,
   hasXero: boolean | null

@@ -8,19 +8,18 @@ const personId = "00000000-0000-4000-8000-000000000001";
 const organisationId = "00000000-0000-4000-8000-000000000002";
 const now = "2026-09-27T00:00:00.000Z";
 const scope = {
-  bindingGeneration: 1,
   clerkOrgId: "org_owned",
   organisationId,
   xeroTenantId: "tenant-owned",
 };
 const importScope = {
   ...scope,
-  campaignStartedAt: now,
   expectedRunIds: [
     "00000000-0000-4000-8000-000000000003",
     "00000000-0000-4000-8000-000000000004",
     "00000000-0000-4000-8000-000000000005",
   ],
+  verificationStartedAt: now,
 };
 function raw() {
   return {

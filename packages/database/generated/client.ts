@@ -72,30 +72,15 @@ export type Person = Prisma.PersonModel
  */
 export type AlternativeContact = Prisma.AlternativeContactModel
 /**
+ * Model XeroAuthorisation
+ * 
+ */
+export type XeroAuthorisation = Prisma.XeroAuthorisationModel
+/**
  * Model XeroConnection
  * 
  */
 export type XeroConnection = Prisma.XeroConnectionModel
-/**
- * Model XeroCredentialOwner
- *
- */
-export type XeroCredentialOwner = Prisma.XeroCredentialOwnerModel
-/**
- * Model XeroRefreshAttempt
- *
- */
-export type XeroRefreshAttempt = Prisma.XeroRefreshAttemptModel
-/**
- * Model XeroProviderConnection
- *
- */
-export type XeroProviderConnection = Prisma.XeroProviderConnectionModel
-/**
- * Model XeroTenant
- * 
- */
-export type XeroTenant = Prisma.XeroTenantModel
 /**
  * Model XeroOAuthSession
  * 
@@ -153,7 +138,7 @@ export type PublicHolidayAssignment = Prisma.PublicHolidayAssignmentModel
 export type Feed = Prisma.FeedModel
 /**
  * Model FeedEventPublication
- *
+ * 
  */
 export type FeedEventPublication = Prisma.FeedEventPublicationModel
 /**
@@ -221,18 +206,3 @@ export type UsageCounter = Prisma.UsageCounterModel
  * 
  */
 export type StripeEvent = Prisma.StripeEventModel
-/**
- * Model XeroCleanupRequest
- *
- */
-export type XeroCleanupRequest = Prisma.XeroCleanupRequestModel
-/**
- * Model XeroCleanupAttempt
- *
- */
-export type XeroCleanupAttempt = Prisma.XeroCleanupAttemptModel
-/**
- * Model XeroInactivityClassification
- *
- */
-export type XeroInactivityClassification = Prisma.XeroInactivityClassificationModel

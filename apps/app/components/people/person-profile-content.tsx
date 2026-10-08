@@ -1,5 +1,4 @@
 "use client";
-
 import type {
   AvailabilityRecordSummary,
   PersonProfile,
@@ -52,14 +51,15 @@ interface PersonProfileContentProps {
   orgQueryValue: string | null;
   profile: PersonProfile;
 }
-
-const tabs: Array<{ label: string; value: PersonProfileTab }> = [
+const tabs: Array<{
+  label: string;
+  value: PersonProfileTab;
+}> = [
   { label: "Upcoming", value: "upcoming" },
   { label: "History", value: "history" },
   { label: "Balances", value: "balances" },
   { label: "Alternative contacts", value: "alternative_contacts" },
 ];
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This component composes a read-only modal surface with simple panel conditionals.
 export function PersonProfileContent({
   balanceRefreshEnabled,
@@ -82,7 +82,6 @@ export function PersonProfileContent({
     xeroConnectionState: profile.balances.xeroConnectionState,
     xeroLinked: profile.balances.xeroLinked,
   });
-
   const refreshBalances = () => {
     if (refreshDisabledReason) {
       return;
@@ -103,7 +102,6 @@ export function PersonProfileContent({
       );
     });
   };
-
   return (
     <div className="flex flex-col gap-6">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -343,7 +341,6 @@ export function PersonProfileContent({
     </div>
   );
 }
-
 function Avatar({ profile }: { profile: PersonProfile }) {
   const initials =
     `${profile.header.firstName[0] ?? ""}${profile.header.lastName[0] ?? ""}`.toUpperCase();
@@ -362,7 +359,6 @@ function Avatar({ profile }: { profile: PersonProfile }) {
     </span>
   );
 }
-
 function Field({
   className,
   label,
@@ -386,7 +382,6 @@ function Field({
     </div>
   );
 }
-
 function RecordList({
   emptyLabel,
   records,
@@ -437,7 +432,6 @@ function RecordList({
     </Table>
   );
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Balance ownership, role and connection states are intentionally resolved in one panel.
 function BalancesPanel({
   canEditManual,
@@ -464,7 +458,6 @@ function BalancesPanel({
     profile.balances.xeroConnectionState === "connected";
   const showManualEditor =
     profile.balances.xeroConnectionState === "not_connected";
-
   const saveManualBalance = () => {
     if (!(canEditManual && showManualEditor)) {
       return;
@@ -492,7 +485,6 @@ function BalancesPanel({
       setMessage({ text: "Manual balance saved.", tone: "status" });
     });
   };
-
   if (!(showXeroBalances || showManualEditor)) {
     return (
       <div className="rounded-2xl bg-surface-container-high p-6 text-label-lg">
@@ -663,11 +655,9 @@ function BalancesPanel({
     </div>
   );
 }
-
 function hasValidBalanceInput(value: string): boolean {
   return value.trim() !== "" && Number.isFinite(Number(value));
 }
-
 function balanceRefreshDisabledReason(input: {
   balanceRefreshEnabled: boolean;
   canRefreshBalances: boolean;
@@ -690,7 +680,6 @@ function balanceRefreshDisabledReason(input: {
   }
   return null;
 }
-
 function refreshReasonLabel(reason?: string): string {
   if (reason === "job_not_registered") {
     return "Balance refresh is not yet enabled.";
@@ -703,14 +692,12 @@ function refreshReasonLabel(reason?: string): string {
   }
   return "Balance refresh could not be queued.";
 }
-
 function labelForValue(value: string): string {
   return value
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
-
 function formatDateRange(
   startsAt: Date | string,
   endsAt: Date | string
@@ -719,7 +706,6 @@ function formatDateRange(
   const end = formatDate(endsAt);
   return start === end ? start : `${start} to ${end}`;
 }
-
 function formatDate(value: Date | string): string {
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
@@ -728,7 +714,6 @@ function formatDate(value: Date | string): string {
     year: "numeric",
   }).format(new Date(value));
 }
-
 function formatDateTime(value: Date | string): string {
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",

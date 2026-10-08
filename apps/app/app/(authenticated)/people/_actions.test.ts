@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     alternativeContact: { findFirst: vi.fn() },
     auditEvent: { create: vi.fn() },
     person: { findFirst: vi.fn() },
-    xeroTenant: { findFirst: vi.fn() },
+    xeroConnection: { findFirst: vi.fn() },
   },
   deleteAlternativeContact: vi.fn(),
   dispatchBalanceRefresh: vi.fn(),
@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
   syncXeroLeaveBalances: vi.fn(),
   updateAlternativeContact: vi.fn(),
 }));
-
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   clerkClient: mocks.clerkClient,
@@ -56,7 +55,6 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
-
 const {
   addAlternativeContactAction,
   deleteAlternativeContactAction,
@@ -67,19 +65,17 @@ const {
   setManualBalanceAction,
   updateAlternativeContactAction,
 } = await import("./_actions");
-
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const personId = "00000000-0000-4000-8000-000000000002";
 const contactId = "00000000-0000-4000-8000-000000000003";
 const clerkOrgId = "org_123";
 const userId = "user_456";
-
 describe("people server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 1, state: "connected" },
+      value: { state: "connected" },
     });
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({ id: userId });
@@ -91,7 +87,9 @@ describe("people server actions", () => {
     mocks.database.alternativeContact.findFirst.mockResolvedValue({
       person_id: personId,
     });
-    mocks.database.xeroTenant.findFirst.mockResolvedValue({ id: "tenant_1" });
+    mocks.database.xeroConnection.findFirst.mockResolvedValue({
+      id: "tenant_1",
+    });
     mocks.addAlternativeContact.mockResolvedValue({
       ok: true,
       value: { id: contactId },
@@ -117,18 +115,15 @@ describe("people server actions", () => {
       value: { id: "balance_1" },
     });
   });
-
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers", async () => {
       mocks.currentUser.mockResolvedValue(null);
-
       const resAdd = await addAlternativeContactAction({
         email: "contact@example.com",
         name: "Emergency Contact",
         organisationId,
         personId,
       });
-
       expect(resAdd).toEqual({
         error: {
           code: "not_authorised",
@@ -138,19 +133,15 @@ describe("people server actions", () => {
       });
       expect(mocks.addAlternativeContact).not.toHaveBeenCalled();
     });
-
     it("rejects unauthenticated or non-member roles without permission", async () => {
       mocks.auth.mockResolvedValue({ orgRole: null });
-
       const resDelete = await deleteAlternativeContactAction({
         contactId,
         organisationId,
       });
-
       expect(resDelete.ok).toBe(false);
       expect(mocks.deleteAlternativeContact).not.toHaveBeenCalled();
     });
-
     it("rejects malformed input", async () => {
       const resAdd = await addAlternativeContactAction({
         email: "contact@example.com",
@@ -158,14 +149,12 @@ describe("people server actions", () => {
         organisationId,
         personId,
       });
-
       expect(resAdd.ok).toBe(false);
       if (!resAdd.ok) {
         expect(resAdd.error.code).toBe("validation_error");
       }
       expect(mocks.addAlternativeContact).not.toHaveBeenCalled();
     });
-
     it("scopes person lookup to clerk_org_id and organisation_id", async () => {
       await addAlternativeContactAction({
         email: "contact@example.com",
@@ -173,7 +162,6 @@ describe("people server actions", () => {
         organisationId,
         personId,
       });
-
       expect(mocks.database.person.findFirst).toHaveBeenCalledWith({
         select: { id: true },
         where: {
@@ -185,7 +173,6 @@ describe("people server actions", () => {
       });
     });
   });
-
   describe("action specific functionality", () => {
     it("addAlternativeContactAction calls service and revalidates people path", async () => {
       const result = await addAlternativeContactAction({
@@ -194,7 +181,6 @@ describe("people server actions", () => {
         organisationId,
         personId,
       });
-
       expect(result).toEqual({ ok: true, value: { id: contactId } });
       expect(mocks.addAlternativeContact).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -211,14 +197,12 @@ describe("people server actions", () => {
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/people");
       expect(mocks.revalidatePath).toHaveBeenCalledWith(`/people/${personId}`);
     });
-
     it("updateAlternativeContactAction looks up contact person and revalidates", async () => {
       const result = await updateAlternativeContactAction({
         contactId,
         organisationId,
         patch: { name: "Updated Name" },
       });
-
       expect(result).toEqual({ ok: true, value: { id: contactId } });
       expect(mocks.database.alternativeContact.findFirst).toHaveBeenCalledWith({
         select: { person_id: true },
@@ -230,7 +214,6 @@ describe("people server actions", () => {
       });
       expect(mocks.revalidatePath).toHaveBeenCalledWith(`/people/${personId}`);
     });
-
     it("reorderAlternativeContactsAction and refreshBalancesAction execute correctly", async () => {
       const resReorder = await reorderAlternativeContactsAction({
         orderedContactIds: [contactId],
@@ -239,7 +222,6 @@ describe("people server actions", () => {
       });
       expect(resReorder).toEqual({ ok: true, value: { personId } });
       expect(mocks.reorderAlternativeContacts).toHaveBeenCalled();
-
       const resRefresh = await refreshBalancesAction({
         organisationId,
         personId,
@@ -247,16 +229,14 @@ describe("people server actions", () => {
       expect(resRefresh).toEqual({ ok: true, value: { queued: true } });
       expect(mocks.dispatchBalanceRefresh).toHaveBeenCalled();
       expect(mocks.syncXeroLeaveBalances).toHaveBeenCalledWith({
-        bindingGeneration: 1,
         clerkOrgId,
+        connectionId: "tenant_1",
         organisationId,
         personId,
         triggeredByUserId: userId,
         triggerType: "manual",
-        xeroTenantId: "tenant_1",
       });
     });
-
     it("setManualBalanceAction validates balance and passes parameters to service", async () => {
       const result = await setManualBalanceAction({
         balance: 40,
@@ -264,7 +244,6 @@ describe("people server actions", () => {
         organisationId,
         personId,
       });
-
       expect(result).toEqual({ ok: true, value: { id: "balance_1" } });
       expect(mocks.setManualLeaveBalance).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -278,13 +257,11 @@ describe("people server actions", () => {
         })
       );
     });
-
     it("loadClerkAccessCandidates requires owner or admin role", async () => {
       mocks.auth.mockResolvedValue({
         has: vi.fn().mockReturnValue(false),
         orgRole: "org:viewer",
       });
-
       const resWrongRole = await loadClerkAccessCandidates({ organisationId });
       expect(resWrongRole).toEqual({
         error: {
@@ -294,7 +271,6 @@ describe("people server actions", () => {
         ok: false,
       });
     });
-
     it("loadClerkAccessCandidates calls service and records audit event", async () => {
       const mockOrganizations = {
         createOrganizationInvitationBulk: vi.fn(),
@@ -318,7 +294,6 @@ describe("people server actions", () => {
           memberCount: 0,
         },
       });
-
       const result = await loadClerkAccessCandidates({ organisationId });
       expect(result.ok).toBe(true);
       expect(mocks.loadClerkAccessReview).toHaveBeenCalledWith({
@@ -345,7 +320,6 @@ describe("people server actions", () => {
         }),
       });
     });
-
     it("inviteClerkAccessCandidates validates auth, calls service, records audit event, and revalidates", async () => {
       const mockOrganizations = {
         createOrganizationInvitationBulk: vi.fn(),
@@ -368,7 +342,6 @@ describe("people server actions", () => {
           succeededCount: 1,
         },
       });
-
       const result = await inviteClerkAccessCandidates({ organisationId });
       expect(result.ok).toBe(true);
       expect(mocks.inviteClerkAccessCandidates).toHaveBeenCalledWith({

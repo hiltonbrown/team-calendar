@@ -21,10 +21,9 @@ const mocks = vi.hoisted(() => ({
   syncRunFindFirst: vi.fn(),
   syncRunUpdateMany: vi.fn(),
   toPlainLanguageMessage: vi.fn(() => "Xero request failed"),
-  xeroTenantFindFirst: vi.fn(),
-  xeroTenantUpdateMany: vi.fn(),
+  xeroConnectionFindFirst: vi.fn(),
+  xeroConnectionUpdateMany: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
@@ -52,9 +51,9 @@ vi.mock("@repo/database", () => ({
       findFirst: mocks.syncRunFindFirst,
       updateMany: mocks.syncRunUpdateMany,
     },
-    xeroTenant: {
-      findFirst: mocks.xeroTenantFindFirst,
-      updateMany: mocks.xeroTenantUpdateMany,
+    xeroConnection: {
+      findFirst: mocks.xeroConnectionFindFirst,
+      updateMany: mocks.xeroConnectionUpdateMany,
     },
   },
   scopedTo: mocks.scopedTo,
@@ -81,54 +80,47 @@ vi.mock("@repo/xero", async () => ({
     if (!result?.ok) {
       return result;
     }
-    const tenant = await mocks.xeroTenantFindFirst.mock.results.at(-1)?.value;
+    const tenant =
+      await mocks.xeroConnectionFindFirst.mock.results.at(-1)?.value;
     return {
       ok: true,
       value: {
         ...result.value,
         accessToken: "fake-access",
-        bindingGeneration: scope.expectedBindingGeneration,
         capability: scope.capability,
+        connectionId: tenant.id,
         deadline: scope.deadline,
         payrollRegion: tenant.payroll_region,
-        tokenVersion: 1,
-        xeroTenantDatabaseId: tenant.id,
-        xeroTenantId: tenant.xero_tenant_id ?? "fake-tenant",
+        providerTenantId: tenant.xero_tenant_id ?? "fake-tenant",
       },
     };
   },
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
-  toResolvedXeroTenant: (scope, value) => ({
+  toResolvedXeroConnection: (scope, value) => ({
     ...value,
     clerk_org_id: scope.clerkOrgId,
-    id: value.xeroTenantDatabaseId,
+    id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
-    xero_tenant_id: value.xeroTenantId,
+    xero_tenant_id: value.providerTenantId,
   }),
 }));
-
 const { reconcileXeroApprovalState } = await import(
   "./reconcile-xero-approval-state"
 );
-
 const CLERK_ORG_ID = "org_reconciliation_guard";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
-const XERO_TENANT_ID = "20000000-0000-4000-8000-000000000001";
-const XERO_CONNECTION_ID = "40000000-0000-4000-8000-000000000001";
+const XERO_CONNECTION_ID = "20000000-0000-4000-8000-000000000001";
 const RECORD_ID = "80000000-0000-4000-8000-000000000001";
-
 function input() {
   return {
-    bindingGeneration: 1,
     clerkOrgId: CLERK_ORG_ID,
+    connectionId: XERO_CONNECTION_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
-    xeroTenantId: XERO_TENANT_ID,
   };
 }
-
 function record() {
   return {
     approval_status: "submitted",
@@ -146,7 +138,6 @@ function record() {
     source_remote_id: "xero-leave-application-1",
   };
 }
-
 describe("reconcile Xero approval state optimistic concurrency", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -158,11 +149,10 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mocks.xeroConnectionFindFirst.mockResolvedValue({
+      id: XERO_CONNECTION_ID,
       payroll_region: "AU",
       sync_paused_at: null,
-      xero_connection_id: XERO_CONNECTION_ID,
     });
     mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
@@ -182,12 +172,9 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       },
     });
   });
-
   it("counts a stale declined transition as matched without auditing or notifying", async () => {
     mocks.availabilityRecordUpdateMany.mockResolvedValue({ count: 0 });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -204,12 +191,9 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       })
     );
   });
-
   it("excludes active outbound claims from reconciliation selection", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([]);
-
     await reconcileXeroApprovalState(input());
-
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -220,10 +204,8 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       })
     );
   });
-
   it("audits and notifies after a guarded declined transition", async () => {
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -236,10 +218,8 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       expect.anything()
     );
   });
-
   it("pins the snapshot state and tenant scope in the transition predicate", async () => {
     await reconcileXeroApprovalState(input());
-
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -251,19 +231,15 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       })
     );
   });
-
   it("does not audit an archive when the snapshot is stale", async () => {
     mocks.availabilityRecordUpdateMany.mockResolvedValue({ count: 0 });
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       error: { code: "not_found_error", rawPayload: null },
       ok: false,
     });
-
     await reconcileXeroApprovalState(input());
-
     expect(mocks.auditEventCreate).not.toHaveBeenCalled();
   });
-
   it("clears the write-error fields on the decline branch", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([
       {
@@ -272,9 +248,7 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
         failed_action: "decline",
       },
     ]);
-
     await reconcileXeroApprovalState(input());
-
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -286,7 +260,6 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       })
     );
   });
-
   it("clears the write-error fields on the final withdraw branch", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([
       { ...record(), approval_status: "approved" },
@@ -299,9 +272,7 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
         status: "WITHDRAWN",
       },
     });
-
     await reconcileXeroApprovalState(input());
-
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -314,7 +285,6 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     );
   });
 });
-
 describe("reconcile Xero approval state bounding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -326,11 +296,10 @@ describe("reconcile Xero approval state bounding", () => {
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mocks.xeroConnectionFindFirst.mockResolvedValue({
+      id: XERO_CONNECTION_ID,
       payroll_region: "AU",
       sync_paused_at: null,
-      xero_connection_id: XERO_CONNECTION_ID,
     });
     mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
@@ -341,16 +310,13 @@ describe("reconcile Xero approval state bounding", () => {
     mocks.failedRecordCreate.mockResolvedValue({});
     mocks.availabilityRecordUpdateMany.mockResolvedValue({ count: 1 });
   });
-
   it("windows candidates by ends_at and caps with take 500 ordered by xero_approval_checked_at nulls first then id", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([]);
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
       value: { approvedAt: null, rawResponse: {}, status: "APPROVED" },
     });
-
     await reconcileXeroApprovalState(input());
-
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: [
@@ -365,7 +331,6 @@ describe("reconcile Xero approval state bounding", () => {
       })
     );
   });
-
   it("cap translates to partial_success with capped error summary and partial flag", async () => {
     vi.useFakeTimers();
     const records = Array.from({ length: 500 }, (_, i) => ({
@@ -386,12 +351,10 @@ describe("reconcile Xero approval state bounding", () => {
       ok: true,
       value: { approvedAt: null, rawResponse: {}, status: "APPROVED" },
     });
-
     const promise = reconcileXeroApprovalState(input());
     await vi.runAllTimersAsync();
     const result = await promise;
     vi.useRealTimers();
-
     expect(result).toEqual(expect.objectContaining({ ok: true }));
     if (result.ok) {
       expect(result.value.partial).toBe(true);
@@ -406,16 +369,13 @@ describe("reconcile Xero approval state bounding", () => {
       })
     );
   });
-
   it("non-capped run is succeeded when no failures and partial is false", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([record()]);
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
       value: { approvedAt: null, rawResponse: {}, status: "REJECTED" },
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -423,7 +383,6 @@ describe("reconcile Xero approval state bounding", () => {
       })
     );
   });
-
   it("partial run is distinct from failed and succeeded via status enum", async () => {
     vi.useFakeTimers();
     const records = Array.from({ length: 500 }, (_, i) => ({
@@ -447,7 +406,6 @@ describe("reconcile Xero approval state bounding", () => {
         status: "APPROVED",
       },
     });
-
     const promise = reconcileXeroApprovalState(input());
     await vi.runAllTimersAsync();
     const result = await promise;
@@ -455,7 +413,6 @@ describe("reconcile Xero approval state bounding", () => {
     expect(result.ok && result.value.status).toBe("partial_success");
     expect(result.ok && result.value.partial).toBe(true);
   });
-
   it("keeps processing other records when one Xero request fails under bounded concurrency", async () => {
     const second = {
       ...record(),
@@ -476,9 +433,7 @@ describe("reconcile Xero approval state bounding", () => {
       } as unknown as Awaited<
         ReturnType<typeof mocks.fetchLeaveApplicationStatusForRegion>
       >);
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -487,7 +442,6 @@ describe("reconcile Xero approval state bounding", () => {
     );
     expect(mocks.fetchLeaveApplicationStatusForRegion).toHaveBeenCalledTimes(2);
   });
-
   it("stops mid-way when cancellation is requested", async () => {
     vi.useFakeTimers();
     const many = Array.from({ length: 10 }, (_, i) => ({
@@ -524,12 +478,10 @@ describe("reconcile Xero approval state bounding", () => {
         ReturnType<typeof mocks.syncRunFindFirst>
       >;
     });
-
     const promise = reconcileXeroApprovalState(input());
     await vi.runAllTimersAsync();
     const result = await promise;
     vi.useRealTimers();
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -538,7 +490,6 @@ describe("reconcile Xero approval state bounding", () => {
     );
     expect(mocks.fetchLeaveApplicationStatusForRegion).toHaveBeenCalledTimes(5);
   });
-
   it("uses BATCH_SIZE 5 to respect Xero five-concurrent limit", async () => {
     vi.useFakeTimers();
     const many = Array.from({ length: 6 }, (_, i) => ({
@@ -568,25 +519,20 @@ describe("reconcile Xero approval state bounding", () => {
         ReturnType<typeof mocks.fetchLeaveApplicationStatusForRegion>
       >;
     });
-
     const promise = reconcileXeroApprovalState(input());
     await vi.runAllTimersAsync();
     await promise;
     vi.useRealTimers();
-
     expect(peak).toBeLessThanOrEqual(5);
     expect(mocks.syncRunFindFirst).toHaveBeenCalledTimes(3);
   });
-
   it("prioritises never-checked records via xero_approval_checked_at nulls first ordering", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([]);
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
       value: { approvedAt: null, rawResponse: {}, status: "REJECTED" },
     });
-
     await reconcileXeroApprovalState(input());
-
     const call = mocks.availabilityRecordFindMany.mock.calls[0]?.[0] as {
       orderBy: unknown;
     };
@@ -595,7 +541,6 @@ describe("reconcile Xero approval state bounding", () => {
       { id: "asc" },
     ]);
   });
-
   it("stamps a matched no-op with xero_approval_checked_at under dual-tenant scope", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([
       { ...record(), approval_status: "approved" },
@@ -608,9 +553,7 @@ describe("reconcile Xero approval state bounding", () => {
         status: "APPROVED",
       },
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -630,7 +573,6 @@ describe("reconcile Xero approval state bounding", () => {
       })
     );
   });
-
   it("processes disjoint record sets across consecutive runs when candidates exceed MAX_REQUESTS_PER_RUN", async () => {
     vi.useFakeTimers();
     const candidateStore = Array.from({ length: 600 }, (_, i) => ({
@@ -640,7 +582,6 @@ describe("reconcile Xero approval state bounding", () => {
       source_remote_id: `xero-leave-${i}`,
       xero_approval_checked_at: null as Date | null,
     }));
-
     mocks.availabilityRecordFindMany.mockImplementation((args: any) => {
       const orderBy = args?.orderBy;
       const records = [...candidateStore];
@@ -670,7 +611,6 @@ describe("reconcile Xero approval state bounding", () => {
       }
       return records.slice(0, args?.take ?? records.length);
     });
-
     mocks.availabilityRecordUpdateMany.mockImplementation((args: any) => {
       if (args?.data?.xero_approval_checked_at) {
         const id = args.where?.id;
@@ -683,37 +623,30 @@ describe("reconcile Xero approval state bounding", () => {
       }
       return { count: 1 };
     });
-
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
       value: { approvedAt: null, rawResponse: {}, status: "APPROVED" },
     });
-
     const run1Promise = reconcileXeroApprovalState(input());
     await vi.runAllTimersAsync();
     await run1Promise;
-
     const firstRunFetchedIds = (
       mocks.fetchLeaveApplicationStatusForRegion.mock.calls as any[]
     ).map((c) => c[1]?.xeroLeaveApplicationId);
     mocks.fetchLeaveApplicationStatusForRegion.mockClear();
-
     const run2Promise = reconcileXeroApprovalState(input());
     await vi.runAllTimersAsync();
     await run2Promise;
-
     const secondRunFetchedIds = (
       mocks.fetchLeaveApplicationStatusForRegion.mock.calls as any[]
     ).map((c) => c[1]?.xeroLeaveApplicationId);
     vi.useRealTimers();
-
     expect(firstRunFetchedIds).toHaveLength(500);
     expect(secondRunFetchedIds).toHaveLength(500);
     expect(secondRunFetchedIds).toContain("xero-leave-500");
     expect(secondRunFetchedIds).toContain("xero-leave-599");
     expect(secondRunFetchedIds).not.toEqual(firstRunFetchedIds);
   });
-
   it("covers every candidate across full multi-run cycles without starvation", async () => {
     vi.useFakeTimers();
     const candidateStore = Array.from({ length: 1200 }, (_, i) => ({
@@ -723,7 +656,6 @@ describe("reconcile Xero approval state bounding", () => {
       source_remote_id: `xero-leave-${i}`,
       xero_approval_checked_at: null as Date | null,
     }));
-
     mocks.availabilityRecordFindMany.mockImplementation((args: any) => {
       const records = [...candidateStore];
       records.sort((a, b) => {
@@ -738,7 +670,6 @@ describe("reconcile Xero approval state bounding", () => {
       });
       return records.slice(0, args?.take ?? records.length);
     });
-
     mocks.availabilityRecordUpdateMany.mockImplementation((args: any) => {
       if (args?.data?.xero_approval_checked_at) {
         const id = args.where?.id;
@@ -751,14 +682,11 @@ describe("reconcile Xero approval state bounding", () => {
       }
       return { count: 1 };
     });
-
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
       value: { approvedAt: null, rawResponse: {}, status: "APPROVED" },
     });
-
     const checkedRemoteIds = new Set<string>();
-
     // 3 runs of 500 cover 1500 slots, fully checking all 1200 records
     for (let run = 0; run < 3; run += 1) {
       const promise = reconcileXeroApprovalState(input());
@@ -771,22 +699,18 @@ describe("reconcile Xero approval state bounding", () => {
       mocks.fetchLeaveApplicationStatusForRegion.mockClear();
     }
     vi.useRealTimers();
-
     expect(checkedRemoteIds.size).toBe(1200);
     expect(
       candidateStore.every((c) => c.xero_approval_checked_at instanceof Date)
     ).toBe(true);
   });
-
   it("increments archivedMissing without incrementing failed on not_found_error and completes with succeeded", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([record()]);
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       error: { code: "not_found_error", rawPayload: null },
       ok: false,
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -799,16 +723,13 @@ describe("reconcile Xero approval state bounding", () => {
     );
     expect(mocks.failedRecordCreate).not.toHaveBeenCalled();
   });
-
   it("increments failed, records failure, stamps checked marker, and forces partial_success on genuine upstream error", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([record()]);
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       error: { code: "validation_error", message: "timeout", rawPayload: null },
       ok: false,
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
@@ -833,7 +754,6 @@ describe("reconcile Xero approval state bounding", () => {
     );
   });
 });
-
 describe("regional approval state reconciliation (Plan 105)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -845,11 +765,10 @@ describe("regional approval state reconciliation (Plan 105)", () => {
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mocks.xeroConnectionFindFirst.mockResolvedValue({
+      id: XERO_CONNECTION_ID,
       payroll_region: "NZ",
       sync_paused_at: null,
-      xero_connection_id: XERO_CONNECTION_ID,
     });
     mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
@@ -862,7 +781,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
     mocks.failedRecordCreate.mockResolvedValue({});
     mocks.toPlainLanguageMessage.mockReturnValue("access_denied");
   });
-
   it("selects xero_employee_id on person and passes it to dispatch for NZ region", async () => {
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
@@ -872,14 +790,11 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         status: "APPROVED",
       },
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toMatchObject({
       ok: true,
       value: { approved: 1, failed: 0, status: "succeeded" },
     });
-
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         include: {
@@ -896,26 +811,23 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         },
       })
     );
-
     expect(mocks.fetchLeaveApplicationStatusForRegion).toHaveBeenCalledWith(
       "NZ",
       expect.objectContaining({
-        xeroEmployeeId: "xero-employee-1",
-        xeroLeaveApplicationId: "xero-leave-application-1",
-        xeroTenant: expect.objectContaining({
-          id: XERO_TENANT_ID,
+        xeroConnection: expect.objectContaining({
+          id: XERO_CONNECTION_ID,
           payroll_region: "NZ",
         }),
+        xeroEmployeeId: "xero-employee-1",
+        xeroLeaveApplicationId: "xero-leave-application-1",
       })
     );
   });
-
   it("selects xero_employee_id on person and passes it to dispatch for UK region", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue({
-      id: XERO_TENANT_ID,
+    mocks.xeroConnectionFindFirst.mockResolvedValue({
+      id: XERO_CONNECTION_ID,
       payroll_region: "UK",
       sync_paused_at: null,
-      xero_connection_id: XERO_CONNECTION_ID,
     });
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       ok: true,
@@ -925,27 +837,23 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         status: "REJECTED",
       },
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toMatchObject({
       ok: true,
       value: { declined: 1, failed: 0, status: "succeeded" },
     });
-
     expect(mocks.fetchLeaveApplicationStatusForRegion).toHaveBeenCalledWith(
       "UK",
       expect.objectContaining({
-        xeroEmployeeId: "xero-employee-1",
-        xeroLeaveApplicationId: "xero-leave-application-1",
-        xeroTenant: expect.objectContaining({
-          id: XERO_TENANT_ID,
+        xeroConnection: expect.objectContaining({
+          id: XERO_CONNECTION_ID,
           payroll_region: "UK",
         }),
+        xeroEmployeeId: "xero-employee-1",
+        xeroLeaveApplicationId: "xero-leave-application-1",
       })
     );
   });
-
   it("treats missing employee ID as a record failure that advances fairly without a raw provider call", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([
       {
@@ -964,9 +872,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
       },
       ok: false,
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toMatchObject({
       ok: true,
       value: {
@@ -974,7 +880,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         status: "partial_success",
       },
     });
-
     expect(mocks.fetchLeaveApplicationStatusForRegion).toHaveBeenCalledWith(
       "NZ",
       expect.objectContaining({
@@ -982,7 +887,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         xeroLeaveApplicationId: "xero-leave-application-1",
       })
     );
-
     expect(mocks.failedRecordCreate).toHaveBeenCalledTimes(1);
     expect(mocks.failedRecordCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -993,7 +897,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         }),
       })
     );
-
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -1007,7 +910,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
       })
     );
   });
-
   it("persists retry_later and rejects through the registered boundary without checked markers", async () => {
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       error: {
@@ -1032,7 +934,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
     );
     expect(mocks.availabilityRecordUpdateMany).not.toHaveBeenCalled();
   });
-
   it("treats a 403 permission_error as a blanket run failure rather than a business status or not found", async () => {
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       error: {
@@ -1044,9 +945,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
       },
       ok: false,
     });
-
     const result = await reconcileXeroApprovalState(input());
-
     expect(result).toMatchObject({
       ok: true,
       value: {
@@ -1058,7 +957,6 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         withdrawn: 0,
       },
     });
-
     expect(mocks.syncRunUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -1069,32 +967,8 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         }),
       })
     );
-
     expect(mocks.failedRecordCreate).not.toHaveBeenCalled();
     expect(mocks.auditEventCreate).not.toHaveBeenCalled();
     expect(mocks.dispatchNotification).not.toHaveBeenCalled();
   });
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

@@ -28,7 +28,7 @@ import type {
 } from "../read/leave-records";
 import { tryMapXeroLeaveRecords } from "../read/leave-records";
 import type {
-  XeroTenantForWrite,
+  XeroAccessContext,
   XeroWriteError,
   XeroWriteResult,
 } from "../write/types";
@@ -36,7 +36,6 @@ import type {
 const XERO_DEFAULT_BASE_URL = "https://api.xero.com";
 const XERO_PAGE_SIZE = 100;
 const XERO_MAX_PAGES = 200;
-
 const AuPayItemsSchema = z
   .object({
     PayItems: z
@@ -55,7 +54,6 @@ const AuPayItemsSchema = z
       .passthrough(),
   })
   .passthrough();
-
 // Xero permits 60 calls/min per connected organisation. Space the per-employee
 // detail reads at least this far apart so a full balance sync stays within that
 // ceiling instead of bursting into a 429 partway through.
@@ -70,16 +68,16 @@ export type {
   XeroLeaveRecordMapFailure,
   XeroLeaveRecordsFetchResult,
 } from "../read/leave-records";
-
 export async function fetchEmployees(input: {
-  xeroTenant: XeroTenantForWrite;
+  mode?: "full" | "incremental";
+  modifiedSince?: Date | null;
+  xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<XeroEmployeesFetchResult>> {
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const employees: XeroEmployee[] = [];
     const failures: XeroEmployeeMapFailure[] = [];
@@ -87,34 +85,32 @@ export async function fetchEmployees(input: {
     let rawItemCount = 0;
     let page = 1;
     let rawResponse: unknown = null;
-
     while (page <= XERO_MAX_PAGES) {
       const response = await xeroFetch({
-        deadline: input.xeroTenant.deadline,
+        deadline: input.xeroConnection.deadline,
         init: {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
-            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+            "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
+            ...modificationHeaders(input),
           },
           method: "GET",
         },
         rateClass: {
           kind: "tenant",
           providerAppId: keys().XERO_CLIENT_ID ?? "",
-          xeroTenantId: input.xeroTenant.xero_tenant_id,
+          xeroTenantId: input.xeroConnection.xero_tenant_id,
         },
         url: `${baseUrl()}/payroll.xro/1.0/Employees?page=${page}`,
       });
       const rawPayload = await readXeroPayload(response);
-
       if (!response.ok) {
         return {
           error: mapXeroReadHttpError(response, rawPayload),
           ok: false,
         };
       }
-
       rawResponse ??= rawPayload;
       const mappedPage = tryMapXeroEmployees(rawPayload);
       if (!mappedPage.ok) {
@@ -124,8 +120,8 @@ export async function fetchEmployees(input: {
         // treated like a truncated leave-record fetch: return what has been
         // gathered so far as incomplete rather than discarding it.
         log.warn("Xero employee page could not be parsed", {
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
+          clerkOrgId: input.xeroConnection.clerk_org_id,
+          organisationId: input.xeroConnection.organisation_id,
           page,
         });
         return {
@@ -140,12 +136,10 @@ export async function fetchEmployees(input: {
           },
         };
       }
-
       employees.push(...mappedPage.employees);
       failures.push(...mappedPage.failures);
       seenEmployeeIds.push(...mappedPage.seenEmployeeIds);
       rawItemCount += mappedPage.rawItemCount;
-
       // Pagination termination must use the raw page length Xero returned,
       // never the count of records that mapped cleanly, otherwise a page
       // full of malformed records would look like a short final page.
@@ -162,13 +156,11 @@ export async function fetchEmployees(input: {
           },
         };
       }
-
       page += 1;
     }
-
     log.warn("Xero employee pagination exceeded the maximum page count", {
-      clerkOrgId: input.xeroTenant.clerk_org_id,
-      organisationId: input.xeroTenant.organisation_id,
+      clerkOrgId: input.xeroConnection.clerk_org_id,
+      organisationId: input.xeroConnection.organisation_id,
       page: XERO_MAX_PAGES,
     });
     return {
@@ -189,26 +181,25 @@ export async function fetchEmployees(input: {
     };
   }
 }
-
 export async function fetchLeaveRecords(input: {
   maxPages?: number;
-  xeroTenant: XeroTenantForWrite;
+  mode?: "full" | "incremental";
+  modifiedSince?: Date | null;
+  xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<XeroLeaveRecordsFetchResult>> {
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const leaveTypeNamesResult = await fetchAuLeaveTypeNames({
       accessToken: decryptedAccessToken,
-      xeroTenant: input.xeroTenant,
+      xeroConnection: input.xeroConnection,
     });
     if (!leaveTypeNamesResult.ok) {
       return leaveTypeNamesResult;
     }
-
     const leaveRecords: XeroLeaveRecord[] = [];
     const failures: XeroLeaveRecordMapFailure[] = [];
     const seenLeaveApplicationIds: string[] = [];
@@ -216,34 +207,32 @@ export async function fetchLeaveRecords(input: {
     let page = 1;
     let rawResponse: unknown = null;
     const maxPages = input.maxPages ?? XERO_MAX_PAGES;
-
     while (page <= maxPages) {
       const response = await xeroFetch({
-        deadline: input.xeroTenant.deadline,
+        deadline: input.xeroConnection.deadline,
         init: {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
-            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+            "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
+            ...modificationHeaders(input),
           },
           method: "GET",
         },
         rateClass: {
           kind: "tenant",
           providerAppId: keys().XERO_CLIENT_ID ?? "",
-          xeroTenantId: input.xeroTenant.xero_tenant_id,
+          xeroTenantId: input.xeroConnection.xero_tenant_id,
         },
         url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications/v2?page=${page}`,
       });
       const rawPayload = await readXeroPayload(response);
-
       if (!response.ok) {
         return {
           error: mapXeroReadHttpError(response, rawPayload),
           ok: false,
         };
       }
-
       rawResponse ??= rawPayload;
       const mappedPage = tryMapXeroLeaveRecords(
         rawPayload,
@@ -251,8 +240,8 @@ export async function fetchLeaveRecords(input: {
       );
       if (!mappedPage.ok) {
         log.warn("Xero leave record page could not be parsed", {
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
+          clerkOrgId: input.xeroConnection.clerk_org_id,
+          organisationId: input.xeroConnection.organisation_id,
           page,
         });
         return {
@@ -269,12 +258,10 @@ export async function fetchLeaveRecords(input: {
           },
         };
       }
-
       leaveRecords.push(...mappedPage.records);
       failures.push(...mappedPage.failures);
       seenLeaveApplicationIds.push(...mappedPage.seenLeaveApplicationIds);
       rawItemCount += mappedPage.rawItemCount;
-
       if (mappedPage.rawItemCount < XERO_PAGE_SIZE) {
         const hasInvalidRecords = failures.length > 0;
         return {
@@ -293,13 +280,11 @@ export async function fetchLeaveRecords(input: {
           },
         };
       }
-
       page += 1;
     }
-
     log.warn("Xero leave record pagination exceeded the maximum page count", {
-      clerkOrgId: input.xeroTenant.clerk_org_id,
-      organisationId: input.xeroTenant.organisation_id,
+      clerkOrgId: input.xeroConnection.clerk_org_id,
+      organisationId: input.xeroConnection.organisation_id,
       page: XERO_MAX_PAGES,
     });
     return {
@@ -322,25 +307,24 @@ export async function fetchLeaveRecords(input: {
     };
   }
 }
-
 async function fetchAuLeaveTypeNames(input: {
   accessToken: string;
-  xeroTenant: XeroTenantForWrite;
+  xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<ReadonlyMap<string, string>>> {
   const response = await xeroFetch({
-    deadline: input.xeroTenant.deadline,
+    deadline: input.xeroConnection.deadline,
     init: {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${input.accessToken}`,
-        "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+        "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
       },
       method: "GET",
     },
     rateClass: {
       kind: "tenant",
       providerAppId: keys().XERO_CLIENT_ID ?? "",
-      xeroTenantId: input.xeroTenant.xero_tenant_id,
+      xeroTenantId: input.xeroConnection.xero_tenant_id,
     },
     url: `${baseUrl()}/payroll.xro/1.0/PayItems`,
   });
@@ -351,7 +335,6 @@ async function fetchAuLeaveTypeNames(input: {
       ok: false,
     };
   }
-
   const parsed = AuPayItemsSchema.safeParse(rawPayload);
   if (!parsed.success) {
     return {
@@ -363,7 +346,6 @@ async function fetchAuLeaveTypeNames(input: {
       ok: false,
     };
   }
-
   return {
     ok: true,
     value: new Map(
@@ -374,7 +356,6 @@ async function fetchAuLeaveTypeNames(input: {
     ),
   };
 }
-
 export async function fetchLeaveBalances(input: {
   employeeIds: string[];
   // Invoked after each employee is processed so a long-running caller can emit a
@@ -384,7 +365,7 @@ export async function fetchLeaveBalances(input: {
   // Override the per-request pacing. Defaults to the Xero rate-limit interval;
   // tests pass 0 to run without the real-time delay.
   readIntervalMs?: number;
-  xeroTenant: XeroTenantForWrite;
+  xeroConnection: XeroAccessContext;
 }): Promise<
   XeroWriteResult<{
     failures: XeroLeaveBalanceFetchFailure[];
@@ -392,31 +373,28 @@ export async function fetchLeaveBalances(input: {
     rawResponses: unknown[];
   }>
 > {
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   const intervalMs = input.readIntervalMs ?? LEAVE_BALANCE_READ_INTERVAL_MS;
   const leaveBalances: XeroLeaveBalance[] = [];
   const rawResponses: unknown[] = [];
   const failures: XeroLeaveBalanceFetchFailure[] = [];
-
   for (const [index, employeeId] of input.employeeIds.entries()) {
     if (index > 0 && intervalMs > 0) {
       await sleep(intervalMs);
     }
-
     let response: Response;
     try {
       response = await xeroFetch({
-        deadline: input.xeroTenant.deadline,
+        deadline: input.xeroConnection.deadline,
         init: {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
-            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+            "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
           },
           method: "GET",
         },
@@ -426,7 +404,7 @@ export async function fetchLeaveBalances(input: {
         rateClass: {
           kind: "tenant",
           providerAppId: keys().XERO_CLIENT_ID ?? "",
-          xeroTenantId: input.xeroTenant.xero_tenant_id,
+          xeroTenantId: input.xeroConnection.xero_tenant_id,
         },
         url: `${baseUrl()}/payroll.xro/1.0/Employees/${encodeURIComponent(employeeId)}`,
       });
@@ -438,10 +416,8 @@ export async function fetchLeaveBalances(input: {
         ok: false,
       };
     }
-
     const rawPayload = await readXeroPayload(response);
     rawResponses.push(rawPayload);
-
     if (!response.ok) {
       const mappedError = mapXeroReadHttpError(response, rawPayload);
       // Auth and rate-limit failures affect every subsequent call, so stop and
@@ -460,11 +436,20 @@ export async function fetchLeaveBalances(input: {
       await input.onProgress?.(index + 1, input.employeeIds.length);
       continue;
     }
-
-    leaveBalances.push(...mapXeroLeaveBalances(rawPayload));
+    try {
+      leaveBalances.push(...mapXeroLeaveBalances(rawPayload));
+    } catch {
+      failures.push({
+        employeeId,
+        error: {
+          code: "validation_error",
+          message: "Xero returned invalid AU payroll leave balances.",
+          rawPayload,
+        },
+      });
+    }
     await input.onProgress?.(index + 1, input.employeeIds.length);
   }
-
   return {
     ok: true,
     value: {
@@ -474,45 +459,39 @@ export async function fetchLeaveBalances(input: {
     },
   };
 }
-
 export async function fetchLeaveApplicationStatus(
   input: FetchLeaveApplicationStatusInput
 ): Promise<XeroWriteResult<XeroLeaveApplicationStatusResult>> {
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const response = await xeroFetch({
-      deadline: input.xeroTenant.deadline,
+      deadline: input.xeroConnection.deadline,
       init: {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${decryptedAccessToken}`,
-          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
         },
         method: "GET",
       },
       rateClass: {
         kind: "tenant",
         providerAppId: keys().XERO_CLIENT_ID ?? "",
-        xeroTenantId: input.xeroTenant.xero_tenant_id,
+        xeroTenantId: input.xeroConnection.xero_tenant_id,
       },
-      url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
-        input.xeroLeaveApplicationId
-      )}`,
+      url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}`,
     });
     const rawPayload = await readXeroPayload(response);
-
     if (!response.ok) {
       return {
         error: mapXeroReadHttpError(response, rawPayload),
         ok: false,
       };
     }
-
     return { ok: true, value: mapLeaveApplicationStatus(rawPayload) };
   } catch (error) {
     return {
@@ -521,19 +500,22 @@ export async function fetchLeaveApplicationStatus(
     };
   }
 }
-
 function baseUrl(): string {
   return keys().XERO_API_BASE_URL ?? XERO_DEFAULT_BASE_URL;
 }
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-function resolveAccessToken(
-  xeroTenant: XeroTenantForWrite
-): { ok: true; token: string } | { ok: false; error: XeroWriteError } {
-  if (!xeroTenant.accessToken) {
+function resolveAccessToken(xeroConnection: XeroAccessContext):
+  | {
+      ok: true;
+      token: string;
+    }
+  | {
+      ok: false;
+      error: XeroWriteError;
+    } {
+  if (!xeroConnection.accessToken) {
     return {
       error: {
         code: "unknown_error",
@@ -544,5 +526,21 @@ function resolveAccessToken(
       ok: false,
     };
   }
-  return { ok: true, token: xeroTenant.accessToken };
+  return { ok: true, token: xeroConnection.accessToken };
+}
+
+const UTC_SECONDS_SUFFIX = /\.\d{3}Z$/;
+
+function modificationHeaders(input: {
+  mode?: "full" | "incremental";
+  modifiedSince?: Date | null;
+}): Record<string, string> {
+  if (input.mode !== "incremental" || !input.modifiedSince) {
+    return {};
+  }
+  return {
+    "If-Modified-Since": new Date(input.modifiedSince.getTime() - 120_000)
+      .toISOString()
+      .replace(UTC_SECONDS_SUFFIX, "Z"),
+  };
 }

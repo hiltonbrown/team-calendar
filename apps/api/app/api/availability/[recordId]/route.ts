@@ -12,30 +12,31 @@ import { getAvailabilityRecordById } from "@repo/database/queries/availability-r
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
-import { withAvailabilityRequestAction } from "@/lib/xero-campaign-action";
 
 const RouteParamsSchema = z.object({
   recordId: z.string().uuid(),
 });
-
 const UpdateAvailabilitySchema = z
   .object({
     organisationId: z.string().uuid(),
   })
   .passthrough();
-
 const DeleteAvailabilitySchema = z.object({
   organisationId: z.string().uuid(),
 });
-
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ recordId: string }> }
+  {
+    params,
+  }: {
+    params: Promise<{
+      recordId: string;
+    }>;
+  }
 ): Promise<Response> {
   try {
     const rawParams = await params;
     const parsedParams = RouteParamsSchema.safeParse(rawParams);
-
     if (!parsedParams.success) {
       return Response.json(
         {
@@ -49,7 +50,6 @@ export async function PATCH(
         { status: 400 }
       );
     }
-
     // Get authenticated user and organisation
     let clerkOrgId: string;
     try {
@@ -63,10 +63,8 @@ export async function PATCH(
         { status: 401 }
       );
     }
-
     // Get current user
     const user = await currentUser();
-
     if (!user) {
       return Response.json(
         {
@@ -76,7 +74,6 @@ export async function PATCH(
         { status: 401 }
       );
     }
-
     let body: unknown;
     try {
       body = await request.json();
@@ -90,7 +87,6 @@ export async function PATCH(
       );
     }
     const parseResult = UpdateAvailabilitySchema.safeParse(body);
-
     if (!parseResult.success) {
       return Response.json(
         {
@@ -104,48 +100,31 @@ export async function PATCH(
         { status: 400 }
       );
     }
-
     const { organisationId, ...patch } = parseResult.data;
-
     // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId and recordId are validated by Zod UUID schemas
     const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
     const scopedOrgId = organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
-
     // Validate organisation exists
     const orgResult = await getOrganisationById(scopedClerkOrgId, scopedOrgId);
-
     if (!orgResult.ok) {
       return Response.json(
         { error: orgResult.error, ok: false },
         { status: orgResult.error.code === "not_found" ? 404 : 500 }
       );
     }
-
     const authResult = await auth();
-
     // Call availability service to update record
-    const updateResult = await withAvailabilityRequestAction(
-      request,
-      "availability.update",
-      {
-        clerkOrgId: scopedClerkOrgId,
-        organisationId: scopedOrgId,
-        userId: user.id,
-      },
-      { ...parseResult.data, recordId: scopedRecordId },
-      () =>
-        updateManualAvailability(
-          {
-            clerkOrgId: scopedClerkOrgId,
-            organisationId: scopedOrgId,
-          },
-          scopedRecordId,
-          patch,
-          { orgRole: authResult.orgRole, userId: user.id }
-        )
-    );
-
+    const updateResult = await (() =>
+      updateManualAvailability(
+        {
+          clerkOrgId: scopedClerkOrgId,
+          organisationId: scopedOrgId,
+        },
+        scopedRecordId,
+        patch,
+        { orgRole: authResult.orgRole, userId: user.id }
+      ))();
     if (!updateResult.ok) {
       return Response.json(
         { error: updateResult.error, ok: false },
@@ -154,7 +133,6 @@ export async function PATCH(
         }
       );
     }
-
     return Response.json({ ok: true, value: updateResult.value });
   } catch (error) {
     log.error("Error updating availability record", { error });
@@ -170,35 +148,34 @@ export async function PATCH(
     );
   }
 }
-
 function statusForUpdateError(code: string): number {
   if (code === "bad_request") {
     return 400;
   }
-
   if (code === "conflict") {
     return 409;
   }
-
   if (code === "not_found") {
     return 404;
   }
-
   if (code === "not_authorised") {
     return 403;
   }
-
   return 500;
 }
-
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ recordId: string }> }
+  {
+    params,
+  }: {
+    params: Promise<{
+      recordId: string;
+    }>;
+  }
 ): Promise<Response> {
   try {
     const rawParams = await params;
     const parsedParams = RouteParamsSchema.safeParse(rawParams);
-
     if (!parsedParams.success) {
       return Response.json(
         {
@@ -212,7 +189,6 @@ export async function DELETE(
         { status: 400 }
       );
     }
-
     // Get authenticated user and organisation
     let clerkOrgId: string;
     try {
@@ -226,10 +202,8 @@ export async function DELETE(
         { status: 401 }
       );
     }
-
     // Get current user
     const user = await currentUser();
-
     if (!user) {
       return Response.json(
         {
@@ -239,7 +213,6 @@ export async function DELETE(
         { status: 401 }
       );
     }
-
     let body: unknown;
     try {
       body = await request.json();
@@ -253,7 +226,6 @@ export async function DELETE(
       );
     }
     const parseResult = DeleteAvailabilitySchema.safeParse(body);
-
     if (!parseResult.success) {
       return Response.json(
         {
@@ -267,41 +239,33 @@ export async function DELETE(
         { status: 400 }
       );
     }
-
     const { data } = parseResult;
-
     // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId and recordId are validated by Zod UUID schemas
     const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
     const scopedOrgId = data.organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
-
     // Validate organisation exists
     const orgResult = await getOrganisationById(scopedClerkOrgId, scopedOrgId);
-
     if (!orgResult.ok) {
       return Response.json(
         { error: orgResult.error, ok: false },
         { status: orgResult.error.code === "not_found" ? 404 : 500 }
       );
     }
-
     // Get record to verify it exists and is editable
     const recordResult = await getAvailabilityRecordById(
       scopedClerkOrgId,
       scopedOrgId,
       scopedRecordId
     );
-
     if (!recordResult.ok) {
       return Response.json(
         { error: recordResult.error, ok: false },
         { status: recordResult.error.code === "not_found" ? 404 : 500 }
       );
     }
-
     const record = recordResult.value;
     const authResult = await auth();
-
     // Check if record is Xero-sourced (read-only)
     if (record.sourceType !== "manual") {
       return Response.json(
@@ -315,28 +279,16 @@ export async function DELETE(
         { status: 403 }
       );
     }
-
     // Call availability service to archive record (soft delete)
-    const deleteResult = await withAvailabilityRequestAction(
-      request,
-      "availability.archive",
-      {
-        clerkOrgId: scopedClerkOrgId,
-        organisationId: scopedOrgId,
-        userId: user.id,
-      },
-      { ...data, recordId: scopedRecordId },
-      () =>
-        archiveManualAvailability(
-          {
-            clerkOrgId: scopedClerkOrgId,
-            organisationId: scopedOrgId,
-          },
-          scopedRecordId,
-          { orgRole: authResult.orgRole, userId: user.id }
-        )
-    );
-
+    const deleteResult = await (() =>
+      archiveManualAvailability(
+        {
+          clerkOrgId: scopedClerkOrgId,
+          organisationId: scopedOrgId,
+        },
+        scopedRecordId,
+        { orgRole: authResult.orgRole, userId: user.id }
+      ))();
     if (!deleteResult.ok) {
       return Response.json(
         { error: deleteResult.error, ok: false },
@@ -345,7 +297,6 @@ export async function DELETE(
         }
       );
     }
-
     return new Response(null, { status: 204 });
   } catch (error) {
     log.error("Error deleting availability record", { error });

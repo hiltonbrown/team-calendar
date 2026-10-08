@@ -5,20 +5,16 @@ import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { organisationWithConnectionSelect } from "../_connection-view";
 import { XeroClient } from "./xero-client";
-
 export const metadata: Metadata = {
   description: "Manage Xero connections for each payroll organisation.",
   title: "Xero - Settings - Team Calendar",
 };
-
 export default async function XeroPage() {
   await requirePageRole("org:admin");
-
   const { orgId } = await auth();
   if (!orgId) {
     throw new Error("Organisation context is required.");
   }
-
   const organisations = await database.organisation.findMany({
     orderBy: [{ created_at: "asc" }, { name: "asc" }],
     select: organisationWithConnectionSelect,
@@ -27,7 +23,6 @@ export default async function XeroPage() {
       clerk_org_id: orgId,
     },
   });
-
   const withState = await Promise.all(
     organisations.map(async (organisation) => {
       const result = await getXeroConnectionStateForScope({
@@ -39,6 +34,5 @@ export default async function XeroPage() {
       return { ...organisation, xeroConnectionState };
     })
   );
-
   return <XeroClient organisations={withState} />;
 }

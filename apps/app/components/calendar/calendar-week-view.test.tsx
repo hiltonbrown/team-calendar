@@ -5,15 +5,12 @@ import { CalendarWeekView } from "./calendar-week-view";
 const ADD_AVAILABILITY_REGEX = /Add availability for/i;
 const LEAVE_EVENT_NAME = /Ari Report.*Source: Team Calendar leave/i;
 const WEDNESDAY_NAME = /Wednesday.*15 April 2026/i;
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
-
 describe("CalendarWeekView", () => {
   afterEach(() => cleanup());
-
   it("renders events in the week grid with public holidays", () => {
     render(
       <CalendarWeekView
@@ -23,11 +20,9 @@ describe("CalendarWeekView", () => {
         selectedPersonId={null}
       />
     );
-
     expect(screen.getByText("Ari Report")).toBeDefined();
     expect(screen.getByText("Queensland Day")).toBeDefined();
   });
-
   it("uses named day groups and lists without claiming an ARIA grid", () => {
     render(
       <CalendarWeekView
@@ -37,12 +32,10 @@ describe("CalendarWeekView", () => {
         selectedPersonId={null}
       />
     );
-
     const week = screen.getByRole("region", { name: "Calendar week view" });
     const day = screen.getByRole("region", {
       name: WEDNESDAY_NAME,
     });
-
     expect(within(week).queryByRole("grid")).toBeNull();
     expect(within(day).getByRole("list", { name: "Events" })).toBeDefined();
     expect(
@@ -51,7 +44,6 @@ describe("CalendarWeekView", () => {
       })
     ).toBeDefined();
   });
-
   it("ensures calendar create control has no focusable interactive descendants", () => {
     render(
       <CalendarWeekView
@@ -61,19 +53,16 @@ describe("CalendarWeekView", () => {
         selectedPersonId={null}
       />
     );
-
     const [createBtn] = screen.getAllByRole("button", {
       name: ADD_AVAILABILITY_REGEX,
     });
     expect(createBtn).toBeDefined();
-
     const interactiveDescendants = createBtn?.querySelectorAll(
       'button, a[href], [tabindex]:not([tabindex="-1"])'
     );
     expect(interactiveDescendants).toHaveLength(0);
   });
 });
-
 function weekRange() {
   return {
     days: Array.from({ length: 7 }, (_, index) => ({
@@ -106,7 +95,6 @@ function weekRange() {
     xeroSyncFailedCount: 0,
   } as const;
 }
-
 function event() {
   return {
     allDay: true,

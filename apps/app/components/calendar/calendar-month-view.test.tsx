@@ -3,15 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CalendarMonthView } from "./calendar-month-view";
 
 const TRUNCATION_COPY = /Showing 1 of 250 people/;
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
-
 describe("CalendarMonthView", () => {
   afterEach(() => cleanup());
-
   it("renders public holiday badges, today, overflow link, and accessible scroll region", () => {
     const { container } = render(
       <CalendarMonthView
@@ -21,18 +18,14 @@ describe("CalendarMonthView", () => {
         selectedPersonId={null}
       />
     );
-
     expect(screen.getByText("Holiday")).toBeDefined();
     expect(screen.getByText("+2 more")).toBeDefined();
-
     const scrollRegion = screen.getByLabelText("Month calendar");
     expect(scrollRegion).toBeDefined();
     expect(scrollRegion.className).toContain("overflow-x-auto");
-
     const grid = container.querySelector(".min-w-\\[56rem\\]");
     expect(grid).not.toBeNull();
   });
-
   it("preserves validated scope and all filters in overflow and mobile drill-down links", () => {
     const filters = {
       anchor: "2026-04-01",
@@ -81,7 +74,6 @@ describe("CalendarMonthView", () => {
       expect(params.getAll("locationId")).toEqual(filters.locationId);
     }
   });
-
   it("ensures calendar create control has no focusable interactive descendants", () => {
     render(
       <CalendarMonthView
@@ -91,7 +83,6 @@ describe("CalendarMonthView", () => {
         selectedPersonId={null}
       />
     );
-
     const createButtons = screen.getAllByRole("button", {
       name: "Add availability for 15 April 2026",
     });
@@ -102,7 +93,6 @@ describe("CalendarMonthView", () => {
       expect(interactiveDescendants).toHaveLength(0);
     }
   });
-
   it("renders the truncation banner", () => {
     render(
       <CalendarMonthView
@@ -116,10 +106,8 @@ describe("CalendarMonthView", () => {
         selectedPersonId={null}
       />
     );
-
     expect(screen.getByText(TRUNCATION_COPY)).toBeDefined();
   });
-
   it("renders a chronological mobile agenda with a day-detail path", () => {
     render(
       <CalendarMonthView
@@ -129,7 +117,6 @@ describe("CalendarMonthView", () => {
         selectedPersonId={null}
       />
     );
-
     const agenda = screen.getByRole("region", { name: "Month agenda" });
     expect(agenda.className).not.toContain("overflow-x-auto");
     expect(
@@ -140,7 +127,6 @@ describe("CalendarMonthView", () => {
     ).toBe("/calendar?view=day&anchor=2026-04-15&org=org_1");
   });
 });
-
 function calendarRange({ eventCount }: { eventCount: number }) {
   const events = Array.from({ length: eventCount }, (_, index) => ({
     ...event(),
@@ -189,7 +175,6 @@ function calendarRange({ eventCount }: { eventCount: number }) {
     xeroSyncFailedCount: 0,
   } as const;
 }
-
 function event() {
   return {
     allDay: true,

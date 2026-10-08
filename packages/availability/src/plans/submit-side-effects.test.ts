@@ -115,4 +115,23 @@ describe("submit side effects", () => {
     expect(mocks.dispatch).toHaveBeenCalledOnce();
     expect(mocks.publish).toHaveBeenCalledTimes(2);
   });
+  it("uses the journal's original decline reason and actor in its durable notification", async () => {
+    const result = await completeSubmitSideEffects({
+      ...input,
+      actorUserId: "original_manager",
+      approvalRecipient: { clerkUserId: "employee", personId: "person" },
+      attempt: { ...input.attempt, action: "decline" },
+      declineReason: "Original coverage decision",
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: "original_manager",
+        body: "Original coverage decision",
+        type: "leave_declined",
+      }),
+      expect.anything(),
+      { publishRealtime: false }
+    );
+  });
 });

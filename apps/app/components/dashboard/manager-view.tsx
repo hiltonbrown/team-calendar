@@ -20,7 +20,6 @@ interface ManagerViewProps {
   personId: string;
   view: ManagerDashboardView;
 }
-
 export function ManagerView({
   view,
   orgQueryValue,
@@ -31,7 +30,6 @@ export function ManagerView({
     now: new Date(),
     timezone: view.header.timezone ?? "Australia/Brisbane",
   });
-
   return (
     <DashboardScaffold
       banner={

@@ -1,5 +1,4 @@
 import "server-only";
-
 import {
   type ClerkOrgId,
   holidayIsNonWorking,
@@ -54,24 +53,38 @@ import { getSettings } from "../settings/organisation-settings-service";
 import { listRuns, listTenantSummaries } from "../sync/sync-monitor-service";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import { createDashboardCache, type DashboardCache } from "./dashboard-cache";
-
 export type DashboardRole =
   | "owner"
   | "admin"
   | "manager"
   | "employee"
   | "viewer";
-
 export type DashboardServiceError =
-  | { code: "not_authorised"; message: string }
-  | { code: "person_not_found"; message: string }
-  | { code: "validation_error"; message: string }
-  | { code: "unknown_error"; message: string };
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "person_not_found";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    };
 export type DashboardSection<TData> =
-  | { status: "error"; message: string }
-  | { data: TData; status: "ready" };
-
+  | {
+      status: "error";
+      message: string;
+    }
+  | {
+      data: TData;
+      status: "ready";
+    };
 export interface EmployeeDashboardView {
   actionItems: DashboardSection<{
     declinedRecords: Array<{
@@ -158,7 +171,6 @@ export interface EmployeeDashboardView {
     }>;
   }>;
 }
-
 export interface ManagerDashboardView extends EmployeeDashboardView {
   approvalQueue: DashboardSection<{
     ctaUrl: string;
@@ -237,9 +249,12 @@ export interface ManagerDashboardView extends EmployeeDashboardView {
     totalPeaksCount: number;
   }>;
 }
-
 export interface AdminDashboardView extends EmployeeDashboardView {
-  activeFeeds: DashboardSection<DashboardFeedSummary & { ctaUrl: string }>;
+  activeFeeds: DashboardSection<
+    DashboardFeedSummary & {
+      ctaUrl: string;
+    }
+  >;
   header: EmployeeDashboardView["header"] & {
     organisationName: string;
     roleLabel: "Admin" | "Owner";
@@ -295,14 +310,12 @@ export interface AdminDashboardView extends EmployeeDashboardView {
     visibleToAdmin: boolean;
   }>;
 }
-
 const ResolveRoleSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   orgRole: z.string().nullable().optional(),
   userId: z.string().min(1),
 });
-
 const ViewSchema = z.object({
   actingRole: z.enum(["admin", "employee", "manager", "owner", "viewer"]),
   clerkOrgId: z.string().min(1),
@@ -310,9 +323,13 @@ const ViewSchema = z.object({
   personId: z.string().uuid(),
   userId: z.string().min(1),
 });
-
 type HolidayListResult = Awaited<ReturnType<typeof listForOrganisation>>;
-type HolidayRow = Extract<HolidayListResult, { ok: true }>["value"][number];
+type HolidayRow = Extract<
+  HolidayListResult,
+  {
+    ok: true;
+  }
+>["value"][number];
 type CalendarRangeData =
   Awaited<ReturnType<typeof getCalendarRange>> extends Result<
     infer TValue,
@@ -320,12 +337,10 @@ type CalendarRangeData =
   >
     ? TValue
     : never;
-
 type SyncHealthCardData =
   AdminDashboardView["syncHealth"] extends DashboardSection<infer TData>
     ? TData
     : never;
-
 const AUDIT_EVENT_ALLOWLIST = [
   "availability_records.submitted",
   "availability_records.approved",
@@ -347,7 +362,6 @@ const AUDIT_EVENT_ALLOWLIST = [
   "xero.tenant_sync_paused",
   "xero.tenant_sync_resumed",
 ];
-
 export async function resolveDashboardRole(
   input: z.input<typeof ResolveRoleSchema>
 ): Promise<Result<DashboardRole, DashboardServiceError>> {
@@ -355,7 +369,6 @@ export async function resolveDashboardRole(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const person = await database.person.findFirst({
       select: { id: true },
@@ -366,7 +379,6 @@ export async function resolveDashboardRole(
         organisation_id: parsed.data.organisationId,
       },
     });
-
     if (parsed.data.orgRole === "org:owner") {
       return { ok: true, value: "owner" };
     }
@@ -376,7 +388,6 @@ export async function resolveDashboardRole(
     if (!person) {
       return { ok: true, value: "viewer" };
     }
-
     const directReportCount = await database.person.count({
       where: {
         archived_at: null,
@@ -385,17 +396,14 @@ export async function resolveDashboardRole(
         organisation_id: parsed.data.organisationId,
       },
     });
-
     if (directReportCount > 0) {
       return { ok: true, value: "manager" };
     }
-
     return { ok: true, value: "employee" };
   } catch {
     return unknownError("Failed to resolve dashboard role.");
   }
 }
-
 export async function getEmployeeView(
   input: z.input<typeof ViewSchema>,
   cache: DashboardCache = createDashboardCache()
@@ -404,13 +412,11 @@ export async function getEmployeeView(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   return await cache.getOrLoad(
     cacheKey("employee", parsed.data),
     async () => await buildEmployeeView(parsed.data, cache)
   );
 }
-
 export async function getManagerView(
   input: z.input<typeof ViewSchema>,
   cache: DashboardCache = createDashboardCache()
@@ -419,7 +425,6 @@ export async function getManagerView(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const [employeeResult, settingsResult, directReportCount, scopePersonIds] =
       await Promise.all([
@@ -442,11 +447,9 @@ export async function getManagerView(
           organisationId: parsed.data.organisationId,
         }),
       ]);
-
     if (!employeeResult.ok) {
       return employeeResult;
     }
-
     const managerRole = approvalRole(parsed.data.actingRole);
     const [
       peopleResult,
@@ -499,7 +502,6 @@ export async function getManagerView(
         view: "month",
       }),
     ]);
-
     const includeIndirectReports =
       settingsResult.ok &&
       settingsResult.value.managerVisibilityScope === "all_team_leave";
@@ -512,7 +514,6 @@ export async function getManagerView(
         ? `${scopeCount} team members (direct + indirect)`
         : `${directReportCount} direct reports`,
     };
-
     return {
       ok: true,
       value: {
@@ -548,7 +549,6 @@ export async function getManagerView(
     return unknownError("Failed to build manager dashboard.");
   }
 }
-
 export async function getAdminView(
   input: z.input<typeof ViewSchema>,
   cache: DashboardCache = createDashboardCache()
@@ -557,7 +557,6 @@ export async function getAdminView(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const adminRole = parsed.data.actingRole === "owner" ? "owner" : "admin";
     const [
@@ -627,11 +626,9 @@ export async function getAdminView(
         pagination: { pageSize: 10 },
       }),
     ]);
-
     if (!employeeResult.ok) {
       return employeeResult;
     }
-
     const header: AdminDashboardView["header"] = {
       ...employeeResult.value.header,
       organisationName: organisation?.name ?? "Organisation",
@@ -640,7 +637,6 @@ export async function getAdminView(
         ? peopleCountResult.value.totalCount
         : 0,
     };
-
     return {
       ok: true,
       value: {
@@ -703,7 +699,6 @@ export async function getAdminView(
     return unknownError("Failed to build admin dashboard.");
   }
 }
-
 async function buildEmployeeView(
   input: z.infer<typeof ViewSchema>,
   cache: DashboardCache
@@ -726,14 +721,12 @@ async function buildEmployeeView(
     const xeroConnectionState = xeroStateResult.ok
       ? xeroStateResult.value.state
       : "unavailable";
-
     if (!profileResult.ok) {
       if (profileResult.error.code === "person_not_found") {
         return personNotFound();
       }
       return unknownError(profileResult.error.message);
     }
-
     const profile = profileResult.value;
     const [actionItems, upcoming, publicHolidays] = await Promise.all([
       cache.getOrLoad(
@@ -758,9 +751,7 @@ async function buildEmployeeView(
           })
       ),
     ]);
-
     const lastFetchedAt = profile.balances.balancesLastFetchedAt;
-
     return {
       ok: true,
       value: {
@@ -803,7 +794,6 @@ async function buildEmployeeView(
     return unknownError("Failed to build employee dashboard.");
   }
 }
-
 async function loadActionItemsCard(
   input: z.infer<typeof ViewSchema>
 ): Promise<EmployeeDashboardView["actionItems"]> {
@@ -839,7 +829,6 @@ async function loadActionItemsCard(
         userId: input.userId,
       }),
     ]);
-
   if (
     !(
       failedRecordsResult.ok &&
@@ -855,7 +844,6 @@ async function loadActionItemsCard(
       )
     );
   }
-
   return readySection({
     declinedRecords: declinedRecordsResult.value
       .filter(
@@ -891,7 +879,6 @@ async function loadActionItemsCard(
     })),
   });
 }
-
 async function loadUpcomingCard(
   input: z.infer<typeof ViewSchema>
 ): Promise<EmployeeDashboardView["upcoming"]> {
@@ -915,13 +902,11 @@ async function loadUpcomingCard(
       personId: input.personId,
     }),
   ]);
-
   if (!(localRecordsResult.ok && profileUpcomingResult.ok)) {
     return errorSection(
       firstErrorMessage(localRecordsResult, profileUpcomingResult)
     );
   }
-
   const upcoming = new Map<
     string,
     {
@@ -933,7 +918,6 @@ async function loadUpcomingCard(
       startsAt: Date;
     }
   >();
-
   for (const record of localRecordsResult.value) {
     upcoming.set(record.id, {
       allDay: record.allDay,
@@ -944,7 +928,6 @@ async function loadUpcomingCard(
       startsAt: record.startsAt,
     });
   }
-
   for (const record of profileUpcomingResult.value.records) {
     if (
       !(
@@ -963,14 +946,12 @@ async function loadUpcomingCard(
       startsAt: record.startsAt,
     });
   }
-
   return readySection({
     next14Days: [...upcoming.values()].sort(
       (left, right) => left.startsAt.getTime() - right.startsAt.getTime()
     ),
   });
 }
-
 async function loadPublicHolidayCard(input: {
   clerkOrgId: string;
   locationCountryCode?: string | null;
@@ -987,7 +968,6 @@ async function loadPublicHolidayCard(input: {
   if (!holidayResult.ok) {
     return errorSection(holidayResult.error.message);
   }
-
   let countryCode = input.locationCountryCode ?? null;
   let regionCode = input.locationRegionCode ?? null;
   if (!countryCode) {
@@ -1002,7 +982,6 @@ async function loadPublicHolidayCard(input: {
     countryCode = org?.country_code ?? null;
     regionCode = null;
   }
-
   const today = startOfDay(new Date());
   const next =
     holidayResult.value.find((holiday) => {
@@ -1019,7 +998,6 @@ async function loadPublicHolidayCard(input: {
           classification: assignment.day_classification,
           locationId: assignment.scope_value,
         }));
-
       return holidayIsNonWorking({
         holiday: {
           archivedAt: holiday.archived_at,
@@ -1036,13 +1014,11 @@ async function loadPublicHolidayCard(input: {
         },
       });
     }) ?? null;
-
   return readySection({
     daysUntil: next ? dayDiff(startOfDay(next.holiday_date), today) : null,
     next,
   });
 }
-
 async function loadSyncHealthCard(input: {
   actingRole: "admin" | "owner";
   clerkOrgId: string;
@@ -1076,7 +1052,6 @@ async function loadSyncHealthCard(input: {
   const xeroConnectionState = xeroStateResult.ok
     ? xeroStateResult.value.state
     : "unavailable";
-
   if (!(summaryResult.ok && runsResult.ok)) {
     return {
       error: {
@@ -1086,7 +1061,6 @@ async function loadSyncHealthCard(input: {
       ok: false,
     };
   }
-
   const lastSuccessfulSync =
     summaryResult.value
       .flatMap((summary) => [
@@ -1097,7 +1071,6 @@ async function loadSyncHealthCard(input: {
       ])
       .filter((value): value is Date => value instanceof Date)
       .sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
-
   return {
     ok: true,
     value: {
@@ -1119,7 +1092,6 @@ async function loadSyncHealthCard(input: {
     },
   };
 }
-
 interface DashboardTeamTodayPerson {
   currentStatus: CurrentStatus;
   firstName: string;
@@ -1127,7 +1099,6 @@ interface DashboardTeamTodayPerson {
   lastName: string;
   xeroSyncFailedCount: number;
 }
-
 // Loads the minimal person projection for the manager-dashboard team-today
 // and attention-list cards, scoped to an already-resolved set of visible
 // person ids. This intentionally bypasses `listPeople`/`listAllPeople`: it
@@ -1139,18 +1110,21 @@ async function loadTeamTodayPeople(input: {
   organisationId: string;
   scopePersonIds: string[];
 }): Promise<
-  Result<{ people: DashboardTeamTodayPerson[] }, DashboardServiceError>
+  Result<
+    {
+      people: DashboardTeamTodayPerson[];
+    },
+    DashboardServiceError
+  >
 > {
   if (input.scopePersonIds.length === 0) {
     return { ok: true, value: { people: [] } };
   }
-
   try {
     const scoped = scopedQuery(
       input.clerkOrgId as ClerkOrgId,
       input.organisationId as OrganisationId
     );
-
     const [people, failedCounts] = await Promise.all([
       database.person.findMany({
         orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
@@ -1176,11 +1150,9 @@ async function loadTeamTodayPeople(input: {
         },
       }),
     ]);
-
     const failedCountByPersonId = new Map(
       failedCounts.map((row) => [row.person_id, row._count._all])
     );
-
     const currentStatusesByPersonId = await computeCurrentStatusForPeople({
       at: new Date(),
       clerkOrgId: input.clerkOrgId,
@@ -1190,7 +1162,6 @@ async function loadTeamTodayPeople(input: {
         personId: person.id,
       })),
     });
-
     return {
       ok: true,
       value: {
@@ -1213,7 +1184,6 @@ async function loadTeamTodayPeople(input: {
     return unknownError("Failed to load team availability.");
   }
 }
-
 function buildApprovalQueueCard(records: ApprovalListItem[]) {
   return {
     ctaUrl: "/leave-approvals?status=submitted",
@@ -1240,7 +1210,6 @@ function buildApprovalQueueCard(records: ApprovalListItem[]) {
     ).length,
   };
 }
-
 function buildTeamTodayCard(people: DashboardTeamTodayPerson[]) {
   let peopleOnLeaveCount = 0;
   let peopleWorkingFromHomeCount = 0;
@@ -1261,7 +1230,6 @@ function buildTeamTodayCard(people: DashboardTeamTodayPerson[]) {
     statusLabel: string;
     xeroSyncFailedCount: number;
   }> = [];
-
   for (const person of people) {
     if (person.xeroSyncFailedCount > 0) {
       peopleWithXeroSyncFailedCount += 1;
@@ -1283,7 +1251,6 @@ function buildTeamTodayCard(people: DashboardTeamTodayPerson[]) {
         peopleOtherOooCount += 1;
         break;
     }
-
     if (
       person.currentStatus.statusKey !== "available" ||
       person.xeroSyncFailedCount > 0
@@ -1312,7 +1279,6 @@ function buildTeamTodayCard(people: DashboardTeamTodayPerson[]) {
       });
     }
   }
-
   return {
     ctaUrl: "/people",
     peopleAvailableCount,
@@ -1329,7 +1295,6 @@ function buildTeamTodayCard(people: DashboardTeamTodayPerson[]) {
     peopleWorkingFromHomeCount,
   };
 }
-
 function teamTodaySortWeight(person: {
   statusKey: PersonListItem["currentStatus"]["statusKey"];
   xeroSyncFailedCount: number;
@@ -1345,7 +1310,6 @@ function teamTodaySortWeight(person: {
   }
   return 3;
 }
-
 function buildTeamThisWeekCard(input: CalendarRangeData) {
   const peopleWithLeave = new Set<string>();
   const upcomingRecords = new Map<
@@ -1367,7 +1331,6 @@ function buildTeamThisWeekCard(input: CalendarRangeData) {
   );
   const rangeStart = input.range.start;
   const rangeEnd = input.range.end;
-
   for (const day of input.days) {
     for (const event of day.events) {
       if (
@@ -1396,7 +1359,6 @@ function buildTeamThisWeekCard(input: CalendarRangeData) {
       }
     }
   }
-
   return {
     ctaUrl: "/calendar?scopeType=my_team&view=week",
     peopleWithLeaveCount: peopleWithLeave.size,
@@ -1405,7 +1367,6 @@ function buildTeamThisWeekCard(input: CalendarRangeData) {
       .slice(0, 10),
   };
 }
-
 function buildUpcomingPeaksCard(input: CalendarRangeData) {
   const peaks: Array<{
     date: Date;
@@ -1414,7 +1375,6 @@ function buildUpcomingPeaksCard(input: CalendarRangeData) {
     recordTypes: availability_record_type[];
     totalPeopleInScope: number;
   }> = [];
-
   for (const day of input.days) {
     const awayEvents = dedupeEventsByPerson(
       day.events.filter((event) => isAwayEvent(event))
@@ -1434,19 +1394,16 @@ function buildUpcomingPeaksCard(input: CalendarRangeData) {
       totalPeopleInScope: input.totalPeopleInScope,
     });
   }
-
   return {
     ctaUrl: "/calendar?scopeType=my_team&view=month",
     peaks,
     totalPeaksCount: peaks.length,
   };
 }
-
 function buildTeamXeroSyncFailedCard(records: ApprovalListItem[]) {
   const failed = records.filter(
     (record) => record.approvalStatus === "xero_sync_failed"
   );
-
   return {
     count: failed.length,
     ctaUrl: "/people?xeroSyncFailedOnly=true",
@@ -1463,7 +1420,6 @@ function buildTeamXeroSyncFailedCard(records: ApprovalListItem[]) {
       })),
   };
 }
-
 function buildOrgPendingApprovalsCard(records: ApprovalListItem[]) {
   const submitted = records.filter(
     (record) => record.approvalStatus === "submitted"
@@ -1473,7 +1429,6 @@ function buildOrgPendingApprovalsCard(records: ApprovalListItem[]) {
       .map((record) => record.submittedAt)
       .filter((value): value is Date => value instanceof Date)
       .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
-
   return {
     count: submitted.length,
     ctaUrl: "/leave-approvals?status=submitted",
@@ -1482,7 +1437,6 @@ function buildOrgPendingApprovalsCard(records: ApprovalListItem[]) {
       : null,
   };
 }
-
 function buildOrgWideXeroSyncFailedCard(records: ApprovalListItem[]) {
   const failed = records.filter(
     (record) => record.approvalStatus === "xero_sync_failed"
@@ -1502,7 +1456,6 @@ function buildOrgWideXeroSyncFailedCard(records: ApprovalListItem[]) {
     ctaUrl: "/people?xeroSyncFailedOnly=true",
   };
 }
-
 function approvalRole(role: DashboardRole): ApprovalRole {
   if (role === "owner") {
     return "owner";
@@ -1512,7 +1465,6 @@ function approvalRole(role: DashboardRole): ApprovalRole {
   }
   return "manager";
 }
-
 function peopleRole(
   role: DashboardRole
 ): "admin" | "manager" | "owner" | "viewer" {
@@ -1527,31 +1479,25 @@ function peopleRole(
   }
   return "viewer";
 }
-
 function startOfDay(value: Date) {
   const next = new Date(value);
   next.setUTCHours(0, 0, 0, 0);
   return next;
 }
-
 function addDays(value: Date, days: number) {
   const next = new Date(value);
   next.setUTCDate(next.getUTCDate() + days);
   return next;
 }
-
 function dayDiff(left: Date, right: Date) {
   return Math.round((left.getTime() - right.getTime()) / 86_400_000);
 }
-
 function readySection<TData>(data: TData): DashboardSection<TData> {
   return { data, status: "ready" };
 }
-
 function errorSection(message: string): DashboardSection<never> {
   return { message, status: "error" };
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, DashboardServiceError> {
@@ -1563,7 +1509,6 @@ function validationError(
     ok: false,
   };
 }
-
 function personNotFound(): Result<never, DashboardServiceError> {
   return {
     error: {
@@ -1573,29 +1518,34 @@ function personNotFound(): Result<never, DashboardServiceError> {
     ok: false,
   };
 }
-
 function unknownError(message: string): Result<never, DashboardServiceError> {
   return { error: { code: "unknown_error", message }, ok: false };
 }
-
 function cacheKey(scope: string, input: z.infer<typeof ViewSchema>) {
   return `${scope}:${input.clerkOrgId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}`;
 }
-
 function firstErrorMessage(
-  ...results: Array<{ error: { message: string }; ok: false } | { ok: true }>
+  ...results: Array<
+    | {
+        error: {
+          message: string;
+        };
+        ok: false;
+      }
+    | {
+        ok: true;
+      }
+  >
 ) {
   return (
     results.find((result) => !result.ok)?.error.message ??
     "Unable to load this dashboard section."
   );
 }
-
 function byDateDescending<TValue>(selector: (value: TValue) => Date | null) {
   return (left: TValue, right: TValue) =>
     (selector(right)?.getTime() ?? 0) - (selector(left)?.getTime() ?? 0);
 }
-
 function dedupeEventsByPerson(events: CalendarEvent[]) {
   const byPerson = new Map<string, CalendarEvent>();
   for (const event of events) {
@@ -1605,14 +1555,12 @@ function dedupeEventsByPerson(events: CalendarEvent[]) {
   }
   return [...byPerson.values()];
 }
-
 function uniqueRecordTypes(events: CalendarEvent[]) {
   return [...new Set(events.map((event) => event.recordType))].filter(
     (recordType): recordType is availability_record_type =>
       recordType !== "private"
   );
 }
-
 function isAwayEvent(event: CalendarEvent) {
   return (
     event.approvalStatus === "approved" &&
@@ -1622,11 +1570,13 @@ function isAwayEvent(event: CalendarEvent) {
     event.recordType !== "limited_availability"
   );
 }
-
 function unwrapApprovalItems(
   value:
     | ApprovalListItem[]
-    | { items: ApprovalListItem[]; nextCursor: string | null }
+    | {
+        items: ApprovalListItem[];
+        nextCursor: string | null;
+      }
 ): ApprovalListItem[] {
   return Array.isArray(value) ? value : value.items;
 }

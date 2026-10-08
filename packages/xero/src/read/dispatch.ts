@@ -20,7 +20,7 @@ import {
 } from "../uk/read";
 import type {
   PayrollRegion,
-  XeroTenantForWrite,
+  XeroAccessContext,
   XeroWriteResult,
 } from "../write/types";
 import type {
@@ -35,15 +35,14 @@ import type {
   XeroLeaveRecord,
   XeroLeaveRecordsFetchResult,
 } from "./leave-records";
-
 export async function fetchLeaveApplicationStatusForRegion(
   payrollRegion: PayrollRegion | string,
   input: FetchLeaveApplicationStatusInput
 ): Promise<XeroWriteResult<XeroLeaveApplicationStatusResult>> {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "AU":
           return await fetchAuLeaveApplicationStatus(nextInput);
@@ -57,38 +56,44 @@ export async function fetchLeaveApplicationStatusForRegion(
     }
   );
 }
-
 export async function fetchEmployeesForRegion(
   payrollRegion: PayrollRegion | string,
-  input: { xeroTenant: XeroTenantForWrite }
+  input: {
+    mode?: "full" | "incremental";
+    modifiedSince?: Date | null;
+    xeroConnection: XeroAccessContext;
+  }
 ): Promise<XeroWriteResult<XeroEmployeesFetchResult>> {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
+    input.xeroConnection,
+    async (xeroConnection) => {
       switch (payrollRegion) {
         case "AU":
-          return await fetchAuEmployees({ xeroTenant });
+          return await fetchAuEmployees({ ...input, xeroConnection });
         case "NZ":
-          return await fetchNzEmployees({ xeroTenant });
+          return await fetchNzEmployees({ xeroConnection });
         case "UK":
-          return await fetchUkEmployees({ xeroTenant });
+          return await fetchUkEmployees({ xeroConnection });
         default:
           return unsupportedRegion();
       }
     }
   );
 }
-
 export async function fetchLeaveRecordsForRegion(
   payrollRegion: PayrollRegion | string,
-  input: { xeroTenant: XeroTenantForWrite }
+  input: {
+    mode?: "full" | "incremental";
+    modifiedSince?: Date | null;
+    xeroConnection: XeroAccessContext;
+  }
 ): Promise<XeroWriteResult<XeroLeaveRecordsFetchResult>> {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
+    input.xeroConnection,
+    async (xeroConnection) => {
       switch (payrollRegion) {
         case "AU":
-          return await fetchAuLeaveRecords({ xeroTenant });
+          return await fetchAuLeaveRecords({ ...input, xeroConnection });
         case "NZ":
           return unsupportedRegion(
             "NZ payroll requires per-employee leave reads."
@@ -103,12 +108,11 @@ export async function fetchLeaveRecordsForRegion(
     }
   );
 }
-
 export async function fetchLeaveForEmployeeForRegion(
   payrollRegion: PayrollRegion | string,
   input: {
     xeroEmployeeId: string;
-    xeroTenant: XeroTenantForWrite;
+    xeroConnection: XeroAccessContext;
   }
 ): Promise<
   XeroWriteResult<{
@@ -118,9 +122,9 @@ export async function fetchLeaveForEmployeeForRegion(
   }>
 > {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "NZ":
           return await fetchNzLeaveForEmployee(nextInput);
@@ -136,13 +140,12 @@ export async function fetchLeaveForEmployeeForRegion(
     }
   );
 }
-
 export async function fetchLeaveBalancesForRegion(
   payrollRegion: PayrollRegion | string,
   input: {
     employeeIds: string[];
     onProgress?: (processed: number, total: number) => Promise<void> | void;
-    xeroTenant: XeroTenantForWrite;
+    xeroConnection: XeroAccessContext;
   }
 ): Promise<
   XeroWriteResult<{
@@ -152,9 +155,9 @@ export async function fetchLeaveBalancesForRegion(
   }>
 > {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "AU":
           return await fetchAuLeaveBalances(nextInput);
@@ -162,14 +165,14 @@ export async function fetchLeaveBalancesForRegion(
           return await fetchPerEmployeeLeaveBalances(
             input.employeeIds,
             fetchNzLeaveBalancesForEmployee,
-            xeroTenant,
+            xeroConnection,
             input.onProgress
           );
         case "UK":
           return await fetchPerEmployeeLeaveBalances(
             input.employeeIds,
             fetchUkLeaveBalancesForEmployee,
-            xeroTenant,
+            xeroConnection,
             input.onProgress
           );
         default:
@@ -178,25 +181,23 @@ export async function fetchLeaveBalancesForRegion(
     }
   );
 }
-
 function unsupportedRegion(
   message = "Unsupported payroll region."
 ): XeroWriteResult<never> {
   return { error: { code: "unknown_error", message }, ok: false };
 }
-
 async function fetchPerEmployeeLeaveBalances(
   employeeIds: string[],
   fetchFn: (input: {
     xeroEmployeeId: string;
-    xeroTenant: XeroTenantForWrite;
+    xeroConnection: XeroAccessContext;
   }) => Promise<
     XeroWriteResult<{
       leaveBalances: XeroLeaveBalance[];
       rawResponse: unknown;
     }>
   >,
-  xeroTenant: XeroTenantForWrite,
+  xeroConnection: XeroAccessContext,
   onProgress?: (processed: number, total: number) => Promise<void> | void
 ): Promise<
   XeroWriteResult<{
@@ -208,13 +209,11 @@ async function fetchPerEmployeeLeaveBalances(
   const leaveBalances: XeroLeaveBalance[] = [];
   const rawResponses: unknown[] = [];
   const failures: XeroLeaveBalanceFetchFailure[] = [];
-
   for (const [index, employeeId] of employeeIds.entries()) {
     const result = await fetchFn({
+      xeroConnection,
       xeroEmployeeId: employeeId,
-      xeroTenant,
     });
-
     if (!result.ok) {
       if (
         result.error.recoveryReason ||
@@ -232,12 +231,10 @@ async function fetchPerEmployeeLeaveBalances(
       await onProgress?.(index + 1, employeeIds.length);
       continue;
     }
-
     leaveBalances.push(...result.value.leaveBalances);
     rawResponses.push(result.value.rawResponse);
     await onProgress?.(index + 1, employeeIds.length);
   }
-
   return {
     ok: true,
     value: {

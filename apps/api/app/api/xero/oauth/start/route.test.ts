@@ -113,7 +113,7 @@ describe("Xero OAuth start route", () => {
       userId: "user_123",
     });
   });
-  it("propagates a validated campaign event with the authenticated actor", async () => {
+  it("uses the authenticated actor despite a forged query user ID", async () => {
     mocks.requireRole.mockResolvedValue(true);
     mocks.buildXeroOAuthStartUrl.mockResolvedValue({
       ok: true,
@@ -122,25 +122,12 @@ describe("Xero OAuth start route", () => {
         redirectUrl: "https://login.xero.com/identity/connect/authorize",
       },
     });
-    const campaign = {
-      dispatchId: "00000000-0000-4000-8000-000000000002",
-      epoch: 1,
-      runId: "00000000-0000-4000-8000-000000000003",
-    };
-    const url = new URL(
+    const request = new Request(
       "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=00000000-0000-4000-8000-000000000001&userId=forged"
     );
-    url.searchParams.set("campaign", JSON.stringify(campaign));
-    expect((await GET(new Request(url))).status).toBe(307);
+    expect((await GET(request)).status).toBe(307);
     expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ campaign, userId: "user_123" })
+      expect.objectContaining({ userId: "user_123" })
     );
-    url.searchParams.set(
-      "campaign",
-      JSON.stringify({ ...campaign, actor: "forged" })
-    );
-    mocks.buildXeroOAuthStartUrl.mockClear();
-    expect((await GET(new Request(url))).status).toBe(400);
-    expect(mocks.buildXeroOAuthStartUrl).not.toHaveBeenCalled();
   });
 });

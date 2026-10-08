@@ -12,7 +12,6 @@ import {
 
 const NOW = new Date("2026-08-29T15:30:00.000Z");
 const TIMEZONE = "Australia/Brisbane";
-
 function makeEmployeeView(
   overrides: Partial<EmployeeDashboardView> = {}
 ): EmployeeDashboardView {
@@ -69,7 +68,6 @@ function makeEmployeeView(
     ...overrides,
   };
 }
-
 function makeManagerView(
   overrides: Partial<ManagerDashboardView> = {}
 ): ManagerDashboardView {
@@ -126,14 +124,12 @@ function makeManagerView(
     ...overrides,
   };
 }
-
 describe("buildAmbientCalendarModel", () => {
   it("builds fourteen deterministic date keys in the requested timezone", () => {
     const model = buildPersonalCalendarTimeline(makeEmployeeView(), {
       now: NOW,
       timezone: TIMEZONE,
     });
-
     expect(model.dayCount).toBe(AMBIENT_CALENDAR_DAY_COUNT);
     expect(model.days).toHaveLength(14);
     expect(model.startDateKey).toBe("2026-08-30");
@@ -151,7 +147,6 @@ describe("buildAmbientCalendarModel", () => {
       tone: "neutral",
     });
   });
-
   it("projects personal records across their inclusive date range", () => {
     const view = makeEmployeeView({
       upcoming: {
@@ -170,18 +165,15 @@ describe("buildAmbientCalendarModel", () => {
         status: "ready",
       },
     });
-
     const model = buildAmbientCalendarModel(
       { mode: "personal", view },
       { now: NOW, timezone: TIMEZONE }
     );
-
     expect(model.days[2]?.signals).toHaveLength(1);
     expect(model.days[3]?.signals).toHaveLength(1);
     expect(model.days[4]?.signals).toHaveLength(0);
     expect(model.days[3]?.confidence).toBe("personal");
   });
-
   it("adds provenance only when today status supplies source type", () => {
     const view = makeEmployeeView({
       todayStatus: {
@@ -222,14 +214,12 @@ describe("buildAmbientCalendarModel", () => {
         status: "ready",
       },
     });
-
     const model = buildAmbientCalendarModel(
       { mode: "personal", view },
       { now: NOW, timezone: TIMEZONE }
     );
     const todaySignal = model.days[0]?.signals[0];
     const upcomingSignal = model.days[2]?.signals[0];
-
     expect(todaySignal).toMatchObject({
       kind: "personal-record",
       provenance: "manual",
@@ -237,7 +227,6 @@ describe("buildAmbientCalendarModel", () => {
     expect(upcomingSignal).toMatchObject({ kind: "personal-record" });
     expect(upcomingSignal && "provenance" in upcomingSignal).toBe(false);
   });
-
   it("marks manager today exact and leaves non-peak future days unknown", () => {
     const view = makeManagerView({
       teamToday: {
@@ -254,12 +243,10 @@ describe("buildAmbientCalendarModel", () => {
         status: "ready",
       },
     });
-
     const model = buildManagerCalendarTimeline(view, {
       now: NOW,
       timezone: TIMEZONE,
     });
-
     expect(model.days[0]).toMatchObject({
       confidence: "exact",
       coverage: { awayCount: 4, ratio: 0.4, totalCount: 10 },
@@ -270,7 +257,6 @@ describe("buildAmbientCalendarModel", () => {
       detailLabel: "No coverage peak is flagged for this day",
     });
   });
-
   it("projects today's public holiday as a labelled warning signal", () => {
     const view = makeEmployeeView({
       todayStatus: {
@@ -294,18 +280,15 @@ describe("buildAmbientCalendarModel", () => {
         status: "ready",
       },
     });
-
     const model = buildPersonalCalendarTimeline(view, {
       now: NOW,
       timezone: TIMEZONE,
     });
-
     expect(model.days[0]).toMatchObject({
       detailLabel: "Public holiday: Brisbane Show Day",
       tone: "warning",
     });
   });
-
   it("does not present failed personal schedule data as clear", () => {
     const view = makeEmployeeView({
       upcoming: {
@@ -313,18 +296,15 @@ describe("buildAmbientCalendarModel", () => {
         status: "error",
       },
     });
-
     const model = buildPersonalCalendarTimeline(view, {
       now: NOW,
       timezone: TIMEZONE,
     });
-
     expect(model.days[1]).toMatchObject({
       confidence: "unknown",
       detailLabel: "Schedule data is unavailable for this day",
     });
   });
-
   it("marks future peak coverage as threshold-only", () => {
     const view = makeManagerView({
       upcomingPeaks: {
@@ -344,19 +324,16 @@ describe("buildAmbientCalendarModel", () => {
         status: "ready",
       },
     });
-
     const model = buildAmbientCalendarModel(
       { mode: "team", view },
       { now: NOW, timezone: TIMEZONE }
     );
     const peakDay = model.days.find((day) => day.dateKey === "2026-09-01");
-
     expect(peakDay).toMatchObject({
       confidence: "threshold-only",
       coverage: { awayCount: 6, ratio: 0.6, totalCount: 10 },
     });
   });
-
   it("marks named team records without claiming non-peak availability or provenance", () => {
     const view = makeManagerView({
       teamThisWeek: {
@@ -377,14 +354,12 @@ describe("buildAmbientCalendarModel", () => {
         status: "ready",
       },
     });
-
     const model = buildAmbientCalendarModel(
       { mode: "team", view },
       { now: NOW, timezone: TIMEZONE }
     );
     const markedDay = model.days.find((day) => day.dateKey === "2026-09-01");
     const signal = markedDay?.signals[0];
-
     expect(markedDay?.confidence).toBe("unknown");
     expect(signal).toMatchObject({
       kind: "team-record",
@@ -392,13 +367,11 @@ describe("buildAmbientCalendarModel", () => {
     });
     expect(signal && "provenance" in signal).toBe(false);
   });
-
   it("returns a JSON-serialisable renderer model", () => {
     const model = buildAmbientCalendarModel(
       { mode: "team", view: makeManagerView() },
       { now: NOW, timezone: TIMEZONE }
     );
-
     expect(JSON.parse(JSON.stringify(model))).toEqual(model);
   });
 });

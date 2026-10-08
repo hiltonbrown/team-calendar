@@ -28,7 +28,6 @@ const mocks = vi.hoisted(() => ({
     organisation_id: organisationId,
   })),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
@@ -87,10 +86,8 @@ vi.mock("../sync/sync-monitor-service", () => ({
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
-
 const { getAdminView, getEmployeeView, getManagerView, resolveDashboardRole } =
   await import("./dashboard-service");
-
 const baseInput = {
   actingRole: "employee" as const,
   clerkOrgId: "org_1",
@@ -98,7 +95,6 @@ const baseInput = {
   personId: "00000000-0000-4000-8000-000000000011",
   userId: "user_1",
 };
-
 describe("dashboard-service", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -161,7 +157,7 @@ describe("dashboard-service", () => {
     });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 1, state: "connected" },
+      value: { state: "connected" },
     });
     mocks.listMyRecords.mockImplementation(({ filters }) => {
       if (filters.approvalStatus?.includes("xero_sync_failed")) {
@@ -180,7 +176,6 @@ describe("dashboard-service", () => {
           ],
         };
       }
-
       if (filters.approvalStatus?.includes("declined")) {
         return {
           ok: true,
@@ -196,7 +191,6 @@ describe("dashboard-service", () => {
           ],
         };
       }
-
       return {
         ok: true,
         value: [
@@ -535,11 +529,9 @@ describe("dashboard-service", () => {
       },
     });
   });
-
   afterEach(() => {
     vi.useRealTimers();
   });
-
   it.each([
     ["org:owner", 3, "owner"],
     ["org:admin", 3, "admin"],
@@ -553,18 +545,15 @@ describe("dashboard-service", () => {
     }) => {
       mocks.personFindFirst.mockResolvedValue(person);
       mocks.personCount.mockResolvedValue(directReportCount);
-
       const result = await resolveDashboardRole({
         clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         orgRole,
         userId: baseInput.userId,
       });
-
       expect(result).toEqual({ ok: true, value: expectedRole });
     }
   );
-
   it("preserves unavailable in the employee DTO rather than reporting disconnected", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       error: { code: "state_unavailable" },
@@ -582,20 +571,16 @@ describe("dashboard-service", () => {
       );
     }
   });
-
   it("builds the employee view and degrades balances when Xero is disconnected", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: null, state: "not_connected" },
+      value: { state: "not_connected" },
     });
-
     const result = await getEmployeeView(baseInput);
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     expect(result.value.header).toMatchObject({
       firstName: "Ava",
       roleLabel: "Employee",
@@ -634,7 +619,6 @@ describe("dashboard-service", () => {
       })
     );
   });
-
   it("builds the manager view with team sections and all-team scope label", async () => {
     mocks.getSettings.mockResolvedValue({
       ok: true,
@@ -642,17 +626,14 @@ describe("dashboard-service", () => {
         managerVisibilityScope: "all_team_leave",
       },
     });
-
     const result = await getManagerView({
       ...baseInput,
       actingRole: "manager",
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     expect(result.value.header).toMatchObject({
       roleLabel: "Manager",
       scopeLabel: "1 team members (direct + indirect)",
@@ -683,20 +664,16 @@ describe("dashboard-service", () => {
       status: "ready",
     });
   });
-
   it("builds the manager view with a direct-reports-only scope label and reuses the resolved scope for the team query", async () => {
     mocks.personCount.mockResolvedValue(1);
-
     const result = await getManagerView({
       ...baseInput,
       actingRole: "manager",
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     expect(result.value.header).toMatchObject({
       directReportCount: 1,
       roleLabel: "Manager",
@@ -715,7 +692,6 @@ describe("dashboard-service", () => {
       })
     );
   });
-
   it("computes every current-status bucket and orders the attention list by severity", async () => {
     const ids = {
       leave: "00000000-0000-4000-8000-000000000101",
@@ -865,17 +841,14 @@ describe("dashboard-service", () => {
         ],
       ])
     );
-
     const result = await getManagerView({
       ...baseInput,
       actingRole: "manager",
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     expect(result.value.teamToday).toMatchObject({
       data: {
         peopleAvailableCount: 2,
@@ -915,7 +888,6 @@ describe("dashboard-service", () => {
       status: "ready",
     });
   });
-
   it.each([1, 200, 201])(
     "keeps a constant query count for %i visible people and never pages through listPeople",
     async (scopeSize) => {
@@ -953,17 +925,14 @@ describe("dashboard-service", () => {
           ])
         )
       );
-
       const result = await getManagerView({
         ...baseInput,
         actingRole: "manager",
       });
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
       }
-
       expect(result.value.teamToday).toMatchObject({
         data: { peopleAvailableCount: scopeSize },
         status: "ready",
@@ -975,7 +944,6 @@ describe("dashboard-service", () => {
       expect(mocks.listPeople).not.toHaveBeenCalled();
     }
   );
-
   it("builds the admin view and degrades only the billing card on failure", async () => {
     mocks.getBillingSummaryForDashboard.mockResolvedValue({
       error: {
@@ -984,17 +952,14 @@ describe("dashboard-service", () => {
       },
       ok: false,
     });
-
     const result = await getAdminView({
       ...baseInput,
       actingRole: "admin",
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     expect(result.value.header).toMatchObject({
       organisationName: "Acme Org",
       roleLabel: "Admin",
@@ -1011,7 +976,6 @@ describe("dashboard-service", () => {
       status: "error",
     });
   });
-
   it("builds the owner admin view with visible billing actions", async () => {
     mocks.getBillingSummaryForDashboard.mockResolvedValue({
       ok: true,
@@ -1030,12 +994,10 @@ describe("dashboard-service", () => {
         visibleToAdmin: true,
       },
     });
-
     const result = await getAdminView({
       ...baseInput,
       actingRole: "owner",
     });
-
     expect(result).toMatchObject({
       ok: true,
       value: {
@@ -1047,10 +1009,8 @@ describe("dashboard-service", () => {
       },
     });
   });
-
   describe("public holiday card applicability aligns with canonical rules", () => {
     const holidayDate = new Date("2026-04-25T00:00:00.000Z");
-
     it("matches regional holiday for a person with matching location region", async () => {
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
@@ -1069,9 +1029,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -1084,7 +1042,6 @@ describe("dashboard-service", () => {
         status: "ready",
       });
     });
-
     it("skips regional holiday when person is in a different region", async () => {
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
@@ -1103,9 +1060,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -1118,7 +1073,6 @@ describe("dashboard-service", () => {
         status: "ready",
       });
     });
-
     it("applies custom holiday to actor regardless of country code", async () => {
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
@@ -1137,9 +1091,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -1155,7 +1107,6 @@ describe("dashboard-service", () => {
         status: "ready",
       });
     });
-
     it("applies location override from working to non_working", async () => {
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
@@ -1181,9 +1132,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -1199,7 +1148,6 @@ describe("dashboard-service", () => {
         status: "ready",
       });
     });
-
     it("skips non_working holiday when overridden to working for person location", async () => {
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
@@ -1225,9 +1173,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -1240,7 +1186,6 @@ describe("dashboard-service", () => {
         status: "ready",
       });
     });
-
     it("uses organisation country fallback for a person without location", async () => {
       mocks.getPersonProfile.mockResolvedValue({
         ok: true,
@@ -1267,7 +1212,6 @@ describe("dashboard-service", () => {
           },
         },
       });
-
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
         value: [
@@ -1285,9 +1229,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -1303,7 +1245,6 @@ describe("dashboard-service", () => {
         status: "ready",
       });
     });
-
     it("treats organisation, team, person, and feed assignments as inert", async () => {
       mocks.listForOrganisation.mockResolvedValue({
         ok: true,
@@ -1347,9 +1288,7 @@ describe("dashboard-service", () => {
           },
         ],
       });
-
       const result = await getEmployeeView(baseInput);
-
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;

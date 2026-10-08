@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mapLeaveApplicationStatus } from "./leave-application-status";
 
 describe("mapLeaveApplicationStatus", () => {
@@ -15,10 +15,8 @@ describe("mapLeaveApplicationStatus", () => {
     ["REQUESTED", "SUBMITTED"],
   ] as const)("maps %s to %s", (xeroStatus, expectedStatus) => {
     const result = mapLeaveApplicationStatus({ Status: xeroStatus });
-
     expect(result.status).toBe(expectedStatus);
   });
-
   it("reads status from the first supported key in fallback order", () => {
     const result = mapLeaveApplicationStatus({
       LeaveApplicationStatus: "DECLINED",
@@ -26,10 +24,8 @@ describe("mapLeaveApplicationStatus", () => {
       Status: "SCHEDULED",
       status: "WITHDRAWN",
     });
-
     expect(result.status).toBe("APPROVED");
   });
-
   it("falls back across supported status key casing variants", () => {
     expect(
       mapLeaveApplicationStatus({ leaveApplicationStatus: "PENDING" }).status
@@ -41,7 +37,6 @@ describe("mapLeaveApplicationStatus", () => {
       mapLeaveApplicationStatus({ leavePeriodStatus: "SCHEDULED" }).status
     ).toBe("APPROVED");
   });
-
   it("maps unknown and empty statuses to UNKNOWN", () => {
     expect(mapLeaveApplicationStatus({ Status: "NOT_A_STATUS" }).status).toBe(
       "UNKNOWN"
@@ -49,7 +44,6 @@ describe("mapLeaveApplicationStatus", () => {
     expect(mapLeaveApplicationStatus({ Status: "   " }).status).toBe("UNKNOWN");
     expect(mapLeaveApplicationStatus({}).status).toBe("UNKNOWN");
   });
-
   it("parses approved dates from the supported keys", () => {
     expect(
       mapLeaveApplicationStatus({
@@ -72,17 +66,14 @@ describe("mapLeaveApplicationStatus", () => {
       }).approvedAt
     ).toEqual(new Date("2026-05-04T01:02:03.000Z"));
   });
-
   it("returns null approvedAt for unparseable dates", () => {
     const result = mapLeaveApplicationStatus({
       ApprovedDate: "not a date",
       Status: "APPROVED",
     });
-
     expect(result.approvedAt).toBeNull();
     expect(result.status).toBe("APPROVED");
   });
-
   it("maps an AU v2 period status and .NET updated date", () => {
     const payload = {
       LeaveApplications: [
@@ -96,14 +87,12 @@ describe("mapLeaveApplicationStatus", () => {
         },
       ],
     };
-
     expect(mapLeaveApplicationStatus(payload)).toEqual({
       approvedAt: new Date("2026-08-01T01:04:05.000Z"),
       rawResponse: payload,
       status: "SUBMITTED",
     });
   });
-
   it("reads the first leave application from wrapped Xero responses", () => {
     const payload = {
       LeaveApplications: [
@@ -113,16 +102,13 @@ describe("mapLeaveApplicationStatus", () => {
         },
       ],
     };
-
     const result = mapLeaveApplicationStatus(payload);
-
     expect(result).toEqual({
       approvedAt: new Date("2026-05-01T01:02:03.000Z"),
       rawResponse: payload,
       status: "SUBMITTED",
     });
   });
-
   it("reads status from nested periods array in v2 employee leave shapes", () => {
     const payload = {
       leave: [
@@ -140,16 +126,13 @@ describe("mapLeaveApplicationStatus", () => {
         },
       ],
     };
-
     const result = mapLeaveApplicationStatus(payload);
-
     expect(result).toEqual({
       approvedAt: new Date("2026-06-02T03:04:05.000Z"),
       rawResponse: payload,
       status: "APPROVED",
     });
   });
-
   it("maps Estimated period status to APPROVED", () => {
     const payload = {
       leaveID: "leave-2",
@@ -159,15 +142,12 @@ describe("mapLeaveApplicationStatus", () => {
         },
       ],
     };
-
     expect(mapLeaveApplicationStatus(payload).status).toBe("APPROVED");
   });
 });
-
 describe("mapXeroReadHttpError", () => {
   it("maps 401 to auth_error and 403 to permission_error", async () => {
     const { mapXeroReadHttpError } = await import("./leave-application-status");
-
     const authRes = new Response(JSON.stringify({ Message: "Unauthorized" }), {
       status: 401,
       statusText: "Unauthorized",
@@ -178,7 +158,6 @@ describe("mapXeroReadHttpError", () => {
       code: "auth_error",
       httpStatus: 401,
     });
-
     const permRes = new Response(JSON.stringify({ Message: "Forbidden" }), {
       status: 403,
       statusText: "Forbidden",
@@ -190,10 +169,8 @@ describe("mapXeroReadHttpError", () => {
       httpStatus: 403,
     });
   });
-
   it("maps 400, 404, 409, 429, and 500", async () => {
     const { mapXeroReadHttpError } = await import("./leave-application-status");
-
     expect(
       mapXeroReadHttpError(new Response("", { status: 400 }), {}).code
     ).toBe("validation_error");
@@ -211,16 +188,3 @@ describe("mapXeroReadHttpError", () => {
     ).toBe("network_error");
   });
 });
-
-// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignCredentialScope: (
-    _scope: unknown,
-    _tenant: string,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignProviderEffect: (
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

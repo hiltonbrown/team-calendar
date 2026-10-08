@@ -12,6 +12,7 @@ import {
 } from "../../../../lib/sync/execute-local-sync-fallback";
 
 const DispatchSyncRequestSchema = z.object({
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   runType: z.enum([
     "people",
@@ -19,7 +20,6 @@ const DispatchSyncRequestSchema = z.object({
     "leave_balances",
     "approval_state_reconciliation",
   ]),
-  xeroTenantId: z.string().uuid(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -72,9 +72,9 @@ export async function POST(request: Request): Promise<Response> {
     actingRole: role,
     actingUserId: user.id,
     clerkOrgId,
+    connectionId: parsed.data.connectionId,
     organisationId: parsed.data.organisationId,
     runType: parsed.data.runType,
-    xeroTenantId: parsed.data.xeroTenantId,
   };
   const result = await dispatchManualSync(syncInput);
 

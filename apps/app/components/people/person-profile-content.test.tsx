@@ -7,12 +7,10 @@ const mocks = vi.hoisted(() => ({
   refreshBalancesAction: vi.fn(),
   setManualBalanceAction: vi.fn(),
 }));
-
 vi.mock("@/app/(authenticated)/people/_actions", () => ({
   refreshBalancesAction: mocks.refreshBalancesAction,
   setManualBalanceAction: mocks.setManualBalanceAction,
 }));
-
 const profile: PersonProfile = {
   alternativeContacts: [],
   balances: {
@@ -20,13 +18,13 @@ const profile: PersonProfile = {
     rows: [
       {
         balanceUnits: 12,
+        connectionId: null,
         currencyCode: null,
         id: "balance-1",
         leaveTypeName: "Annual leave",
         leaveTypeXeroId: "annual",
         recordType: "annual_leave",
         unitType: "hours",
-        xeroTenantId: null,
       },
     ],
     xeroConnectionState: "not_connected",
@@ -73,37 +71,31 @@ const profile: PersonProfile = {
   upcomingRecords: [],
   xeroSyncFailedCount: 0,
 };
-
 describe("PersonProfileContent", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
-
-  it.each([
-    "unavailable",
-    "disconnect_pending",
-    "reauthorisation_required",
-  ] as const)("never offers manual balance editing during %s", (state) => {
-    renderProfile(true, {
-      ...profile,
-      balances: { ...profile.balances, xeroConnectionState: state },
-    });
-    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Save balance" })).toBeNull();
-    expect(mocks.setManualBalanceAction).not.toHaveBeenCalled();
-  });
-
+  it.each(["unavailable", "reauthorisation_required"] as const)(
+    "never offers manual balance editing during %s",
+    (state) => {
+      renderProfile(true, {
+        ...profile,
+        balances: { ...profile.balances, xeroConnectionState: state },
+      });
+      expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Save balance" })).toBeNull();
+      expect(mocks.setManualBalanceAction).not.toHaveBeenCalled();
+    }
+  );
   it("shows profile provenance and hides manual balance editing from viewers", () => {
     renderProfile(false);
-
     expect(screen.getByText("Source: Manual entry.")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
     expect(
       screen.getByText("Only admins and owners can edit manual balances.")
     ).toBeDefined();
   });
-
   it("gives admins a recovery path for an unlinked Xero profile", () => {
     renderProfile(true, {
       ...profile,
@@ -113,7 +105,6 @@ describe("PersonProfileContent", () => {
         xeroConnectionState: "connected",
       },
     });
-
     expect(
       screen.getByText("This profile is not linked to Xero.")
     ).toBeDefined();
@@ -125,11 +116,9 @@ describe("PersonProfileContent", () => {
       "/settings/integrations/xero/matches?org=00000000-0000-4000-8000-000000000001"
     );
   });
-
   it("uses plain labels and announces a saved manual balance", async () => {
     mocks.setManualBalanceAction.mockResolvedValueOnce({ ok: true, value: {} });
     renderProfile(true);
-
     expect(screen.getByText("Leave type reference")).toBeDefined();
     fireEvent.change(screen.getByLabelText("Leave type reference"), {
       target: { value: "annual" },
@@ -138,15 +127,12 @@ describe("PersonProfileContent", () => {
       target: { value: "12" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
     expect((await screen.findByRole("status")).textContent).toContain(
       "Manual balance saved."
     );
   });
-
   it("opens the balance panel when a deep link selects Balances", () => {
     renderProfile(false);
-
     expect(screen.getByRole("button", { name: "Balances" })).toBeDefined();
     expect(
       screen.getByRole("columnheader", { name: "Leave type" })
@@ -154,7 +140,6 @@ describe("PersonProfileContent", () => {
     expect(screen.getByText("Annual leave")).toBeDefined();
   });
 });
-
 function renderProfile(canRefreshBalances: boolean, value = profile) {
   return render(
     <PersonProfileContent

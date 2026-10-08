@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
 }));
-
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -95,9 +94,7 @@ vi.mock("./plans-client", () => ({
   PlansClient: ({ records }: { records: unknown[] }) =>
     createElement("section", null, `Plans client: ${records.length}`),
 }));
-
 const { default: PlansPage } = await import("./page");
-
 describe("Plans page server data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -122,12 +119,10 @@ describe("Plans page server data", () => {
     mocks.listTeamRecords.mockResolvedValue({ ok: true, value: [] });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: null, state: "not_connected" },
+      value: { state: "not_connected" },
     });
   });
-
   afterEach(() => cleanup());
-
   it("offers Connect Xero only for a verified disconnected admin", async () => {
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
@@ -154,10 +149,8 @@ describe("Plans page server data", () => {
       )
     ).toBeDefined();
   });
-
   it("repairs the current user person before listing my records", async () => {
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
-
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledWith(
       {
         clerkOrgId: "org_1",
@@ -180,7 +173,6 @@ describe("Plans page server data", () => {
       })
     );
   });
-
   it("does not render the generic fetch error when person linking conflicts", async () => {
     mocks.ensureCurrentUserPerson.mockResolvedValue({
       error: {
@@ -189,22 +181,39 @@ describe("Plans page server data", () => {
       },
       ok: false,
     });
-
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
-
     expect(screen.getByText("Person profile needs review")).toBeDefined();
     expect(screen.queryByText("Unable to load plans")).toBeNull();
     expect(mocks.listMyRecords).not.toHaveBeenCalled();
   });
-
   it("keeps existing linked users scoped to their own records", async () => {
     render(await PlansPage({ searchParams: Promise.resolve({ tab: "my" }) }));
-
     expect(mocks.listMyRecords).toHaveBeenCalledTimes(1);
     expect(mocks.listTeamRecords).not.toHaveBeenCalled();
     expect(screen.getByText("Plans client: 0")).toBeDefined();
   });
-
+  it("passes the imported recovery filter through the scoped administrator Plans route", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    render(
+      await PlansPage({
+        searchParams: Promise.resolve({
+          allHistory: "true",
+          sourceType: "xero_leave",
+          tab: "team",
+        }),
+      })
+    );
+    expect(mocks.listTeamRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actingOrgRole: "org:admin",
+        allHistory: true,
+        clerkOrgId: "org_1",
+        filters: expect.objectContaining({ sourceType: ["xero_leave"] }),
+        organisationId: "00000000-0000-4000-8000-000000000001",
+      })
+    );
+    expect(mocks.listMyRecords).not.toHaveBeenCalled();
+  });
   it("computes working days once per returned record without amplification", async () => {
     const records = Array.from({ length: 25 }, (_, index) => ({
       allDay: true,
@@ -245,9 +254,7 @@ describe("Plans page server data", () => {
     }));
     mocks.listMyRecords.mockResolvedValue({ ok: true, value: records });
     mocks.computeWorkingDays.mockReturnValue({ ok: true, value: 2 });
-
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
-
     expect(mocks.computeWorkingDays).toHaveBeenCalledTimes(records.length);
     expect(screen.getByText("Plans client: 25")).toBeDefined();
   });

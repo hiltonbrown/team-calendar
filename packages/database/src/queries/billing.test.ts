@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   queryRaw: vi.fn(),
   xeroConnectionCount: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   database: {
@@ -21,7 +20,6 @@ vi.mock("../client", () => ({
     xeroConnection: { count: mocks.xeroConnectionCount },
   },
 }));
-
 const {
   getAuthoritativeUsageCount,
   getFailedStripeEventsForOperators,
@@ -32,7 +30,6 @@ const {
   recordStripeEventFailure,
   upsertSubscriptionFromWebhook,
 } = await import("./billing");
-
 const usageCases = [
   ["seats", "personCount", 8],
   ["feeds", "feedCount", 2],
@@ -42,28 +39,22 @@ const usageCases = [
 ] satisfies ReadonlyArray<
   readonly [AuthoritativeUsageType, keyof typeof mocks, number]
 >;
-
 describe("authoritative billing usage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   it.each(usageCases)(
     "counts %s from authoritative rows",
     async (usageType, mock, count) => {
       mocks[mock].mockResolvedValue(count);
-
       await expect(
         getAuthoritativeUsageCount("org_123", usageType)
       ).resolves.toBe(count);
     }
   );
-
   it("counts only active, unarchived people", async () => {
     mocks.personCount.mockResolvedValue(3);
-
     await getAuthoritativeUsageCount("org_123", "seats");
-
     expect(mocks.personCount).toHaveBeenCalledWith({
       where: {
         archived_at: null,
@@ -72,12 +63,9 @@ describe("authoritative billing usage", () => {
       },
     });
   });
-
   it("counts only active, unarchived feeds", async () => {
     mocks.feedCount.mockResolvedValue(2);
-
     await getAuthoritativeUsageCount("org_123", "feeds");
-
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: {
         archived_at: null,
@@ -86,12 +74,9 @@ describe("authoritative billing usage", () => {
       },
     });
   });
-
   it("counts only active, unarchived organisations", async () => {
     mocks.organisationCount.mockResolvedValue(1);
-
     await getAuthoritativeUsageCount("org_123", "payroll_entities");
-
     expect(mocks.organisationCount).toHaveBeenCalledWith({
       where: {
         archived_at: null,
@@ -100,52 +85,40 @@ describe("authoritative billing usage", () => {
       },
     });
   });
-
   it("counts only active Xero connections", async () => {
     mocks.xeroConnectionCount.mockResolvedValue(1);
-
     await getAuthoritativeUsageCount("org_123", "connections");
-
     expect(mocks.xeroConnectionCount).toHaveBeenCalledWith({
       where: {
         clerk_org_id: "org_123",
         disconnected_at: null,
-        revoked_at: null,
         status: "active",
       },
     });
   });
-
   it("takes a transaction-scoped advisory lock using the Clerk Organisation", async () => {
     mocks.queryRaw.mockResolvedValue([{ acquired: "" }]);
-
     await lockPlanLimitMutations(
       // The raw-query mock is the complete surface used by the lock helper.
       { $queryRaw: mocks.queryRaw } as never,
       "org_123"
     );
-
     expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
   });
 });
-
 describe("Stripe event receipt health", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   it("only treats completed or ignored receipts as processed", async () => {
     mocks.queryRaw
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ stripe_event_id: "evt_processed" }]);
-
     await expect(isStripeEventProcessed("evt_failed")).resolves.toBe(false);
     await expect(isStripeEventProcessed("evt_processed")).resolves.toBe(true);
   });
-
   it("reports a newer unresolved event for a known organisation", async () => {
     mocks.queryRaw.mockResolvedValue([{ exists: true }]);
-
     await expect(
       hasUnresolvedStripeEventForOrg(
         "org_123",
@@ -153,7 +126,6 @@ describe("Stripe event receipt health", () => {
       )
     ).resolves.toBe(true);
   });
-
   it("returns safe operator receipt summaries", async () => {
     const attemptedAt = new Date("2026-09-19T00:00:00.000Z");
     mocks.queryRaw.mockResolvedValue([
@@ -163,7 +135,6 @@ describe("Stripe event receipt health", () => {
         stripe_event_id: "evt_operator",
       },
     ]);
-
     await expect(getUnresolvedStripeEventsForOrg("org_123")).resolves.toEqual([
       {
         errorCategory: "provider_fetch",
@@ -172,7 +143,6 @@ describe("Stripe event receipt health", () => {
       },
     ]);
   });
-
   it.each([
     [1, true],
     [2, true],
@@ -194,7 +164,6 @@ describe("Stripe event receipt health", () => {
       ).resolves.toBe(expected);
     }
   );
-
   it("includes unmatched failed events in the operator view", async () => {
     const attemptedAt = new Date("2026-09-19T00:00:00.000Z");
     mocks.queryRaw.mockResolvedValue([
@@ -205,7 +174,6 @@ describe("Stripe event receipt health", () => {
         stripe_event_id: "evt_unmatched",
       },
     ]);
-
     await expect(getFailedStripeEventsForOperators()).resolves.toEqual([
       {
         clerkOrgId: null,
@@ -216,7 +184,6 @@ describe("Stripe event receipt health", () => {
     ]);
   });
 });
-
 describe("subscription mirror ordering", () => {
   it("passes an explicit authoritative tie fence into the atomic upsert", async () => {
     mocks.executeRaw.mockResolvedValue(1);
@@ -232,7 +199,6 @@ describe("subscription mirror ordering", () => {
       stripeEventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
       stripeSubscriptionId: "sub_123",
     });
-
     expect(mocks.executeRaw).toHaveBeenCalledTimes(1);
     expect(mocks.executeRaw.mock.calls[0]).toContain(true);
   });

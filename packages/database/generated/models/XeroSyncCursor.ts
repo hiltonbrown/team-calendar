@@ -28,9 +28,9 @@ export type XeroSyncCursorMinAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
-  xero_tenant_id: string | null
-  entity_type: $Enums.xero_sync_entity_type | null
-  cursor_value: string | null
+  xero_connection_id: string | null
+  entity_type: $Enums.xero_cursor_entity_type | null
+  modified_since: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -39,9 +39,9 @@ export type XeroSyncCursorMaxAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
-  xero_tenant_id: string | null
-  entity_type: $Enums.xero_sync_entity_type | null
-  cursor_value: string | null
+  xero_connection_id: string | null
+  entity_type: $Enums.xero_cursor_entity_type | null
+  modified_since: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -50,9 +50,9 @@ export type XeroSyncCursorCountAggregateOutputType = {
   id: number
   clerk_org_id: number
   organisation_id: number
-  xero_tenant_id: number
+  xero_connection_id: number
   entity_type: number
-  cursor_value: number
+  modified_since: number
   created_at: number
   updated_at: number
   _all: number
@@ -63,9 +63,9 @@ export type XeroSyncCursorMinAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
-  xero_tenant_id?: true
+  xero_connection_id?: true
   entity_type?: true
-  cursor_value?: true
+  modified_since?: true
   created_at?: true
   updated_at?: true
 }
@@ -74,9 +74,9 @@ export type XeroSyncCursorMaxAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
-  xero_tenant_id?: true
+  xero_connection_id?: true
   entity_type?: true
-  cursor_value?: true
+  modified_since?: true
   created_at?: true
   updated_at?: true
 }
@@ -85,9 +85,9 @@ export type XeroSyncCursorCountAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
-  xero_tenant_id?: true
+  xero_connection_id?: true
   entity_type?: true
-  cursor_value?: true
+  modified_since?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -169,9 +169,9 @@ export type XeroSyncCursorGroupByOutputType = {
   id: string
   clerk_org_id: string
   organisation_id: string
-  xero_tenant_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value: string | null
+  xero_connection_id: string
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since: Date | null
   created_at: Date
   updated_at: Date
   _count: XeroSyncCursorCountAggregateOutputType | null
@@ -201,52 +201,52 @@ export type XeroSyncCursorWhereInput = {
   id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
   clerk_org_id?: Prisma.StringFilter<"XeroSyncCursor"> | string
   organisation_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
-  xero_tenant_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFilter<"XeroSyncCursor"> | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.StringNullableFilter<"XeroSyncCursor"> | string | null
+  xero_connection_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFilter<"XeroSyncCursor"> | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.DateTimeNullableFilter<"XeroSyncCursor"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"XeroSyncCursor"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroSyncCursor"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-  xero_tenant?: Prisma.XOR<Prisma.XeroTenantScalarRelationFilter, Prisma.XeroTenantWhereInput>
+  xero_connection?: Prisma.XOR<Prisma.XeroConnectionScalarRelationFilter, Prisma.XeroConnectionWhereInput>
 }
 
 export type XeroSyncCursorOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_connection_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
-  cursor_value?: Prisma.SortOrderInput | Prisma.SortOrder
+  modified_since?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
-  xero_tenant?: Prisma.XeroTenantOrderByWithRelationInput
+  xero_connection?: Prisma.XeroConnectionOrderByWithRelationInput
 }
 
 export type XeroSyncCursorWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  xero_tenant_id_entity_type?: Prisma.XeroSyncCursorXero_tenant_idEntity_typeCompoundUniqueInput
+  xero_connection_id_entity_type?: Prisma.XeroSyncCursorXero_connection_idEntity_typeCompoundUniqueInput
   AND?: Prisma.XeroSyncCursorWhereInput | Prisma.XeroSyncCursorWhereInput[]
   OR?: Prisma.XeroSyncCursorWhereInput[]
   NOT?: Prisma.XeroSyncCursorWhereInput | Prisma.XeroSyncCursorWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"XeroSyncCursor"> | string
   organisation_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
-  xero_tenant_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFilter<"XeroSyncCursor"> | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.StringNullableFilter<"XeroSyncCursor"> | string | null
+  xero_connection_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFilter<"XeroSyncCursor"> | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.DateTimeNullableFilter<"XeroSyncCursor"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"XeroSyncCursor"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroSyncCursor"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-  xero_tenant?: Prisma.XOR<Prisma.XeroTenantScalarRelationFilter, Prisma.XeroTenantWhereInput>
-}, "id" | "xero_tenant_id_entity_type">
+  xero_connection?: Prisma.XOR<Prisma.XeroConnectionScalarRelationFilter, Prisma.XeroConnectionWhereInput>
+}, "id" | "xero_connection_id_entity_type">
 
 export type XeroSyncCursorOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_connection_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
-  cursor_value?: Prisma.SortOrderInput | Prisma.SortOrder
+  modified_since?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.XeroSyncCursorCountOrderByAggregateInput
@@ -261,53 +261,51 @@ export type XeroSyncCursorScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"XeroSyncCursor"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"XeroSyncCursor"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"XeroSyncCursor"> | string
-  xero_tenant_id?: Prisma.UuidWithAggregatesFilter<"XeroSyncCursor"> | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeWithAggregatesFilter<"XeroSyncCursor"> | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.StringNullableWithAggregatesFilter<"XeroSyncCursor"> | string | null
+  xero_connection_id?: Prisma.UuidWithAggregatesFilter<"XeroSyncCursor"> | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeWithAggregatesFilter<"XeroSyncCursor"> | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroSyncCursor"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"XeroSyncCursor"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"XeroSyncCursor"> | Date | string
 }
 
 export type XeroSyncCursorCreateInput = {
   id?: string
-  clerk_org_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_sync_cursorsInput
-  xero_tenant: Prisma.XeroTenantCreateNestedOneWithoutSync_cursorsInput
+  xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutSync_cursorsInput
 }
 
 export type XeroSyncCursorUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
-  xero_tenant_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  xero_connection_id: string
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
 
 export type XeroSyncCursorUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_sync_cursorsNestedInput
-  xero_tenant?: Prisma.XeroTenantUpdateOneRequiredWithoutSync_cursorsNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutSync_cursorsNestedInput
 }
 
 export type XeroSyncCursorUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -316,18 +314,17 @@ export type XeroSyncCursorCreateManyInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
-  xero_tenant_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  xero_connection_id: string
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
 
 export type XeroSyncCursorUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -336,9 +333,9 @@ export type XeroSyncCursorUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -353,18 +350,18 @@ export type XeroSyncCursorOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
-export type XeroSyncCursorXero_tenant_idEntity_typeCompoundUniqueInput = {
-  xero_tenant_id: string
-  entity_type: $Enums.xero_sync_entity_type
+export type XeroSyncCursorXero_connection_idEntity_typeCompoundUniqueInput = {
+  xero_connection_id: string
+  entity_type: $Enums.xero_cursor_entity_type
 }
 
 export type XeroSyncCursorCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_connection_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
-  cursor_value?: Prisma.SortOrder
+  modified_since?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -373,9 +370,9 @@ export type XeroSyncCursorMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_connection_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
-  cursor_value?: Prisma.SortOrder
+  modified_since?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -384,9 +381,9 @@ export type XeroSyncCursorMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_connection_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
-  cursor_value?: Prisma.SortOrder
+  modified_since?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -433,68 +430,67 @@ export type XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput = {
   deleteMany?: Prisma.XeroSyncCursorScalarWhereInput | Prisma.XeroSyncCursorScalarWhereInput[]
 }
 
-export type XeroSyncCursorCreateNestedManyWithoutXero_tenantInput = {
-  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput> | Prisma.XeroSyncCursorCreateWithoutXero_tenantInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput[]
-  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput[]
-  createMany?: Prisma.XeroSyncCursorCreateManyXero_tenantInputEnvelope
+export type XeroSyncCursorCreateNestedManyWithoutXero_connectionInput = {
+  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput> | Prisma.XeroSyncCursorCreateWithoutXero_connectionInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput[]
+  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput[]
+  createMany?: Prisma.XeroSyncCursorCreateManyXero_connectionInputEnvelope
   connect?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
 }
 
-export type XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput = {
-  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput> | Prisma.XeroSyncCursorCreateWithoutXero_tenantInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput[]
-  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput[]
-  createMany?: Prisma.XeroSyncCursorCreateManyXero_tenantInputEnvelope
+export type XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput = {
+  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput> | Prisma.XeroSyncCursorCreateWithoutXero_connectionInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput[]
+  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput[]
+  createMany?: Prisma.XeroSyncCursorCreateManyXero_connectionInputEnvelope
   connect?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
 }
 
-export type XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput = {
-  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput> | Prisma.XeroSyncCursorCreateWithoutXero_tenantInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput[]
-  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput[]
-  upsert?: Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_tenantInput | Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_tenantInput[]
-  createMany?: Prisma.XeroSyncCursorCreateManyXero_tenantInputEnvelope
+export type XeroSyncCursorUpdateManyWithoutXero_connectionNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput> | Prisma.XeroSyncCursorCreateWithoutXero_connectionInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput[]
+  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput[]
+  upsert?: Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_connectionInput | Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_connectionInput[]
+  createMany?: Prisma.XeroSyncCursorCreateManyXero_connectionInputEnvelope
   set?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
   disconnect?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
   delete?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
   connect?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
-  update?: Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_tenantInput | Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_tenantInput[]
-  updateMany?: Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_tenantInput | Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_tenantInput[]
+  update?: Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_connectionInput | Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_connectionInput[]
+  updateMany?: Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_connectionInput | Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_connectionInput[]
   deleteMany?: Prisma.XeroSyncCursorScalarWhereInput | Prisma.XeroSyncCursorScalarWhereInput[]
 }
 
-export type XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput = {
-  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput> | Prisma.XeroSyncCursorCreateWithoutXero_tenantInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput[]
-  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_tenantInput[]
-  upsert?: Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_tenantInput | Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_tenantInput[]
-  createMany?: Prisma.XeroSyncCursorCreateManyXero_tenantInputEnvelope
+export type XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput> | Prisma.XeroSyncCursorCreateWithoutXero_connectionInput[] | Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput[]
+  connectOrCreate?: Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput | Prisma.XeroSyncCursorCreateOrConnectWithoutXero_connectionInput[]
+  upsert?: Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_connectionInput | Prisma.XeroSyncCursorUpsertWithWhereUniqueWithoutXero_connectionInput[]
+  createMany?: Prisma.XeroSyncCursorCreateManyXero_connectionInputEnvelope
   set?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
   disconnect?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
   delete?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
   connect?: Prisma.XeroSyncCursorWhereUniqueInput | Prisma.XeroSyncCursorWhereUniqueInput[]
-  update?: Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_tenantInput | Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_tenantInput[]
-  updateMany?: Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_tenantInput | Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_tenantInput[]
+  update?: Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_connectionInput | Prisma.XeroSyncCursorUpdateWithWhereUniqueWithoutXero_connectionInput[]
+  updateMany?: Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_connectionInput | Prisma.XeroSyncCursorUpdateManyWithWhereWithoutXero_connectionInput[]
   deleteMany?: Prisma.XeroSyncCursorScalarWhereInput | Prisma.XeroSyncCursorScalarWhereInput[]
 }
 
-export type Enumxero_sync_entity_typeFieldUpdateOperationsInput = {
-  set?: $Enums.xero_sync_entity_type
+export type Enumxero_cursor_entity_typeFieldUpdateOperationsInput = {
+  set?: $Enums.xero_cursor_entity_type
 }
 
 export type XeroSyncCursorCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  xero_tenant: Prisma.XeroTenantCreateNestedOneWithoutSync_cursorsInput
+  xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutSync_cursorsInput
 }
 
 export type XeroSyncCursorUncheckedCreateWithoutOrganisationInput = {
   id?: string
   clerk_org_id: string
-  xero_tenant_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  xero_connection_id: string
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -532,85 +528,81 @@ export type XeroSyncCursorScalarWhereInput = {
   id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
   clerk_org_id?: Prisma.StringFilter<"XeroSyncCursor"> | string
   organisation_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
-  xero_tenant_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFilter<"XeroSyncCursor"> | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.StringNullableFilter<"XeroSyncCursor"> | string | null
+  xero_connection_id?: Prisma.UuidFilter<"XeroSyncCursor"> | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFilter<"XeroSyncCursor"> | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.DateTimeNullableFilter<"XeroSyncCursor"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"XeroSyncCursor"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroSyncCursor"> | Date | string
 }
 
-export type XeroSyncCursorCreateWithoutXero_tenantInput = {
+export type XeroSyncCursorCreateWithoutXero_connectionInput = {
   id?: string
-  clerk_org_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_sync_cursorsInput
 }
 
-export type XeroSyncCursorUncheckedCreateWithoutXero_tenantInput = {
+export type XeroSyncCursorUncheckedCreateWithoutXero_connectionInput = {
   id?: string
-  clerk_org_id: string
-  organisation_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
 
-export type XeroSyncCursorCreateOrConnectWithoutXero_tenantInput = {
+export type XeroSyncCursorCreateOrConnectWithoutXero_connectionInput = {
   where: Prisma.XeroSyncCursorWhereUniqueInput
-  create: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput>
+  create: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput>
 }
 
-export type XeroSyncCursorCreateManyXero_tenantInputEnvelope = {
-  data: Prisma.XeroSyncCursorCreateManyXero_tenantInput | Prisma.XeroSyncCursorCreateManyXero_tenantInput[]
+export type XeroSyncCursorCreateManyXero_connectionInputEnvelope = {
+  data: Prisma.XeroSyncCursorCreateManyXero_connectionInput | Prisma.XeroSyncCursorCreateManyXero_connectionInput[]
   skipDuplicates?: boolean
 }
 
-export type XeroSyncCursorUpsertWithWhereUniqueWithoutXero_tenantInput = {
+export type XeroSyncCursorUpsertWithWhereUniqueWithoutXero_connectionInput = {
   where: Prisma.XeroSyncCursorWhereUniqueInput
-  update: Prisma.XOR<Prisma.XeroSyncCursorUpdateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedUpdateWithoutXero_tenantInput>
-  create: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_tenantInput>
+  update: Prisma.XOR<Prisma.XeroSyncCursorUpdateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedUpdateWithoutXero_connectionInput>
+  create: Prisma.XOR<Prisma.XeroSyncCursorCreateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedCreateWithoutXero_connectionInput>
 }
 
-export type XeroSyncCursorUpdateWithWhereUniqueWithoutXero_tenantInput = {
+export type XeroSyncCursorUpdateWithWhereUniqueWithoutXero_connectionInput = {
   where: Prisma.XeroSyncCursorWhereUniqueInput
-  data: Prisma.XOR<Prisma.XeroSyncCursorUpdateWithoutXero_tenantInput, Prisma.XeroSyncCursorUncheckedUpdateWithoutXero_tenantInput>
+  data: Prisma.XOR<Prisma.XeroSyncCursorUpdateWithoutXero_connectionInput, Prisma.XeroSyncCursorUncheckedUpdateWithoutXero_connectionInput>
 }
 
-export type XeroSyncCursorUpdateManyWithWhereWithoutXero_tenantInput = {
+export type XeroSyncCursorUpdateManyWithWhereWithoutXero_connectionInput = {
   where: Prisma.XeroSyncCursorScalarWhereInput
-  data: Prisma.XOR<Prisma.XeroSyncCursorUpdateManyMutationInput, Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantInput>
+  data: Prisma.XOR<Prisma.XeroSyncCursorUpdateManyMutationInput, Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionInput>
 }
 
 export type XeroSyncCursorCreateManyOrganisationInput = {
   id?: string
   clerk_org_id: string
-  xero_tenant_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  xero_connection_id: string
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
 
 export type XeroSyncCursorUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  xero_tenant?: Prisma.XeroTenantUpdateOneRequiredWithoutSync_cursorsNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutSync_cursorsNestedInput
 }
 
 export type XeroSyncCursorUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -618,49 +610,42 @@ export type XeroSyncCursorUncheckedUpdateWithoutOrganisationInput = {
 export type XeroSyncCursorUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type XeroSyncCursorCreateManyXero_tenantInput = {
+export type XeroSyncCursorCreateManyXero_connectionInput = {
   id?: string
-  clerk_org_id: string
-  organisation_id: string
-  entity_type: $Enums.xero_sync_entity_type
-  cursor_value?: string | null
+  entity_type: $Enums.xero_cursor_entity_type
+  modified_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
 
-export type XeroSyncCursorUpdateWithoutXero_tenantInput = {
+export type XeroSyncCursorUpdateWithoutXero_connectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_sync_cursorsNestedInput
 }
 
-export type XeroSyncCursorUncheckedUpdateWithoutXero_tenantInput = {
+export type XeroSyncCursorUncheckedUpdateWithoutXero_connectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantInput = {
+export type XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
-  cursor_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  entity_type?: Prisma.Enumxero_cursor_entity_typeFieldUpdateOperationsInput | $Enums.xero_cursor_entity_type
+  modified_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -671,79 +656,79 @@ export type XeroSyncCursorSelect<ExtArgs extends runtime.Types.Extensions.Intern
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  xero_tenant_id?: boolean
+  xero_connection_id?: boolean
   entity_type?: boolean
-  cursor_value?: boolean
+  modified_since?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["xeroSyncCursor"]>
 
 export type XeroSyncCursorSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  xero_tenant_id?: boolean
+  xero_connection_id?: boolean
   entity_type?: boolean
-  cursor_value?: boolean
+  modified_since?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["xeroSyncCursor"]>
 
 export type XeroSyncCursorSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  xero_tenant_id?: boolean
+  xero_connection_id?: boolean
   entity_type?: boolean
-  cursor_value?: boolean
+  modified_since?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["xeroSyncCursor"]>
 
 export type XeroSyncCursorSelectScalar = {
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  xero_tenant_id?: boolean
+  xero_connection_id?: boolean
   entity_type?: boolean
-  cursor_value?: boolean
+  modified_since?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type XeroSyncCursorOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_tenant_id" | "entity_type" | "cursor_value" | "created_at" | "updated_at", ExtArgs["result"]["xeroSyncCursor"]>
+export type XeroSyncCursorOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_connection_id" | "entity_type" | "modified_since" | "created_at" | "updated_at", ExtArgs["result"]["xeroSyncCursor"]>
 export type XeroSyncCursorInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
 }
 export type XeroSyncCursorIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
 }
 export type XeroSyncCursorIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
 }
 
 export type $XeroSyncCursorPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "XeroSyncCursor"
   objects: {
     organisation: Prisma.$OrganisationPayload<ExtArgs>
-    xero_tenant: Prisma.$XeroTenantPayload<ExtArgs>
+    xero_connection: Prisma.$XeroConnectionPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
     organisation_id: string
-    xero_tenant_id: string
-    entity_type: $Enums.xero_sync_entity_type
-    cursor_value: string | null
+    xero_connection_id: string
+    entity_type: $Enums.xero_cursor_entity_type
+    modified_since: Date | null
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["xeroSyncCursor"]>
@@ -1141,7 +1126,7 @@ readonly fields: XeroSyncCursorFieldRefs;
 export interface Prisma__XeroSyncCursorClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  xero_tenant<T extends Prisma.XeroTenantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenantDefaultArgs<ExtArgs>>): Prisma.Prisma__XeroTenantClient<runtime.Types.Result.GetResult<Prisma.$XeroTenantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  xero_connection<T extends Prisma.XeroConnectionDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnectionDefaultArgs<ExtArgs>>): Prisma.Prisma__XeroConnectionClient<runtime.Types.Result.GetResult<Prisma.$XeroConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1174,9 +1159,9 @@ export interface XeroSyncCursorFieldRefs {
   readonly id: Prisma.FieldRef<"XeroSyncCursor", 'String'>
   readonly clerk_org_id: Prisma.FieldRef<"XeroSyncCursor", 'String'>
   readonly organisation_id: Prisma.FieldRef<"XeroSyncCursor", 'String'>
-  readonly xero_tenant_id: Prisma.FieldRef<"XeroSyncCursor", 'String'>
-  readonly entity_type: Prisma.FieldRef<"XeroSyncCursor", 'xero_sync_entity_type'>
-  readonly cursor_value: Prisma.FieldRef<"XeroSyncCursor", 'String'>
+  readonly xero_connection_id: Prisma.FieldRef<"XeroSyncCursor", 'String'>
+  readonly entity_type: Prisma.FieldRef<"XeroSyncCursor", 'xero_cursor_entity_type'>
+  readonly modified_since: Prisma.FieldRef<"XeroSyncCursor", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"XeroSyncCursor", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"XeroSyncCursor", 'DateTime'>
 }

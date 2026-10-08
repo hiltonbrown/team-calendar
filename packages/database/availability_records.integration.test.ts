@@ -3,11 +3,9 @@ import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
 vi.mock("server-only", () => ({}));
-
 const fixture = allocateLiveTestFixture(
   "packages/database/availability_records.integration.test.ts"
 );
-
 const {
   availability_approval_status,
   availability_contactability,
@@ -22,7 +20,6 @@ const {
   employment_type,
   source_system,
 } = await import("./index.js");
-
 const tenantA = {
   clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
   locationId: fixture.id("location", 0),
@@ -30,7 +27,6 @@ const tenantA = {
   personId: fixture.id("person", 0),
   teamId: fixture.id("team", 0),
 } as const;
-
 const tenantB = {
   clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
   locationId: fixture.id("location", 1),
@@ -38,9 +34,8 @@ const tenantB = {
   personId: fixture.id("person", 1),
   teamId: fixture.id("team", 1),
 } as const;
-
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
-
+const approvalAuthorisationId = fixture.id("approval-authorisation");
 interface Tenant {
   clerkOrgId: string;
   locationId: string;
@@ -48,7 +43,6 @@ interface Tenant {
   personId: string;
   teamId: string;
 }
-
 const availabilityRecordIds = {
   manualDuplicate: fixture.id("availability-record", 5),
   manualOriginal: fixture.id("availability-record", 4),
@@ -57,7 +51,6 @@ const availabilityRecordIds = {
   xeroDuplicate: fixture.id("availability-record", 3),
   xeroOriginal: fixture.id("availability-record", 2),
 } as const;
-
 const createTenant = async (tenant: Tenant) => {
   await database.organisation.create({
     data: {
@@ -67,7 +60,6 @@ const createTenant = async (tenant: Tenant) => {
       name: `Test ${tenant.clerkOrgId}`,
     },
   });
-
   await database.team.create({
     data: {
       clerk_org_id: tenant.clerkOrgId,
@@ -76,7 +68,6 @@ const createTenant = async (tenant: Tenant) => {
       organisation_id: tenant.organisationId,
     },
   });
-
   await database.location.create({
     data: {
       clerk_org_id: tenant.clerkOrgId,
@@ -86,7 +77,6 @@ const createTenant = async (tenant: Tenant) => {
       region_code: "QLD",
     },
   });
-
   await database.person.create({
     data: {
       clerk_org_id: tenant.clerkOrgId,
@@ -104,7 +94,6 @@ const createTenant = async (tenant: Tenant) => {
     },
   });
 };
-
 const createAvailabilityRecord = async ({
   id,
   tenant,
@@ -137,7 +126,6 @@ const createAvailabilityRecord = async ({
       starts_at: new Date("2026-05-01T00:00:00.000Z"),
     },
   });
-
 const cleanTestData = async () => {
   const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
   await database.failedRecord.deleteMany({ where: scope });
@@ -151,8 +139,10 @@ const cleanTestData = async () => {
   await database.notificationPreference.deleteMany({ where: scope });
   await database.xeroSyncCursor.deleteMany({ where: scope });
   await database.syncRun.deleteMany({ where: scope });
-  await database.xeroTenant.deleteMany({ where: scope });
   await database.xeroConnection.deleteMany({ where: scope });
+  await database.xeroAuthorisation.deleteMany({
+    where: { id: approvalAuthorisationId },
+  });
   await database.publicHolidayAssignment.deleteMany({ where: scope });
   await database.publicHoliday.deleteMany({ where: scope });
   await database.publicHolidayJurisdiction.deleteMany({ where: scope });
@@ -164,41 +154,38 @@ const cleanTestData = async () => {
   await database.team.deleteMany({ where: scope });
   await database.organisation.deleteMany({ where: scope });
 };
-
 const expectPrismaErrorCode = async (
   operation: Promise<unknown>,
   code: string
 ) => {
   let error: unknown;
-
   try {
     await operation;
   } catch (caught) {
     error = caught;
   }
-
   expect(error).toMatchObject({ code });
 };
-
 beforeEach(async () => {
   await cleanTestData();
 });
-
 afterAll(async () => {
   await cleanTestData();
   await database.$disconnect();
 });
-
 describe("availability_records", () => {
   test("has expected foreign keys and indexes", async () => {
-    const indexes = await database.$queryRaw<Array<{ indexname: string }>>`
+    const indexes = await database.$queryRaw<
+      Array<{
+        indexname: string;
+      }>
+    >`
       SELECT indexname::text AS indexname
       FROM pg_indexes
       WHERE schemaname = 'public'
         AND tablename = 'availability_records'
     `;
     const indexNames = indexes.map(({ indexname }) => indexname);
-
     expect(indexNames).toEqual(
       expect.arrayContaining([
         "availability_records_clerk_org_id_idx",
@@ -210,9 +197,10 @@ describe("availability_records", () => {
         "availability_records_source_type_source_last_modified_at_idx",
       ])
     );
-
     const foreignKeys = await database.$queryRaw<
-      Array<{ constraint_name: string }>
+      Array<{
+        constraint_name: string;
+      }>
     >`
       SELECT constraint_name::text AS constraint_name
       FROM information_schema.table_constraints
@@ -223,7 +211,6 @@ describe("availability_records", () => {
     const foreignKeyNames = foreignKeys.map(
       ({ constraint_name }) => constraint_name
     );
-
     expect(foreignKeyNames).toEqual(
       expect.arrayContaining([
         "availability_records_organisation_id_fkey",
@@ -231,15 +218,12 @@ describe("availability_records", () => {
       ])
     );
   });
-
   test("inserts scoped records", async () => {
     await createTenant(tenantA);
-
     const record = await createAvailabilityRecord({
       id: availabilityRecordIds.scoped,
       tenant: tenantA,
     });
-
     expect(record).toMatchObject({
       clerk_org_id: tenantA.clerkOrgId,
       id: availabilityRecordIds.scoped,
@@ -248,9 +232,38 @@ describe("availability_records", () => {
       source_type: availability_source_type.manual,
     });
   });
-
   test("fences concurrent approval creates and preserves uncertainty after the worker lease expires", async () => {
     await createTenant(tenantA);
+    // Provider-write preparation requires the same active canonical connection
+    // as the real approval flow; this test never decrypts or uses these tokens.
+    await database.xeroAuthorisation.create({
+      data: {
+        access_token_auth_tag: "fixture-tag",
+        access_token_encrypted: "fixture-ciphertext",
+        access_token_expires_at: new Date(Date.now() + 3_600_000),
+        access_token_iv: "fixture-iv",
+        granted_scopes: ["payroll.employees"],
+        id: approvalAuthorisationId,
+        last_refreshed_at: new Date(),
+        provider_app_id: fixture.id("approval-provider-app"),
+        refresh_token_auth_tag: "fixture-refresh-tag",
+        refresh_token_encrypted: "fixture-refresh-ciphertext",
+        refresh_token_iv: "fixture-refresh-iv",
+        token_encrypted_at: new Date(),
+        token_key_version: 1,
+        xero_user_id: fixture.id("approval-xero-user"),
+      },
+    });
+    await database.xeroConnection.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+        payroll_region: "AU",
+        remote_connection_id: fixture.id("approval-remote-connection"),
+        xero_authorisation_id: approvalAuthorisationId,
+        xero_tenant_id: fixture.id("approval-tenant"),
+      },
+    });
     const record = await createAvailabilityRecord({
       id: availabilityRecordIds.scoped,
       tenant: tenantA,
@@ -279,6 +292,20 @@ describe("availability_records", () => {
       expectedFailedAction: null,
       expectedSequence: record.derived_sequence,
       expectedStatus: "submitted" as const,
+      request: {
+        body: JSON.stringify([
+          {
+            EmployeeID: "fixture_employee",
+            EndDate: record.ends_at.toISOString().slice(0, 10),
+            LeaveTypeID: "fixture_leave_type",
+            StartDate: record.starts_at.toISOString().slice(0, 10),
+            Title: "Annual leave",
+          },
+        ]),
+        method: "POST" as const,
+        url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+        xeroTenantId: "fixture_xero_tenant",
+      },
       requestEmployeeId: "fixture_employee",
       requestEndsAt: record.ends_at,
       requestFingerprint: "fixture_immutable_request",
@@ -317,13 +344,64 @@ describe("availability_records", () => {
         organisation_id: tenantA.organisationId,
       },
     });
+    const dispatched = await getSubmitOperation(scope);
+    const replay = await prepareAndClaimSubmitOperation({
+      ...request,
+      actorUserId: "second_manager",
+    });
+    expect(replay).toMatchObject({
+      actorUserId: "fixture_manager",
+      attemptGeneration: 2,
+      mutation: {
+        firstDispatchedAt: dispatched?.idempotency_first_dispatched_at,
+        idempotencyKey: dispatched?.idempotency_key,
+        replayBefore: dispatched?.idempotency_replay_before,
+      },
+      replayedUnknown: true,
+    });
+    expect(await getSubmitOperation(scope)).toMatchObject({
+      attempt_generation: 2,
+      status: "outcome_unknown",
+    });
+    expect(
+      await markSubmitDispatchStarted(
+        { ...scope, attemptGeneration: 2 },
+        replay?.mutation
+      )
+    ).toBe(true);
+    await database.availabilityRecord.updateMany({
+      data: { xero_write_claimed_at: null },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: record.id,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    expect(
+      await prepareAndClaimSubmitOperation({
+        ...request,
+        request: { ...request.request, xeroTenantId: "different_tenant" },
+      })
+    ).toBeNull();
+    await database.outboundOperation.updateMany({
+      data: { idempotency_replay_before: new Date(Date.now() - 1) },
+      where: {
+        ...{
+          clerk_org_id: tenantA.clerkOrgId,
+          organisation_id: tenantA.organisationId,
+        },
+        action: "approve",
+        availability_record_id: record.id,
+      },
+    });
     expect(await prepareAndClaimSubmitOperation(request)).toBeNull();
     expect(await getSubmitOperation(scope)).toMatchObject({
-      attempt_generation: 1,
+      actor_user_id: "fixture_manager",
+      attempt_generation: 2,
+      idempotency_key: dispatched?.idempotency_key,
       status: "outcome_unknown",
     });
   });
-
   test("rejects cross-org queries when tenant scope is applied", async () => {
     await createTenant(tenantA);
     await createTenant(tenantB);
@@ -331,7 +409,6 @@ describe("availability_records", () => {
       id: availabilityRecordIds.otherTenant,
       tenant: tenantB,
     });
-
     const crossOrgRecord = await database.availabilityRecord.findFirst({
       where: {
         clerk_org_id: tenantA.clerkOrgId,
@@ -346,7 +423,6 @@ describe("availability_records", () => {
         organisation_id: tenantB.organisationId,
       },
     });
-
     expect(crossOrgRecord).toBeNull();
     expect(correctlyScopedRecord).toMatchObject({
       clerk_org_id: tenantB.clerkOrgId,
@@ -354,7 +430,6 @@ describe("availability_records", () => {
       organisation_id: tenantB.organisationId,
     });
   });
-
   test("validates uniqueness constraints", async () => {
     await createTenant(tenantA);
     await createAvailabilityRecord({
@@ -363,7 +438,6 @@ describe("availability_records", () => {
       sourceType: availability_source_type.xero,
       tenant: tenantA,
     });
-
     await expectPrismaErrorCode(
       createAvailabilityRecord({
         id: availabilityRecordIds.xeroDuplicate,
@@ -373,7 +447,6 @@ describe("availability_records", () => {
       }),
       "P2002"
     );
-
     await createAvailabilityRecord({
       id: availabilityRecordIds.manualOriginal,
       tenant: tenantA,
@@ -386,10 +459,8 @@ describe("availability_records", () => {
       "P2002"
     );
   });
-
   test("enforces foreign keys", async () => {
     await createTenant(tenantA);
-
     await expectPrismaErrorCode(
       database.availabilityRecord.create({
         data: {

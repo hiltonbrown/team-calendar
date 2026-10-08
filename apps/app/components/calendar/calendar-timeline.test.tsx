@@ -3,13 +3,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { CalendarTimeline } from "./calendar-timeline";
 
 const HIDDEN_PEOPLE_COPY = /Showing 10 of 12 people in this scope/;
-
 describe("CalendarTimeline", () => {
   afterEach(() => cleanup());
-
   it("combines coverage pressure, provenance and person lanes", () => {
     render(<CalendarTimeline data={calendarRange()} orgQueryValue={null} />);
-
     expect(screen.getByRole("heading", { name: "Calendar" })).toBeDefined();
     expect(screen.getByText("Xero leave")).toBeDefined();
     expect(screen.getByText("Manual availability")).toBeDefined();
@@ -23,7 +20,6 @@ describe("CalendarTimeline", () => {
       })
     ).toBeDefined();
   });
-
   it("preserves scope and category on desktop and mobile day links", () => {
     render(
       <CalendarTimeline
@@ -57,7 +53,6 @@ describe("CalendarTimeline", () => {
       expect(params.get("includeDrafts")).toBe("true");
     }
   });
-
   it("shows both local dates for an overnight timed entry", () => {
     const data = calendarRange();
     const [firstDay] = data.days;
@@ -85,7 +80,6 @@ describe("CalendarTimeline", () => {
       screen.getAllByText("15 April 2026, 23:00 to 16 April 2026, 02:00")
     ).toHaveLength(2);
   });
-
   it("caps the initial lane set and lets the viewer reveal everyone", () => {
     render(
       <CalendarTimeline
@@ -100,13 +94,11 @@ describe("CalendarTimeline", () => {
         orgQueryValue={null}
       />
     );
-
     expect(screen.getByText(HIDDEN_PEOPLE_COPY)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Show all people" }));
     expect(screen.getAllByText("Person 12").length).toBeGreaterThan(0);
     expect(screen.queryByText(HIDDEN_PEOPLE_COPY)).toBeNull();
   });
-
   it("renders an honest empty scope state", () => {
     render(
       <CalendarTimeline
@@ -119,7 +111,6 @@ describe("CalendarTimeline", () => {
         orgQueryValue={null}
       />
     );
-
     expect(
       screen.getByText("No people match this calendar scope.")
     ).toBeDefined();
@@ -127,7 +118,6 @@ describe("CalendarTimeline", () => {
       screen.getAllByText("No recorded unavailability").length
     ).toBeGreaterThan(0);
   });
-
   it("keeps people without records visible in the runway", () => {
     const data = calendarRange();
     render(
@@ -146,13 +136,11 @@ describe("CalendarTimeline", () => {
         orgQueryValue={null}
       />
     );
-
     expect(screen.getByText("Casey Clear")).toBeDefined();
     expect(
       screen.getAllByText("No recorded unavailability").length
     ).toBeGreaterThan(0);
   });
-
   it("does not bridge gaps between non-contiguous event days", () => {
     const data = calendarRange();
     const sharedEvent = event({
@@ -174,7 +162,6 @@ describe("CalendarTimeline", () => {
         orgQueryValue={null}
       />
     );
-
     expect(
       screen.getAllByRole("button", {
         name: "Ari Report: Annual Leave, Team Calendar leave",
@@ -182,7 +169,6 @@ describe("CalendarTimeline", () => {
     ).toHaveLength(2);
   });
 });
-
 function calendarRange(
   overrides: { people?: ReturnType<typeof person>[] } = {}
 ) {
@@ -224,7 +210,6 @@ function calendarRange(
           ]
         : [],
   }));
-
   return {
     days,
     people,
@@ -240,7 +225,6 @@ function calendarRange(
     xeroSyncFailedCount: 0,
   } as const;
 }
-
 function person(overrides: { displayName: string; id: string }) {
   return {
     avatarUrl: null,
@@ -255,7 +239,6 @@ function person(overrides: { displayName: string; id: string }) {
     xeroSyncFailedCountInRange: 0,
   } as const;
 }
-
 function event(overrides: {
   displayName: string;
   id: string;

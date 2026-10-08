@@ -1,6 +1,5 @@
 import { log } from "@repo/observability/log";
 import "server-only";
-
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
@@ -27,15 +26,24 @@ import {
   type FieldOwnership,
   fieldOwnershipForPerson,
 } from "./field-ownership";
-
 export type PeopleRole = "admin" | "manager" | "owner" | "viewer";
-
 export type PeopleServiceError =
-  | { code: "not_authorised"; message: string }
-  | { code: "person_not_found"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "person_not_found";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 export interface PeopleFilters {
   includeArchived: boolean;
   locationId?: string[];
@@ -46,12 +54,10 @@ export interface PeopleFilters {
   xeroLinked: "all" | "false" | "true";
   xeroSyncFailedOnly: boolean;
 }
-
 export interface PeoplePagination {
   cursor?: string | null;
   pageSize: number;
 }
-
 export interface PersonListItem {
   archivedAt: Date | null;
   avatarUrl: string | null;
@@ -68,13 +74,18 @@ export interface PersonListItem {
     regionCode: string | null;
     timezone: string | null;
   } | null;
-  manager: { displayName: string; id: string } | null;
+  manager: {
+    displayName: string;
+    id: string;
+  } | null;
   personType: person_type | "contractor" | "employee";
-  team: { id: string; name: string } | null;
+  team: {
+    id: string;
+    name: string;
+  } | null;
   xeroLinked: boolean;
   xeroSyncFailedCount: number;
 }
-
 export interface AvailabilityRecordSummary {
   allDay: boolean;
   approvalStatus: availability_approval_status;
@@ -89,18 +100,16 @@ export interface AvailabilityRecordSummary {
   title: string | null;
   xeroWriteError: string | null;
 }
-
 export interface BalanceRow {
   balanceUnits: number;
+  connectionId: string | null;
   currencyCode: string | null;
   id: string;
   leaveTypeName: string | null;
   leaveTypeXeroId: string;
   recordType: availability_record_type | null;
   unitType: leave_balance_unit | null;
-  xeroTenantId: string | null;
 }
-
 export interface AlternativeContactSnapshot {
   displayOrder: number;
   email: string | null;
@@ -110,7 +119,6 @@ export interface AlternativeContactSnapshot {
   phone: string | null;
   role: string | null;
 }
-
 export interface PersonProfile {
   alternativeContacts: AlternativeContactSnapshot[];
   balances: {
@@ -136,17 +144,23 @@ export interface PersonProfile {
       regionCode: string | null;
       timezone: string | null;
     } | null;
-    manager: { firstName: string; id: string; lastName: string } | null;
+    manager: {
+      firstName: string;
+      id: string;
+      lastName: string;
+    } | null;
     personType: person_type | "contractor" | "employee";
     startDate: Date | null;
     statusNote: string | null;
-    team: { id: string; name: string } | null;
+    team: {
+      id: string;
+      name: string;
+    } | null;
     xeroLinked: boolean;
   };
   upcomingRecords: AvailabilityRecordSummary[];
   xeroSyncFailedCount: number;
 }
-
 const RoleSchema = z.enum(["admin", "manager", "owner", "viewer"]);
 const StatusSchema = z.enum([
   "alternative_contact",
@@ -163,7 +177,6 @@ const StatusSchema = z.enum([
   "travelling",
   "wfh",
 ]);
-
 const FiltersSchema = z
   .object({
     includeArchived: z.boolean().default(false),
@@ -181,14 +194,12 @@ const FiltersSchema = z
     xeroLinked: "all",
     xeroSyncFailedOnly: false,
   });
-
 const PaginationSchema = z
   .object({
     cursor: z.string().nullable().optional(),
     pageSize: z.number().int().min(1).max(200).default(50),
   })
   .default({ pageSize: 50 });
-
 const ListPeopleSchema = z.object({
   actingPersonId: z.string().uuid().nullable().optional(),
   clerkOrgId: z.string().min(1),
@@ -197,7 +208,6 @@ const ListPeopleSchema = z.object({
   pagination: PaginationSchema,
   role: RoleSchema.default("viewer"),
 });
-
 const PersonProfileSchema = z.object({
   actingPersonId: z.string().uuid().nullable().optional(),
   actingUserId: z.string().min(1),
@@ -206,7 +216,6 @@ const PersonProfileSchema = z.object({
   personId: z.string().uuid(),
   role: RoleSchema,
 });
-
 const HistorySchema = z.object({
   actingPersonId: z.string().uuid().nullable().optional(),
   clerkOrgId: z.string().min(1),
@@ -216,7 +225,6 @@ const HistorySchema = z.object({
   personId: z.string().uuid(),
   role: RoleSchema,
 });
-
 export async function canAccessPerson(input: {
   actingPersonId?: null | string;
   clerkOrgId: string;
@@ -240,14 +248,12 @@ export async function canAccessPerson(input: {
   });
   return visiblePersonIds.includes(input.personId);
 }
-
 const UpcomingSchema = z.object({
   clerkOrgId: z.string().min(1),
   horizonDays: z.number().int().min(1).max(90).default(30),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
 });
-
 export async function listPeople(input: {
   actingPersonId?: null | string;
   clerkOrgId: string;
@@ -257,7 +263,11 @@ export async function listPeople(input: {
   role?: PeopleRole;
 }): Promise<
   Result<
-    { nextCursor: string | null; people: PersonListItem[]; totalCount: number },
+    {
+      nextCursor: string | null;
+      people: PersonListItem[];
+      totalCount: number;
+    },
     PeopleServiceError
   >
 > {
@@ -269,7 +279,6 @@ export async function listPeople(input: {
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const {
       actingPersonId,
@@ -338,7 +347,6 @@ export async function listPeople(input: {
     const failedCountByPersonId = new Map(
       failedCounts.map((row) => [row.person_id, row._count._all])
     );
-
     const currentStatusesByPersonId = await computeCurrentStatusForPeople({
       at,
       clerkOrgId: scoped.clerk_org_id,
@@ -363,7 +371,6 @@ export async function listPeople(input: {
       people.length > pagination.pageSize
         ? encodePeopleCursor(page.at(-1))
         : null;
-
     return {
       ok: true,
       value: {
@@ -376,14 +383,16 @@ export async function listPeople(input: {
     return unknownError("Failed to list people.");
   }
 }
-
 function buildPeopleWhere({
   filters,
   scoped,
   visiblePersonIds,
 }: {
   filters: PeopleFilters;
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId };
+  scoped: {
+    clerk_org_id: ClerkOrgId;
+    organisation_id: OrganisationId;
+  };
   visiblePersonIds: null | string[];
 }): Prisma.PersonWhereInput {
   return {
@@ -444,7 +453,6 @@ function buildPeopleWhere({
       : {}),
   };
 }
-
 const LEAVE_TYPES: availability_record_type[] = [
   "annual_leave",
   "holiday",
@@ -470,7 +478,6 @@ const LOCAL_RUNGS: Array<{
   { key: "alternative_contact", types: ["alternative_contact"] },
   { key: "other", types: ["other"] },
 ];
-
 async function buildCurrentStatusWhere(input: {
   at: Date;
   clerkOrgId: string;
@@ -575,7 +582,6 @@ async function buildCurrentStatusWhere(input: {
   }
   return predicates.length ? { OR: predicates } : { id: { in: [] } };
 }
-
 function peopleCursorWhere(cursor: PeopleCursor): Prisma.PersonWhereInput {
   return {
     OR: [
@@ -589,7 +595,6 @@ function peopleCursorWhere(cursor: PeopleCursor): Prisma.PersonWhereInput {
     ],
   };
 }
-
 export async function getPersonProfile(input: {
   actingPersonId?: null | string;
   actingUserId: string;
@@ -602,15 +607,12 @@ export async function getPersonProfile(input: {
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   if (!RoleSchema.safeParse(parsed.data.role).success) {
     return notAuthorised();
   }
-
   if (!(await canAccessPerson(parsed.data))) {
     return notAuthorised();
   }
-
   try {
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
@@ -626,7 +628,6 @@ export async function getPersonProfile(input: {
     if (!person) {
       return await personNotFound(parsed.data);
     }
-
     const [
       currentStatus,
       upcomingResult,
@@ -680,20 +681,17 @@ export async function getPersonProfile(input: {
       ? xeroStateResult.value.state
       : "unavailable";
     const hasXero = xeroConnectionState !== "not_connected";
-
     const xeroLinked = Boolean(person.xero_employee_id);
     const visibleBalances = hasXero
-      ? balances.filter((balance) => balance.xero_tenant_id !== null)
-      : balances.filter((balance) => balance.xero_tenant_id === null);
+      ? balances.filter((balance) => balance.xero_connection_id !== null)
+      : balances.filter((balance) => balance.xero_connection_id === null);
     const balanceRows =
       (xeroLinked && hasXero) || !hasXero
         ? visibleBalances.map(toBalanceRow)
         : [];
-    const balancesLastFetchedAt =
-      xeroLinked && hasXero
-        ? maxDate(visibleBalances.map((row) => row.last_fetched_at))
-        : null;
-
+    const balancesLastFetchedAt = hasXero
+      ? maxDate(visibleBalances.map((row) => row.last_fetched_at))
+      : null;
     return {
       ok: true,
       value: {
@@ -751,7 +749,6 @@ export async function getPersonProfile(input: {
     return unknownError("Failed to load this profile.");
   }
 }
-
 export async function listHistoryPage(input: {
   actingPersonId?: null | string;
   clerkOrgId: string;
@@ -762,7 +759,10 @@ export async function listHistoryPage(input: {
   role: PeopleRole;
 }): Promise<
   Result<
-    { nextCursor: string | null; records: AvailabilityRecordSummary[] },
+    {
+      nextCursor: string | null;
+      records: AvailabilityRecordSummary[];
+    },
     PeopleServiceError
   >
 > {
@@ -770,11 +770,9 @@ export async function listHistoryPage(input: {
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   if (!(await canAccessPerson(parsed.data))) {
     return notAuthorised();
   }
-
   try {
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
@@ -787,7 +785,6 @@ export async function listHistoryPage(input: {
     if (!person) {
       return await personNotFound(parsed.data);
     }
-
     const cursor = decodeDateCursor(parsed.data.cursor ?? null);
     const records = await database.availabilityRecord.findMany({
       orderBy: [{ starts_at: "desc" }, { id: "desc" }],
@@ -808,26 +805,28 @@ export async function listHistoryPage(input: {
       records.length > parsed.data.pageSize
         ? encodeDateCursor(page.at(-1))
         : null;
-
     return { ok: true, value: { nextCursor, records: page } };
   } catch {
     return unknownError("Failed to load history.");
   }
 }
-
 export async function listUpcomingRecords(input: {
   clerkOrgId: string;
   horizonDays?: number;
   organisationId: string;
   personId: string;
 }): Promise<
-  Result<{ records: AvailabilityRecordSummary[] }, PeopleServiceError>
+  Result<
+    {
+      records: AvailabilityRecordSummary[];
+    },
+    PeopleServiceError
+  >
 > {
   const parsed = UpcomingSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
@@ -840,7 +839,6 @@ export async function listUpcomingRecords(input: {
     if (!person) {
       return await personNotFound(parsed.data);
     }
-
     const now = new Date();
     const horizonEnd = new Date(now);
     horizonEnd.setUTCDate(horizonEnd.getUTCDate() + parsed.data.horizonDays);
@@ -858,7 +856,6 @@ export async function listUpcomingRecords(input: {
         },
       },
     });
-
     return {
       ok: true,
       value: { records: records.map(toAvailabilityRecordSummary) },
@@ -867,7 +864,6 @@ export async function listUpcomingRecords(input: {
     return unknownError("Failed to load upcoming records.");
   }
 }
-
 const personListSelect = {
   archived_at: true,
   avatar_url: true,
@@ -903,13 +899,11 @@ const personListSelect = {
   },
   xero_employee_id: true,
 } as const;
-
 const personProfileSelect = {
   ...personListSelect,
   start_date: true,
   status_note: true,
 } as const;
-
 const alternativeContactSelect = {
   display_order: true,
   email: true,
@@ -919,7 +913,6 @@ const alternativeContactSelect = {
   phone: true,
   role: true,
 } as const;
-
 const availabilityRecordSelect = {
   all_day: true,
   approval_status: true,
@@ -934,7 +927,6 @@ const availabilityRecordSelect = {
   title: true,
   xero_write_error: true,
 } as const;
-
 const leaveBalanceProfileSelect = {
   balance: true,
   balance_unit: true,
@@ -944,29 +936,26 @@ const leaveBalanceProfileSelect = {
   leave_type_name: true,
   leave_type_xero_id: true,
   record_type: true,
-  xero_tenant_id: true,
+  xero_connection_id: true,
 } satisfies Prisma.LeaveBalanceSelect;
-
 type LeaveBalanceProfileRow = Prisma.LeaveBalanceGetPayload<{
   select: typeof leaveBalanceProfileSelect;
 }>;
-
 // Carry the raw stored leave type name (nullable). The fallback to the Xero id
 // is a display concern applied in the UI and is never persisted, so opening the
 // manual balance editor cannot silently turn a missing name into the id.
 export function toBalanceRow(balance: LeaveBalanceProfileRow): BalanceRow {
   return {
     balanceUnits: Number(balance.balance),
+    connectionId: balance.xero_connection_id,
     currencyCode: balance.currency_code,
     id: balance.id,
     leaveTypeName: balance.leave_type_name,
     leaveTypeXeroId: balance.leave_type_xero_id,
     recordType: balance.record_type,
     unitType: balance.balance_unit,
-    xeroTenantId: balance.xero_tenant_id,
   };
 }
-
 function toPersonListItem(
   person: {
     archived_at: Date | null;
@@ -985,9 +974,16 @@ function toPersonListItem(
       timezone: string | null;
     } | null;
     location_id: string | null;
-    manager: { first_name: string; id: string; last_name: string } | null;
+    manager: {
+      first_name: string;
+      id: string;
+      last_name: string;
+    } | null;
     person_type: person_type | null;
-    team: { id: string; name: string } | null;
+    team: {
+      id: string;
+      name: string;
+    } | null;
     xero_employee_id: string | null;
   },
   currentStatus: CurrentStatus,
@@ -1023,7 +1019,6 @@ function toPersonListItem(
     xeroSyncFailedCount,
   };
 }
-
 function toAvailabilityRecordSummary(record: {
   all_day: boolean;
   approval_status: availability_approval_status;
@@ -1053,7 +1048,6 @@ function toAvailabilityRecordSummary(record: {
     xeroWriteError: record.xero_write_error,
   };
 }
-
 function toAlternativeContactSnapshot(contact: {
   display_order: number;
   email: string | null;
@@ -1073,7 +1067,6 @@ function toAlternativeContactSnapshot(contact: {
     role: contact.role,
   };
 }
-
 function effectivePersonType(
   personType: null | person_type,
   employmentType: string
@@ -1083,13 +1076,11 @@ function effectivePersonType(
   }
   return employmentType === "contractor" ? "contractor" : "employee";
 }
-
 interface PeopleCursor {
   firstName: string;
   id: string;
   lastName: string;
 }
-
 function encodePeopleCursor(person: PersonListItem | undefined): string | null {
   if (!person) {
     return null;
@@ -1102,7 +1093,6 @@ function encodePeopleCursor(person: PersonListItem | undefined): string | null {
     })
   ).toString("base64url");
 }
-
 function decodePeopleCursor(cursor: null | string): PeopleCursor | null {
   if (!cursor) {
     return null;
@@ -1121,7 +1111,6 @@ function decodePeopleCursor(cursor: null | string): PeopleCursor | null {
     return null;
   }
 }
-
 function encodeDateCursor(
   record: AvailabilityRecordSummary | undefined
 ): string | null {
@@ -1135,10 +1124,10 @@ function encodeDateCursor(
     })
   ).toString("base64url");
 }
-
-function decodeDateCursor(
-  cursor: null | string
-): { id: string; startsAt: Date } | null {
+function decodeDateCursor(cursor: null | string): {
+  id: string;
+  startsAt: Date;
+} | null {
   if (!cursor) {
     return null;
   }
@@ -1155,7 +1144,6 @@ function decodeDateCursor(
     return null;
   }
 }
-
 function maxDate(values: Array<Date | null>): Date | null {
   return values.reduce<Date | null>((latest, value) => {
     if (!value) {
@@ -1167,7 +1155,6 @@ function maxDate(values: Array<Date | null>): Date | null {
     return latest;
   }, null);
 }
-
 async function personNotFound(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -1197,7 +1184,6 @@ async function personNotFound(input: {
     ok: false,
   };
 }
-
 function validationError(error: z.ZodError): Result<never, PeopleServiceError> {
   return {
     error: {
@@ -1207,7 +1193,6 @@ function validationError(error: z.ZodError): Result<never, PeopleServiceError> {
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, PeopleServiceError> {
   return {
     error: {
@@ -1217,7 +1202,6 @@ function notAuthorised(): Result<never, PeopleServiceError> {
     ok: false,
   };
 }
-
 function unknownError(message: string): Result<never, PeopleServiceError> {
   return {
     error: {

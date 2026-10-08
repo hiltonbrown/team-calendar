@@ -45,7 +45,6 @@ export const canonicalImportSchema = z.strictObject({
       value: z.number(),
     })
   ),
-  bindingGeneration: z.number().int().nonnegative(),
   clerkOrgId: z.string().min(1),
   leaves: z.array(
     z.strictObject({
@@ -93,16 +92,15 @@ export function assertIndependentInitialImport(
   scope: {
     clerkOrgId: string;
     organisationId: string;
-    bindingGeneration: number;
     xeroTenantId: string;
-    campaignStartedAt: string;
+    verificationStartedAt: string;
     expectedRunIds: readonly string[];
   }
 ) {
   const raw = rawAuEnumerationSchema.parse(rawValue);
   const canonical = canonicalImportSchema.parse(canonicalValue);
-  const campaignStartedAt = Date.parse(
-    z.iso.datetime().parse(scope.campaignStartedAt)
+  const verificationStartedAt = Date.parse(
+    z.iso.datetime().parse(scope.verificationStartedAt)
   );
   const expectedRunIds = z
     .array(z.uuid())
@@ -115,10 +113,9 @@ export function assertIndependentInitialImport(
   if (
     canonical.clerkOrgId !== scope.clerkOrgId ||
     canonical.organisationId !== scope.organisationId ||
-    canonical.bindingGeneration !== scope.bindingGeneration ||
     canonical.xeroTenantId !== scope.xeroTenantId
   ) {
-    throw new Error("Import canonical scope or generation is foreign");
+    throw new Error("Import canonical scope is foreign");
   }
   exactIds(
     canonical.people.map((row) => row.sourceId),
@@ -200,7 +197,7 @@ export function assertIndependentInitialImport(
       runs.length !== 1 ||
       !run ||
       run.fetched !== expectedCounts[entity] ||
-      Date.parse(run.startedAt) < campaignStartedAt ||
+      Date.parse(run.startedAt) < verificationStartedAt ||
       Date.parse(run.startedAt) > Date.parse(run.completedAt) ||
       Date.parse(run.completedAt) > observedUntil
     ) {
@@ -217,7 +214,6 @@ export function assertIndependentInitialImport(
   };
 }
 const scheduledSchema = z.strictObject({
-  bindingGeneration: z.number().int().nonnegative(),
   candidateSha: z.string().regex(/^[a-f0-9]{40}$/),
   canonicalRemoteIds: z.array(z.string().min(1)),
   clerkOrgId: z.string().min(1),
@@ -241,7 +237,6 @@ export function assertActualScheduledDiscovery(
     candidateSha: string;
     clerkOrgId: string;
     organisationId: string;
-    bindingGeneration: number;
     xeroTenantId: string;
     remoteId: string;
     startedAt: string;
@@ -254,7 +249,6 @@ export function assertActualScheduledDiscovery(
     observation.candidateSha !== expected.candidateSha ||
     observation.clerkOrgId !== expected.clerkOrgId ||
     observation.organisationId !== expected.organisationId ||
-    observation.bindingGeneration !== expected.bindingGeneration ||
     observation.providerRemoteId !== expected.remoteId ||
     Date.parse(observation.dispatchedAt) < Date.parse(expected.startedAt) ||
     Date.parse(observation.completedAt) <

@@ -41,7 +41,7 @@ export type NotificationSseEvent =
         runId: string;
         runType: string;
         status: string;
-        xeroTenantId: string | null;
+        connectionId: string | null;
       };
     };
 

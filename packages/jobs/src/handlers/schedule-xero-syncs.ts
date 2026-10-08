@@ -1,33 +1,22 @@
-import {
-  claimXeroCampaignScheduledDispatch,
-  xeroCampaignAllowsOrdinaryMaintenance,
-} from "@repo/database/xero-campaign-access";
-import type { XeroCampaignEvent } from "@repo/database/xero-campaign-contract";
-import { recoverXeroRefreshAttempts } from "@repo/xero";
 import "server-only";
-
 import type { Result } from "@repo/core";
 import {
-  findConnectionsNeedingTokenRotation,
-  listSchedulableXeroTenants,
-  type SchedulableXeroTenant,
+  listSchedulableXeroConnections,
+  type SchedulableXeroConnection,
 } from "@repo/database";
 import { log } from "@repo/observability/log";
 import {
-  resolveXeroAccess,
-  scrubInactiveXeroOAuthSessionCredentials,
+  purgeClosedXeroOAuthSessions,
+  refreshDormantXeroAuthorisations,
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
 import { inngest } from "../client";
 import {
   dispatchSyncEvent,
   getScheduledSyncEventId,
-  getUtcCadenceSlot,
   type RegisteredSyncRunType,
-  syncEventNames,
 } from "../events";
 import { recoverXeroImportDispatch } from "./recover-xero-import-dispatch";
-
 export function isValidTimezone(tz: string | null | undefined): boolean {
   if (!tz) {
     return false;
@@ -39,7 +28,6 @@ export function isValidTimezone(tz: string | null | undefined): boolean {
     return false;
   }
 }
-
 export interface TenantLocalTimeParts {
   dateStr: string;
   day: number;
@@ -49,7 +37,6 @@ export interface TenantLocalTimeParts {
   month: number;
   year: number;
 }
-
 export function getTenantLocalTimeParts(
   date: Date,
   timeZone: string
@@ -65,19 +52,16 @@ export function getTenantLocalTimeParts(
       weekday: "short",
       year: "numeric",
     });
-
     const parts = formatter.formatToParts(date);
     const partMap: Record<string, string> = {};
     for (const p of parts) {
       partMap[p.type] = p.value;
     }
-
     const year = Number.parseInt(partMap.year, 10);
     const month = Number.parseInt(partMap.month, 10);
     const day = Number.parseInt(partMap.day, 10);
     const hour = Number.parseInt(partMap.hour, 10);
     const minute = Number.parseInt(partMap.minute, 10);
-
     const weekdayStr = partMap.weekday;
     const weekdayMap: Record<string, number> = {
       Fri: 5,
@@ -90,7 +74,6 @@ export function getTenantLocalTimeParts(
     };
     const dayOfWeek = weekdayMap[weekdayStr] ?? 0;
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-
     return {
       dateStr,
       day,
@@ -104,7 +87,6 @@ export function getTenantLocalTimeParts(
     return null;
   }
 }
-
 function isInboundDue(
   lastSyncAt: Date | null,
   now: Date,
@@ -118,7 +100,6 @@ function isInboundDue(
   const interval = isBusinessHours ? fifteenMinMs : sixtyMinMs;
   return now.getTime() - new Date(lastSyncAt).getTime() >= interval;
 }
-
 function isBalanceDue(lastSyncAt: Date | null, now: Date): boolean {
   if (!lastSyncAt) {
     return true;
@@ -126,7 +107,6 @@ function isBalanceDue(lastSyncAt: Date | null, now: Date): boolean {
   const sixtyMinMs = 60 * 60 * 1000;
   return now.getTime() - new Date(lastSyncAt).getTime() >= sixtyMinMs;
 }
-
 function isReconciliationDue(
   lastReconciledAt: Date | null,
   _now: Date,
@@ -146,7 +126,6 @@ function isReconciliationDue(
   );
   return !lastReconciledLocal || lastReconciledLocal.dateStr !== localDateStr;
 }
-
 /**
  * Pure cadence decision function to determine which sync run types are due for a tenant.
  *
@@ -158,27 +137,41 @@ function isReconciliationDue(
  * - null last-success timestamp is immediately due.
  */
 export function dueRunTypes(
-  tenant: SchedulableXeroTenant,
+  tenant: SchedulableXeroConnection,
   now: Date = new Date()
 ): RegisteredSyncRunType[] {
   if (!(tenant.timezone && isValidTimezone(tenant.timezone))) {
     return [];
   }
-
   const local = getTenantLocalTimeParts(now, tenant.timezone);
   if (!local) {
     return [];
   }
-
   const isWeekday = local.dayOfWeek >= 1 && local.dayOfWeek <= 5;
   const isBusinessHours = isWeekday && local.hour >= 7 && local.hour <= 18;
-
   const due: RegisteredSyncRunType[] = [];
-
-  if (isInboundDue(tenant.lastPeopleSyncAt, now, isBusinessHours)) {
+  if (
+    isInboundDue(tenant.lastPeopleSyncAt, now, isBusinessHours) ||
+    isReconciliationDue(
+      tenant.lastFullPeopleSyncAt ?? null,
+      now,
+      tenant.timezone,
+      local.hour,
+      local.dateStr
+    )
+  ) {
     due.push("people");
   }
-  if (isInboundDue(tenant.lastLeaveRecordsSyncAt, now, isBusinessHours)) {
+  if (
+    isInboundDue(tenant.lastLeaveRecordsSyncAt, now, isBusinessHours) ||
+    isReconciliationDue(
+      tenant.lastFullLeaveRecordsSyncAt ?? null,
+      now,
+      tenant.timezone,
+      local.hour,
+      local.dateStr
+    )
+  ) {
     due.push("leave_records");
   }
   if (isBalanceDue(tenant.lastLeaveBalancesSyncAt, now)) {
@@ -195,16 +188,38 @@ export function dueRunTypes(
   ) {
     due.push("approval_state_reconciliation");
   }
-
   return due;
 }
-
+function scheduledSyncMode(
+  tenant: SchedulableXeroConnection,
+  runType: RegisteredSyncRunType,
+  now: Date
+): "full" | "incremental" | undefined {
+  if (runType !== "people" && runType !== "leave_records") {
+    return undefined;
+  }
+  const timezone = tenant.timezone ?? "";
+  const local = getTenantLocalTimeParts(now, timezone);
+  const lastFullAt =
+    runType === "people"
+      ? tenant.lastFullPeopleSyncAt
+      : tenant.lastFullLeaveRecordsSyncAt;
+  return local &&
+    isReconciliationDue(
+      lastFullAt ?? null,
+      now,
+      timezone,
+      local.hour,
+      local.dateStr
+    )
+    ? "full"
+    : "incremental";
+}
 export interface ScheduleXeroSyncsPageOptions {
   cursor?: string;
   now?: Date;
   schedulerRunId?: string;
 }
-
 export interface ScheduleXeroSyncsPageResult {
   dispatched: number;
   invalidTimezone: number;
@@ -212,78 +227,14 @@ export interface ScheduleXeroSyncsPageResult {
   scanned: number;
   skipped: number;
 }
-
-export interface RotateDormantXeroConnectionsResult {
-  failed: number;
-  rotated: number;
-  scanned: number;
-}
-
-export async function rotateDormantXeroConnections(
-  now: Date = new Date()
-): Promise<Result<RotateDormantXeroConnectionsResult>> {
-  const connectionsResult = await findConnectionsNeedingTokenRotation({
-    now,
-  });
-  if (!connectionsResult.ok) {
-    return connectionsResult;
-  }
-
-  let failed = 0;
-  let rotated = 0;
-  const seenOwners = new Set<string>();
-  for (const connection of connectionsResult.value) {
-    if (!(await xeroCampaignAllowsOrdinaryMaintenance(connection))) {
-      continue;
-    }
-    if (connection.ownerId && seenOwners.has(connection.ownerId)) {
-      continue;
-    }
-    if (connection.ownerId) {
-      seenOwners.add(connection.ownerId);
-    }
-    const refreshResult = await resolveXeroAccess({
-      capability: "payroll.employees.read",
-      clerkOrgId: connection.clerkOrgId,
-      deadline: { expiresAtMs: Date.now() + 30_000 },
-      expectedBindingGeneration: connection.bindingGeneration,
-      forceRefresh: true,
-      organisationId: connection.organisationId,
-    });
-    if (refreshResult.ok) {
-      rotated += 1;
-      continue;
-    }
-
-    failed += 1;
-    log.error("Failed to rotate dormant Xero refresh token", {
-      clerkOrgId: connection.clerkOrgId,
-      connectionId: connection.connectionId,
-      error: refreshResult.error,
-      organisationId: connection.organisationId,
-    });
-  }
-
-  return {
-    ok: true,
-    value: {
-      failed,
-      rotated,
-      scanned: connectionsResult.value.length,
-    },
-  };
-}
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Each due job independently checks cadence, campaign ticket and dispatch result.
 export async function scheduleXeroSyncsPage(
   options: ScheduleXeroSyncsPageOptions = {}
 ): Promise<Result<ScheduleXeroSyncsPageResult>> {
   const now = options.now ?? new Date();
-  const listResult = await listSchedulableXeroTenants({
+  const listResult = await listSchedulableXeroConnections({
     cursor: options.cursor,
     limit: 100,
   });
-
   if (!listResult.ok) {
     log.error(
       "Failed to list schedulable Xero tenants in scheduleXeroSyncsPage",
@@ -296,83 +247,55 @@ export async function scheduleXeroSyncsPage(
       ok: false,
     };
   }
-
-  const { tenants, nextCursor } = listResult.value;
+  const { connections: tenants, nextCursor } = listResult.value;
   const scanned = tenants.length;
   let dispatched = 0;
   let skipped = 0;
   let invalidTimezone = 0;
-
   for (const tenant of tenants) {
     if (!isValidTimezone(tenant.timezone)) {
       invalidTimezone += 1;
       log.warn("Skipping Xero tenant with invalid timezone", {
         clerkOrgId: tenant.clerkOrgId,
+        connectionId: tenant.connectionId,
         organisationId: tenant.organisationId,
-        xeroTenantId: tenant.databaseTenantId,
       });
       continue;
     }
-
     const due = dueRunTypes(tenant, now);
     if (due.length === 0) {
       skipped += 1;
       continue;
     }
-
     for (const runType of due) {
-      let campaign: XeroCampaignEvent | undefined;
-      try {
-        campaign = await claimXeroCampaignScheduledDispatch(
-          {
-            bindingGeneration: tenant.bindingGeneration,
-            clerkOrgId: tenant.clerkOrgId,
-            organisationId: tenant.organisationId,
-            xeroTenantId: tenant.databaseTenantId,
-          },
-          syncEventNames[runType],
-          getUtcCadenceSlot(runType, now),
-          options.schedulerRunId
-        );
-      } catch {
-        skipped += 1;
-        continue;
-      }
-      const eventId = campaign
-        ? "campaign:" +
-          campaign.runId +
-          ":" +
-          campaign.epoch +
-          ":" +
-          campaign.dispatchId
-        : getScheduledSyncEventId(tenant.databaseTenantId, runType, now);
+      const mode = scheduledSyncMode(tenant, runType, now);
+      const eventId =
+        getScheduledSyncEventId(tenant.connectionId, runType, now) +
+        (mode === "full" ? ":full" : "");
       const dispatchRes = await dispatchSyncEvent(
         {
-          ...(campaign ? { campaign } : {}),
-          bindingGeneration: tenant.bindingGeneration,
           clerkOrgId: tenant.clerkOrgId,
+          connectionId: tenant.connectionId,
           organisationId: tenant.organisationId,
           runType,
+          ...(mode ? { mode } : {}),
           triggerType: "scheduled",
-          xeroTenantId: tenant.databaseTenantId,
         },
         { eventId }
       );
-
       if (dispatchRes.ok) {
         dispatched += 1;
       } else {
         log.error("Failed to dispatch scheduled sync event", {
           clerkOrgId: tenant.clerkOrgId,
+          connectionId: tenant.connectionId,
           error: dispatchRes.error,
           organisationId: tenant.organisationId,
           runType,
-          xeroTenantId: tenant.databaseTenantId,
         });
       }
     }
   }
-
   return {
     ok: true,
     value: {
@@ -384,7 +307,6 @@ export async function scheduleXeroSyncsPage(
     },
   };
 }
-
 export const scheduleXeroSyncsFunction: InngestFunction.Any =
   inngest.createFunction(
     {
@@ -402,50 +324,27 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
       let totalSkipped = 0;
       let totalInvalidTimezone = 0;
       let hasMorePages = true;
-
-      const ordinaryMaintenance = await xeroCampaignAllowsOrdinaryMaintenance();
-      if (ordinaryMaintenance) {
-        const cleanupResult = await step.run(
-          "cleanup-xero-oauth-sessions",
-          async () => scrubInactiveXeroOAuthSessionCredentials()
-        );
-        if (!cleanupResult.ok) {
-          log.error("Failed to clean up inactive Xero OAuth sessions", {
-            error: cleanupResult.error,
-          });
+      await step.run("cleanup-xero-oauth-sessions", () =>
+        purgeClosedXeroOAuthSessions()
+      );
+      await step.run("recover-xero-import-dispatch", () =>
+        recoverXeroImportDispatch({ now: new Date() })
+      );
+      const authorisations = await step.run(
+        "refresh-dormant-authorisations",
+        async () => {
+          const result = await refreshDormantXeroAuthorisations(new Date());
+          if (!result.ok) {
+            throw new Error(result.error.message);
+          }
+          return result.value;
         }
-
-        await step.run("recover-xero-refresh-attempts", async () =>
-          recoverXeroRefreshAttempts({ now: new Date() })
-        );
-        await step.run("recover-xero-import-dispatch", async () =>
-          recoverXeroImportDispatch({ now: new Date() })
-        );
-        const rotationResult = await step.run(
-          "rotate-dormant-connections",
-          async () => rotateDormantXeroConnections()
-        );
-        if (rotationResult.ok) {
-          log.info("Completed dormant Xero token rotation pass", {
-            failed: rotationResult.value.failed,
-            rotated: rotationResult.value.rotated,
-            scanned: rotationResult.value.scanned,
-          });
-        } else {
-          log.error(
-            "Failed to find dormant Xero connections for token rotation",
-            {
-              error: rotationResult.error,
-            }
-          );
-        }
-      }
+      );
       while (hasMorePages) {
         const pageResult = await step.run(
           `process-page-${pageIndex}`,
           async () => scheduleXeroSyncsPage({ cursor, schedulerRunId })
         );
-
         if (!pageResult.ok) {
           log.error("Failed to fetch schedulable Xero tenants page", {
             error: pageResult.error,
@@ -453,12 +352,10 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
           });
           break;
         }
-
         totalScanned += pageResult.value.scanned;
         totalDispatched += pageResult.value.dispatched;
         totalSkipped += pageResult.value.skipped;
         totalInvalidTimezone += pageResult.value.invalidTimezone;
-
         if (pageResult.value.nextCursor) {
           cursor = pageResult.value.nextCursor;
           pageIndex += 1;
@@ -466,15 +363,15 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
           hasMorePages = false;
         }
       }
-
       log.info("Completed scheduled Xero syncs coordinator run", {
+        authorisations,
         dispatched: totalDispatched,
         invalidTimezone: totalInvalidTimezone,
         scanned: totalScanned,
         skipped: totalSkipped,
       });
-
       return {
+        authorisations,
         dispatched: totalDispatched,
         invalidTimezone: totalInvalidTimezone,
         scanned: totalScanned,

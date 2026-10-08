@@ -9,19 +9,15 @@ import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { PeopleFilterSchema } from "./_schemas";
 import { PeopleClient } from "./people-client";
-
 export const metadata: Metadata = {
   description: "Team directory with live availability and Xero sync status.",
   title: "People - Team Calendar",
 };
-
 interface PeoplePageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
-
 const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
   await requirePageRole("org:viewer");
-
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
@@ -48,7 +44,6 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
   } else if (orgRole === "org:owner") {
     peopleRole = "owner";
   }
-
   const actingPerson = userId
     ? await database.person.findFirst({
         select: { id: true },
@@ -59,8 +54,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
         },
       })
     : null;
-
-  const [peopleResult, teams, locations, xeroTenant, xeroStateResult] =
+  const [peopleResult, teams, locations, xeroConnection, xeroStateResult] =
     await Promise.all([
       listPeople({
         actingPersonId: actingPerson?.id,
@@ -83,7 +77,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
         select: { id: true, name: true },
         where: scopedQuery(clerkOrgId, organisationId),
       }),
-      database.xeroTenant.findFirst({
+      database.xeroConnection.findFirst({
         select: {
           id: true,
         },
@@ -97,8 +91,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
   const xeroConnectionState = xeroStateResult.ok
     ? xeroStateResult.value.state
     : "unavailable";
-  const xeroTenantId = xeroTenant?.id ?? null;
-
+  const connectionId = xeroConnection?.id ?? null;
   if (!peopleResult.ok) {
     return (
       <>
@@ -109,7 +102,6 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
       </>
     );
   }
-
   return (
     <>
       <Header page="People" />
@@ -117,6 +109,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
         <PeopleClient
           canIncludeArchived={canIncludeArchived}
           canManageClerkAccess={canIncludeArchived}
+          connectionId={connectionId}
           filters={filters}
           locations={locations}
           nextCursor={peopleResult.value.nextCursor}
@@ -126,11 +119,9 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
           teams={teams}
           totalCount={peopleResult.value.totalCount}
           xeroConnectionState={xeroConnectionState}
-          xeroTenantId={xeroTenantId}
         />
       </div>
     </>
   );
 };
-
 export default PeoplePage;

@@ -22,14 +22,12 @@ interface AdminViewProps {
   personId: string;
   view: AdminDashboardView;
 }
-
 export function AdminView({ view, orgQueryValue, personId }: AdminViewProps) {
   const xero = view.header.xeroConnectionState === "connected";
   const timeline = buildPersonalCalendarTimeline(view, {
     now: new Date(),
     timezone: view.header.timezone ?? "Australia/Brisbane",
   });
-
   return (
     <DashboardScaffold
       banner={

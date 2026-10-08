@@ -1,6 +1,5 @@
 import { log } from "@repo/observability/log";
 import "server-only";
-
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { xeroRecoveryMessage } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
@@ -8,36 +7,48 @@ import { z } from "zod";
 import { dispatchSyncEvent } from "../sync/sync-events";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import type { PeopleRole } from "./people-service";
-
 export type BalanceRefreshError =
-  | { code: "not_authorised"; message: string }
-  | { code: "person_not_found"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "person_not_found";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 export type BalanceRefreshReason =
   | "dispatch_failed"
   | "job_not_registered"
   | "not_xero_linked"
   | "xero_not_connected";
-
 export type BalanceRefreshDispatcher = (payload: {
-  bindingGeneration: number;
   clerkOrgId: string;
   dispatchedBy: string;
   organisationId: string;
   personId: string;
-  xeroTenantId: string;
-}) => Promise<Result<void, { message: string }>>;
-
+  connectionId: string;
+}) => Promise<
+  Result<
+    void,
+    {
+      message: string;
+    }
+  >
+>;
 let balanceRefreshDispatcher: BalanceRefreshDispatcher | null = null;
-
 export function setBalanceRefreshDispatcher(
   dispatcher: BalanceRefreshDispatcher | null
 ): void {
   balanceRefreshDispatcher = dispatcher;
 }
-
 const DispatchBalanceRefreshSchema = z.object({
   actingRole: z.enum(["admin", "manager", "owner", "viewer"]),
   actingUserId: z.string().min(1),
@@ -45,7 +56,6 @@ const DispatchBalanceRefreshSchema = z.object({
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
 });
-
 export async function dispatchBalanceRefresh(input: {
   actingRole: PeopleRole;
   actingUserId: string;
@@ -54,7 +64,10 @@ export async function dispatchBalanceRefresh(input: {
   personId: string;
 }): Promise<
   Result<
-    { queued: boolean; reason?: BalanceRefreshReason },
+    {
+      queued: boolean;
+      reason?: BalanceRefreshReason;
+    },
     BalanceRefreshError
   >
 > {
@@ -67,7 +80,6 @@ export async function dispatchBalanceRefresh(input: {
   ) {
     return notAuthorised();
   }
-
   try {
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
@@ -86,13 +98,11 @@ export async function dispatchBalanceRefresh(input: {
     if (!person) {
       return await personNotFound(parsed.data);
     }
-
     if (!person.xero_employee_id) {
       const value = { queued: false, reason: "not_xero_linked" as const };
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
     }
-
     const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
@@ -121,48 +131,40 @@ export async function dispatchBalanceRefresh(input: {
       };
     }
     const hasXero = xeroConnectionState === "connected";
-    if (!hasXero || xeroStateResult.value.bindingGeneration === null) {
+    if (!hasXero) {
       const value = { queued: false, reason: "xero_not_connected" as const };
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
     }
-
-    const xeroTenant = await database.xeroTenant.findFirst({
+    const xeroConnection = await database.xeroConnection.findFirst({
       select: { id: true },
       where: {
         ...scoped,
-        active_slot: 1,
-        binding_generation: xeroStateResult.value.bindingGeneration,
         organisation_id: parsed.data.organisationId,
-        retired_at: null,
       },
     });
-    if (!xeroTenant) {
+    if (!xeroConnection) {
       const value = { queued: false, reason: "xero_not_connected" as const };
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
     }
-
     if (!balanceRefreshDispatcher) {
       const value = { queued: false, reason: "job_not_registered" as const };
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
     }
-
     const dispatched = await balanceRefreshDispatcher({
-      bindingGeneration: xeroStateResult.value.bindingGeneration,
       clerkOrgId: parsed.data.clerkOrgId,
+      connectionId: xeroConnection.id,
       dispatchedBy: parsed.data.actingUserId,
       organisationId: parsed.data.organisationId,
       personId: parsed.data.personId,
-      xeroTenantId: xeroTenant.id,
     });
     if (!dispatched.ok) {
       const value = { queued: false, reason: "dispatch_failed" as const };
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
     }
-
     const value = { queued: true };
     await auditDispatch(parsed.data, value);
     return { ok: true, value };
@@ -176,10 +178,12 @@ export async function dispatchBalanceRefresh(input: {
     };
   }
 }
-
 async function auditDispatch(
   input: z.infer<typeof DispatchBalanceRefreshSchema>,
-  result: { queued: boolean; reason?: BalanceRefreshReason }
+  result: {
+    queued: boolean;
+    reason?: BalanceRefreshReason;
+  }
 ) {
   await database.auditEvent.create({
     data: {
@@ -198,7 +202,6 @@ async function auditDispatch(
     },
   });
 }
-
 async function personNotFound(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -225,7 +228,6 @@ async function personNotFound(input: {
     ok: false,
   };
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, BalanceRefreshError> {
@@ -237,7 +239,6 @@ function validationError(
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, BalanceRefreshError> {
   return {
     error: {
@@ -247,17 +248,15 @@ function notAuthorised(): Result<never, BalanceRefreshError> {
     ok: false,
   };
 }
-
 setBalanceRefreshDispatcher(async (payload) => {
   const result = await dispatchSyncEvent({
-    bindingGeneration: payload.bindingGeneration,
     clerkOrgId: payload.clerkOrgId,
+    connectionId: payload.connectionId,
     organisationId: payload.organisationId,
     personId: payload.personId,
     runType: "leave_balances",
     triggeredByUserId: payload.dispatchedBy,
     triggerType: "manual",
-    xeroTenantId: payload.xeroTenantId,
   });
   if (!result.ok) {
     return {

@@ -8,13 +8,7 @@ import {
 
 const UUID_GLOBAL_KEY_KINDS = new Set<GlobalKeyKind>([
   "plan_id",
-  "credential_owner",
-  "provider_connection",
-  "tenant_binding",
-  "oauth_attempt",
-  "cleanup_request",
-  "cleanup_attempt",
-  "campaign_domain",
+  "authorisation",
 ]);
 
 export const REQUIRED_GLOBAL_KEY_COUNTS = Object.freeze(

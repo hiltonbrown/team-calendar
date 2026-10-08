@@ -88,7 +88,7 @@ const DispatchApiResponseSchema = z.discriminatedUnion("ok", [
 export async function dispatchManualSyncAction(input: {
   organisationId: string;
   runType: string;
-  xeroTenantId: string;
+  connectionId: string;
 }): Promise<Result<DispatchResultValue, SyncActionError>> {
   const parsed = DispatchManualSyncActionSchema.safeParse(input);
   if (!parsed.success) {
@@ -99,16 +99,16 @@ export async function dispatchManualSyncAction(input: {
     return context;
   }
   return await dispatchManualSyncViaApi({
+    connectionId: parsed.data.connectionId,
     organisationId: context.value.organisationId,
     runType: parsed.data.runType,
-    xeroTenantId: parsed.data.xeroTenantId,
   });
 }
 
 async function dispatchManualSyncViaApi(input: {
   organisationId: string;
   runType: string;
-  xeroTenantId: string;
+  connectionId: string;
 }): Promise<Result<DispatchResultValue, SyncActionError>> {
   const apiUrl = getPublicApiUrl("/api/sync/dispatch");
   if (!apiUrl) {

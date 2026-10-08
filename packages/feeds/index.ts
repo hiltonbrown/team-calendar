@@ -3,6 +3,7 @@ export * from "./src/cache/feed-invalidation";
 export * from "./src/feed-service";
 export * from "./src/preview/preview-service";
 export * from "./src/projection/feed-projection";
+export { establishFeedRepresentation } from "./src/publication/feed-representation";
 export * from "./src/publication/publication-service";
 export * from "./src/render/render-feed";
 export * from "./src/scope/feed-scope";

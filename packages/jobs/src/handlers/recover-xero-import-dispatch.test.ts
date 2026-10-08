@@ -3,14 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   dispatchInitialXeroSync: vi.fn(),
   syncRunFindFirst: vi.fn(),
-  xeroTenantFindMany: vi.fn(),
+  xeroConnectionFindMany: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
     syncRun: { findFirst: mocks.syncRunFindFirst },
-    xeroTenant: { findMany: mocks.xeroTenantFindMany },
+    xeroConnection: { findMany: mocks.xeroConnectionFindMany },
   },
 }));
 vi.mock("@repo/observability/log", () => ({
@@ -19,11 +18,9 @@ vi.mock("@repo/observability/log", () => ({
 vi.mock("../events", () => ({
   dispatchInitialXeroSync: mocks.dispatchInitialXeroSync,
 }));
-
 const { recoverXeroImportDispatch } = await import(
   "./recover-xero-import-dispatch"
 );
-
 describe("recoverXeroImportDispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,25 +30,20 @@ describe("recoverXeroImportDispatch", () => {
       value: { eventName: "initial-xero-sync", ids: ["event_1"], queued: true },
     });
   });
-
   it("finds active connected tenants missing initial people sync and dispatches initial sync", async () => {
-    mocks.xeroTenantFindMany.mockResolvedValue([
+    mocks.xeroConnectionFindMany.mockResolvedValue([
       {
-        binding_generation: 1,
         clerk_org_id: "org_1",
         id: "tenant_uuid_1",
         organisation_id: "org_model_uuid_1",
       },
       {
-        binding_generation: 2,
         clerk_org_id: "org_2",
         id: "tenant_uuid_2",
         organisation_id: "org_model_uuid_2",
       },
     ]);
-
     const result = await recoverXeroImportDispatch();
-
     expect(result).toEqual({
       ok: true,
       value: {
@@ -60,28 +52,35 @@ describe("recoverXeroImportDispatch", () => {
         skipped: 0,
       },
     });
-
+    expect(mocks.xeroConnectionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          authorisation: { status: "active" },
+          disconnected_at: null,
+          status: "active",
+        }),
+      })
+    );
+    expect(
+      mocks.xeroConnectionFindMany.mock.calls[0]?.[0].where
+    ).not.toHaveProperty("xero_connection");
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledTimes(2);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenNthCalledWith(1, {
-      bindingGeneration: 1,
       clerkOrgId: "org_1",
+      connectionId: "tenant_uuid_1",
       organisationId: "org_model_uuid_1",
       triggerType: "scheduled",
-      xeroTenantId: "tenant_uuid_1",
     });
     expect(mocks.dispatchInitialXeroSync).toHaveBeenNthCalledWith(2, {
-      bindingGeneration: 2,
       clerkOrgId: "org_2",
+      connectionId: "tenant_uuid_2",
       organisationId: "org_model_uuid_2",
       triggerType: "scheduled",
-      xeroTenantId: "tenant_uuid_2",
     });
   });
-
   it("skips tenants that already have an active running people sync run", async () => {
-    mocks.xeroTenantFindMany.mockResolvedValue([
+    mocks.xeroConnectionFindMany.mockResolvedValue([
       {
-        binding_generation: 1,
         clerk_org_id: "org_1",
         id: "tenant_uuid_1",
         organisation_id: "org_model_uuid_1",
@@ -91,9 +90,7 @@ describe("recoverXeroImportDispatch", () => {
       id: "run_active_1",
       status: "running",
     });
-
     const result = await recoverXeroImportDispatch();
-
     expect(result).toEqual({
       ok: true,
       value: {
@@ -102,14 +99,11 @@ describe("recoverXeroImportDispatch", () => {
         skipped: 1,
       },
     });
-
     expect(mocks.dispatchInitialXeroSync).not.toHaveBeenCalled();
   });
-
   it("increments skipped count when dispatch fails and records error log", async () => {
-    mocks.xeroTenantFindMany.mockResolvedValue([
+    mocks.xeroConnectionFindMany.mockResolvedValue([
       {
-        binding_generation: 1,
         clerk_org_id: "org_1",
         id: "tenant_uuid_1",
         organisation_id: "org_model_uuid_1",
@@ -119,9 +113,7 @@ describe("recoverXeroImportDispatch", () => {
       error: { code: "dispatch_failed", message: "Inngest unavailable" },
       ok: false,
     });
-
     const result = await recoverXeroImportDispatch();
-
     expect(result).toEqual({
       ok: true,
       value: {

@@ -85,7 +85,7 @@ const createManualBalance = ({
       leave_type_xero_id: leaveTypeXeroId,
       organisation_id: tenant.organisationId,
       person_id: tenant.personId,
-      xero_tenant_id: null,
+      xero_connection_id: null,
     },
   });
 
@@ -134,13 +134,13 @@ describe("leave_balances", () => {
 
     expect(indexNames).toEqual(
       expect.arrayContaining([
-        "leave_balances_person_id_xero_tenant_id_leave_type_xero_id_key",
+        "leave_balances_person_id_xero_connection_id_leave_type_xero_key",
         "leave_balances_person_id_leave_type_xero_id_manual_key",
       ])
     );
   });
 
-  test("accepts a manual balance with a null xero_tenant_id", async () => {
+  test("accepts a manual balance with a null xero_connection_id", async () => {
     await createTenant();
 
     const balance = await createManualBalance({
@@ -151,7 +151,7 @@ describe("leave_balances", () => {
       clerk_org_id: tenant.clerkOrgId,
       leave_type_xero_id: "annual-leave",
       person_id: tenant.personId,
-      xero_tenant_id: null,
+      xero_connection_id: null,
     });
   });
 
@@ -184,7 +184,7 @@ describe("leave_balances", () => {
     ).resolves.toMatchObject({
       id: "41000000-0000-4000-8000-000000000005",
       leave_type_xero_id: "sick-leave",
-      xero_tenant_id: null,
+      xero_connection_id: null,
     });
   });
 
@@ -241,7 +241,7 @@ describe("leave_balances", () => {
         organisation_id: tenant.organisationId,
         person_id: tenant.personId,
         source_payload_json: { CurrencyCode: "NZD", TypeOfUnits: "Dollars" },
-        xero_tenant_id: null,
+        xero_connection_id: null,
       },
     });
 

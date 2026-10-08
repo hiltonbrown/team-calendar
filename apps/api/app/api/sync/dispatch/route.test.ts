@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   syncXeroPeople: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
-
 vi.mock("@repo/auth/helpers", () => ({
   currentUser: mocks.currentUser,
   requireOrg: mocks.requireOrg,
@@ -28,7 +27,7 @@ vi.mock("@repo/database/queries/xero-connection-state", () => ({
 vi.mock("@repo/database", () => ({
   database: {
     syncRun: { findFirst: mocks.syncRunFindFirst },
-    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
+    xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
 }));
 vi.mock("@repo/jobs", () => ({
@@ -37,15 +36,12 @@ vi.mock("@repo/jobs", () => ({
   syncXeroLeaveRecords: mocks.syncXeroLeaveRecords,
   syncXeroPeople: mocks.syncXeroPeople,
 }));
-
 const { POST } = await import("./route");
-
 const input = {
+  connectionId: "00000000-0000-4000-8000-000000000002",
   organisationId: "00000000-0000-4000-8000-000000000001",
   runType: "people",
-  xeroTenantId: "00000000-0000-4000-8000-000000000002",
 } as const;
-
 function request(body: unknown): Request {
   return new Request("https://api.example.com/api/sync/dispatch", {
     body: JSON.stringify(body),
@@ -53,7 +49,6 @@ function request(body: unknown): Request {
     method: "POST",
   });
 }
-
 function successfulInlineResult() {
   return {
     ok: true,
@@ -67,15 +62,14 @@ function successfulInlineResult() {
     },
   } as const;
 }
-
 describe("manual sync dispatch route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getXeroConnectionState.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 8, state: "connected" },
+      value: { state: "connected" },
     });
-    mocks.xeroTenantFindFirst.mockResolvedValue({ id: input.xeroTenantId });
+    mocks.xeroTenantFindFirst.mockResolvedValue({ id: input.connectionId });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     vi.stubEnv("NODE_ENV", "test");
     mocks.requireOrg.mockResolvedValue("org_123");
@@ -94,47 +88,36 @@ describe("manual sync dispatch route", () => {
     mocks.syncXeroLeaveRecords.mockResolvedValue(successfulInlineResult());
     mocks.syncXeroPeople.mockResolvedValue(successfulInlineResult());
   });
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
-
   it("rejects unauthenticated callers", async () => {
     mocks.requireOrg.mockRejectedValueOnce(new Error("No organisation"));
-
     const response = await POST(request(input));
-
     expect(response.status).toBe(401);
     expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
   });
-
   it("rejects callers who are not admins or owners", async () => {
     mocks.requireRole.mockResolvedValue(false);
-
     const response = await POST(request(input));
-
     expect(response.status).toBe(403);
     expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
   });
-
   it("validates the external request body", async () => {
     const response = await POST(request({ ...input, organisationId: "bad" }));
-
     expect(response.status).toBe(400);
     expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
   });
-
   it("dispatches with both authenticated tenant identifiers", async () => {
     const response = await POST(request(input));
-
     expect(response.status).toBe(202);
     expect(mocks.dispatchManualSync).toHaveBeenCalledWith({
       actingRole: "admin",
       actingUserId: "user_123",
       clerkOrgId: "org_123",
+      connectionId: input.connectionId,
       organisationId: input.organisationId,
       runType: "people",
-      xeroTenantId: input.xeroTenantId,
     });
     expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toEqual({
@@ -142,7 +125,6 @@ describe("manual sync dispatch route", () => {
       value: { eventName: "sync-xero-people", queued: true },
     });
   });
-
   it("preserves a scoped service failure", async () => {
     mocks.dispatchManualSync.mockResolvedValueOnce({
       error: {
@@ -151,9 +133,7 @@ describe("manual sync dispatch route", () => {
       },
       ok: false,
     });
-
     const response = await POST(request(input));
-
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({
       error: {
@@ -163,7 +143,6 @@ describe("manual sync dispatch route", () => {
       ok: false,
     });
   });
-
   it.each([
     { handler: mocks.syncXeroPeople, runType: "people" },
     { handler: mocks.syncXeroLeaveRecords, runType: "leave_records" },
@@ -182,18 +161,15 @@ describe("manual sync dispatch route", () => {
         },
         ok: false,
       });
-
       const response = await POST(request({ ...input, runType }));
-
       expect(response.status).toBe(200);
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith({
-        bindingGeneration: 8,
         clerkOrgId: "org_123",
+        connectionId: input.connectionId,
         organisationId: input.organisationId,
         triggeredByUserId: "user_123",
         triggerType: "manual",
-        xeroTenantId: input.xeroTenantId,
       });
       await expect(response.json()).resolves.toMatchObject({
         ok: true,
@@ -208,7 +184,6 @@ describe("manual sync dispatch route", () => {
       });
     }
   );
-
   it.each(["disconnect_pending", "reauthorisation_required"] as const)(
     "does not run local fallback for %s",
     async (state) => {
@@ -218,13 +193,12 @@ describe("manual sync dispatch route", () => {
       });
       mocks.getXeroConnectionState.mockResolvedValue({
         ok: true,
-        value: { bindingGeneration: 8, state },
+        value: { state },
       });
       expect((await POST(request(input))).status).toBe(500);
       expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
     }
   );
-
   it("does not run local fallback for a different scoped database tenant", async () => {
     mocks.dispatchManualSync.mockResolvedValue({
       error: { code: "dispatch_failed", message: "Queue unavailable" },
@@ -236,16 +210,13 @@ describe("manual sync dispatch route", () => {
     expect(mocks.xeroTenantFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          active_slot: 1,
-          binding_generation: 8,
           clerk_org_id: "org_123",
-          id: input.xeroTenantId,
+          id: input.connectionId,
           organisation_id: input.organisationId,
         },
       })
     );
   });
-
   it("keeps production dispatch failures as 503 responses", async () => {
     vi.stubEnv("NODE_ENV", "production");
     mocks.dispatchManualSync.mockResolvedValueOnce({
@@ -255,13 +226,10 @@ describe("manual sync dispatch route", () => {
       },
       ok: false,
     });
-
     const response = await POST(request(input));
-
     expect(response.status).toBe(503);
     expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
   });
-
   it.each(["failed", "cancelled"] as const)(
     "does not report a locally executed %s run as successful",
     async (status) => {
@@ -283,9 +251,7 @@ describe("manual sync dispatch route", () => {
           upserted: 0,
         },
       });
-
       const response = await POST(request(input));
-
       expect(response.status).toBe(500);
       await expect(response.json()).resolves.toEqual({
         error: {
@@ -296,7 +262,6 @@ describe("manual sync dispatch route", () => {
       });
     }
   );
-
   it.each([
     ["update_permissions", "Update Xero permissions to continue."],
     ["reauthorise", "Xero access needs to be renewed."],
@@ -333,7 +298,6 @@ describe("manual sync dispatch route", () => {
       });
     }
   );
-
   it("preserves a local handler error", async () => {
     mocks.dispatchManualSync.mockResolvedValueOnce({
       error: {
@@ -346,16 +310,13 @@ describe("manual sync dispatch route", () => {
       error: { code: "unknown_error", message: "Xero read failed." },
       ok: false,
     });
-
     const response = await POST(request(input));
-
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
       error: { code: "unknown_error", message: "Xero read failed." },
       ok: false,
     });
   });
-
   it("surfaces an unexpected local handler exception", async () => {
     mocks.dispatchManualSync.mockResolvedValueOnce({
       error: {
@@ -367,9 +328,7 @@ describe("manual sync dispatch route", () => {
     mocks.syncXeroPeople.mockRejectedValueOnce(
       new Error("Database connection lost.")
     );
-
     const response = await POST(request(input));
-
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
       error: {

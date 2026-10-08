@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   peopleCount: vi.fn(),
   publicHolidayJurisdictionCount: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/availability", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
@@ -37,9 +36,7 @@ vi.mock("@repo/database", () => ({
     },
   },
 }));
-
 const { loadOnboardingState } = await import("./load-onboarding-state");
-
 describe("loadOnboardingState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,7 +46,7 @@ describe("loadOnboardingState", () => {
     });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 1, state: "connected" },
+      value: { state: "connected" },
     });
     mocks.peopleCount.mockResolvedValue(2);
     mocks.currentUserPersonFindFirst.mockResolvedValue({ id: "person_1" });
@@ -57,13 +54,11 @@ describe("loadOnboardingState", () => {
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
     mocks.feedCount.mockResolvedValue(1);
   });
-
   it.each([
     [
       "unavailable",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
     ["reauthorisation_required", "Xero access needs to be renewed."],
   ] as const)(
     "does not instruct reconnecting during %s",
@@ -71,7 +66,7 @@ describe("loadOnboardingState", () => {
       mocks.getXeroConnectionStateForScope.mockResolvedValue(
         xeroState === "unavailable"
           ? { error: { code: "state_unavailable" }, ok: false }
-          : { ok: true, value: { bindingGeneration: 7, state: xeroState } }
+          : { ok: true, value: { state: xeroState } }
       );
       const result = await loadOnboardingState({
         clerkOrgId: "org_1",
@@ -85,14 +80,12 @@ describe("loadOnboardingState", () => {
       });
     }
   );
-
   it("uses default-feed copy when a feed already exists", async () => {
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       userId: "user_1",
     });
-
     const feedStep = state.steps.find((step) => step.id === "feed");
     expect(feedStep).toMatchObject({
       ctaLabel: "View default feed",
@@ -103,15 +96,12 @@ describe("loadOnboardingState", () => {
     });
     expect(state.activeFeedCount).toBe(1);
   });
-
   it("keeps a manual fallback when no feed exists", async () => {
     mocks.feedCount.mockResolvedValue(0);
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
     });
-
     const feedStep = state.steps.find((step) => step.id === "feed");
     expect(feedStep).toMatchObject({
       ctaLabel: "Create feed",
@@ -120,16 +110,13 @@ describe("loadOnboardingState", () => {
       title: "Review calendar feed",
     });
   });
-
   it("provisions complete holidays step when jurisdiction exists", async () => {
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       userId: "user_1",
     });
-
     const holidayStep = state.steps.find((step) => step.id === "holidays");
     expect(holidayStep).toMatchObject({
       ctaLabel: "Review holidays",
@@ -139,16 +126,13 @@ describe("loadOnboardingState", () => {
       title: "Review public holidays",
     });
   });
-
   it("provisions incomplete holidays step when no jurisdiction exists", async () => {
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(0);
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       userId: "user_1",
     });
-
     const holidayStep = state.steps.find((step) => step.id === "holidays");
     expect(holidayStep).toMatchObject({
       ctaLabel: "Review setup",
@@ -158,21 +142,18 @@ describe("loadOnboardingState", () => {
       title: "Review public holidays",
     });
   });
-
   it("keeps a disconnected Xero task optional so one required step leads", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: null, state: "not_connected" },
+      value: { state: "not_connected" },
     });
     mocks.peopleCount.mockResolvedValue(0);
     mocks.currentUserPersonFindFirst.mockResolvedValue(null);
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       userId: "user_1",
     });
-
     expect(state.steps.find((step) => step.id === "xero")?.status).toBe(
       "optional"
     );
@@ -183,19 +164,16 @@ describe("loadOnboardingState", () => {
       "people"
     );
   });
-
   it("shows an entity-specific Xero connect step for a second un-connected entity", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: null, state: "not_connected" },
+      value: { state: "not_connected" },
     });
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000002",
       userId: "user_1",
     });
-
     const xeroStep = state.steps.find((step) => step.id === "xero");
     expect(xeroStep).toMatchObject({
       ctaLabel: "Connect Xero",
@@ -203,34 +181,28 @@ describe("loadOnboardingState", () => {
       title: "Connect Xero",
     });
   });
-
   it("completes business setup when people exist even if admin user is not a payroll employee", async () => {
     mocks.peopleCount.mockResolvedValue(10);
     mocks.currentUserPersonFindFirst.mockResolvedValue(null);
     mocks.pendingMatchesCount.mockResolvedValue(0);
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       userId: "admin_external_user",
     });
-
     const peopleStep = state.steps.find((step) => step.id === "people");
     expect(peopleStep?.status).toBe("complete");
     expect(state.isComplete).toBe(true);
     expect(state.currentUserPersonLinked).toBe(false);
   });
-
   it("requires review when imported people have pending identity matches", async () => {
     mocks.peopleCount.mockResolvedValue(10);
     mocks.pendingMatchesCount.mockResolvedValue(2);
-
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       userId: "user_1",
     });
-
     const peopleStep = state.steps.find((step) => step.id === "people");
     expect(peopleStep?.status).toBe("next");
     expect(peopleStep?.ctaLabel).toBe("Review people");

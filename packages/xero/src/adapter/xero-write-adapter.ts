@@ -2,6 +2,7 @@ import type {
   ApproveLeaveInput,
   DeclineLeaveInput,
   ExternalWritePort,
+  PrepareLeaveMutationInput,
   ProviderResolutionError,
   ProviderWriteError,
   Result,
@@ -9,8 +10,9 @@ import type {
   WithdrawLeaveInput,
 } from "@repo/core";
 import { availability_record_type } from "@repo/database/generated/enums";
+import { prepareAuLeaveMutation } from "../au/write";
 import { emitXeroMetric } from "../metrics";
-import { resolveXeroAccess } from "../oauth/credential-owner";
+import { resolveXeroAccess } from "../oauth/authorisation";
 import { createXeroDeadline } from "../rate-limit/deadline";
 import {
   fetchLeaveForEmployeeForRegion,
@@ -27,7 +29,7 @@ import {
 import { toPlainLanguageMessage, type XeroWriteError } from "../write/types";
 import { XERO_OPERATION_CAPABILITIES } from "./capabilities";
 import { classifyXeroFailure } from "./classify-xero-failure";
-import { toResolvedXeroTenant } from "./resolved-tenant";
+import { toResolvedXeroConnection } from "./resolved-tenant";
 
 function isAvailabilityRecordType(
   val: string
@@ -83,7 +85,7 @@ async function getTenant(
   }
   return {
     ok: true as const,
-    value: toResolvedXeroTenant(scope, resolved.value),
+    value: toResolvedXeroConnection(scope, resolved.value),
   };
 }
 
@@ -104,6 +106,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
   async approveLeaveApplication(
     input: ApproveLeaveInput
   ): Promise<Result<void, ProviderWriteError>> {
+    if (!input.mutation) {
+      return missingMutationIdentity();
+    }
     const resolution = await getTenant(
       input.clerkOrgId,
       input.organisationId,
@@ -114,9 +119,10 @@ export const XeroWriteAdapter: ExternalWritePort = {
     }
     const tenant = resolution.value;
     const res = await approveLeaveApplicationForRegion(tenant.payroll_region, {
+      mutation: input.mutation,
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -130,6 +136,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
   async declineLeaveApplication(
     input: DeclineLeaveInput
   ): Promise<Result<void, ProviderWriteError>> {
+    if (!input.mutation) {
+      return missingMutationIdentity();
+    }
     const resolution = await getTenant(
       input.clerkOrgId,
       input.organisationId,
@@ -140,10 +149,11 @@ export const XeroWriteAdapter: ExternalWritePort = {
     }
     const tenant = resolution.value;
     const res = await declineLeaveApplicationForRegion(tenant.payroll_region, {
+      mutation: input.mutation,
       reason: input.reason,
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -163,14 +173,28 @@ export const XeroWriteAdapter: ExternalWritePort = {
       return resolution;
     }
     const tenant = resolution.value;
+    if (
+      input.expectedXeroTenantId &&
+      input.expectedXeroTenantId !== tenant.xero_tenant_id
+    ) {
+      return {
+        error: toProviderError({
+          code: "validation_error",
+          dispatchPhase: "before_dispatch",
+          message:
+            "The Xero tenant no longer matches the recorded leave action.",
+        }),
+        ok: false,
+      };
+    }
     const result =
       tenant.payroll_region === "AU"
         ? await fetchLeaveRecordsForRegion(tenant.payroll_region, {
-            xeroTenant: tenant,
+            xeroConnection: tenant,
           })
         : await fetchLeaveForEmployeeForRegion(tenant.payroll_region, {
+            xeroConnection: tenant,
             xeroEmployeeId: input.employeeId,
-            xeroTenant: tenant,
           });
     if (!result.ok) {
       return {
@@ -198,6 +222,40 @@ export const XeroWriteAdapter: ExternalWritePort = {
       },
     };
   },
+  async prepareLeaveMutation(input: PrepareLeaveMutationInput) {
+    const operations = {
+      approve: "approveLeaveApplication",
+      create: "submitLeaveApplication",
+      decline: "declineLeaveApplication",
+      withdraw: "withdrawLeaveApplication",
+    } as const;
+    const operation = operations[input.action];
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      operation
+    );
+    if (!resolution.ok) {
+      return resolution;
+    }
+    if (resolution.value.payroll_region !== "AU") {
+      return {
+        error: toProviderError({
+          code: "region_not_supported_error",
+          dispatchPhase: "before_dispatch",
+          message: "Payroll writes are not supported for this region.",
+        }),
+        ok: false,
+      };
+    }
+    const request = prepareAuLeaveMutation(
+      input,
+      resolution.value.xero_tenant_id
+    );
+    return request.ok
+      ? request
+      : { error: toProviderError(request.error), ok: false };
+  },
   async resolveEmployeeId(input: {
     personId: string;
     clerkOrgId: string;
@@ -222,7 +280,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const tenant = resolution.value;
     const res = await resolveXeroEmployeeId({
       personId: input.personId,
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
     if (!res.ok) {
       return {
@@ -268,7 +326,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const res = await resolveXeroLeaveTypeId({
       personId: input.personId,
       recordType: input.recordType,
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
     if (!res.ok) {
       return {
@@ -284,6 +342,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
   ): Promise<
     Result<{ remoteId: string; rawResponse: unknown }, ProviderWriteError>
   > {
+    if (!input.mutation) {
+      return missingMutationIdentity();
+    }
     const resolution = await getTenant(
       input.clerkOrgId,
       input.organisationId,
@@ -295,12 +356,13 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const tenant = resolution.value;
     const res = await submitLeaveApplicationForRegion(tenant.payroll_region, {
       endsAt: input.endsAt,
+      mutation: input.mutation,
       startsAt: input.startsAt,
       title: input.title,
       units: input.units,
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveTypeId: input.leaveTypeId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -320,6 +382,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
   async withdrawLeaveApplication(
     input: WithdrawLeaveInput
   ): Promise<Result<void, ProviderWriteError>> {
+    if (!input.mutation) {
+      return missingMutationIdentity();
+    }
     const resolution = await getTenant(
       input.clerkOrgId,
       input.organisationId,
@@ -330,9 +395,10 @@ export const XeroWriteAdapter: ExternalWritePort = {
     }
     const tenant = resolution.value;
     const res = await withdrawLeaveApplicationForRegion(tenant.payroll_region, {
+      mutation: input.mutation,
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -365,4 +431,16 @@ function providerApprovalStatus(
     default:
       return "submitted";
   }
+}
+
+function missingMutationIdentity(): Result<never, ProviderWriteError> {
+  return {
+    error: toProviderError({
+      code: "validation_error",
+      dispatchPhase: "before_dispatch",
+      message:
+        "A recorded mutation identity is required for Xero payroll writes.",
+    }),
+    ok: false,
+  };
 }

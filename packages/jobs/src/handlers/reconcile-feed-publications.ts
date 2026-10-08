@@ -1,11 +1,4 @@
-import {
-  currentXeroCampaignInvocation,
-  dispatchXeroCampaignChild,
-  withXeroCampaignScopedInvocation,
-} from "@repo/database/xero-campaign-access";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
-
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import {
@@ -20,69 +13,56 @@ import { inngest } from "../client";
 const BATCH_SIZE = 100;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 1000;
-
 const ReconcileFeedPublicationsInputSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative().optional(),
-  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
+  connectionId: z.uuid().optional(),
   organisationId: z.string().uuid(),
-  xeroTenantId: z.uuid().optional(),
 });
-
 export type ReconcileFeedPublicationsInput = z.infer<
   typeof ReconcileFeedPublicationsInputSchema
 >;
-
 export type ReconcileFeedPublicationsError =
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 interface ReconcileCounts {
   changed: number;
   failed: number;
   feedsQueued: number;
   scanned: number;
 }
-
 type ReconcileFeedPublicationsResult = Result<
   ReconcileCounts,
   ReconcileFeedPublicationsError
 >;
-
 export const reconcileFeedPublicationsFunction: InngestFunction.Any =
   inngest.createFunction(
     {
       id: "reconcile-feed-publications",
       triggers: { event: "reconcile-feed-publications" },
     },
-    async ({ event, step, runId: workerRunId }) =>
+    async ({ event, step }) =>
       await step.run("reconcile-feed-publications", async () => {
-        const result = await reconcileFeedPublications(event.data, workerRunId);
+        const result = await reconcileFeedPublications(event.data);
         if (!result.ok) {
           throw new Error(result.error.message);
         }
         return result.value;
       })
   );
-
-export async function reconcileFeedPublications(
-  input: unknown,
-  workerRunId: string | null = null
-) {
+export async function reconcileFeedPublications(input: unknown) {
   const parsed = ReconcileFeedPublicationsInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  return await withXeroCampaignScopedInvocation(
-    "reconcile-feed-publications",
-    input,
-    () => reconcileFeedPublicationsUnderCampaign(input),
-    workerRunId
-  );
+  return await reconcileFeedPublicationsInternal(input);
 }
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Preserve bounded per-record isolation and attributed child dispatch under one campaign scope.
-async function reconcileFeedPublicationsUnderCampaign(
+async function reconcileFeedPublicationsInternal(
   input: unknown
 ): Promise<ReconcileFeedPublicationsResult> {
   const parsed = ReconcileFeedPublicationsInputSchema.safeParse(input);
@@ -90,7 +70,6 @@ async function reconcileFeedPublicationsUnderCampaign(
     return validationError(parsed.error);
   }
   const context = parsed.data;
-
   try {
     const counts: ReconcileCounts = {
       changed: 0,
@@ -99,28 +78,27 @@ async function reconcileFeedPublicationsUnderCampaign(
       scanned: 0,
     };
     const changedPersonIds = new Set<string>();
-
     let cursor: string | null = null;
     let pages = 0;
-
     while (pages < MAX_PAGES) {
-      const records: Array<{ id: string; person_id: string }> =
-        await database.availabilityRecord.findMany({
-          cursor: cursor ? { id: cursor } : undefined,
-          orderBy: { id: "asc" },
-          select: { id: true, person_id: true },
-          skip: cursor ? 1 : 0,
-          take: PAGE_SIZE,
-          where: {
-            clerk_org_id: context.clerkOrgId,
-            organisation_id: context.organisationId,
-          },
-        });
+      const records: Array<{
+        id: string;
+        person_id: string;
+      }> = await database.availabilityRecord.findMany({
+        cursor: cursor ? { id: cursor } : undefined,
+        orderBy: { id: "asc" },
+        select: { id: true, person_id: true },
+        skip: cursor ? 1 : 0,
+        take: PAGE_SIZE,
+        where: {
+          clerk_org_id: context.clerkOrgId,
+          organisation_id: context.organisationId,
+        },
+      });
       if (records.length === 0) {
         break;
       }
       counts.scanned += records.length;
-
       for (let index = 0; index < records.length; index += BATCH_SIZE) {
         const batch = records.slice(index, index + BATCH_SIZE);
         // Promise.all over already-caught promises: a single record's failure is
@@ -134,14 +112,12 @@ async function reconcileFeedPublicationsUnderCampaign(
           )
         );
       }
-
       cursor = records.at(-1)?.id ?? null;
       pages += 1;
       if (records.length < PAGE_SIZE) {
         break;
       }
     }
-
     if (pages >= MAX_PAGES) {
       log.error("Reached MAX_PAGES limit while reconciling feed publications", {
         clerkOrgId: context.clerkOrgId,
@@ -150,42 +126,25 @@ async function reconcileFeedPublicationsUnderCampaign(
         pages,
       });
     }
-
     if (changedPersonIds.size > 0) {
       const feedIds = await feedIdsForPeople({
         clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
         personIds: [...changedPersonIds],
       });
-      if (currentXeroCampaignInvocation()) {
-        for (const feed of feedIds) {
-          await dispatchXeroCampaignChild(
-            "rebuild-feed-cache",
-            {
-              clerkOrgId: context.clerkOrgId,
-              feedId: feed.id,
-              organisationId: context.organisationId,
-              reason: "publication_reconciled",
-            },
-            (event) => inngest.send(event)
-          );
-        }
-      } else {
-        await inngest.send(
-          feedIds.map((feed) => ({
-            data: {
-              clerkOrgId: context.clerkOrgId,
-              feedId: feed.id,
-              organisationId: context.organisationId,
-              reason: "publication_reconciled",
-            },
-            name: "rebuild-feed-cache" as const,
-          }))
-        );
-      }
+      await inngest.send(
+        feedIds.map((feed) => ({
+          data: {
+            clerkOrgId: context.clerkOrgId,
+            feedId: feed.id,
+            organisationId: context.organisationId,
+            reason: "publication_reconciled",
+          },
+          name: "rebuild-feed-cache" as const,
+        }))
+      );
       counts.feedsQueued = feedIds.length;
     }
-
     return { ok: true, value: counts };
   } catch (error) {
     log.error("Unhandled exception in reconcileFeedPublications:", { error });
@@ -198,10 +157,15 @@ async function reconcileFeedPublicationsUnderCampaign(
     };
   }
 }
-
 async function reconcileOne(
-  context: { clerkOrgId: string; organisationId: string },
-  record: { id: string; person_id: string },
+  context: {
+    clerkOrgId: string;
+    organisationId: string;
+  },
+  record: {
+    id: string;
+    person_id: string;
+  },
   counts: ReconcileCounts,
   changedPersonIds: Set<string>
 ): Promise<void> {
@@ -241,7 +205,6 @@ async function reconcileOne(
     });
   }
 }
-
 function validationError(error: z.ZodError): ReconcileFeedPublicationsResult {
   return {
     error: {

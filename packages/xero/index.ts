@@ -2,44 +2,33 @@ import "./keys";
 
 export { XERO_OPERATION_CAPABILITIES } from "./src/adapter/capabilities";
 export { classifyXeroFailure } from "./src/adapter/classify-xero-failure";
-export { toResolvedXeroTenant } from "./src/adapter/resolved-tenant";
+export { toResolvedXeroConnection } from "./src/adapter/resolved-tenant";
 export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export type { XeroEmployeesFetchResult } from "./src/au/read";
 export { emitXeroMetric } from "./src/metrics";
 export {
-  aggregateXeroDisconnectReceipt,
-  getXeroDisconnectReceipt,
-  processXeroCleanupAttempt,
-  reissueXeroCleanupAttempt,
-  retireResolvedCleanupRequest,
-  type XeroDisconnectReceipt,
-} from "./src/oauth/connection-cleanup";
-export {
-  recoverXeroRefreshAttempts,
-  refreshXeroCredentialOwner,
+  refreshDormantXeroAuthorisations,
   resolveXeroAccess,
-} from "./src/oauth/credential-owner";
+} from "./src/oauth/authorisation";
+export {
+  disconnectXeroOAuthConnection,
+  type XeroDisconnectResult,
+} from "./src/oauth/disconnect";
+export { hasXeroCapability, XERO_SCOPES } from "./src/oauth/scopes";
 export {
   buildXeroOAuthStartUrl,
   cancelXeroOAuth,
   completeXeroOAuth,
   completeXeroTenantSelection,
-  disconnectXeroOAuthConnection,
-  ensureFreshXeroConnection,
   getPendingXeroOAuthSession,
   isLocalApplicationPath,
   isPreviewDeployment,
-  markXeroConnectionStale,
   type PendingXeroSessionOrganisation,
   type PendingXeroSessionTenant,
-  refreshXeroOAuthConnection,
-  scrubInactiveXeroOAuthSessionCredentials,
-  type XeroConnectionRefreshDecision,
+  purgeClosedXeroOAuthSessions,
   type XeroOAuthError,
-  xeroConnectionRefreshDecision,
 } from "./src/oauth/service";
 export {
-  initialiseXeroRateNamespace,
   type XeroRateClass,
   xeroRateKeys,
 } from "./src/rate-limit/shared-store";
@@ -94,7 +83,7 @@ export {
   submitLeaveApplicationForRegion,
   withdrawLeaveApplicationForRegion,
 } from "./src/write/dispatch";
-export type { XeroRecoveryReason, XeroTenantForWrite } from "./src/write/types";
+export type { XeroAccessContext, XeroRecoveryReason } from "./src/write/types";
 export {
   toPlainLanguageMessage,
   type XeroWriteError,

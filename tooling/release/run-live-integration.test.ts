@@ -43,11 +43,10 @@ const candidateSha = "a".repeat(40);
 let evidenceDir: string;
 function report() {
   const json: unknown = JSON.parse(
-    readFileSync(join(evidenceDir, "xero-evidence.json"), "utf8")
+    readFileSync(join(evidenceDir, "live-integration.json"), "utf8")
   );
   return {
     json,
-    markdown: readFileSync(join(evidenceDir, "xero-evidence.md"), "utf8"),
   };
 }
 function requestEvidence() {
@@ -156,7 +155,6 @@ describe("protected runner evidence failure paths", () => {
       );
       expect(report().json).toMatchObject({
         candidateSha,
-        deployedSha: null,
         runner: {
           cleanupStatus: "NOT_VERIFIED",
           exitCode: 1,
@@ -165,9 +163,7 @@ describe("protected runner evidence failure paths", () => {
           outcome: "FAIL",
           phase: "authority",
         },
-        status: "NOT_VERIFIED",
       });
-      expect(report().markdown).toContain("Runner phase: authority");
     }
   );
 
@@ -195,7 +191,6 @@ describe("protected runner evidence failure paths", () => {
         phase: "cleanup",
       },
     });
-    expect(report().markdown).toContain("Runner failurePhase: snapshot");
   });
   it("preserves nonzero test exit and releases only after verified cleanup while recording both outcomes", async () => {
     requestEvidence();
@@ -214,11 +209,9 @@ describe("protected runner evidence failure paths", () => {
         inventoryStatus: "FAIL",
         outcome: "FAIL",
       },
-      status: "NOT_VERIFIED",
     });
-    expect(report().markdown).toContain("Runner inventoryStatus: FAIL");
   });
-  it("keeps successful inventory exit zero while charter readiness remains NOT_VERIFIED", async () => {
+  it("keeps successful inventory exit zero with a bounded integration result", async () => {
     requestEvidence();
     results(0);
     await expect(import("./run-live-integration.js")).rejects.toThrow(
@@ -233,9 +226,7 @@ describe("protected runner evidence failure paths", () => {
         inventoryStatus: "PASS",
         outcome: "PASS",
       },
-      status: "NOT_VERIFIED",
     });
-    expect(report().markdown).toContain("Programme readiness: NOT_VERIFIED");
   });
   it("writes cleanup failure evidence and preserves the ownership fence", async () => {
     requestEvidence();
@@ -256,7 +247,6 @@ describe("protected runner evidence failure paths", () => {
         phase: "cleanup",
       },
     });
-    expect(report().markdown).toContain("Runner cleanupStatus: FAIL");
   });
   it("records recovery cleanup without rerunning inventory tests", async () => {
     requestEvidence();
@@ -317,7 +307,7 @@ describe("protected runner evidence failure paths", () => {
     expect(process.exit).toHaveBeenCalledExactlyOnceWith(2);
     expect(mocks.release).toHaveBeenCalledOnce();
     expect(process.stderr.write).toHaveBeenCalledWith(
-      "Xero evidence output failed; original runner failure preserved.\n"
+      "Integration evidence output failed; original runner failure preserved.\n"
     );
   });
   it("makes writer failure primary after an otherwise successful inventory run", async () => {
@@ -341,12 +331,12 @@ describe("protected runner evidence failure paths", () => {
     process.argv.push("--evidence-dir", blockedDirectory);
     await expect(import("./run-live-integration.js")).rejects.toBe(original);
     expect(process.stderr.write).toHaveBeenCalledWith(
-      "Xero evidence output failed; original runner failure preserved.\n"
+      "Integration evidence output failed; original runner failure preserved.\n"
     );
     expect(mocks.acquire).not.toHaveBeenCalled();
     expect(mocks.release).not.toHaveBeenCalled();
   });
-  it("writes both evidence files in a real missing-manifest invocation without attempting authority", async () => {
+  it("writes integration result artifact in a real missing-manifest invocation without attempting authority", async () => {
     const { spawnSync } =
       await vi.importActual<typeof import("node:child_process")>(
         "node:child_process"
@@ -371,7 +361,6 @@ describe("protected runner evidence failure paths", () => {
       "A protected release manifest path is required"
     );
     expect(report().json).toMatchObject({
-      deployedSha: null,
       runner: {
         cleanupStatus: "NOT_VERIFIED",
         fenceState: "not_acquired",
@@ -379,8 +368,6 @@ describe("protected runner evidence failure paths", () => {
         outcome: "FAIL",
         phase: "authority",
       },
-      status: "NOT_VERIFIED",
     });
-    expect(report().markdown).toContain("Runner phase: authority");
   });
 });

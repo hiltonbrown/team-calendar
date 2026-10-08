@@ -142,7 +142,6 @@ export function classifyXeroFailure(input: {
     [
       "not_connected",
       "disconnected",
-      "generation_changed",
       "connection_changed",
       "connection_inactive",
     ].includes(code ?? "")
@@ -190,6 +189,13 @@ export function mapXeroTransportError(
   return {
     ...classifyXeroFailure({ dispatched, error, isMutation }),
     dispatchPhase: dispatched ? "after_dispatch" : "before_dispatch",
+    ...(error instanceof XeroFetchError
+      ? {
+          correlationId: error.correlationId,
+          httpStatus: error.httpStatus,
+          retryAfterMs: error.retryAfterMs,
+        }
+      : {}),
     message: "Xero request could not be completed.",
   };
 }

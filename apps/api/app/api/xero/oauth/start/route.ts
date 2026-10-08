@@ -1,8 +1,4 @@
 import { currentUser, requireOrg, requireRole } from "@repo/auth/helpers";
-import {
-  type XeroCampaignEvent,
-  XeroCampaignEventSchema,
-} from "@repo/database/xero-campaign-contract";
 import { buildXeroOAuthStartUrl } from "@repo/xero";
 import { NextResponse } from "next/server";
 
@@ -55,24 +51,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const campaignValue = url.searchParams.get("campaign");
-  let campaign: XeroCampaignEvent | undefined;
-  if (campaignValue !== null) {
-    try {
-      if (campaignValue.length > 1024) {
-        throw new Error("Invalid campaign");
-      }
-      campaign = XeroCampaignEventSchema.parse(JSON.parse(campaignValue));
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid verification authority." },
-        { status: 400 }
-      );
-    }
-  }
-
   const result = await buildXeroOAuthStartUrl({
-    ...(campaign ? { campaign } : {}),
     clerkOrgId: authenticatedClerkOrgId,
     organisationId,
     returnTo,

@@ -1,4 +1,4 @@
-/** Test-only facade, default operations still pass through the real write guard. */
+/** Test-only facade; default operations still call the ordinary delegate. */
 export function createSpyableDatabase<Client extends object>(
   client: Client,
   operations: Readonly<Record<string, readonly string[]>>

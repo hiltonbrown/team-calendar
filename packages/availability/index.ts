@@ -256,6 +256,7 @@ export {
 export * from "./src/xero-connection-state";
 
 export {
+  acquireXeroWriteClaim,
   noUnresolvedSubmitOperationWhere,
   unclaimedOrExpiredXeroWriteWhere,
   XERO_WRITE_CLAIM_LEASE_MS,

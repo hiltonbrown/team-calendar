@@ -1,20 +1,363 @@
 # Current work
 
-## Task: AU contract continuation, 4 October 2026
+## PR129 review corrections
 
-- [ ] Remove ordinary campaign bootstrap prerequisite without bypassing isolation.
-- [ ] Route protected integration suites and verify source gates.
-- [ ] Freeze reviewed candidate and replay integration through the live Neon runner.
-- [ ] Execute admissible bounded AU UI/provider rows, clean up and report honestly.
+- [x] Evaluate all review comments against explicit pre-production/no-recovery-architecture scope.
+- [x] Reproduce and fix imported leave recovery visibility and feed publication after archive commit.
+- [x] Correct verified refresh rotation issue without a new durable recovery model; remove duplicate classifier entry.
+- [x] Run relevant RED/GREEN and repository checks; obtain independent review.
+- [x] Prepare verified corrections and documented review rulings for the existing PR.
 
-Execution: `plans/163-ordinary-campaign-admission.md` records the narrow source
-prerequisite. The operator target is live Neon only. No new generic harness work.
+Baseline22cefe59, PR129 main←work. Stopping condition: actionable findings
+fixed and verified, explicit scope conflicts explained, same PR updated. Do
+not backfill existing connections, add lifecycle recovery state, access live
+Xero, create a worktree or merge. Update the existing PR with verified fixes and
+record the review rulings in its description.
 
-Last reviewed: 2026-10-03
+Review: imported recovery discovery, pre-commit archive publication and discarded
+rotated tokens reproduced in failing regressions and were corrected. Plans stays
+scoped and imported records stay view-only; refresh saves the authenticated
+token-endpoint response without a redundant JWKS request or new durable state.
+The backfill request is inapplicable to the explicitly empty/pre-production Xero
+dataset. Removed the duplicate classifier entry and corrected imported recovery
+attestation wording. Fresh independent review has no remaining findings.
 
-## Task: Reconcile Plans 160 through 161h, 27 September 2026
+Verification before the correction commit: `bun run check` passed (1,155 files);
+`bun run typecheck --force --concurrency=3` passed (19 uncached tasks);
+`bun run boundaries` passed (1,084 files, 21 packages);
+`bun run test --force --continue=always --concurrency=2 -- --maxWorkers=2`
+passed (3,054 tests, 18 uncached tasks); `bun run test:integration --force
+--continue=always --concurrency=2` passed (273 tests, six uncached tasks);
+`bun run build --force --concurrency=1` passed (four uncached tasks, including
+Prisma generation). Integration used only owned loopback PostgreSQL/Redis.
 
-- [ ] Obtain the separately authorised real provider/application-browser observations and charter sign-off when sanctioned fixtures, approved AU contract, deployed revisions, role sessions and enforced worker isolation are available.
+The first full unit run exposed a real-time 25 ms AU stalled-body test deadline
+race. It now uses the existing transport tests' controlled-clock pattern, retains
+the exact permission error and single-dispatch assertions, and restores timers.
+The complete failed unit command was rerun successfully after this correction.
+Live provider/browser/Neon verification remains NOT VERIFIED; no new live
+verification or production operation was performed.
+
+## Final completed-phase Xero audit, Prompt 8
+
+- [x] Independently review OAuth, canonical persistence, refresh, sync, writes, disconnect and security in fresh contexts.
+- [x] Recheck official provider contracts and classify every remaining obsolete reference across the repository.
+- [x] Correct verified defects with regression coverage and reconcile canonical documentation without speculative infrastructure.
+- [x] Run fresh complete check, typecheck, boundaries, unit, integration, build and necessary Xero/release checks.
+- [x] Record live connect/discovery/refresh/read/disconnect/reconnect/write availability and precise NOT VERIFIED outcomes.
+- [x] Resolve Critical/Important findings, report rulings/minors and finish the existing branch after verification.
+
+Stopping condition: the completed source implements the approved lifecycle,
+all required local gates are freshly green, review findings are resolved and
+the completion report records evidence and limits. Baseline `e5fe001f` on
+`work`; continue this worktree. The prior branch-retention choice remains in
+force. No new architecture phase, worktree, live fixture, deployment or push.
+
+Review: three Important defects were reproduced and corrected: old absent-link
+reconnect with a new authoriser, isolated malformed balance progress, and atomic
+concurrent sync admission. Two scoped reviewers and a third independent
+correction reviewer report no remaining Critical/Important/Minor findings.
+The deadline regression now uses a controlled clock while preserving and
+strengthening its dispatch/body/release assertions. No production HTTP change
+or generated-output edit was needed. Build and unit verification are sequenced
+after the initial concurrent regeneration/import failure.
+
+Verification: all final commands exited 0. Check covered 1,155 files;
+typecheck passed 19 uncached tasks; boundaries covered 1,084 files/21 packages;
+full unit rerun passed 3,045 tests/18 uncached tasks; integration passed 267
+owned-local tests/six uncached tasks; build passed all four uncached tasks,
+including Prisma generation. Release tools passed 196 tests with four existing
+Chromium-dependent static-browser skips; release typecheck passed. All 28
+migrations replayed in a fresh owned database with zero drift and no obsolete
+tables/columns/binding function. Additional OAuth/refresh/provider-loss140,
+HTTP56, jobs unit190 and jobs integration82 passed. No unit/integration skips.
+The first unit attempt's real-clock deadline failure and concurrent Prisma
+regeneration/import failure are recorded and corrected, followed by a full
+uncached rerun. Final review has no deferred minor findings.
+
+Live OAuth connect, discovery, automatic refresh, read sync, disconnect,
+reconnect and writes remain individually NOT VERIFIED because no configured
+Xero app/demo/payroll fixture exists. Actual authenticated browser, deployed
+scheduled jobs and Neon-adapter concurrency are NOT VERIFIED. No live provider
+call was made. The report is `docs/reports/2026-10-07-xero-final-architecture-audit.md`.
+Finish using the existing branch-retention choice: commit locally, preserve
+`work` and this workspace, stop owned fixtures and remove only the new replay
+database. No merge, push, deployment, PR or worktree creation.
+
+## Xero HTTP and Plan 161 infrastructure simplification, Prompt 7
+
+- [x] Audit exact provider limits and remaining Plan 161 consumers.
+- [x] Replace fabricated local HTTP responses with structured, undispatched rate errors; retain earlier mutation uncertainty.
+- [x] Remove speculative non-tenant quota buckets, duplicated retry parsing and redundant lease options with RED/GREEN coverage.
+- [x] Remove remaining obsolete fixture authority and documentation; actively prohibit deleted lifecycle patterns.
+- [x] Run targeted tests, check, typecheck, boundaries, unit, integration, build and applicable release-tool gates.
+- [x] Resolve independent Critical/Important review findings and commit on `work`.
+
+Stopping condition: one bounded HTTP boundary enforces demonstrated quotas and
+security requirements, obsolete architecture is absent, required gates pass and
+the focused phase is reviewed and committed. Baseline `53a59df1`; reuse approved
+design and implementation plan Tasks 3, 11 and 12, without another worktree.
+
+Ruling: retain the small atomic Redis quota script and expiring concurrency slots.
+App/API/job workers share Xero's five-request tenant ceiling and rolling quotas;
+process-local limits would not enforce those requirements across deployments.
+Keep fixture-only namespace injection for owned test cleanup, no runtime
+namespace bootstrap or configuration. Keep the one-field deadline helper,
+bounded database transactions, 5 MiB buffered response cap and origin/redirect
+protections. They protect current synchronous writes, token grants and sync.
+Remove the undocumented token/inventory 60/minute policy, fabricated provider
+429s and duplicated parsing. Preserve Plan 160 domain recovery and generic
+non-local database safeguards. Historical migration bytes remain immutable;
+generate a narrow forward DROP from PostgreSQL's function catalogue because
+Prisma cannot express this standalone trigger function.
+
+Verification: 1,155 linted files, all 19 typecheck tasks, 1,084 boundary files
+in 21 packages, 3,044 unit tests across 18 tasks, 262 owned-local integration
+tests across six tasks and all four production build tasks passed. Initial
+whole-source unit/typecheck gates ran uncached; final affected tasks reran after
+removing two obsolete bootstrap-only assertions. Release tools passed 196 tests
+with four existing Chromium-dependent static-browser skips, plus typecheck.
+All 28 migrations replayed into a fresh owned database with zero schema drift;
+real PostgreSQL verifies the obsolete function is absent. Independent review
+has no Critical, Important or Minor findings. No live Xero, application-browser
+or deployment verification is claimed. Evidence and retained-control rationale
+are recorded in `docs/reports/2026-10-07-xero-http-simplification.md`.
+
+## Xero native idempotent outbound writes, Prompt 6
+
+- [x] Recheck exact AU mutation headers and regional differences against current official OpenAPI; inspect Plan 160, transport and approval recovery.
+- [x] Use TDD to retain earlier ambiguous dispatch evidence across retries without adding durable provider recovery state.
+- [x] Simplify common AU response parsing, reject unconfirmed provider outcomes and capture safe correlation IDs consistently.
+- [x] Preserve Plan 160 state on definitively refused withdrawal and centralise existing domain failure classification.
+- [x] Run targeted and fresh check/typecheck/test/integration gates, resolve independent review and commit on `work`.
+
+Stopping condition: supported writes use one stable native key and bounded
+synchronous retries; domain transitions remain safe, duplicated handling is
+removed, required gates pass and the focused phase is reviewed and committed.
+Reuse the approved design and existing journal/native-key implementation from
+`e875525d`. Preserve the five-minute replay cutoff and approval recovery beyond
+Xero's six-minute cache. Do not introduce outbound jobs, new journals,
+dependencies, worktrees or NZ/UK activation.
+
+Verification: 1,155 linted files, all 19 typecheck tasks, 3,038 unit tests across
+18 tasks and 259 owned-local PostgreSQL/Redis integration tests across 6 tasks
+passed. Changed packages reran after final corrections; unchanged task evidence
+was reused. Prisma generated with no DDL change. Fresh independent review's sole
+Important withdrawal-result finding was reproduced, corrected and closed;
+remaining Critical/Important/Minor findings are zero. No live Xero mutation or
+application-browser verification is claimed. Evidence and scope are recorded
+in `docs/reports/2026-10-07-xero-idempotent-writes.md`.
+
+## Xero incremental inbound sync, Prompt 5
+
+- [x] Recheck official AU employee/V2 leave modification filters and balance retrieval contracts; inspect current implementation against Prompt 5.
+- [x] Test and remove obsolete employee snapshot absence thresholds/delay; retain complete/full/success prerequisites, manual-data protection and both tenancy keys.
+- [x] Verify watermarks remain unchanged after provider, parsing, persistence and incomplete-run failures; fix any proven gaps with TDD.
+- [x] Run targeted sync tests and fresh check/typecheck/test/integration gates, resolve independent review and commit on `work`.
+
+Stopping condition: normal supported polling is incremental, full reconciliation
+is separate and truthful, balances use supported retrieval, obsolete snapshot
+policy is removed, required gates pass and the focused phase is committed and
+reviewed. Existing implementation in `75a939ae` is reused; do not rebuild it,
+redesign OAuth/writes or create another worktree.
+
+Verification: 1,153 linted files, 19 uncached typecheck tasks, 2,965 unit tests
+across 18 uncached tasks and 259 local PostgreSQL/Redis integration tests across
+6 uncached tasks passed. Prisma generated, migration deploy/status and schema
+diff passed with 27 migrations. Fresh independent review has no remaining
+Critical, Important or Minor findings. No live provider or application-browser
+verification is claimed. Evidence and scope are recorded in
+`docs/reports/2026-10-07-xero-incremental-sync.md`.
+
+## Final Xero architecture audit, 8 October 2026
+
+- [x] Independently audit current architecture/security/sync/writes and every residual lifecycle/campaign reference against official Xero contracts.
+- [x] Fix verified defects and remove obsolete infrastructure/docs without adding speculative architecture; verify regression coverage.
+- [x] Run fresh complete check, typecheck, boundaries, unit, integration and production build commands; resolve their root causes.
+- [x] Confirm safe live fixture availability and record each unavailable provider/browser flow explicitly as NOT VERIFIED.
+- [x] Reconcile AGENTS/PRODUCT/README and current developer documentation with actual implemented architecture.
+- [x] Resolve all Critical/Important independent review findings, report exact evidence and commit the phase in the existing branch after required gates pass.
+
+Stopping condition: actual approved lifecycle and current provider contracts are
+verified, required gates pass, independent review has no unresolved Critical or
+Important findings, documentation is canonical and branch finishing is handled.
+This is an audit and verified-defect correction phase. Add no speculative
+infrastructure, new worktree, new campaign framework or unapproved provider write.
+Baseline is clean commit 8d38e978 (simplification phases 2, 3 and 4); later phases
+are not represented by commits in this checkout, so audit existing sync/write
+and release code rather than assuming that missing work was completed elsewhere.
+
+Review: final independent security and sync/write reviews have no unresolved
+Critical or Important findings. The full lint, typecheck, boundaries, unit,
+integration and production build gates passed uncached where Turbo applies:
+1,153 linted files; 19 typecheck tasks; 1,082 boundary files in 21 packages;
+2,948 unit tests across 18 tasks; 252 PostgreSQL/Redis integration tests across
+6 tasks; all 4 production build tasks. Release tooling passed 195 tests with
+4 explicit Chromium-dependent static-browser skips; its typecheck passed.
+Prisma generated and all 26 migrations replayed into a fresh owned local
+database with no schema drift. Build configuration used the user-supplied Clerk
+development publishable key and a temporary real encryption key, without
+provider credentials or validation bypass. No live Xero or application-browser
+verification is claimed. The 11-part result and resolved review rulings are in
+`docs/reports/2026-10-08-xero-architecture-audit.md`.
+
+## Xero disconnect lifecycle, 8 October 2026
+
+- [x] Verify official user-authorisation DELETE and absent-connection contracts; map current lifecycle consumers.
+- [x] Test and implement scoped remote-first disconnect, required atomic audit and safe unreferenced-authorisation pruning.
+- [x] Preserve imported data on soft disconnect; verify explicit purge preserves manual data and consistent feed publication.
+- [x] Test provider-confirmed disconnection, stale-response protection and scheduled-sync exclusion; remove obsolete cleanup configuration.
+- [x] Pass targeted tests and repository check/typecheck/test/integration gates.
+- [x] Resolve independent code review and commit this phase in the existing branch/worktree.
+
+Stopping condition: the requested disconnect lifecycle is implemented, verified,
+reviewed and committed. Do not redesign OAuth, refresh, incremental sync or Xero
+writes; add only the small connection guard required by an observed disconnect
+versus write race. No new schema, lifecycle worker or management credentials.
+
+Official Xero Identity OpenAPI specifies user OAuth DELETE /Connections/{id}:
+204 removes the selected connection, 404 confirms it is already absent. Never
+revoke the shared user grant to delete a single connection. Retain local state
+on uncertain/transient failure. Preserve grants referenced by another connection
+or a live short-lived selecting OAuth session. Authoritative provider inventory
+and existing identities/timestamps protect reconnect state from stale responses;
+do not infer lifecycle from activity or add generation state.
+The current product has no Organisation deletion/archive action requiring remote
+removal; the Clerk user-deleted webhook records analytics only. Do not introduce
+a new account deletion workflow in this phase.
+
+Verification: repository check passed for 1141 files; typecheck passed all 19
+tasks; unit tests passed all 18 tasks (2903 tests, including 564 Xero and 514
+availability tests); integration passed all 6 packages (247 tests) against
+local PostgreSQL and Redis. Focused disconnect/service verification passed
+206 units and 54 PostgreSQL tests; provider handling passed 13 additional
+PostgreSQL tests. Release tooling passed 179 tests with 4 existing skips and
+its typecheck passed. Source and filename audits find no obsolete cleanup,
+inactivity, management-client or stale-marker runtime implementation. One
+canonical refresh implementation remains. No schema/generated changes.
+
+Independent review approved the final candidate after test-first fixes for
+local-only decline/withdraw after disconnect, persisted uncertain payroll
+outcomes, expired-session credential pruning and retry, and run-isolated
+provider fixture identities. Remote deletion precedes local teardown; required
+audit and pruning are transactional. Transient failure retains the local link;
+404 supports safe recovery after remote success and local rollback. Explicit
+purge preserves manual entries and their people's stable identity and feed.
+Actual waiting write claims/preparation are fenced by the existing connection
+row; this adds no cleanup lease, generation or payroll algorithm redesign.
+
+Gate failures caused by this change were fixed: package-default server-only
+mocks, claim transaction fixtures and the database preparation fixture's active
+canonical connection prerequisite. An unchanged 25ms AU scope/deadline test
+failed under concurrent compilation and passed in the complete unit gate once
+that load ended; its assertions and provider bounds were not weakened. The
+final complete unit and integration gates pass. Provider HTTP/token identity
+were mocked; official provider documentation supplies the DELETE/inventory
+contracts. No live Xero, browser, deployed application or remote database
+verification is claimed. All source changes are frozen, verified and reviewed
+for the focused phase commit in the existing branch/worktree.
+
+## Xero OAuth and automatic refresh, 7 October 2026
+
+- [x] Verify current official Xero code-flow, inventory, scope and refresh-grace contracts; map current consumers.
+- [x] Test and implement exact least-privilege scopes and protected, single-exchange OAuth with eligible-tenant selection and initial sync.
+- [x] Test and implement one canonical scoped access resolver, automatic rotation, concurrency and next-attempt grace recovery.
+- [x] Refresh dormant authorisations once per grant, including paused connections; remove customer token controls and obsolete refresh wrappers.
+- [x] Pass targeted OAuth/concurrency/database tests and repository check/typecheck/test/integration gates.
+- [x] Resolve independent code review and commit this phase on the existing branch.
+
+Stopping condition: the requested OAuth/token lifecycle is implemented, verified,
+reviewed and committed. Inbound sync and payroll mutation redesign are separate
+phases. Existing canonical persistence remains the only token owner.
+
+Provider verification: current official OAuth FAQ confirms 60-day unused refresh
+expiry and 30-minute retry grace after a lost response; the tenants guide confirms
+`authEventId` filters the current authorisation event and the unfiltered inventory
+contains all tenants authorised by that Xero user. Official Identity, Accounting
+and AU Payroll OpenAPI documents were downloaded again. Current code requires
+exactly `offline_access accounting.settings.read payroll.employees
+payroll.settings.read`; no Pay Runs endpoint or settings mutation exists.
+
+Use the existing PostgreSQL canonical app/user refresh lock and narrow grant
+issuance barrier to prevent a new unknown-user code exchange from superseding a
+concurrent rotation; add no connection/binding/owner refresh locks. Valid access
+and missing permissions return before locking. Token HTTP exchanges make one
+attempt; uncertain refresh preserves the stored pair for the next normal retry
+within documented grace. Reuse the 15-minute scheduler for due grants at 45 days;
+a daily-only retry gate would miss that grace window after an uncertain response.
+
+Verification: repository check passed for 1137 files; typecheck passed all 19
+tasks; unit tests passed all 18 tasks (2859 tests, including 535 Xero tests);
+integration passed all 6 packages (204 tests) against disposable local PostgreSQL
+and Redis. Focused core verification passed 167 units and 27 real PostgreSQL
+tests, including concurrent refresh, callback versus rotation, lost response,
+actual save rollback, shared invalid grant and paused dormant grant maintenance.
+Provider HTTP was mocked; official current documentation supplied the provider
+contracts. No live Xero, browser or deployment verification is claimed. Prisma
+generated successfully during typecheck; this phase changes no schema or
+generated output. Runtime legacy-refresh/manual-control audit and diff check
+are clean.
+
+Independent review approved spec compliance and code quality after corrections
+to preserve every authorised file while highlighting current consent, and to
+share the existing best-effort activation capture between both connection paths.
+The ancillary post-commit audit cannot prevent initial-sync dispatch; the
+canonical transactional audit remains required. Test-first failure/passing
+evidence covers these corrections. Compile failures were fixed with an explicit
+missing-app configuration result, plain JSON session tuples and a typed callback
+result. The existing analytics workspace dependency is declared for its extracted
+helper; regenerated lock metadata matches existing manifests without upgrading
+installed packages. The focused phase is committed on the existing branch;
+incremental sync, central HTTP policy and payroll writes remain later phases.
+
+## Xero persistence simplification, 7 October 2026
+
+- [x] Establish failing real-database assertions for canonical credentials, connection ownership, cursor scope and manual balance uniqueness.
+- [x] Generate the four-model schema and destructive migration; replace scoped queries and affected consumers without legacy wrappers.
+- [x] Delete obsolete lifecycle-only code, tests and scripts; verify no runtime obsolete model or token mirror remains.
+- [x] Pass Prisma generation, targeted tests, database integrations and repository check/typecheck/test/integration gates.
+- [x] Obtain independent code review, resolve findings and commit this phase on the existing branch.
+
+Stopping condition: persistence and compile-time consumers are consistent,
+required checks pass, code review is resolved and the focused phase is committed.
+OAuth, refresh, incremental sync and payroll write redesign remain later phases.
+
+Verification: Prisma Client 7.10.0 generated successfully. The complete historical
+migration chain and generated `20261007122236_simplify_xero_lifecycle` applied to
+a fresh disposable PostgreSQL database with zero schema drift. Existing manual
+availability and active feed-token partial uniqueness are preserved. Repository
+check passed for 1129 files; typecheck passed 19 tasks; unit tests passed all 18
+tasks; integration tests passed all 6 packages (195 tests) against local
+PostgreSQL and Redis. After review fixes, 23 affected PostgreSQL integration
+tests and 65 affected unit tests also passed. Release tooling passed 179 tests
+with 4 existing skips, and its typecheck passed. The final Xero unit suite passed
+496 tests; only 7 tests for an unused obsolete credential decision were removed
+after the earlier 503-test run. Runtime obsolete-model/mirroring audit is clean.
+
+Independent review approved spec compliance and code quality after fixes for
+initial-import recovery's removed relation, disconnect-induced reconnect pause,
+and stale selection racing disconnect. The latter has a failing/passing real
+PostgreSQL interleaving regression. Unused legacy refresh decisions were deleted;
+canonical adoption uses the stable-identity database save helper. This phase is
+committed on the existing branch; later phases remain outside this change.
+
+
+## Xero simplification planning, 7 October 2026
+
+- [x] Inspect repository instructions, product requirements, Plans 160/161 and current Xero code/schema/jobs/UI/tooling.
+- [x] Validate the approved direction against current official Xero documentation and OpenAPI; use Context7 where applicable.
+- [x] Write `docs/superpowers/specs/2026-10-07-xero-simplification-design.md` and record the Plan 161 lesson.
+- [x] Write and self-review `docs/superpowers/plans/2026-10-07-xero-simplification.md` with exact files, deletions and TDD red/green tasks.
+
+Stopping condition: both requested planning artefacts and the lesson are complete
+and self-reviewed. Production code, schema application and live provider work
+are outside this turn. Existing unrelated task history is preserved below.
+
+Review: inspected repository source and current official Xero/OpenAPI contracts.
+The self-reviewed design and 13-task implementation plan are complete. PASS:
+document structure, relative links, whitespace, red/green task structure, all 92
+exact deletion paths and planning-only change inventory. No production suite,
+provider mutation or implementation is claimed.
 
 ## Active plan: Australian go-live implementation and release validation
 
@@ -160,75 +503,14 @@ Tailwind's preflight strips the default, so bullets on the privacy policy and
 terms pages render as indented paragraphs. Present at baseline. Worth a one-line
 fix later; not changed here to keep the production push to reviewed scope.
 
-# Plan 160 execution
+# Previous Xero verification work
 
-## Plan 160 completion, 29 September 2026
+The former Plan 160/161/163 campaign tasks are retired by the approved Xero
+simplification. Their execution history remains in Git. No campaign lease,
+credential-domain sentinel, namespace bootstrap, tenant-binding cutover or
+cleanup receipt is a current prerequisite. Current release work uses ordinary
+scoped fixtures, the shared quota limiter and the guarded release runner.
 
-- [ ] Complete synchronous action/OAuth admission, acquisition drain and the real campaign lease/drivers.
-- [ ] Verify the final candidate and protected online inventory.
-- [ ] Execute admitted scenarios and reconcile cleanup and reports.
-- [ ] Independent review and final evidence reconciliation.
-
-Review: in progress; live/browser/provider results require actual admitted execution.
-
-### Plan 160 resumed continuation, 30 September 2026
-
-- [ ] Rebuild protected monitor artefacts lost with the temporary worktree, freeze the corrected candidate and repeat required gates and online verification.
-- [ ] Reconcile final source, evidence and remaining full-campaign requirements independently.
-
-Review: `72a7115` passed offline gates, but its online attempts were interrupted and failed respectively. Both cleaned up and preserved the database, but their private receipts were lost when `/tmp` was cleared by the disconnect. The persistent isolated worktree now holds the next corrections. Neither attempt proves the browser/provider campaign or a passing domain regression for the changed source.
-
-### Plan 160 source verification after disconnect, 30 September 2026
-
-- [ ] Complete protected exact-candidate online integration and independent postcheck.
-- [ ] Complete actual approved fixture/session and browser/provider verification. Full campaign drivers/recovery remain deferred outside the merge scope.
-
-Review: source result is PASS within the stated gates; protected online, actual browser/provider and PITR evidence remain NOT VERIFIED. Historical failed online attempts are not promoted to this source candidate.
-
-## Plan 160 campaign continuation, 2 October 2026
-
-Execution policy: the user removed the fixed 24-hour namespace initialisation
-waiting period. It is excluded from remaining tasks and completion estimates.
-Proceed when namespace authority and actual Xero quota admission checks pass.
-
-- [ ] Verify new source against focused and complete source gates; freeze for protected live verification.
-- [ ] Complete lease and scenario drivers if the full campaign is resumed; preserve unfinished tooling outside this merge.
-- [ ] Record actual remaining operational requirements and final evidence without promoting unit tests to campaign proof.
-
-### Remaining runtime and campaign work, execution order
-
-- [ ] Implement operational lease acquisition/recovery: exact deployment and registered worker revision, partial ownership retention, independent writer closure, worker drain and settings restoration.
-- [ ] Wire actual producer execution to browser subcases, including independent provider/local observations and causal no-call receipts.
-- [ ] Implement scheduled X08 driver with real tick/run join and controlled X03/X05/X14/X22 handler drivers, then complete remaining multi-step catalogue cases.
-- [ ] Freeze candidate, pass source gates and protected live inventory; execute only scenarios whose sanctioned fixtures, sessions, deployed revision and operation authority are present.
-- [ ] Reconcile effects and emit exact-candidate sanitised reports. Missing operational facts and PITR remain NOT VERIFIED.
-
-### Plan 160 deferred native execution work, excluded from merge (2026-10-02)
-
-- [ ] Verify the runtime controller uses the existing SQL advisory transition barrier and complete its focused regression checkpoint.
-- [ ] Implement campaign-fenced consumer admission distinct from the ordinary paused/unregistered database-fixture contract.
-- [ ] Implement durable native browser supervisor identity and independent cross-process recovery closure.
-- [ ] Implement narrowly scoped post-drain cleanup action authority for new-request withdrawal, with no create replay or generic provider deletion.
-- [ ] Compose the actual lease members and default CLI path with the native scenario operation factory; bind private actors/session files and reobserve deployment/registration throughout execution.
-- [ ] Complete outside-owned baseline/restoration/release evidence, final source gates, exact candidate freeze and coordinated protected live verification.
-
-Checkpoint evidence: 35 credential-free tests passed across native admission, lease recovery, fixture resolution and runtime control; release-tool typecheck passed. Subsequent advisory-barrier and cleanup-only journal-transition corrections remain under focused verification. The default execution adapter is not yet wired and no end-to-end campaign is claimed.
-
-### Plan 160 commit and merge reconciliation, 2 October 2026
-
-- [ ] Complete the requested reviewed commits and merge to main (reviewer owns staging and merge).
-- [ ] If verification resumes, replay corrected live integration and execute the approved bounded AU browser/provider flow with existing mandatory controls and independent readbacks.
-
-Review: source delivery and live verification are distinct. The full Plan 160 catalogue is incomplete. Browser/provider actions, deployed candidate and scheduled-job claims, PITR availability and restore exercise remain NOT VERIFIED. A candidate development app/API can exercise the ordinary synchronous AU flow without deployment; it must still satisfy shared sentinel/rate/binding/database guards, exact fixture authority, fresh demo confirmation and authenticated user sessions. No additional framework is required merely to claim a focused flow, and no focused flow result may be promoted to full campaign completion.
-
-### Plan 160 continuation and Plan 163, 4 October 2026
-
-- [ ] Verify authorised bounded AU UI/provider rows and cleanup.
-
-Review: 189 focused database tests pass; ordinary collection skips all 13
-protected suites without database access. One Important review finding was fixed
-in one pass; no other source findings. Actual Lua regressions are registered in
-the protected suite and await live execution. Backup inspection is not a PITR or
-destructive restore exercise. CI publication, provider/browser and deployed
-worker evidence remain NOT VERIFIED.
-
+Historical source results do not verify the current candidate. Live Xero,
+application browser, deployment and recovery observations remain NOT VERIFIED
+until explicitly authorised safe fixtures and valid sessions are available.

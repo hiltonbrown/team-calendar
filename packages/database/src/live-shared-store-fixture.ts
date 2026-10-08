@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { executeRedisRestCommand } from "@repo/core";
 import { z } from "zod";
 
-const CAMPAIGN_KEY_SUFFIX = /^[a-zA-Z0-9:_-]+$/;
 const NAMESPACE_PREFIX = "shared_store_namespace:";
 const CURSOR = /^(0|[1-9][0-9]{0,19})$/;
 const OWNED_KEY = /^xero:\{[^{}]+\}:([a-f0-9]{32}):.+$/;
@@ -11,7 +10,6 @@ const deleteSchema = z.number().int().nonnegative();
 const MAX_KEYS = 20_000;
 const MAX_PAGES = 10_000;
 const CLEANUP_BUDGET_MS = 60_000;
-
 export interface SharedStoreCleanupInput {
   globalKeys: readonly string[];
   token?: string;
@@ -21,10 +19,9 @@ export interface SharedStoreCleanupDependencies {
   command?: (command: readonly string[], timeoutMs: number) => Promise<unknown>;
   now?: () => number;
 }
-
 interface KeyScope {
   id: string;
-  kind: "quota" | "campaign";
+  kind: "quota";
 }
 function ownedEpochs(globalKeys: readonly string[]): KeyScope[] {
   const namespaces = globalKeys
@@ -33,14 +30,7 @@ function ownedEpochs(globalKeys: readonly string[]): KeyScope[] {
   const quotas: KeyScope[] = [
     ...new Set(namespaces.map(sharedStoreFixtureEpoch)),
   ].map((id) => ({ id, kind: "quota" }));
-  const domains: KeyScope[] = [
-    ...new Set(
-      globalKeys
-        .filter((key) => key.startsWith("campaign_domain:"))
-        .map((key) => z.uuid().parse(key.slice("campaign_domain:".length)))
-    ),
-  ].map((id) => ({ id, kind: "campaign" }));
-  return [...quotas, ...domains];
+  return quotas;
 }
 function commands(
   input: SharedStoreCleanupInput,
@@ -91,9 +81,7 @@ async function scanOwnedKeys(
           "SCAN",
           cursor,
           "MATCH",
-          epoch.kind === "quota"
-            ? `xero:{*}:${epoch.id}:*`
-            : `xero:e2e:runtime:v1:${epoch.id}:*`,
+          `xero:{*}:${epoch.id}:*`,
           "COUNT",
           "1000",
         ])
@@ -116,7 +104,6 @@ async function scanOwnedKeys(
   }
   return [...keys];
 }
-
 export async function countSharedStoreFixtureKeys(
   input: SharedStoreCleanupInput,
   deps?: SharedStoreCleanupDependencies
@@ -125,7 +112,6 @@ export async function countSharedStoreFixtureKeys(
     await scanOwnedKeys(ownedEpochs(input.globalKeys), commands(input, deps))
   ).length;
 }
-
 export async function deleteSharedStoreFixtureKeys(
   input: SharedStoreCleanupInput,
   deps?: SharedStoreCleanupDependencies
@@ -161,31 +147,14 @@ export async function deleteSharedStoreFixtureKeys(
   }
   return deleted;
 }
-
 function assertOwnedKey(key: string, epoch: KeyScope) {
-  if (epoch.kind === "campaign") {
-    const prefix = `xero:e2e:runtime:v1:${epoch.id}:`;
-    if (
-      !(
-        key.startsWith(prefix) &&
-        CAMPAIGN_KEY_SUFFIX.test(key.slice(prefix.length))
-      )
-    ) {
-      throw new Error(
-        "Campaign cleanup returned a key outside manifest ownership"
-      );
-    }
-    return;
-  }
-  // biome-ignore lint/suspicious/noUnnecessaryConditions: Redis keys are untrusted; RegExp.exec returns null for malformed values.
-  const parsedEpoch = OWNED_KEY.exec(key)?.[1];
+  const parsedEpoch = key.match(OWNED_KEY)?.[1];
   if (parsedEpoch !== epoch.id) {
     throw new Error(
       "Shared-store cleanup returned a key outside manifest ownership"
     );
   }
 }
-
 // Hash the exact allocated fixture value, including underscores and its run marker.
 export function sharedStoreFixtureEpoch(namespace: string): string {
   if (!namespace) {

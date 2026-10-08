@@ -47,12 +47,12 @@ describe("Xero leave-type mapping", () => {
 
   it("keeps the stable source key deterministic", () => {
     const input = {
+      connectionId: "30000000-0000-4000-8000-000000000003",
       employeeId: "11111111-1111-4111-8111-111111111111",
       endsAt: new Date("2026-05-08T00:00:00.000Z"),
       leaveTypeId: "annual",
       startsAt: new Date("2026-05-07T00:00:00.000Z"),
       units: 15.2,
-      xeroTenantId: "30000000-0000-4000-8000-000000000003",
     };
 
     expect(deriveXeroStableSourceKey(input)).toBe(

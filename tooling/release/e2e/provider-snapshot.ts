@@ -34,11 +34,7 @@ export function readProviderSnapshot(recordId: string): ProviderSnapshot {
     [
       "--preload",
       resolve("tooling/release/e2e/server-only-preload.mjs"),
-      resolve(
-        process.env.TC_XERO_MANIFEST
-          ? "tooling/release/e2e/xero-independent-snapshot-cli.ts"
-          : "tooling/release/e2e/provider-snapshot-cli.ts"
-      ),
+      resolve("tooling/release/e2e/provider-snapshot-cli.ts"),
       z.string().uuid().parse(recordId),
     ],
     { encoding: "utf8", env: { ...process.env, NODE_ENV: "test" } }

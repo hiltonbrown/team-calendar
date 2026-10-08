@@ -2,22 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 import {
   countSharedStoreFixtureKeys,
   deleteSharedStoreFixtureKeys,
+  sharedStoreFixtureEpoch,
 } from "./live-shared-store-fixture";
 
-const domain = "11111111-1111-4111-8111-111111111111";
-const prefix = `xero:e2e:runtime:v1:${domain}:`;
-const input = { globalKeys: [`campaign_domain:${domain}`] };
-
-describe("owned campaign shared-store cleanup", () => {
+const domain = sharedStoreFixtureEpoch("owned-namespace");
+const prefix = `xero:{provider-app}:${domain}:`;
+const input = { globalKeys: ["shared_store_namespace:owned-namespace"] };
+describe("owned quota shared-store cleanup", () => {
   it("counts only the exact allocated domain", async () => {
     const command = vi.fn().mockResolvedValue(["0", [`${prefix}sentinel`]]);
     expect(await countSharedStoreFixtureKeys(input, { command })).toBe(1);
     expect(command).toHaveBeenCalledWith(
-      ["SCAN", "0", "MATCH", `${prefix}*`, "COUNT", "1000"],
+      ["SCAN", "0", "MATCH", `xero:{*}:${domain}:*`, "COUNT", "1000"],
       expect.any(Number)
     );
   });
-
   it("rejects a foreign key before deleting any key", async () => {
     const command = vi
       .fn()
@@ -25,7 +24,7 @@ describe("owned campaign shared-store cleanup", () => {
         "0",
         [
           `${prefix}sentinel`,
-          "xero:e2e:runtime:v1:22222222-2222-4222-8222-222222222222:sentinel",
+          "xero:{provider-app}:22222222222222222222222222222222:sentinel",
         ],
       ]);
     await expect(
@@ -33,31 +32,28 @@ describe("owned campaign shared-store cleanup", () => {
     ).rejects.toThrow("outside manifest ownership");
     expect(command.mock.calls.every(([args]) => args[0] === "SCAN")).toBe(true);
   });
-
-  it("deletes separate untagged keys separately and verifies no residue", async () => {
+  it("deletes keys grouped by Redis hash tag and verifies no residue", async () => {
     const keys = [`${prefix}sentinel`, `${prefix}organisation:owned`];
     const command = vi
       .fn()
       .mockResolvedValueOnce(["0", keys])
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(2)
       .mockResolvedValueOnce(["0", []]);
     expect(await deleteSharedStoreFixtureKeys(input, { command })).toBe(2);
     expect(
       command.mock.calls
         .filter(([args]) => args[0] === "DEL")
         .map(([args]) => args)
-    ).toEqual(keys.map((key) => ["DEL", key]));
+    ).toEqual([["DEL", ...keys]]);
   });
-
-  it("rejects malformed domain selectors without calling the store", async () => {
+  it("does not contact the store for unrelated manifest fixture kinds", async () => {
     const command = vi.fn();
-    await expect(
-      countSharedStoreFixtureKeys(
-        { globalKeys: ["campaign_domain:*"] },
+    expect(
+      await countSharedStoreFixtureKeys(
+        { globalKeys: ["authorisation:grant"] },
         { command }
       )
-    ).rejects.toThrow();
+    ).toBe(0);
     expect(command).not.toHaveBeenCalled();
   });
 });

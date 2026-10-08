@@ -10,7 +10,6 @@ interface XeroDisconnectedBannerProps {
   orgQueryValue: string | null;
   xeroConnectionState?: XeroConnectionDisplayState;
 }
-
 export function XeroDisconnectedBanner({
   connectHref,
   orgQueryValue,

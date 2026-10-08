@@ -13,25 +13,20 @@ import {
 } from "./shared-store";
 
 interface MemoryStoreOptions {
-  epoch?: string;
-  expectedCredentialDomainId?: string;
-  initialised?: boolean;
   limits: SharedRateLimits;
+  namespace?: string;
   now?: () => number;
-  observedCredentialDomainId?: string;
 }
 export class MemorySharedXeroRateStore implements SharedXeroRateStore {
   private readonly options: MemoryStoreOptions;
   private readonly windows = new Map<string, Map<string, number>>();
   private readonly cooldowns = new Map<string, number>();
   private readonly now: () => number;
-  private readonly epoch: string;
-  private readonly initialised: boolean;
+  private readonly namespace: string;
   constructor(options: MemoryStoreOptions) {
     this.options = options;
     this.now = options.now ?? Date.now;
-    this.epoch = options.epoch ?? "dev";
-    this.initialised = options.initialised ?? true;
+    this.namespace = options.namespace ?? "v1";
   }
   private window(key: string, cutoff: number): Map<string, number> {
     const values = this.windows.get(key) ?? new Map<string, number>();
@@ -49,22 +44,12 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
   ): Promise<
     Result<{ reservationId: string }, { reason: SharedRateDeniedReason }>
   > {
-    if (
-      !this.initialised ||
-      (input.deadline && remainingMs(input.deadline) <= 0)
-    ) {
+    if (input.deadline && remainingMs(input.deadline) <= 0) {
       return { error: { reason: "infrastructure" }, ok: false };
     }
-    if (
-      this.options.expectedCredentialDomainId !== undefined &&
-      this.options.expectedCredentialDomainId !==
-        this.options.observedCredentialDomainId
-    ) {
-      return { error: { reason: "credential_domain_mismatch" }, ok: false };
-    }
     const now = this.now();
-    const [, appKey, minuteKey, dayKey, concurrentKey, cooldownKey] =
-      xeroRateKeys(input.rateClass, this.epoch);
+    const [appKey, minuteKey, dayKey, concurrentKey, cooldownKey] =
+      xeroRateKeys(input.rateClass, this.namespace);
     const app = this.window(appKey, now - 60_000);
     const minute = this.window(minuteKey, now - 60_000);
     const day = this.window(dayKey, now - 86_400_000);
@@ -81,7 +66,7 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       reason = "daily";
     } else if (
       app.size >= limits.appCallsPerMinute ||
-      minute.size >= (tenant ? limits.callsPerMinutePerOrg : 60)
+      (tenant && minute.size >= limits.callsPerMinutePerOrg)
     ) {
       reason = "minute";
     } else if (tenant && concurrent.size >= limits.concurrentRequestsPerOrg) {
@@ -91,8 +76,8 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       return { error: { reason }, ok: false };
     }
     app.set(input.reservationId, now);
-    minute.set(input.reservationId, now);
     if (tenant) {
+      minute.set(input.reservationId, now);
       day.set(input.reservationId, now);
       concurrent.set(input.reservationId, now + Math.max(1, input.leaseMs));
     }
@@ -101,24 +86,18 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
   // biome-ignore lint/suspicious/useAwait: Memory implementation preserves the asynchronous store interface.
   async release(input: RateReleaseInput): Promise<void> {
     this.windows
-      .get(xeroRateKeys(input.rateClass, this.epoch)[4])
+      .get(xeroRateKeys(input.rateClass, this.namespace)[3])
       ?.delete(input.reservationId);
   }
   // biome-ignore lint/suspicious/useAwait: Memory implementation preserves the asynchronous store interface.
   async observe(input: RateObservationInput): Promise<void> {
     const now = this.now();
-    const [, appKey, minuteKey, dayKey, , cooldownKey] = xeroRateKeys(
+    const [appKey, minuteKey, dayKey, , cooldownKey] = xeroRateKeys(
       input.rateClass,
-      this.epoch
+      this.namespace
     );
     const tenant = input.rateClass.kind === "tenant";
     const entries = [
-      {
-        cap: tenant ? this.options.limits.callsPerMinutePerOrg : 60,
-        duration: 60_000,
-        header: "X-MinLimit-Remaining",
-        key: minuteKey,
-      },
       {
         cap: this.options.limits.appCallsPerMinute,
         duration: 60_000,
@@ -127,6 +106,12 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       },
       ...(tenant
         ? [
+            {
+              cap: this.options.limits.callsPerMinutePerOrg,
+              duration: 60_000,
+              header: "X-MinLimit-Remaining",
+              key: minuteKey,
+            },
             {
               cap: this.options.limits.callsPerDayPerOrg,
               duration: 86_400_000,

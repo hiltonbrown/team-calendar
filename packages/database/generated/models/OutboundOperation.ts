@@ -43,6 +43,14 @@ export type OutboundOperationMinAggregateOutputType = {
   availability_record_id: string | null
   action: $Enums.outbound_operation_action | null
   status: $Enums.outbound_operation_status | null
+  idempotency_key: string | null
+  request_xero_tenant_id: string | null
+  request_method: string | null
+  request_url: string | null
+  request_body_json: string | null
+  request_reason: string | null
+  idempotency_first_dispatched_at: Date | null
+  idempotency_replay_before: Date | null
   request_fingerprint: string | null
   request_employee_id: string | null
   request_leave_type_id: string | null
@@ -71,6 +79,14 @@ export type OutboundOperationMaxAggregateOutputType = {
   availability_record_id: string | null
   action: $Enums.outbound_operation_action | null
   status: $Enums.outbound_operation_status | null
+  idempotency_key: string | null
+  request_xero_tenant_id: string | null
+  request_method: string | null
+  request_url: string | null
+  request_body_json: string | null
+  request_reason: string | null
+  idempotency_first_dispatched_at: Date | null
+  idempotency_replay_before: Date | null
   request_fingerprint: string | null
   request_employee_id: string | null
   request_leave_type_id: string | null
@@ -99,6 +115,14 @@ export type OutboundOperationCountAggregateOutputType = {
   availability_record_id: number
   action: number
   status: number
+  idempotency_key: number
+  request_xero_tenant_id: number
+  request_method: number
+  request_url: number
+  request_body_json: number
+  request_reason: number
+  idempotency_first_dispatched_at: number
+  idempotency_replay_before: number
   request_fingerprint: number
   request_employee_id: number
   request_leave_type_id: number
@@ -139,6 +163,14 @@ export type OutboundOperationMinAggregateInputType = {
   availability_record_id?: true
   action?: true
   status?: true
+  idempotency_key?: true
+  request_xero_tenant_id?: true
+  request_method?: true
+  request_url?: true
+  request_body_json?: true
+  request_reason?: true
+  idempotency_first_dispatched_at?: true
+  idempotency_replay_before?: true
   request_fingerprint?: true
   request_employee_id?: true
   request_leave_type_id?: true
@@ -167,6 +199,14 @@ export type OutboundOperationMaxAggregateInputType = {
   availability_record_id?: true
   action?: true
   status?: true
+  idempotency_key?: true
+  request_xero_tenant_id?: true
+  request_method?: true
+  request_url?: true
+  request_body_json?: true
+  request_reason?: true
+  idempotency_first_dispatched_at?: true
+  idempotency_replay_before?: true
   request_fingerprint?: true
   request_employee_id?: true
   request_leave_type_id?: true
@@ -195,6 +235,14 @@ export type OutboundOperationCountAggregateInputType = {
   availability_record_id?: true
   action?: true
   status?: true
+  idempotency_key?: true
+  request_xero_tenant_id?: true
+  request_method?: true
+  request_url?: true
+  request_body_json?: true
+  request_reason?: true
+  idempotency_first_dispatched_at?: true
+  idempotency_replay_before?: true
   request_fingerprint?: true
   request_employee_id?: true
   request_leave_type_id?: true
@@ -310,6 +358,14 @@ export type OutboundOperationGroupByOutputType = {
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key: string | null
+  request_xero_tenant_id: string | null
+  request_method: string | null
+  request_url: string | null
+  request_body_json: string | null
+  request_reason: string | null
+  idempotency_first_dispatched_at: Date | null
+  idempotency_replay_before: Date | null
   request_fingerprint: string
   request_employee_id: string | null
   request_leave_type_id: string | null
@@ -361,6 +417,14 @@ export type OutboundOperationWhereInput = {
   availability_record_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFilter<"OutboundOperation"> | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.UuidNullableFilter<"OutboundOperation"> | string | null
+  request_xero_tenant_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_method?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_url?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_body_json?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_reason?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  idempotency_first_dispatched_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  idempotency_replay_before?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   request_fingerprint?: Prisma.StringFilter<"OutboundOperation"> | string
   request_employee_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
   request_leave_type_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
@@ -391,6 +455,14 @@ export type OutboundOperationOrderByWithRelationInput = {
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  idempotency_key?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_xero_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_method?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_url?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_body_json?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_reason?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotency_first_dispatched_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotency_replay_before?: Prisma.SortOrderInput | Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
   request_employee_id?: Prisma.SortOrderInput | Prisma.SortOrder
   request_leave_type_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -416,6 +488,7 @@ export type OutboundOperationOrderByWithRelationInput = {
 
 export type OutboundOperationWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  idempotency_key?: string
   availability_record_id_action?: Prisma.OutboundOperationAvailability_record_idActionCompoundUniqueInput
   AND?: Prisma.OutboundOperationWhereInput | Prisma.OutboundOperationWhereInput[]
   OR?: Prisma.OutboundOperationWhereInput[]
@@ -425,6 +498,13 @@ export type OutboundOperationWhereUniqueInput = Prisma.AtLeast<{
   availability_record_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFilter<"OutboundOperation"> | $Enums.outbound_operation_status
+  request_xero_tenant_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_method?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_url?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_body_json?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_reason?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  idempotency_first_dispatched_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  idempotency_replay_before?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   request_fingerprint?: Prisma.StringFilter<"OutboundOperation"> | string
   request_employee_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
   request_leave_type_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
@@ -446,7 +526,7 @@ export type OutboundOperationWhereUniqueInput = Prisma.AtLeast<{
   updated_at?: Prisma.DateTimeFilter<"OutboundOperation"> | Date | string
   availability_record?: Prisma.XOR<Prisma.AvailabilityRecordScalarRelationFilter, Prisma.AvailabilityRecordWhereInput>
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-}, "id" | "availability_record_id_action">
+}, "id" | "idempotency_key" | "availability_record_id_action">
 
 export type OutboundOperationOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -455,6 +535,14 @@ export type OutboundOperationOrderByWithAggregationInput = {
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  idempotency_key?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_xero_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_method?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_url?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_body_json?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_reason?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotency_first_dispatched_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotency_replay_before?: Prisma.SortOrderInput | Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
   request_employee_id?: Prisma.SortOrderInput | Prisma.SortOrder
   request_leave_type_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -491,6 +579,14 @@ export type OutboundOperationScalarWhereWithAggregatesInput = {
   availability_record_id?: Prisma.UuidWithAggregatesFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionWithAggregatesFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusWithAggregatesFilter<"OutboundOperation"> | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.UuidNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_xero_tenant_id?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_method?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_url?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_body_json?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_reason?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  idempotency_first_dispatched_at?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
+  idempotency_replay_before?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
   request_fingerprint?: Prisma.StringWithAggregatesFilter<"OutboundOperation"> | string
   request_employee_id?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
   request_leave_type_id?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
@@ -517,6 +613,14 @@ export type OutboundOperationCreateInput = {
   clerk_org_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -547,6 +651,14 @@ export type OutboundOperationUncheckedCreateInput = {
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -573,6 +685,14 @@ export type OutboundOperationUpdateInput = {
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -603,6 +723,14 @@ export type OutboundOperationUncheckedUpdateInput = {
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -631,6 +759,14 @@ export type OutboundOperationCreateManyInput = {
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -657,6 +793,14 @@ export type OutboundOperationUpdateManyMutationInput = {
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -685,6 +829,14 @@ export type OutboundOperationUncheckedUpdateManyInput = {
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -728,6 +880,14 @@ export type OutboundOperationCountOrderByAggregateInput = {
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  idempotency_key?: Prisma.SortOrder
+  request_xero_tenant_id?: Prisma.SortOrder
+  request_method?: Prisma.SortOrder
+  request_url?: Prisma.SortOrder
+  request_body_json?: Prisma.SortOrder
+  request_reason?: Prisma.SortOrder
+  idempotency_first_dispatched_at?: Prisma.SortOrder
+  idempotency_replay_before?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
   request_employee_id?: Prisma.SortOrder
   request_leave_type_id?: Prisma.SortOrder
@@ -761,6 +921,14 @@ export type OutboundOperationMaxOrderByAggregateInput = {
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  idempotency_key?: Prisma.SortOrder
+  request_xero_tenant_id?: Prisma.SortOrder
+  request_method?: Prisma.SortOrder
+  request_url?: Prisma.SortOrder
+  request_body_json?: Prisma.SortOrder
+  request_reason?: Prisma.SortOrder
+  idempotency_first_dispatched_at?: Prisma.SortOrder
+  idempotency_replay_before?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
   request_employee_id?: Prisma.SortOrder
   request_leave_type_id?: Prisma.SortOrder
@@ -789,6 +957,14 @@ export type OutboundOperationMinOrderByAggregateInput = {
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  idempotency_key?: Prisma.SortOrder
+  request_xero_tenant_id?: Prisma.SortOrder
+  request_method?: Prisma.SortOrder
+  request_url?: Prisma.SortOrder
+  request_body_json?: Prisma.SortOrder
+  request_reason?: Prisma.SortOrder
+  idempotency_first_dispatched_at?: Prisma.SortOrder
+  idempotency_replay_before?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
   request_employee_id?: Prisma.SortOrder
   request_leave_type_id?: Prisma.SortOrder
@@ -912,6 +1088,14 @@ export type OutboundOperationCreateWithoutOrganisationInput = {
   clerk_org_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -940,6 +1124,14 @@ export type OutboundOperationUncheckedCreateWithoutOrganisationInput = {
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -997,6 +1189,14 @@ export type OutboundOperationScalarWhereInput = {
   availability_record_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFilter<"OutboundOperation"> | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.UuidNullableFilter<"OutboundOperation"> | string | null
+  request_xero_tenant_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_method?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_url?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_body_json?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_reason?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  idempotency_first_dispatched_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  idempotency_replay_before?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   request_fingerprint?: Prisma.StringFilter<"OutboundOperation"> | string
   request_employee_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
   request_leave_type_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
@@ -1023,6 +1223,14 @@ export type OutboundOperationCreateWithoutAvailability_recordInput = {
   clerk_org_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -1051,6 +1259,14 @@ export type OutboundOperationUncheckedCreateWithoutAvailability_recordInput = {
   organisation_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -1104,6 +1320,14 @@ export type OutboundOperationCreateManyOrganisationInput = {
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -1130,6 +1354,14 @@ export type OutboundOperationUpdateWithoutOrganisationInput = {
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1158,6 +1390,14 @@ export type OutboundOperationUncheckedUpdateWithoutOrganisationInput = {
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1185,6 +1425,14 @@ export type OutboundOperationUncheckedUpdateManyWithoutOrganisationInput = {
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1212,6 +1460,14 @@ export type OutboundOperationCreateManyAvailability_recordInput = {
   organisation_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
+  idempotency_key?: string | null
+  request_xero_tenant_id?: string | null
+  request_method?: string | null
+  request_url?: string | null
+  request_body_json?: string | null
+  request_reason?: string | null
+  idempotency_first_dispatched_at?: Date | string | null
+  idempotency_replay_before?: Date | string | null
   request_fingerprint: string
   request_employee_id?: string | null
   request_leave_type_id?: string | null
@@ -1238,6 +1494,14 @@ export type OutboundOperationUpdateWithoutAvailability_recordInput = {
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1266,6 +1530,14 @@ export type OutboundOperationUncheckedUpdateWithoutAvailability_recordInput = {
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1293,6 +1565,14 @@ export type OutboundOperationUncheckedUpdateManyWithoutAvailability_recordInput 
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
+  idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_url?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_body_json?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotency_first_dispatched_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotency_replay_before?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
   request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1323,6 +1603,14 @@ export type OutboundOperationSelect<ExtArgs extends runtime.Types.Extensions.Int
   availability_record_id?: boolean
   action?: boolean
   status?: boolean
+  idempotency_key?: boolean
+  request_xero_tenant_id?: boolean
+  request_method?: boolean
+  request_url?: boolean
+  request_body_json?: boolean
+  request_reason?: boolean
+  idempotency_first_dispatched_at?: boolean
+  idempotency_replay_before?: boolean
   request_fingerprint?: boolean
   request_employee_id?: boolean
   request_leave_type_id?: boolean
@@ -1353,6 +1641,14 @@ export type OutboundOperationSelectCreateManyAndReturn<ExtArgs extends runtime.T
   availability_record_id?: boolean
   action?: boolean
   status?: boolean
+  idempotency_key?: boolean
+  request_xero_tenant_id?: boolean
+  request_method?: boolean
+  request_url?: boolean
+  request_body_json?: boolean
+  request_reason?: boolean
+  idempotency_first_dispatched_at?: boolean
+  idempotency_replay_before?: boolean
   request_fingerprint?: boolean
   request_employee_id?: boolean
   request_leave_type_id?: boolean
@@ -1383,6 +1679,14 @@ export type OutboundOperationSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   availability_record_id?: boolean
   action?: boolean
   status?: boolean
+  idempotency_key?: boolean
+  request_xero_tenant_id?: boolean
+  request_method?: boolean
+  request_url?: boolean
+  request_body_json?: boolean
+  request_reason?: boolean
+  idempotency_first_dispatched_at?: boolean
+  idempotency_replay_before?: boolean
   request_fingerprint?: boolean
   request_employee_id?: boolean
   request_leave_type_id?: boolean
@@ -1413,6 +1717,14 @@ export type OutboundOperationSelectScalar = {
   availability_record_id?: boolean
   action?: boolean
   status?: boolean
+  idempotency_key?: boolean
+  request_xero_tenant_id?: boolean
+  request_method?: boolean
+  request_url?: boolean
+  request_body_json?: boolean
+  request_reason?: boolean
+  idempotency_first_dispatched_at?: boolean
+  idempotency_replay_before?: boolean
   request_fingerprint?: boolean
   request_employee_id?: boolean
   request_leave_type_id?: boolean
@@ -1434,7 +1746,7 @@ export type OutboundOperationSelectScalar = {
   updated_at?: boolean
 }
 
-export type OutboundOperationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "action" | "status" | "request_fingerprint" | "request_employee_id" | "request_leave_type_id" | "request_starts_at" | "request_ends_at" | "request_title" | "request_units" | "actor_user_id" | "attempt_generation" | "safe_error_code" | "known_remote_id" | "merged_record_id" | "side_effect_claimed_at" | "prepared_at" | "dispatch_started_at" | "provider_accepted_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["outboundOperation"]>
+export type OutboundOperationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "action" | "status" | "idempotency_key" | "request_xero_tenant_id" | "request_method" | "request_url" | "request_body_json" | "request_reason" | "idempotency_first_dispatched_at" | "idempotency_replay_before" | "request_fingerprint" | "request_employee_id" | "request_leave_type_id" | "request_starts_at" | "request_ends_at" | "request_title" | "request_units" | "actor_user_id" | "attempt_generation" | "safe_error_code" | "known_remote_id" | "merged_record_id" | "side_effect_claimed_at" | "prepared_at" | "dispatch_started_at" | "provider_accepted_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["outboundOperation"]>
 export type OutboundOperationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   availability_record?: boolean | Prisma.AvailabilityRecordDefaultArgs<ExtArgs>
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -1461,6 +1773,14 @@ export type $OutboundOperationPayload<ExtArgs extends runtime.Types.Extensions.I
     availability_record_id: string
     action: $Enums.outbound_operation_action
     status: $Enums.outbound_operation_status
+    idempotency_key: string | null
+    request_xero_tenant_id: string | null
+    request_method: string | null
+    request_url: string | null
+    request_body_json: string | null
+    request_reason: string | null
+    idempotency_first_dispatched_at: Date | null
+    idempotency_replay_before: Date | null
     request_fingerprint: string
     request_employee_id: string | null
     request_leave_type_id: string | null
@@ -1911,6 +2231,14 @@ export interface OutboundOperationFieldRefs {
   readonly availability_record_id: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly action: Prisma.FieldRef<"OutboundOperation", 'outbound_operation_action'>
   readonly status: Prisma.FieldRef<"OutboundOperation", 'outbound_operation_status'>
+  readonly idempotency_key: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_xero_tenant_id: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_method: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_url: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_body_json: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_reason: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly idempotency_first_dispatched_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
+  readonly idempotency_replay_before: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
   readonly request_fingerprint: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly request_employee_id: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly request_leave_type_id: Prisma.FieldRef<"OutboundOperation", 'String'>

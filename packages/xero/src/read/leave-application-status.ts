@@ -1,6 +1,6 @@
 import { classifyXeroHttpFailure } from "../adapter/classify-xero-failure";
 import type {
-  XeroTenantForWrite,
+  XeroAccessContext,
   XeroWriteError,
   XeroWriteResult,
 } from "../write/types";
@@ -21,9 +21,9 @@ export interface XeroLeaveApplicationStatusResult {
 }
 
 export interface FetchLeaveApplicationStatusInput {
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId?: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface FetchNzLeaveApplicationStatusInput

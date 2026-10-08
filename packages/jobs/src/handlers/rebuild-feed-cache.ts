@@ -1,10 +1,4 @@
-import {
-  withXeroCampaignScopedEffect,
-  withXeroCampaignScopedInvocation,
-} from "@repo/database/xero-campaign-access";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
-
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import {
@@ -19,61 +13,54 @@ import { z } from "zod";
 import { inngest } from "../client";
 
 const FEED_CACHE_TTL_SECONDS = 3600;
-
 export const RebuildFeedCacheInputSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative().optional(),
-  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
+  connectionId: z.uuid().optional(),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid(),
   reason: z.string().min(1).optional(),
-  xeroTenantId: z.uuid().optional(),
 });
-
 export type RebuildFeedCacheInput = z.infer<typeof RebuildFeedCacheInputSchema>;
-
 export type RebuildFeedCacheError =
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 type RebuildFeedCacheResult = Result<
-  { feedId: string; rebuilt: boolean; skipped: boolean },
+  {
+    feedId: string;
+    rebuilt: boolean;
+    skipped: boolean;
+  },
   RebuildFeedCacheError
 >;
-
 export const rebuildFeedCacheFunction: InngestFunction.Any =
   inngest.createFunction(
     {
       id: "rebuild-feed-cache",
       triggers: { event: "rebuild-feed-cache" },
     },
-    async ({ event, step, runId: workerRunId }) =>
+    async ({ event, step }) =>
       await step.run("rebuild-feed-cache", async () => {
-        const result = await rebuildFeedCache(event.data, workerRunId);
+        const result = await rebuildFeedCache(event.data);
         if (!result.ok) {
           throw new Error(result.error.message);
         }
         return result.value;
       })
   );
-
-export async function rebuildFeedCache(
-  input: unknown,
-  workerRunId: string | null = null
-) {
+export async function rebuildFeedCache(input: unknown) {
   const parsed = RebuildFeedCacheInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  return await withXeroCampaignScopedInvocation(
-    "rebuild-feed-cache",
-    input,
-    () => rebuildFeedCacheUnderCampaign(input),
-    workerRunId
-  );
+  return await rebuildFeedCacheInternal(input);
 }
-
-async function rebuildFeedCacheUnderCampaign(
+async function rebuildFeedCacheInternal(
   input: unknown
 ): Promise<RebuildFeedCacheResult> {
   const parsed = RebuildFeedCacheInputSchema.safeParse(input);
@@ -81,7 +68,6 @@ async function rebuildFeedCacheUnderCampaign(
     return validationError(parsed.error);
   }
   const context = parsed.data;
-
   try {
     const feed = await database.feed.findFirst({
       select: {
@@ -101,19 +87,13 @@ async function rebuildFeedCacheUnderCampaign(
     if (!feed) {
       // Feed is paused, archived, or out of this tenant's scope. Drop any cached body so a
       // stale feed is never served, then treat the rebuild as a no-op.
-      await withXeroCampaignScopedEffect(context, () =>
-        invalidateFeedCache({ feedId: context.feedId })
-      );
+      await (() => invalidateFeedCache({ feedId: context.feedId }))();
       return {
         ok: true,
         value: { feedId: context.feedId, rebuilt: false, skipped: true },
       };
     }
-
-    await withXeroCampaignScopedEffect(context, () =>
-      invalidateFeedCache({ feedId: feed.id })
-    );
-
+    await (() => invalidateFeedCache({ feedId: feed.id }))();
     const rendered = await renderFeedBody({
       clerkOrgId: context.clerkOrgId,
       feedId: feed.id,
@@ -133,8 +113,7 @@ async function rebuildFeedCacheUnderCampaign(
         ok: false,
       };
     }
-
-    const cached = await withXeroCampaignScopedEffect(context, () =>
+    const cached = await (() =>
       setCachedFeedBody({
         body: rendered.value.body,
         etag: rendered.value.etag,
@@ -143,13 +122,10 @@ async function rebuildFeedCacheUnderCampaign(
           feedId: feed.id,
         }),
         ttlSeconds: FEED_CACHE_TTL_SECONDS,
-      })
-    );
-
+      }))();
     if (!cached.ok) {
       return { error: cached.error, ok: false };
     }
-
     await database.feed.updateMany({
       data: { last_etag: rendered.value.etag, last_rendered_at: new Date() },
       where: {
@@ -159,7 +135,6 @@ async function rebuildFeedCacheUnderCampaign(
         representation_generation: rendered.value.generation,
       },
     });
-
     return {
       ok: true,
       value: { feedId: feed.id, rebuilt: true, skipped: false },
@@ -175,7 +150,6 @@ async function rebuildFeedCacheUnderCampaign(
     };
   }
 }
-
 function validationError(error: z.ZodError): RebuildFeedCacheResult {
   return {
     error: {

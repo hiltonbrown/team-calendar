@@ -1,5 +1,4 @@
 "use client";
-
 import {
   Alert,
   AlertDescription,
@@ -14,7 +13,6 @@ import {
   CardTitle,
 } from "@repo/design-system/components/ui/card";
 import { toast } from "@repo/design-system/components/ui/sonner";
-import type { XeroDisconnectReceipt } from "@repo/xero";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { dispatchManualSyncAction } from "@/app/(authenticated)/sync/_actions";
@@ -27,14 +25,12 @@ import {
   connectXeroAction,
   disconnectXeroAction,
   pauseTenantSyncAction,
-  refreshXeroConnectionAction,
   resumeTenantSyncAction,
 } from "./_actions";
 
 interface XeroClientProps {
   organisations: OrganisationWithConnectionView[];
 }
-
 export const XeroClient = ({ organisations }: XeroClientProps) => {
   const router = useRouter();
   const [disconnectMessage, setDisconnectMessage] = useState<string | null>(
@@ -47,7 +43,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
     organisationId: string;
     organisationName: string;
   } | null>(null);
-
   const handleConnect = (organisationId: string) => {
     startTransition(async () => {
       const result = await connectXeroAction({ organisationId });
@@ -58,19 +53,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       window.location.href = result.value.redirectUrl;
     });
   };
-
-  const handleRefresh = (connectionId: string, organisationId: string) => {
-    startTransition(async () => {
-      const result = await refreshXeroConnectionAction({
-        connectionId,
-        organisationId,
-      });
-      toast[result.ok ? "success" : "error"](
-        result.ok ? "Connection refreshed." : result.error.message
-      );
-    });
-  };
-
   const handleDisconnect = () => {
     if (!disconnectTarget) {
       return;
@@ -86,28 +68,24 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         toast.error(result.error.message);
         return;
       }
-      const message = disconnectReceiptMessage(
-        result.value.receipt.remoteStatus
-      );
+      const message = "Disconnected from Xero.";
       setDisconnectMessage(message);
       toast.message(message);
-
       if (result.ok) {
         setDisconnectTarget(null);
         router.refresh();
       }
     });
   };
-
   const updatePauseState = (
     organisationId: string,
-    xeroTenantId: string,
+    connectionId: string,
     paused: boolean
   ) => {
     startTransition(async () => {
       const result = paused
-        ? await pauseTenantSyncAction({ organisationId, xeroTenantId })
-        : await resumeTenantSyncAction({ organisationId, xeroTenantId });
+        ? await pauseTenantSyncAction({ connectionId, organisationId })
+        : await resumeTenantSyncAction({ connectionId, organisationId });
       if (!result.ok) {
         toast.error(result.error.message);
         return;
@@ -118,18 +96,17 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       router.refresh();
     });
   };
-
   const runSync = (
     organisationId: string,
-    xeroTenantId: string,
+    connectionId: string,
     runType: string
   ) => {
     startTransition(async () => {
       try {
         const result = await dispatchManualSyncAction({
+          connectionId,
           organisationId,
           runType,
-          xeroTenantId,
         });
         if (!result.ok) {
           toast.error(result.error.message);
@@ -154,7 +131,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       }
     });
   };
-
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
@@ -174,22 +150,15 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Organisation card renders status, stats, sync actions, and disconnect confirmation */}
       {organisations.map((organisation) => {
         const connection = organisation.xero_connection;
-        const tenant = connection?.xero_tenant ?? null;
+        const tenant = connection ?? null;
         const state = organisation.xeroConnectionState;
         const status = statusForState(state);
         const canConnect =
           state === "not_connected" || state === "reauthorisation_required";
-        const canRecheck =
-          state === "unavailable" || state === "disconnect_pending";
-        const canRefresh =
-          state === "connected" &&
-          connection?.status === "active" &&
-          connection.disconnected_at === null &&
-          connection.revoked_at === null;
+        const canRecheck = state === "unavailable";
         const recommendedSync = tenant
           ? recommendedSyncForTenant(tenant)
           : null;
-
         return (
           <Card
             className="rounded-2xl"
@@ -319,17 +288,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                     Connection controls
                   </summary>
                   <div className="mt-4 flex flex-wrap gap-3">
-                    {canRefresh ? (
-                      <Button
-                        disabled={isPending}
-                        onClick={() =>
-                          handleRefresh(connection.id, organisation.id)
-                        }
-                        variant="outline"
-                      >
-                        Refresh tokens
-                      </Button>
-                    ) : null}
                     {tenant ? (
                       <Button
                         disabled={isPending}
@@ -413,7 +371,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
     </div>
   );
 };
-
 const SYNC_OPTIONS = [
   { label: "Sync people", runType: "people" },
   { label: "Sync leave records", runType: "leave_records" },
@@ -423,13 +380,8 @@ const SYNC_OPTIONS = [
     runType: "approval_state_reconciliation",
   },
 ] as const;
-
 function recommendedSyncForTenant(
-  tenant: NonNullable<
-    NonNullable<
-      OrganisationWithConnectionView["xero_connection"]
-    >["xero_tenant"]
-  >
+  tenant: NonNullable<OrganisationWithConnectionView["xero_connection"]>
 ) {
   const timestamps = {
     approval_state_reconciliation: tenant.last_approval_state_reconciled_at,
@@ -443,15 +395,12 @@ function recommendedSyncForTenant(
       timestampPriority(timestamps[second.runType])
   )[0];
 }
-
 function timestampPriority(value: Date | null) {
   return value?.getTime() ?? Number.NEGATIVE_INFINITY;
 }
-
 function formatTimestamp(value: Date | null): string {
   return value ? value.toLocaleString("en-AU") : "Not run yet";
 }
-
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted/30 p-3">
@@ -460,24 +409,6 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-function disconnectReceiptMessage(
-  status: XeroDisconnectReceipt["remoteStatus"]
-): string {
-  switch (status) {
-    case "not_applicable":
-    case "confirmed_deleted":
-    case "confirmed_absent":
-      return "Disconnected from Xero.";
-    case "left_in_place":
-      return "Sync stopped. Team Calendar no longer uses this Xero connection. To remove it from Xero as well, open Connected apps in Xero.";
-    case "pending":
-      return "Sync stopped. Xero disconnection is pending.";
-    default:
-      return "Sync stopped. We could not confirm the Xero disconnection. Contact support for help.";
-  }
-}
-
 function statusForState(
   state: import("@repo/core").XeroConnectionDisplayState
 ): "connected" | "disconnected" | "error" | "expired" {

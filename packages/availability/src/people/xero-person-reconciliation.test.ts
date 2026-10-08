@@ -144,9 +144,10 @@ describe("xero-person-reconciliation", () => {
       expect(mocks.personUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
+            archived_at: null,
+            is_active: true,
             job_title: "Senior Engineer",
             xero_employee_id: employeeId,
-            xero_missing_since: null,
           }),
           where: { id: xeroPersonId },
         })
@@ -388,11 +389,11 @@ describe("xero-person-reconciliation", () => {
       // Candidate person has balance for (tenant1, leaveTypeA) [conflict -> delete] and (tenant1, leaveTypeB) [transfer]
       mocks.leaveBalanceFindMany
         .mockResolvedValueOnce([
-          { id: "xb1", leave_type_xero_id: "ltA", xero_tenant_id: "t1" },
+          { id: "xb1", leave_type_xero_id: "ltA", xero_connection_id: "t1" },
         ])
         .mockResolvedValueOnce([
-          { id: "cb1", leave_type_xero_id: "ltA", xero_tenant_id: "t1" },
-          { id: "cb2", leave_type_xero_id: "ltB", xero_tenant_id: "t1" },
+          { id: "cb1", leave_type_xero_id: "ltA", xero_connection_id: "t1" },
+          { id: "cb2", leave_type_xero_id: "ltB", xero_connection_id: "t1" },
         ]);
 
       // Feed scopes setup:

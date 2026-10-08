@@ -1,4 +1,9 @@
-import { type Result, xeroRecoveryMessage } from "@repo/core";
+import {
+  type Result,
+  type XeroMutationIdentity,
+  xeroRecoveryMessage,
+} from "@repo/core";
+import type { XeroProviderConnectionCapture } from "@repo/database/queries/xero-connections";
 import type { XeroDeadline } from "../rate-limit/deadline";
 
 export type XeroWriteError =
@@ -40,46 +45,50 @@ export type XeroWriteResult<T> = Result<T, XeroWriteError>;
 
 export type PayrollRegion = "AU" | "NZ" | "UK";
 
-export interface XeroTenantForWrite {
+export interface XeroAccessContext {
   accessToken: string;
-  bindingGeneration: number;
   capability?: string | readonly string[];
   clerk_org_id: string;
   deadline: XeroDeadline;
   id: string;
+  mutationAttemptBudget?: { remaining: number };
   organisation_id: string;
   payroll_region: PayrollRegion;
-  tokenVersion: number | null;
+  providerConnection?: XeroProviderConnectionCapture;
   xero_tenant_id: string;
 }
 
 export interface SubmitLeaveApplicationInput {
   endsAt: Date;
+  mutation?: XeroMutationIdentity;
   startsAt: Date;
   title?: string;
   units: number;
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveTypeId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface ApproveLeaveApplicationInput {
+  mutation?: XeroMutationIdentity;
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface DeclineLeaveApplicationInput {
+  mutation?: XeroMutationIdentity;
   reason: string;
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface WithdrawLeaveApplicationInput {
+  mutation?: XeroMutationIdentity;
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export function toPlainLanguageMessage(error: XeroWriteError): string {

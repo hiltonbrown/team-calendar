@@ -88,7 +88,7 @@ const SyncRunDetailPage = async ({
             tenantSummary={
               summariesResult.value.find(
                 (summary) =>
-                  summary.xeroTenantId === detailResult.value.run.xeroTenantId
+                  summary.connectionId === detailResult.value.run.connectionId
               ) ?? null
             }
           />

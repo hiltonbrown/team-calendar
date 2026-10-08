@@ -25,6 +25,23 @@ function reservation(rateClass: XeroRateClass = tenant) {
   return { leaseMs: 1000, rateClass, reservationId: crypto.randomUUID() };
 }
 describe("shared Xero rate budgets", () => {
+  it.each(["token", "user_inventory"] as const)(
+    "%s has no invented tenant minute quota",
+    async (kind) => {
+      const store = new MemorySharedXeroRateStore({
+        limits: { ...limits, appCallsPerMinute: 100 },
+      });
+      const rateClass = { kind, providerAppId: "app" };
+      await store.observe({
+        headers: new Headers({ "X-MinLimit-Remaining": "0" }),
+        rateClass,
+      });
+      for (let index = 0; index < 61; index += 1) {
+        expect((await store.reserve(reservation(rateClass))).ok).toBe(true);
+      }
+    }
+  );
+
   it("uses external tenant identity and prevents hash-tag injection", () => {
     expect(xeroRateKeys(tenant, "dev")).toEqual(
       xeroRateKeys({ ...tenant }, "dev")
@@ -157,13 +174,6 @@ describe("shared Xero rate budgets", () => {
     });
     expect(parseRateCooldown("invalid", now)).toBeUndefined();
   });
-  it("fails closed when namespace initialisation is missing", async () => {
-    const store = new MemorySharedXeroRateStore({ initialised: false, limits });
-    expect(await store.reserve(reservation())).toMatchObject({
-      error: { reason: "infrastructure" },
-      ok: false,
-    });
-  });
   it("bounds reserve, observation and release even when fetch ignores abort", async () => {
     const fetchImpl = vi.fn<typeof fetch>(
       () =>
@@ -172,9 +182,9 @@ describe("shared Xero rate budgets", () => {
         })
     );
     const store = new RedisSharedXeroRateStore({
-      epoch: "owned",
       fetchImpl,
       limits,
+      namespace: "owned",
       token: "test",
       url: "https://invalid.example",
     });
@@ -194,9 +204,9 @@ describe("shared Xero rate budgets", () => {
   });
   it("fails closed on malformed Redis replies without fallback", async () => {
     const store = new RedisSharedXeroRateStore({
-      epoch: "owned",
       fetchImpl: async () => Response.json({ result: ["admitted", "extra"] }),
       limits,
+      namespace: "owned",
       token: "test",
       url: "https://invalid.example",
     });
@@ -204,9 +214,6 @@ describe("shared Xero rate budgets", () => {
       error: { reason: "infrastructure" },
       ok: false,
     });
-    await expect(store.initialiseNamespace("app", true)).rejects.toThrow(
-      "unavailable"
-    );
   });
 });
 
@@ -217,7 +224,6 @@ describe("production shared-store selection", () => {
   });
   for (const missing of [
     "XERO_APP_TIER",
-    "XERO_RATE_NAMESPACE_EPOCH",
     "XERO_CLIENT_ID",
     "KV_REST_API_URL",
     "KV_REST_API_TOKEN",
@@ -225,7 +231,6 @@ describe("production shared-store selection", () => {
     it(`fails closed without ${missing}`, async () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("XERO_APP_TIER", "starter");
-      vi.stubEnv("XERO_RATE_NAMESPACE_EPOCH", "test");
       vi.stubEnv("XERO_CLIENT_ID", "app");
       vi.stubEnv("KV_REST_API_URL", "https://invalid.example");
       vi.stubEnv("KV_REST_API_TOKEN", "test-token");
@@ -235,10 +240,20 @@ describe("production shared-store selection", () => {
       ).toMatchObject({ error: { reason: "infrastructure" }, ok: false });
     });
   }
+  it("uses the shared store in production without bootstrap configuration", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("XERO_APP_TIER", "starter");
+    vi.stubEnv("XERO_CLIENT_ID", "app");
+    vi.stubEnv("KV_REST_API_URL", "https://invalid.example");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-token");
+    vi.stubGlobal("fetch", async () => Response.json({ result: ["admitted"] }));
+    expect((await getSharedXeroRateStore().reserve(reservation())).ok).toBe(
+      true
+    );
+  });
   it("keeps configured KV outage closed rather than selecting memory", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("XERO_APP_TIER", "starter");
-    vi.stubEnv("XERO_RATE_NAMESPACE_EPOCH", "test");
     vi.stubEnv("XERO_CLIENT_ID", "app");
     vi.stubEnv("KV_REST_API_URL", "https://invalid.example");
     vi.stubEnv("KV_REST_API_TOKEN", "test-token");
@@ -250,50 +265,5 @@ describe("production shared-store selection", () => {
       { error: { reason: "infrastructure" }, ok: false }
     );
     expect(unavailable).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("credential domain admission", () => {
-  it.each(["tenant", "token", "user_inventory", "app_management"] as const)(
-    "memory mismatch denies %s before spending or replay",
-    async (kind) => {
-      const store = new MemorySharedXeroRateStore({
-        expectedCredentialDomainId: "expected",
-        limits,
-        observedCredentialDomainId: "foreign",
-      });
-      const rateClass: XeroRateClass =
-        kind === "tenant" ? tenant : { kind, providerAppId: "app" };
-      const input = reservation(rateClass);
-      for (let i = 0; i < 2; i += 1) {
-        expect(await store.reserve(input)).toMatchObject({
-          error: { reason: "credential_domain_mismatch" },
-          ok: false,
-        });
-      }
-    }
-  );
-  it("passes expected domain as fixed argument before operation extras", async () => {
-    const fetchImpl = vi.fn<typeof fetch>(async () =>
-      Response.json({ result: ["credential_domain_mismatch"] })
-    );
-    const domain = "11111111-1111-4111-8111-111111111111";
-    const store = new RedisSharedXeroRateStore({
-      credentialDomainId: domain,
-      epoch: "owned",
-      fetchImpl,
-      limits,
-      token: "test",
-      url: "https://invalid.example",
-    });
-    expect(await store.reserve(reservation())).toMatchObject({
-      error: { reason: "credential_domain_mismatch" },
-      ok: false,
-    });
-    await expect(store.initialiseNamespace("app", true)).rejects.toThrow(
-      "credential domain mismatch"
-    );
-    const body = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body));
-    expect(body[17]).toBe(domain);
   });
 });

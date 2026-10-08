@@ -1,10 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
-import {
-  assertXeroCampaignDispatch,
-  recordXeroCampaignDispatch,
-} from "@repo/database/xero-campaign-access";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import { Inngest } from "inngest";
 import { z } from "zod";
 
@@ -12,13 +7,11 @@ function getInngestClient(): Inngest {
   const eventKey = process.env.INNGEST_EVENT_KEY;
   const signingKey = process.env.INNGEST_SIGNING_KEY;
   const devUrl = process.env.INNGEST_DEV;
-
   // INNGEST_DEV enables the local dev server without production keys. A URL
   // override is passed explicitly; boolean values use the SDK's default
   // http://localhost:8288 endpoint. The API boundary handles a temporarily
   // unavailable local server without changing production dispatch behaviour.
   const baseUrl = devUrl?.startsWith("http") ? devUrl : undefined;
-
   return new Inngest({
     baseUrl,
     eventKey: eventKey || undefined,
@@ -26,29 +19,23 @@ function getInngestClient(): Inngest {
     signingKey: signingKey || undefined,
   });
 }
-
 const inngest = getInngestClient();
-
 export const syncEventNames = {
   approval_state_reconciliation: "reconcile-xero-approval-state",
   leave_balances: "sync-xero-leave-balances",
   leave_records: "sync-xero-leave-records",
   people: "sync-xero-people",
 } as const;
-
 export type RegisteredSyncRunType = keyof typeof syncEventNames;
-
 const registeredHandlers = new Set<RegisteredSyncRunType>([
   "approval_state_reconciliation",
   "leave_balances",
   "leave_records",
   "people",
 ]);
-
 const SyncEventSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative(),
-  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
   runId: z.string().uuid().optional(),
@@ -60,26 +47,26 @@ const SyncEventSchema = z.object({
   ]),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
-  xeroTenantId: z.string().uuid(),
 });
-
 const CancelSyncEventSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   runId: z.string().uuid(),
 });
-
 export function getRegisteredSyncEventName(
   runType: RegisteredSyncRunType
 ): string | null {
   return registeredHandlers.has(runType) ? syncEventNames[runType] : null;
 }
-
 export async function dispatchSyncEvent(
   input: z.input<typeof SyncEventSchema>
 ): Promise<
   Result<
-    { eventName: string; ids: string[]; queued: true },
+    {
+      eventName: string;
+      ids: string[];
+      queued: true;
+    },
     {
       code: "dispatch_failed" | "dispatch_not_wired" | "validation_error";
       message: string;
@@ -106,34 +93,20 @@ export async function dispatchSyncEvent(
       ok: false,
     };
   }
-
   try {
-    await assertXeroCampaignDispatch(
-      parsed.data,
-      eventName,
-      parsed.data.campaign
-    );
     const runId = parsed.data.runId ?? randomUUID();
     const sent = await inngest.send({
       data: {
-        bindingGeneration: parsed.data.bindingGeneration,
-        ...(parsed.data.campaign ? { campaign: parsed.data.campaign } : {}),
         clerkOrgId: parsed.data.clerkOrgId,
+        connectionId: parsed.data.connectionId,
         organisationId: parsed.data.organisationId,
         personId: parsed.data.personId,
         runId,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
         triggerType: parsed.data.triggerType,
-        xeroTenantId: parsed.data.xeroTenantId,
       },
       name: eventName,
     });
-    await recordXeroCampaignDispatch(
-      parsed.data,
-      eventName,
-      parsed.data.campaign,
-      sent.ids
-    );
     return { ok: true, value: { eventName, ids: sent.ids, queued: true } };
   } catch {
     return {
@@ -145,13 +118,17 @@ export async function dispatchSyncEvent(
     };
   }
 }
-
 export async function dispatchCancelSyncRun(
   input: z.input<typeof CancelSyncEventSchema>
 ): Promise<
   Result<
-    { queued: true },
-    { code: "dispatch_failed" | "validation_error"; message: string }
+    {
+      queued: true;
+    },
+    {
+      code: "dispatch_failed" | "validation_error";
+      message: string;
+    }
   >
 > {
   const parsed = CancelSyncEventSchema.safeParse(input);
@@ -165,7 +142,6 @@ export async function dispatchCancelSyncRun(
       ok: false,
     };
   }
-
   try {
     await inngest.send({
       data: parsed.data,

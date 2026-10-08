@@ -54,10 +54,6 @@
       "types": "./queries/public-holidays.ts",
       "default": "./queries/public-holidays.ts"
     },
-    "./queries/schedulable-xero-tenants": {
-      "types": "./queries/schedulable-xero-tenants.ts",
-      "default": "./queries/schedulable-xero-tenants.ts"
-    },
     "./queries/support-submissions": {
       "types": "./queries/support-submissions.ts",
       "default": "./queries/support-submissions.ts"
@@ -70,10 +66,6 @@
       "types": "./test-fixtures/slice-14-fixture.ts",
       "default": "./test-fixtures/slice-14-fixture.ts"
     },
-    "./queries/xero-credential-owner": {
-      "types": "./queries/xero-credential-owner.ts",
-      "default": "./queries/xero-credential-owner.ts"
-    },
     "./live-shared-store-fixture": {
       "types": "./src/live-shared-store-fixture.ts",
       "default": "./src/live-shared-store-fixture.ts"
@@ -82,49 +74,35 @@
       "types": "./src/live-test-guard.ts",
       "default": "./src/live-test-guard.ts"
     },
-    "./queries/xero-cleanup": {
-      "types": "./queries/xero-cleanup.ts",
-      "default": "./queries/xero-cleanup.ts"
-    },
     "./queries/xero-connection-state": {
       "types": "./queries/xero-connection-state.ts",
       "default": "./queries/xero-connection-state.ts"
     },
-    "./queries/xero-inactivity-signals": {
-      "types": "./queries/xero-inactivity-signals.ts",
-      "default": "./queries/xero-inactivity-signals.ts"
-    },
-    "./xero-credential-identity-artifact": {
-      "types": "./xero-credential-identity-artifact.ts",
-      "default": "./xero-credential-identity-artifact.ts"
-    },
-    "./xero-campaign-access": {
-      "types": "./src/xero-campaign-access.ts",
-      "default": "./src/xero-campaign-access.ts"
-    },
-    "./xero-campaign-contract": {
-      "types": "./src/xero-campaign-contract.ts",
-      "default": "./src/xero-campaign-contract.ts"
-    },
-    "./xero-campaign-store": {
-      "types": "./src/xero-campaign-store.ts",
-      "default": "./src/xero-campaign-store.ts"
-    },
-    "./live-campaign-fixture": {
-      "types": "./src/live-campaign-fixture.ts",
-      "default": "./src/live-campaign-fixture.ts"
-    },
     "./integration-spies": {
       "types": "./src/integration-spies.ts",
       "default": "./src/integration-spies.ts"
+    },
+    "./queries/xero-connections": {
+      "types": "./queries/xero-connections.ts",
+      "default": "./queries/xero-connections.ts"
+    },
+    "./queries/xero-authorisation": {
+      "types": "./queries/xero-authorisation.ts",
+      "default": "./queries/xero-authorisation.ts"
+    },
+    "./queries/xero-sync-cursors": {
+      "types": "./queries/xero-sync-cursors.ts",
+      "default": "./queries/xero-sync-cursors.ts"
+    },
+    "./queries/schedulable-xero-connections": {
+      "types": "./queries/schedulable-xero-connections.ts",
+      "default": "./queries/schedulable-xero-connections.ts"
     }
   },
   "main": "./index.ts",
   "types": "./index.ts",
   "scripts": {
     "analyze": "prisma generate --no-hints --schema=./prisma/schema.prisma",
-    "backfill:xero-credential-owner": "bun --conditions=react-server scripts/backfill-xero-credential-owner.ts",
-    "backfill:xero-tenant-binding": "bun scripts/backfill-xero-tenant-binding.ts",
     "build": "prisma generate --no-hints --schema=./prisma/schema.prisma",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "seed": "bun run seed.ts",

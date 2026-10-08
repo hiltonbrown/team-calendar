@@ -23,7 +23,7 @@ import type {
   XeroLeaveRecordStatus,
 } from "../read/leave-records";
 import type {
-  XeroTenantForWrite,
+  XeroAccessContext,
   XeroWriteError,
   XeroWriteResult,
 } from "../write/types";
@@ -31,16 +31,14 @@ import type {
 const XERO_DEFAULT_BASE_URL = "https://api.xero.com";
 const XERO_PAGE_SIZE = 100;
 const XERO_MAX_PAGES = 200;
-
 export async function fetchEmployees(input: {
-  xeroTenant: XeroTenantForWrite;
+  xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<XeroEmployeesFetchResult>> {
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const employees: XeroEmployee[] = [];
     const failures: XeroEmployeeMapFailure[] = [];
@@ -48,40 +46,37 @@ export async function fetchEmployees(input: {
     let rawItemCount = 0;
     let page = 1;
     let rawResponse: unknown = null;
-
     while (page <= XERO_MAX_PAGES) {
       const response = await xeroFetch({
-        deadline: input.xeroTenant.deadline,
+        deadline: input.xeroConnection.deadline,
         init: {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
-            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+            "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
           },
           method: "GET",
         },
         rateClass: {
           kind: "tenant",
           providerAppId: keys().XERO_CLIENT_ID ?? "",
-          xeroTenantId: input.xeroTenant.xero_tenant_id,
+          xeroTenantId: input.xeroConnection.xero_tenant_id,
         },
         url: `${baseUrl()}/payroll.xro/2.0/employees?page=${page}`,
       });
       const rawPayload = await readXeroPayload(response);
-
       if (!response.ok) {
         return {
           error: mapXeroReadHttpError(response, rawPayload),
           ok: false,
         };
       }
-
       rawResponse ??= rawPayload;
       const mappedPage = tryMapXeroEmployees(rawPayload);
       if (!mappedPage.ok) {
         log.warn("Xero employee page could not be parsed", {
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
+          clerkOrgId: input.xeroConnection.clerk_org_id,
+          organisationId: input.xeroConnection.organisation_id,
           page,
         });
         return {
@@ -96,12 +91,10 @@ export async function fetchEmployees(input: {
           },
         };
       }
-
       employees.push(...mappedPage.employees);
       failures.push(...mappedPage.failures);
       seenEmployeeIds.push(...mappedPage.seenEmployeeIds);
       rawItemCount += mappedPage.rawItemCount;
-
       if (mappedPage.rawItemCount < XERO_PAGE_SIZE) {
         return {
           ok: true,
@@ -115,13 +108,11 @@ export async function fetchEmployees(input: {
           },
         };
       }
-
       page += 1;
     }
-
     log.warn("Xero employee pagination exceeded the maximum page count", {
-      clerkOrgId: input.xeroTenant.clerk_org_id,
-      organisationId: input.xeroTenant.organisation_id,
+      clerkOrgId: input.xeroConnection.clerk_org_id,
+      organisationId: input.xeroConnection.organisation_id,
       page: XERO_MAX_PAGES,
     });
     return {
@@ -142,7 +133,6 @@ export async function fetchEmployees(input: {
     };
   }
 }
-
 const UkLeavePeriodSchema = z
   .object({
     NumberOfUnits: z.number().optional().nullable(),
@@ -155,7 +145,6 @@ const UkLeavePeriodSchema = z
     periodStatus: z.string().optional().nullable(),
   })
   .passthrough();
-
 const UkLeaveItemSchema = z
   .object({
     Description: z.string().optional().nullable(),
@@ -194,7 +183,6 @@ const UkLeaveItemSchema = z
     updatedDateUtc: z.string().optional().nullable(),
   })
   .passthrough();
-
 const UkLeaveEnvelopeSchema = z
   .object({
     Leave: z.array(UkLeaveItemSchema).optional(),
@@ -204,11 +192,14 @@ const UkLeaveEnvelopeSchema = z
   .refine((data) => Array.isArray(data.leave) || Array.isArray(data.Leave), {
     message: "Envelope must contain leave or Leave array",
   });
-
 export type MapUkLeaveRecordsResult =
-  | { ok: true; records: XeroLeaveRecord[] }
-  | { ok: false };
-
+  | {
+      ok: true;
+      records: XeroLeaveRecord[];
+    }
+  | {
+      ok: false;
+    };
 export function mapUkLeaveRecords(
   payload: unknown,
   employeeId: string
@@ -216,7 +207,6 @@ export function mapUkLeaveRecords(
   const result = tryMapUkLeaveRecords(payload, employeeId);
   return result.ok ? result.records : [];
 }
-
 export function tryMapUkLeaveRecords(
   payload: unknown,
   employeeId: string
@@ -225,13 +215,10 @@ export function tryMapUkLeaveRecords(
   if (!parsedEnvelope.success) {
     return { ok: false };
   }
-
   const rawItems = parsedEnvelope.data.leave ?? parsedEnvelope.data.Leave ?? [];
   const records = rawItems.map((item) => mapUkLeaveItem(item, employeeId));
-
   return { ok: true, records };
 }
-
 function mapUkLeaveItem(
   item: z.infer<typeof UkLeaveItemSchema>,
   fallbackEmployeeId: string
@@ -245,14 +232,12 @@ function mapUkLeaveItem(
           0
         )
       : (item.numberOfUnits ?? item.NumberOfUnits ?? 0);
-
   const rawStatus =
     item.status ??
     item.Status ??
     periods[0]?.periodStatus ??
     periods[0]?.PeriodStatus ??
     null;
-
   return {
     employeeId:
       text(
@@ -289,10 +274,9 @@ function mapUkLeaveItem(
     ),
   };
 }
-
 export async function fetchUkLeaveForEmployee(input: {
   xeroEmployeeId: string;
-  xeroTenant: XeroTenantForWrite;
+  xeroConnection: XeroAccessContext;
 }): Promise<
   XeroWriteResult<{
     complete: boolean;
@@ -310,48 +294,42 @@ export async function fetchUkLeaveForEmployee(input: {
       ok: false,
     };
   }
-
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const response = await xeroFetch({
-      deadline: input.xeroTenant.deadline,
+      deadline: input.xeroConnection.deadline,
       init: {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${decryptedAccessToken}`,
-          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
         },
         method: "GET",
       },
       rateClass: {
         kind: "tenant",
         providerAppId: keys().XERO_CLIENT_ID ?? "",
-        xeroTenantId: input.xeroTenant.xero_tenant_id,
+        xeroTenantId: input.xeroConnection.xero_tenant_id,
       },
-      url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(
-        employeeId
-      )}/leave`,
+      url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(employeeId)}/leave`,
     });
     const rawPayload = await readXeroPayload(response);
-
     if (!response.ok) {
       return {
         error: mapXeroReadHttpError(response, rawPayload),
         ok: false,
       };
     }
-
     const mapped = tryMapUkLeaveRecords(rawPayload, employeeId);
     if (!mapped.ok) {
       log.warn("Xero UK employee leave payload could not be parsed", {
-        clerkOrgId: input.xeroTenant.clerk_org_id,
+        clerkOrgId: input.xeroConnection.clerk_org_id,
         employeeId,
-        organisationId: input.xeroTenant.organisation_id,
+        organisationId: input.xeroConnection.organisation_id,
       });
       return {
         ok: true,
@@ -362,7 +340,6 @@ export async function fetchUkLeaveForEmployee(input: {
         },
       };
     }
-
     return {
       ok: true,
       value: {
@@ -378,9 +355,7 @@ export async function fetchUkLeaveForEmployee(input: {
     };
   }
 }
-
 export const fetchLeaveForEmployee = fetchUkLeaveForEmployee;
-
 const UkLeaveBalanceItemSchema = z
   .object({
     Balance: z.number().optional().nullable(),
@@ -404,7 +379,6 @@ const UkLeaveBalanceItemSchema = z
     typeOfUnits: z.string().optional().nullable(),
   })
   .passthrough();
-
 const UkLeaveBalancesEnvelopeSchema = z
   .object({
     LeaveBalances: z.array(UkLeaveBalanceItemSchema).optional(),
@@ -416,11 +390,14 @@ const UkLeaveBalancesEnvelopeSchema = z
       Array.isArray(data.leaveBalances) || Array.isArray(data.LeaveBalances),
     { message: "Envelope must contain leaveBalances or LeaveBalances array" }
   );
-
 export type MapUkLeaveBalancesResult =
-  | { ok: true; leaveBalances: XeroLeaveBalance[] }
-  | { ok: false };
-
+  | {
+      ok: true;
+      leaveBalances: XeroLeaveBalance[];
+    }
+  | {
+      ok: false;
+    };
 export function mapUkLeaveBalances(
   payload: unknown,
   employeeId: string
@@ -428,7 +405,6 @@ export function mapUkLeaveBalances(
   const result = tryMapUkLeaveBalances(payload, employeeId);
   return result.ok ? result.leaveBalances : [];
 }
-
 export function tryMapUkLeaveBalances(
   payload: unknown,
   employeeId: string
@@ -437,12 +413,10 @@ export function tryMapUkLeaveBalances(
   if (!parsedEnvelope.success) {
     return { ok: false };
   }
-
   const rawItems =
     parsedEnvelope.data.leaveBalances ??
     parsedEnvelope.data.LeaveBalances ??
     [];
-
   const leaveBalances: XeroLeaveBalance[] = [];
   for (const item of rawItems) {
     const normalised = normaliseUkUnitTypeAndCurrency(
@@ -453,14 +427,12 @@ export function tryMapUkLeaveBalances(
       // UK monetary or unsupported units fail closed without an explicit documented mapping.
       return { ok: false };
     }
-
     const balance =
       item.numberOfUnits ??
       item.NumberOfUnits ??
       item.balance ??
       item.Balance ??
       0;
-
     leaveBalances.push({
       balance,
       currencyCode: normalised.currencyCode,
@@ -478,10 +450,8 @@ export function tryMapUkLeaveBalances(
       unitType: normalised.unitType,
     });
   }
-
   return { leaveBalances, ok: true };
 }
-
 function normaliseUkUnitTypeAndCurrency(
   typeOfUnitsRaw: string | null | undefined,
   currencyCodeRaw: string | null | undefined
@@ -496,7 +466,6 @@ function normaliseUkUnitTypeAndCurrency(
     // Do not infer GBP or accept currency codes. Fail closed.
     return { currencyCode: null, ok: false, unitType: null };
   }
-
   const normalised = text(typeOfUnitsRaw).toLowerCase();
   if (!normalised) {
     return { currencyCode: null, ok: true, unitType: null };
@@ -510,10 +479,9 @@ function normaliseUkUnitTypeAndCurrency(
   // Any monetary unit (e.g. "pound", "pounds", "gbp", "dollars", "currency") or unknown unit fails closed:
   return { currencyCode: null, ok: false, unitType: null };
 }
-
 export async function fetchUkLeaveBalancesForEmployee(input: {
   xeroEmployeeId: string;
-  xeroTenant: XeroTenantForWrite;
+  xeroConnection: XeroAccessContext;
 }): Promise<
   XeroWriteResult<{
     leaveBalances: XeroLeaveBalance[];
@@ -531,48 +499,42 @@ export async function fetchUkLeaveBalancesForEmployee(input: {
       ok: false,
     };
   }
-
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const response = await xeroFetch({
-      deadline: input.xeroTenant.deadline,
+      deadline: input.xeroConnection.deadline,
       init: {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${decryptedAccessToken}`,
-          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
         },
         method: "GET",
       },
       rateClass: {
         kind: "tenant",
         providerAppId: keys().XERO_CLIENT_ID ?? "",
-        xeroTenantId: input.xeroTenant.xero_tenant_id,
+        xeroTenantId: input.xeroConnection.xero_tenant_id,
       },
-      url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(
-        employeeId
-      )}/leaveBalances`,
+      url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(employeeId)}/leaveBalances`,
     });
     const rawPayload = await readXeroPayload(response);
-
     if (!response.ok) {
       return {
         error: mapXeroReadHttpError(response, rawPayload),
         ok: false,
       };
     }
-
     const mapped = tryMapUkLeaveBalances(rawPayload, employeeId);
     if (!mapped.ok) {
       log.warn("Xero UK employee leave balances payload could not be parsed", {
-        clerkOrgId: input.xeroTenant.clerk_org_id,
+        clerkOrgId: input.xeroConnection.clerk_org_id,
         employeeId,
-        organisationId: input.xeroTenant.organisation_id,
+        organisationId: input.xeroConnection.organisation_id,
       });
       return {
         error: {
@@ -583,7 +545,6 @@ export async function fetchUkLeaveBalancesForEmployee(input: {
         ok: false,
       };
     }
-
     return {
       ok: true,
       value: {
@@ -598,15 +559,12 @@ export async function fetchUkLeaveBalancesForEmployee(input: {
     };
   }
 }
-
 export const fetchLeaveBalancesForEmployee = fetchUkLeaveBalancesForEmployee;
-
 export async function fetchUkLeaveApplicationStatus(
   input: FetchUkLeaveApplicationStatusInput
 ): Promise<XeroWriteResult<XeroLeaveApplicationStatusResult>> {
   const employeeId = text(input.xeroEmployeeId);
   const leaveApplicationId = text(input.xeroLeaveApplicationId);
-
   if (!(employeeId && leaveApplicationId)) {
     return {
       error: {
@@ -617,42 +575,36 @@ export async function fetchUkLeaveApplicationStatus(
       ok: false,
     };
   }
-
-  const tokenResult = resolveAccessToken(input.xeroTenant);
+  const tokenResult = resolveAccessToken(input.xeroConnection);
   if (!tokenResult.ok) {
     return tokenResult;
   }
   const decryptedAccessToken = tokenResult.token;
-
   try {
     const response = await xeroFetch({
-      deadline: input.xeroTenant.deadline,
+      deadline: input.xeroConnection.deadline,
       init: {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${decryptedAccessToken}`,
-          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
         },
         method: "GET",
       },
       rateClass: {
         kind: "tenant",
         providerAppId: keys().XERO_CLIENT_ID ?? "",
-        xeroTenantId: input.xeroTenant.xero_tenant_id,
+        xeroTenantId: input.xeroConnection.xero_tenant_id,
       },
-      url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(
-        employeeId
-      )}/leave/${encodeURIComponent(leaveApplicationId)}`,
+      url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(employeeId)}/leave/${encodeURIComponent(leaveApplicationId)}`,
     });
     const rawPayload = await readXeroPayload(response);
-
     if (!response.ok) {
       return {
         error: mapXeroReadHttpError(response, rawPayload),
         ok: false,
       };
     }
-
     return { ok: true, value: mapLeaveApplicationStatus(rawPayload) };
   } catch (error) {
     return {
@@ -661,7 +613,6 @@ export async function fetchUkLeaveApplicationStatus(
     };
   }
 }
-
 export async function fetchLeaveApplicationStatus(
   input: FetchLeaveApplicationStatusInput
 ): Promise<XeroWriteResult<XeroLeaveApplicationStatusResult>> {
@@ -678,15 +629,19 @@ export async function fetchLeaveApplicationStatus(
     input as FetchUkLeaveApplicationStatusInput
   );
 }
-
 function baseUrl(): string {
   return keys().XERO_API_BASE_URL ?? XERO_DEFAULT_BASE_URL;
 }
-
-function resolveAccessToken(
-  xeroTenant: XeroTenantForWrite
-): { ok: true; token: string } | { ok: false; error: XeroWriteError } {
-  if (!xeroTenant.accessToken) {
+function resolveAccessToken(xeroConnection: XeroAccessContext):
+  | {
+      ok: true;
+      token: string;
+    }
+  | {
+      ok: false;
+      error: XeroWriteError;
+    } {
+  if (!xeroConnection.accessToken) {
     return {
       error: {
         code: "unknown_error",
@@ -697,18 +652,15 @@ function resolveAccessToken(
       ok: false,
     };
   }
-  return { ok: true, token: xeroTenant.accessToken };
+  return { ok: true, token: xeroConnection.accessToken };
 }
-
 function text(value: string | null | undefined): string {
   return typeof value === "string" ? value.trim() : "";
 }
-
 function nullableText(value: string | null | undefined): string | null {
   const normalised = text(value);
   return normalised.length > 0 ? normalised : null;
 }
-
 function normaliseUkStatus(
   value: string | null | undefined
 ): XeroLeaveRecordStatus {

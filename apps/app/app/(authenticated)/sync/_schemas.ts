@@ -40,19 +40,19 @@ const optionalDateOnly = z.preprocess(
 );
 
 export const SyncRunFiltersSchema = z.object({
+  connectionId: csvArray(z.string().uuid()),
   cursor: z.string().optional(),
   dateFrom: optionalDateOnly,
   dateTo: optionalDateOnly,
   runType: csvArray(z.enum(syncRunTypes)),
   status: csvArray(z.enum(syncRunStatuses)),
   triggerType: csvArray(z.enum(syncTriggerTypes)),
-  xeroTenantId: csvArray(z.string().uuid()),
 });
 
 export const DispatchManualSyncActionSchema = z.object({
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   runType: z.enum(syncRunTypes),
-  xeroTenantId: z.string().uuid(),
 });
 
 export const CancelRunActionSchema = z.object({

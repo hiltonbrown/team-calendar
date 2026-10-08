@@ -28,23 +28,19 @@ import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { type CalendarFilterInput, CalendarFilterSchema } from "./_schemas";
 import { CalendarRetryButton } from "./calendar-retry-button";
-
 export const metadata: Metadata = {
   description: "View team leave, availability and public holidays.",
   title: "Calendar - Team Calendar",
 };
-
 interface CalendarPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
-
 const defaultCalendarFilters: CalendarFilterInput = {
   includeDrafts: false,
   recordTypeCategory: "all",
   surface: "calendar",
   view: "week",
 };
-
 async function loadCalendarResources(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
@@ -54,7 +50,7 @@ async function loadCalendarResources(
   role: CalendarRole,
   scope: CalendarScope
 ) {
-  const [organisation, teams, locations, xeroTenant] = await Promise.all([
+  const [organisation, teams, locations, xeroConnection] = await Promise.all([
     database.organisation.findFirst({
       select: { name: true, timezone: true },
       where: {
@@ -73,7 +69,7 @@ async function loadCalendarResources(
       select: { id: true, name: true },
       where: scopedQuery(clerkOrgId, organisationId),
     }),
-    database.xeroTenant.findFirst({
+    database.xeroConnection.findFirst({
       select: {
         last_leave_records_sync_at: true,
         last_sync_error_message: true,
@@ -92,7 +88,6 @@ async function loadCalendarResources(
   const anchorDate = parsedFilters.anchor
     ? new Date(`${parsedFilters.anchor}T12:00:00.000Z`)
     : new Date();
-
   const dataResult = await getCalendarRange({
     actingPersonId,
     actingUserId: userId,
@@ -111,20 +106,17 @@ async function loadCalendarResources(
     scope,
     view: parsedFilters.view,
   });
-
   return {
     dataResult,
     locations,
     organisation,
     teams,
     timezone,
-    xeroTenant,
+    xeroConnection,
   };
 }
-
 const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   await requirePageRole("org:viewer");
-
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
@@ -138,7 +130,6 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   if (!user) {
     redirect("/");
   }
-
   const role = calendarRole(orgRole);
   const currentPerson = await database.person.findFirst({
     select: { id: true },
@@ -158,18 +149,22 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
       )
     );
   }
-
-  const { dataResult, locations, organisation, teams, timezone, xeroTenant } =
-    await loadCalendarResources(
-      clerkOrgId,
-      organisationId,
-      user.id,
-      currentPerson?.id ?? null,
-      parsedFilters,
-      role,
-      scope.value
-    );
-
+  const {
+    dataResult,
+    locations,
+    organisation,
+    teams,
+    timezone,
+    xeroConnection,
+  } = await loadCalendarResources(
+    clerkOrgId,
+    organisationId,
+    user.id,
+    currentPerson?.id ?? null,
+    parsedFilters,
+    role,
+    scope.value
+  );
   if (!dataResult.ok) {
     if (dataResult.error.code === "invalid_scope") {
       redirect(
@@ -191,7 +186,6 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
       </>
     );
   }
-
   const calendarFilters: CalendarFilterInput = {
     ...parsedFilters,
     scopeType: scope.value.type,
@@ -199,7 +193,6 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   };
   const selectedPersonId =
     scope.value.type === "person" ? scope.value.value : null;
-
   return (
     <>
       <Header page="Calendar" />
@@ -208,14 +201,16 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
         {dataResult.value.xeroConnectionState === "connected" ? (
           <CalendarSyncStatus
             businessName={
-              xeroTenant?.tenant_name ?? organisation?.name ?? "Xero"
+              xeroConnection?.tenant_name ?? organisation?.name ?? "Xero"
             }
             isPersonalUnlinked={currentPerson === null}
-            isStale={Boolean(xeroTenant?.leave_records_stale_since)}
-            isSyncPaused={Boolean(xeroTenant?.sync_paused_at)}
-            lastLeaveRefresh={xeroTenant?.last_leave_records_sync_at ?? null}
+            isStale={Boolean(xeroConnection?.leave_records_stale_since)}
+            isSyncPaused={Boolean(xeroConnection?.sync_paused_at)}
+            lastLeaveRefresh={
+              xeroConnection?.last_leave_records_sync_at ?? null
+            }
             orgQueryValue={orgQueryValue}
-            syncError={xeroTenant?.last_sync_error_message ?? null}
+            syncError={xeroConnection?.last_sync_error_message ?? null}
           />
         ) : (
           <DisconnectedXeroBanner
@@ -266,13 +261,21 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
     </>
   );
 };
-
 export default CalendarPage;
-
 function resolveScope(
-  filters: { scopeType?: string; scopeValue?: string },
+  filters: {
+    scopeType?: string;
+    scopeValue?: string;
+  },
   defaultScopeType: CalendarScope["type"]
-): { ok: true; value: CalendarScope } | { ok: false } {
+):
+  | {
+      ok: true;
+      value: CalendarScope;
+    }
+  | {
+      ok: false;
+    } {
   const scopeType = filters.scopeType ?? defaultScopeType;
   if (scopeType === "team" || scopeType === "person") {
     return filters.scopeValue
@@ -288,7 +291,6 @@ function resolveScope(
   }
   return { ok: false };
 }
-
 function DisconnectedXeroBanner({
   canConnect,
   orgQueryValue,
@@ -318,7 +320,6 @@ function DisconnectedXeroBanner({
     </div>
   );
 }
-
 function renderCalendarView({
   actingPersonId,
   data,
@@ -352,7 +353,6 @@ function renderCalendarView({
     />
   );
 }
-
 function calendarRole(role: string | null | undefined): CalendarRole {
   if (role === "org:owner") {
     return "owner";
@@ -365,7 +365,6 @@ function calendarRole(role: string | null | undefined): CalendarRole {
   }
   return "viewer";
 }
-
 function defaultScopeForRole(role: CalendarRole): CalendarScope["type"] {
   if (role === "admin" || role === "owner") {
     return "all_teams";
@@ -375,7 +374,6 @@ function defaultScopeForRole(role: CalendarRole): CalendarScope["type"] {
   }
   return "my_self";
 }
-
 function dateOnlyInTimeZone(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     day: "2-digit",

@@ -20,44 +20,47 @@ export type XeroConnectionModel = runtime.Types.Result.DefaultSelection<Prisma.$
 
 export type AggregateXeroConnection = {
   _count: XeroConnectionCountAggregateOutputType | null
-  _avg: XeroConnectionAvgAggregateOutputType | null
-  _sum: XeroConnectionSumAggregateOutputType | null
   _min: XeroConnectionMinAggregateOutputType | null
   _max: XeroConnectionMaxAggregateOutputType | null
-}
-
-export type XeroConnectionAvgAggregateOutputType = {
-  token_key_version: number | null
-}
-
-export type XeroConnectionSumAggregateOutputType = {
-  token_key_version: number | null
 }
 
 export type XeroConnectionMinAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
+  xero_authorisation_id: string | null
+  xero_tenant_id: string | null
+  remote_connection_id: string | null
+  tenant_name: string | null
+  tenant_type: string | null
+  auth_event_id: string | null
+  payroll_region: $Enums.payroll_region | null
   status: $Enums.xero_connection_status | null
-  access_token_encrypted: string | null
-  access_token_iv: string | null
-  access_token_auth_tag: string | null
-  refresh_token_encrypted: string | null
-  refresh_token_iv: string | null
-  refresh_token_auth_tag: string | null
-  xero_authorisation_connection_id: string | null
-  token_key_version: number | null
-  token_encrypted_at: Date | null
-  expires_at: Date | null
-  last_refreshed_at: Date | null
+  sync_paused_at: Date | null
   last_connected_at: Date | null
   last_disconnected_at: Date | null
-  last_error_code: string | null
-  last_error_message: string | null
-  stale_since: Date | null
-  revoked_at: Date | null
   disconnected_at: Date | null
   disconnected_by_user_id: string | null
+  last_error_code: string | null
+  last_error_message: string | null
+  last_people_sync_at: Date | null
+  last_leave_records_sync_at: Date | null
+  last_leave_balances_sync_at: Date | null
+  last_approval_state_reconciled_at: Date | null
+  people_stale_since: Date | null
+  leave_records_stale_since: Date | null
+  leave_balances_stale_since: Date | null
+  approval_state_stale_since: Date | null
+  last_sync_error_code: string | null
+  last_sync_error_message: string | null
+  initial_sync_requested_at: Date | null
+  initial_sync_completed_at: Date | null
+  last_full_people_sync_at: Date | null
+  last_full_leave_records_sync_at: Date | null
+  balance_next_person_id: string | null
+  balance_sweep_failed: boolean | null
+  leave_next_person_id: string | null
+  leave_sweep_failed: boolean | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -66,26 +69,39 @@ export type XeroConnectionMaxAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
+  xero_authorisation_id: string | null
+  xero_tenant_id: string | null
+  remote_connection_id: string | null
+  tenant_name: string | null
+  tenant_type: string | null
+  auth_event_id: string | null
+  payroll_region: $Enums.payroll_region | null
   status: $Enums.xero_connection_status | null
-  access_token_encrypted: string | null
-  access_token_iv: string | null
-  access_token_auth_tag: string | null
-  refresh_token_encrypted: string | null
-  refresh_token_iv: string | null
-  refresh_token_auth_tag: string | null
-  xero_authorisation_connection_id: string | null
-  token_key_version: number | null
-  token_encrypted_at: Date | null
-  expires_at: Date | null
-  last_refreshed_at: Date | null
+  sync_paused_at: Date | null
   last_connected_at: Date | null
   last_disconnected_at: Date | null
-  last_error_code: string | null
-  last_error_message: string | null
-  stale_since: Date | null
-  revoked_at: Date | null
   disconnected_at: Date | null
   disconnected_by_user_id: string | null
+  last_error_code: string | null
+  last_error_message: string | null
+  last_people_sync_at: Date | null
+  last_leave_records_sync_at: Date | null
+  last_leave_balances_sync_at: Date | null
+  last_approval_state_reconciled_at: Date | null
+  people_stale_since: Date | null
+  leave_records_stale_since: Date | null
+  leave_balances_stale_since: Date | null
+  approval_state_stale_since: Date | null
+  last_sync_error_code: string | null
+  last_sync_error_message: string | null
+  initial_sync_requested_at: Date | null
+  initial_sync_completed_at: Date | null
+  last_full_people_sync_at: Date | null
+  last_full_leave_records_sync_at: Date | null
+  balance_next_person_id: string | null
+  balance_sweep_failed: boolean | null
+  leave_next_person_id: string | null
+  leave_sweep_failed: boolean | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -94,64 +110,82 @@ export type XeroConnectionCountAggregateOutputType = {
   id: number
   clerk_org_id: number
   organisation_id: number
+  xero_authorisation_id: number
+  xero_tenant_id: number
+  remote_connection_id: number
+  tenant_name: number
+  tenant_type: number
+  auth_event_id: number
+  payroll_region: number
   status: number
-  access_token_encrypted: number
-  access_token_iv: number
-  access_token_auth_tag: number
-  refresh_token_encrypted: number
-  refresh_token_iv: number
-  refresh_token_auth_tag: number
-  xero_authorisation_connection_id: number
-  token_key_version: number
-  token_encrypted_at: number
-  expires_at: number
-  last_refreshed_at: number
+  sync_paused_at: number
   last_connected_at: number
   last_disconnected_at: number
-  last_error_code: number
-  last_error_message: number
-  stale_since: number
-  revoked_at: number
   disconnected_at: number
   disconnected_by_user_id: number
+  last_error_code: number
+  last_error_message: number
+  last_people_sync_at: number
+  last_leave_records_sync_at: number
+  last_leave_balances_sync_at: number
+  last_approval_state_reconciled_at: number
+  people_stale_since: number
+  leave_records_stale_since: number
+  leave_balances_stale_since: number
+  approval_state_stale_since: number
+  last_sync_error_code: number
+  last_sync_error_message: number
+  initial_sync_requested_at: number
+  initial_sync_completed_at: number
+  last_full_people_sync_at: number
+  last_full_leave_records_sync_at: number
+  balance_next_person_id: number
+  balance_sweep_failed: number
+  leave_next_person_id: number
+  leave_sweep_failed: number
   created_at: number
   updated_at: number
   _all: number
 }
 
 
-export type XeroConnectionAvgAggregateInputType = {
-  token_key_version?: true
-}
-
-export type XeroConnectionSumAggregateInputType = {
-  token_key_version?: true
-}
-
 export type XeroConnectionMinAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
+  xero_authorisation_id?: true
+  xero_tenant_id?: true
+  remote_connection_id?: true
+  tenant_name?: true
+  tenant_type?: true
+  auth_event_id?: true
+  payroll_region?: true
   status?: true
-  access_token_encrypted?: true
-  access_token_iv?: true
-  access_token_auth_tag?: true
-  refresh_token_encrypted?: true
-  refresh_token_iv?: true
-  refresh_token_auth_tag?: true
-  xero_authorisation_connection_id?: true
-  token_key_version?: true
-  token_encrypted_at?: true
-  expires_at?: true
-  last_refreshed_at?: true
+  sync_paused_at?: true
   last_connected_at?: true
   last_disconnected_at?: true
-  last_error_code?: true
-  last_error_message?: true
-  stale_since?: true
-  revoked_at?: true
   disconnected_at?: true
   disconnected_by_user_id?: true
+  last_error_code?: true
+  last_error_message?: true
+  last_people_sync_at?: true
+  last_leave_records_sync_at?: true
+  last_leave_balances_sync_at?: true
+  last_approval_state_reconciled_at?: true
+  people_stale_since?: true
+  leave_records_stale_since?: true
+  leave_balances_stale_since?: true
+  approval_state_stale_since?: true
+  last_sync_error_code?: true
+  last_sync_error_message?: true
+  initial_sync_requested_at?: true
+  initial_sync_completed_at?: true
+  last_full_people_sync_at?: true
+  last_full_leave_records_sync_at?: true
+  balance_next_person_id?: true
+  balance_sweep_failed?: true
+  leave_next_person_id?: true
+  leave_sweep_failed?: true
   created_at?: true
   updated_at?: true
 }
@@ -160,26 +194,39 @@ export type XeroConnectionMaxAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
+  xero_authorisation_id?: true
+  xero_tenant_id?: true
+  remote_connection_id?: true
+  tenant_name?: true
+  tenant_type?: true
+  auth_event_id?: true
+  payroll_region?: true
   status?: true
-  access_token_encrypted?: true
-  access_token_iv?: true
-  access_token_auth_tag?: true
-  refresh_token_encrypted?: true
-  refresh_token_iv?: true
-  refresh_token_auth_tag?: true
-  xero_authorisation_connection_id?: true
-  token_key_version?: true
-  token_encrypted_at?: true
-  expires_at?: true
-  last_refreshed_at?: true
+  sync_paused_at?: true
   last_connected_at?: true
   last_disconnected_at?: true
-  last_error_code?: true
-  last_error_message?: true
-  stale_since?: true
-  revoked_at?: true
   disconnected_at?: true
   disconnected_by_user_id?: true
+  last_error_code?: true
+  last_error_message?: true
+  last_people_sync_at?: true
+  last_leave_records_sync_at?: true
+  last_leave_balances_sync_at?: true
+  last_approval_state_reconciled_at?: true
+  people_stale_since?: true
+  leave_records_stale_since?: true
+  leave_balances_stale_since?: true
+  approval_state_stale_since?: true
+  last_sync_error_code?: true
+  last_sync_error_message?: true
+  initial_sync_requested_at?: true
+  initial_sync_completed_at?: true
+  last_full_people_sync_at?: true
+  last_full_leave_records_sync_at?: true
+  balance_next_person_id?: true
+  balance_sweep_failed?: true
+  leave_next_person_id?: true
+  leave_sweep_failed?: true
   created_at?: true
   updated_at?: true
 }
@@ -188,26 +235,39 @@ export type XeroConnectionCountAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
+  xero_authorisation_id?: true
+  xero_tenant_id?: true
+  remote_connection_id?: true
+  tenant_name?: true
+  tenant_type?: true
+  auth_event_id?: true
+  payroll_region?: true
   status?: true
-  access_token_encrypted?: true
-  access_token_iv?: true
-  access_token_auth_tag?: true
-  refresh_token_encrypted?: true
-  refresh_token_iv?: true
-  refresh_token_auth_tag?: true
-  xero_authorisation_connection_id?: true
-  token_key_version?: true
-  token_encrypted_at?: true
-  expires_at?: true
-  last_refreshed_at?: true
+  sync_paused_at?: true
   last_connected_at?: true
   last_disconnected_at?: true
-  last_error_code?: true
-  last_error_message?: true
-  stale_since?: true
-  revoked_at?: true
   disconnected_at?: true
   disconnected_by_user_id?: true
+  last_error_code?: true
+  last_error_message?: true
+  last_people_sync_at?: true
+  last_leave_records_sync_at?: true
+  last_leave_balances_sync_at?: true
+  last_approval_state_reconciled_at?: true
+  people_stale_since?: true
+  leave_records_stale_since?: true
+  leave_balances_stale_since?: true
+  approval_state_stale_since?: true
+  last_sync_error_code?: true
+  last_sync_error_message?: true
+  initial_sync_requested_at?: true
+  initial_sync_completed_at?: true
+  last_full_people_sync_at?: true
+  last_full_leave_records_sync_at?: true
+  balance_next_person_id?: true
+  balance_sweep_failed?: true
+  leave_next_person_id?: true
+  leave_sweep_failed?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -251,18 +311,6 @@ export type XeroConnectionAggregateArgs<ExtArgs extends runtime.Types.Extensions
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
-   * Select which fields to average
-  **/
-  _avg?: XeroConnectionAvgAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
-   * Select which fields to sum
-  **/
-  _sum?: XeroConnectionSumAggregateInputType
-  /**
-   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
    * Select which fields to find the minimum value
   **/
   _min?: XeroConnectionMinAggregateInputType
@@ -293,8 +341,6 @@ export type XeroConnectionGroupByArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   _count?: XeroConnectionCountAggregateInputType | true
-  _avg?: XeroConnectionAvgAggregateInputType
-  _sum?: XeroConnectionSumAggregateInputType
   _min?: XeroConnectionMinAggregateInputType
   _max?: XeroConnectionMaxAggregateInputType
 }
@@ -303,31 +349,42 @@ export type XeroConnectionGroupByOutputType = {
   id: string
   clerk_org_id: string
   organisation_id: string
+  xero_authorisation_id: string | null
+  xero_tenant_id: string
+  remote_connection_id: string | null
+  tenant_name: string | null
+  tenant_type: string | null
+  auth_event_id: string | null
+  payroll_region: $Enums.payroll_region
   status: $Enums.xero_connection_status
-  access_token_encrypted: string
-  access_token_iv: string | null
-  access_token_auth_tag: string | null
-  refresh_token_encrypted: string
-  refresh_token_iv: string | null
-  refresh_token_auth_tag: string | null
-  xero_authorisation_connection_id: string | null
-  token_key_version: number
-  token_encrypted_at: Date | null
-  expires_at: Date
-  last_refreshed_at: Date | null
+  sync_paused_at: Date | null
   last_connected_at: Date | null
   last_disconnected_at: Date | null
-  last_error_code: string | null
-  last_error_message: string | null
-  stale_since: Date | null
-  revoked_at: Date | null
   disconnected_at: Date | null
   disconnected_by_user_id: string | null
+  last_error_code: string | null
+  last_error_message: string | null
+  last_people_sync_at: Date | null
+  last_leave_records_sync_at: Date | null
+  last_leave_balances_sync_at: Date | null
+  last_approval_state_reconciled_at: Date | null
+  people_stale_since: Date | null
+  leave_records_stale_since: Date | null
+  leave_balances_stale_since: Date | null
+  approval_state_stale_since: Date | null
+  last_sync_error_code: string | null
+  last_sync_error_message: string | null
+  initial_sync_requested_at: Date | null
+  initial_sync_completed_at: Date | null
+  last_full_people_sync_at: Date | null
+  last_full_leave_records_sync_at: Date | null
+  balance_next_person_id: string | null
+  balance_sweep_failed: boolean
+  leave_next_person_id: string | null
+  leave_sweep_failed: boolean
   created_at: Date
   updated_at: Date
   _count: XeroConnectionCountAggregateOutputType | null
-  _avg: XeroConnectionAvgAggregateOutputType | null
-  _sum: XeroConnectionSumAggregateOutputType | null
   _min: XeroConnectionMinAggregateOutputType | null
   _max: XeroConnectionMaxAggregateOutputType | null
 }
@@ -354,126 +411,187 @@ export type XeroConnectionWhereInput = {
   id?: Prisma.UuidFilter<"XeroConnection"> | string
   clerk_org_id?: Prisma.StringFilter<"XeroConnection"> | string
   organisation_id?: Prisma.UuidFilter<"XeroConnection"> | string
+  xero_authorisation_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  xero_tenant_id?: Prisma.StringFilter<"XeroConnection"> | string
+  remote_connection_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  tenant_name?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  tenant_type?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  auth_event_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFilter<"XeroConnection"> | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFilter<"XeroConnection"> | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFilter<"XeroConnection"> | string
-  access_token_iv?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  access_token_auth_tag?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  refresh_token_encrypted?: Prisma.StringFilter<"XeroConnection"> | string
-  refresh_token_iv?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  refresh_token_auth_tag?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  xero_authorisation_connection_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  token_key_version?: Prisma.IntFilter<"XeroConnection"> | number
-  token_encrypted_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
-  expires_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
-  last_refreshed_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  sync_paused_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
-  last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  last_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
-  revoked_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_leave_balances_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  people_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  leave_records_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  leave_balances_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  approval_state_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_sync_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_sync_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  initial_sync_requested_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  initial_sync_completed_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_full_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  balance_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
+  leave_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-  xero_tenant?: Prisma.XOR<Prisma.XeroTenantNullableScalarRelationFilter, Prisma.XeroTenantWhereInput> | null
+  authorisation?: Prisma.XOR<Prisma.XeroAuthorisationNullableScalarRelationFilter, Prisma.XeroAuthorisationWhereInput> | null
+  sync_cursors?: Prisma.XeroSyncCursorListRelationFilter
+  leave_balances?: Prisma.LeaveBalanceListRelationFilter
+  sync_runs?: Prisma.SyncRunListRelationFilter
 }
 
 export type XeroConnectionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_authorisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrder
+  remote_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  tenant_name?: Prisma.SortOrderInput | Prisma.SortOrder
+  tenant_type?: Prisma.SortOrderInput | Prisma.SortOrder
+  auth_event_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  payroll_region?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  access_token_encrypted?: Prisma.SortOrder
-  access_token_iv?: Prisma.SortOrderInput | Prisma.SortOrder
-  access_token_auth_tag?: Prisma.SortOrderInput | Prisma.SortOrder
-  refresh_token_encrypted?: Prisma.SortOrder
-  refresh_token_iv?: Prisma.SortOrderInput | Prisma.SortOrder
-  refresh_token_auth_tag?: Prisma.SortOrderInput | Prisma.SortOrder
-  xero_authorisation_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
-  token_key_version?: Prisma.SortOrder
-  token_encrypted_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  expires_at?: Prisma.SortOrder
-  last_refreshed_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  sync_paused_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_connected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  last_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
-  last_error_message?: Prisma.SortOrderInput | Prisma.SortOrder
-  stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
-  revoked_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_error_message?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_people_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_leave_records_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_leave_balances_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_approval_state_reconciled_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  people_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_records_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_balances_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  approval_state_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_sync_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_sync_error_message?: Prisma.SortOrderInput | Prisma.SortOrder
+  initial_sync_requested_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  initial_sync_completed_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_full_people_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_full_leave_records_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  balance_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
+  leave_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
-  xero_tenant?: Prisma.XeroTenantOrderByWithRelationInput
+  authorisation?: Prisma.XeroAuthorisationOrderByWithRelationInput
+  sync_cursors?: Prisma.XeroSyncCursorOrderByRelationAggregateInput
+  leave_balances?: Prisma.LeaveBalanceOrderByRelationAggregateInput
+  sync_runs?: Prisma.SyncRunOrderByRelationAggregateInput
 }
 
 export type XeroConnectionWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   organisation_id?: string
+  xero_tenant_id?: string
+  remote_connection_id?: string
+  id_clerk_org_id_organisation_id?: Prisma.XeroConnectionIdClerk_org_idOrganisation_idCompoundUniqueInput
+  organisation_id_clerk_org_id?: Prisma.XeroConnectionOrganisation_idClerk_org_idCompoundUniqueInput
   AND?: Prisma.XeroConnectionWhereInput | Prisma.XeroConnectionWhereInput[]
   OR?: Prisma.XeroConnectionWhereInput[]
   NOT?: Prisma.XeroConnectionWhereInput | Prisma.XeroConnectionWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"XeroConnection"> | string
+  xero_authorisation_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  tenant_name?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  tenant_type?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  auth_event_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFilter<"XeroConnection"> | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFilter<"XeroConnection"> | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFilter<"XeroConnection"> | string
-  access_token_iv?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  access_token_auth_tag?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  refresh_token_encrypted?: Prisma.StringFilter<"XeroConnection"> | string
-  refresh_token_iv?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  refresh_token_auth_tag?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  xero_authorisation_connection_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  token_key_version?: Prisma.IntFilter<"XeroConnection"> | number
-  token_encrypted_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
-  expires_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
-  last_refreshed_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  sync_paused_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
-  last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  last_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
-  stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
-  revoked_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_leave_balances_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  people_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  leave_records_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  leave_balances_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  approval_state_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_sync_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_sync_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  initial_sync_requested_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  initial_sync_completed_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_full_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  balance_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
+  leave_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-  xero_tenant?: Prisma.XOR<Prisma.XeroTenantNullableScalarRelationFilter, Prisma.XeroTenantWhereInput> | null
-}, "id" | "organisation_id">
+  authorisation?: Prisma.XOR<Prisma.XeroAuthorisationNullableScalarRelationFilter, Prisma.XeroAuthorisationWhereInput> | null
+  sync_cursors?: Prisma.XeroSyncCursorListRelationFilter
+  leave_balances?: Prisma.LeaveBalanceListRelationFilter
+  sync_runs?: Prisma.SyncRunListRelationFilter
+}, "id" | "organisation_id" | "xero_tenant_id" | "remote_connection_id" | "id_clerk_org_id_organisation_id" | "organisation_id_clerk_org_id">
 
 export type XeroConnectionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_authorisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrder
+  remote_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  tenant_name?: Prisma.SortOrderInput | Prisma.SortOrder
+  tenant_type?: Prisma.SortOrderInput | Prisma.SortOrder
+  auth_event_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  payroll_region?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  access_token_encrypted?: Prisma.SortOrder
-  access_token_iv?: Prisma.SortOrderInput | Prisma.SortOrder
-  access_token_auth_tag?: Prisma.SortOrderInput | Prisma.SortOrder
-  refresh_token_encrypted?: Prisma.SortOrder
-  refresh_token_iv?: Prisma.SortOrderInput | Prisma.SortOrder
-  refresh_token_auth_tag?: Prisma.SortOrderInput | Prisma.SortOrder
-  xero_authorisation_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
-  token_key_version?: Prisma.SortOrder
-  token_encrypted_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  expires_at?: Prisma.SortOrder
-  last_refreshed_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  sync_paused_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_connected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  last_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
-  last_error_message?: Prisma.SortOrderInput | Prisma.SortOrder
-  stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
-  revoked_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_error_message?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_people_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_leave_records_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_leave_balances_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_approval_state_reconciled_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  people_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_records_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_balances_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  approval_state_stale_since?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_sync_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_sync_error_message?: Prisma.SortOrderInput | Prisma.SortOrder
+  initial_sync_requested_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  initial_sync_completed_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_full_people_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  last_full_leave_records_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  balance_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
+  leave_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.XeroConnectionCountOrderByAggregateInput
-  _avg?: Prisma.XeroConnectionAvgOrderByAggregateInput
   _max?: Prisma.XeroConnectionMaxOrderByAggregateInput
   _min?: Prisma.XeroConnectionMinOrderByAggregateInput
-  _sum?: Prisma.XeroConnectionSumOrderByAggregateInput
 }
 
 export type XeroConnectionScalarWhereWithAggregatesInput = {
@@ -483,197 +601,292 @@ export type XeroConnectionScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"XeroConnection"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"XeroConnection"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"XeroConnection"> | string
+  xero_authorisation_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  xero_tenant_id?: Prisma.StringWithAggregatesFilter<"XeroConnection"> | string
+  remote_connection_id?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  tenant_name?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  tenant_type?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  auth_event_id?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  payroll_region?: Prisma.Enumpayroll_regionWithAggregatesFilter<"XeroConnection"> | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusWithAggregatesFilter<"XeroConnection"> | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringWithAggregatesFilter<"XeroConnection"> | string
-  access_token_iv?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  access_token_auth_tag?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  refresh_token_encrypted?: Prisma.StringWithAggregatesFilter<"XeroConnection"> | string
-  refresh_token_iv?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  refresh_token_auth_tag?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  xero_authorisation_connection_id?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  token_key_version?: Prisma.IntWithAggregatesFilter<"XeroConnection"> | number
-  token_encrypted_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
-  expires_at?: Prisma.DateTimeWithAggregatesFilter<"XeroConnection"> | Date | string
-  last_refreshed_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  sync_paused_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
-  last_error_code?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  last_error_message?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
-  stale_since?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
-  revoked_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  last_error_code?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  last_error_message?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  last_people_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  last_leave_records_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  last_leave_balances_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  people_stale_since?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  leave_records_stale_since?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  leave_balances_stale_since?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  approval_state_stale_since?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  last_sync_error_code?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  last_sync_error_message?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  initial_sync_requested_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  initial_sync_completed_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  last_full_people_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  balance_next_person_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolWithAggregatesFilter<"XeroConnection"> | boolean
+  leave_next_person_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolWithAggregatesFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeWithAggregatesFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"XeroConnection"> | Date | string
 }
 
 export type XeroConnectionCreateInput = {
   id?: string
-  clerk_org_id: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
-  xero_tenant?: Prisma.XeroTenantCreateNestedOneWithoutXero_connectionInput
+  authorisation?: Prisma.XeroAuthorisationCreateNestedOneWithoutConnectionsInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_connectionInput
 }
 
 export type XeroConnectionUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_authorisation_id?: string | null
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
-  xero_tenant?: Prisma.XeroTenantUncheckedCreateNestedOneWithoutXero_connectionInput
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_connectionInput
 }
 
 export type XeroConnectionUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
-  xero_tenant?: Prisma.XeroTenantUpdateOneWithoutXero_connectionNestedInput
+  authorisation?: Prisma.XeroAuthorisationUpdateOneWithoutConnectionsNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_connectionNestedInput
 }
 
 export type XeroConnectionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_authorisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  xero_tenant?: Prisma.XeroTenantUncheckedUpdateOneWithoutXero_connectionNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_connectionNestedInput
 }
 
 export type XeroConnectionCreateManyInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_authorisation_id?: string | null
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
 }
 
 export type XeroConnectionUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -682,26 +895,39 @@ export type XeroConnectionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_authorisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -711,62 +937,105 @@ export type XeroConnectionNullableScalarRelationFilter = {
   isNot?: Prisma.XeroConnectionWhereInput | null
 }
 
+export type XeroConnectionListRelationFilter = {
+  every?: Prisma.XeroConnectionWhereInput
+  some?: Prisma.XeroConnectionWhereInput
+  none?: Prisma.XeroConnectionWhereInput
+}
+
+export type XeroConnectionOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
+}
+
+export type XeroConnectionIdClerk_org_idOrganisation_idCompoundUniqueInput = {
+  id: string
+  clerk_org_id: string
+  organisation_id: string
+}
+
+export type XeroConnectionOrganisation_idClerk_org_idCompoundUniqueInput = {
+  organisation_id: string
+  clerk_org_id: string
+}
+
 export type XeroConnectionCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_authorisation_id?: Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrder
+  remote_connection_id?: Prisma.SortOrder
+  tenant_name?: Prisma.SortOrder
+  tenant_type?: Prisma.SortOrder
+  auth_event_id?: Prisma.SortOrder
+  payroll_region?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  access_token_encrypted?: Prisma.SortOrder
-  access_token_iv?: Prisma.SortOrder
-  access_token_auth_tag?: Prisma.SortOrder
-  refresh_token_encrypted?: Prisma.SortOrder
-  refresh_token_iv?: Prisma.SortOrder
-  refresh_token_auth_tag?: Prisma.SortOrder
-  xero_authorisation_connection_id?: Prisma.SortOrder
-  token_key_version?: Prisma.SortOrder
-  token_encrypted_at?: Prisma.SortOrder
-  expires_at?: Prisma.SortOrder
-  last_refreshed_at?: Prisma.SortOrder
+  sync_paused_at?: Prisma.SortOrder
   last_connected_at?: Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrder
-  last_error_code?: Prisma.SortOrder
-  last_error_message?: Prisma.SortOrder
-  stale_since?: Prisma.SortOrder
-  revoked_at?: Prisma.SortOrder
   disconnected_at?: Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrder
+  last_error_code?: Prisma.SortOrder
+  last_error_message?: Prisma.SortOrder
+  last_people_sync_at?: Prisma.SortOrder
+  last_leave_records_sync_at?: Prisma.SortOrder
+  last_leave_balances_sync_at?: Prisma.SortOrder
+  last_approval_state_reconciled_at?: Prisma.SortOrder
+  people_stale_since?: Prisma.SortOrder
+  leave_records_stale_since?: Prisma.SortOrder
+  leave_balances_stale_since?: Prisma.SortOrder
+  approval_state_stale_since?: Prisma.SortOrder
+  last_sync_error_code?: Prisma.SortOrder
+  last_sync_error_message?: Prisma.SortOrder
+  initial_sync_requested_at?: Prisma.SortOrder
+  initial_sync_completed_at?: Prisma.SortOrder
+  last_full_people_sync_at?: Prisma.SortOrder
+  last_full_leave_records_sync_at?: Prisma.SortOrder
+  balance_next_person_id?: Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
+  leave_next_person_id?: Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
-}
-
-export type XeroConnectionAvgOrderByAggregateInput = {
-  token_key_version?: Prisma.SortOrder
 }
 
 export type XeroConnectionMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_authorisation_id?: Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrder
+  remote_connection_id?: Prisma.SortOrder
+  tenant_name?: Prisma.SortOrder
+  tenant_type?: Prisma.SortOrder
+  auth_event_id?: Prisma.SortOrder
+  payroll_region?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  access_token_encrypted?: Prisma.SortOrder
-  access_token_iv?: Prisma.SortOrder
-  access_token_auth_tag?: Prisma.SortOrder
-  refresh_token_encrypted?: Prisma.SortOrder
-  refresh_token_iv?: Prisma.SortOrder
-  refresh_token_auth_tag?: Prisma.SortOrder
-  xero_authorisation_connection_id?: Prisma.SortOrder
-  token_key_version?: Prisma.SortOrder
-  token_encrypted_at?: Prisma.SortOrder
-  expires_at?: Prisma.SortOrder
-  last_refreshed_at?: Prisma.SortOrder
+  sync_paused_at?: Prisma.SortOrder
   last_connected_at?: Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrder
-  last_error_code?: Prisma.SortOrder
-  last_error_message?: Prisma.SortOrder
-  stale_since?: Prisma.SortOrder
-  revoked_at?: Prisma.SortOrder
   disconnected_at?: Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrder
+  last_error_code?: Prisma.SortOrder
+  last_error_message?: Prisma.SortOrder
+  last_people_sync_at?: Prisma.SortOrder
+  last_leave_records_sync_at?: Prisma.SortOrder
+  last_leave_balances_sync_at?: Prisma.SortOrder
+  last_approval_state_reconciled_at?: Prisma.SortOrder
+  people_stale_since?: Prisma.SortOrder
+  leave_records_stale_since?: Prisma.SortOrder
+  leave_balances_stale_since?: Prisma.SortOrder
+  approval_state_stale_since?: Prisma.SortOrder
+  last_sync_error_code?: Prisma.SortOrder
+  last_sync_error_message?: Prisma.SortOrder
+  initial_sync_requested_at?: Prisma.SortOrder
+  initial_sync_completed_at?: Prisma.SortOrder
+  last_full_people_sync_at?: Prisma.SortOrder
+  last_full_leave_records_sync_at?: Prisma.SortOrder
+  balance_next_person_id?: Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
+  leave_next_person_id?: Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -775,32 +1044,41 @@ export type XeroConnectionMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_authorisation_id?: Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrder
+  remote_connection_id?: Prisma.SortOrder
+  tenant_name?: Prisma.SortOrder
+  tenant_type?: Prisma.SortOrder
+  auth_event_id?: Prisma.SortOrder
+  payroll_region?: Prisma.SortOrder
   status?: Prisma.SortOrder
-  access_token_encrypted?: Prisma.SortOrder
-  access_token_iv?: Prisma.SortOrder
-  access_token_auth_tag?: Prisma.SortOrder
-  refresh_token_encrypted?: Prisma.SortOrder
-  refresh_token_iv?: Prisma.SortOrder
-  refresh_token_auth_tag?: Prisma.SortOrder
-  xero_authorisation_connection_id?: Prisma.SortOrder
-  token_key_version?: Prisma.SortOrder
-  token_encrypted_at?: Prisma.SortOrder
-  expires_at?: Prisma.SortOrder
-  last_refreshed_at?: Prisma.SortOrder
+  sync_paused_at?: Prisma.SortOrder
   last_connected_at?: Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrder
-  last_error_code?: Prisma.SortOrder
-  last_error_message?: Prisma.SortOrder
-  stale_since?: Prisma.SortOrder
-  revoked_at?: Prisma.SortOrder
   disconnected_at?: Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrder
+  last_error_code?: Prisma.SortOrder
+  last_error_message?: Prisma.SortOrder
+  last_people_sync_at?: Prisma.SortOrder
+  last_leave_records_sync_at?: Prisma.SortOrder
+  last_leave_balances_sync_at?: Prisma.SortOrder
+  last_approval_state_reconciled_at?: Prisma.SortOrder
+  people_stale_since?: Prisma.SortOrder
+  leave_records_stale_since?: Prisma.SortOrder
+  leave_balances_stale_since?: Prisma.SortOrder
+  approval_state_stale_since?: Prisma.SortOrder
+  last_sync_error_code?: Prisma.SortOrder
+  last_sync_error_message?: Prisma.SortOrder
+  initial_sync_requested_at?: Prisma.SortOrder
+  initial_sync_completed_at?: Prisma.SortOrder
+  last_full_people_sync_at?: Prisma.SortOrder
+  last_full_leave_records_sync_at?: Prisma.SortOrder
+  balance_next_person_id?: Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
+  leave_next_person_id?: Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
-}
-
-export type XeroConnectionSumOrderByAggregateInput = {
-  token_key_version?: Prisma.SortOrder
 }
 
 export type XeroConnectionScalarRelationFilter = {
@@ -840,78 +1118,184 @@ export type XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.XeroConnectionUpdateToOneWithWhereWithoutOrganisationInput, Prisma.XeroConnectionUpdateWithoutOrganisationInput>, Prisma.XeroConnectionUncheckedUpdateWithoutOrganisationInput>
 }
 
+export type XeroConnectionCreateNestedManyWithoutAuthorisationInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput> | Prisma.XeroConnectionCreateWithoutAuthorisationInput[] | Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput[]
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput | Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput[]
+  createMany?: Prisma.XeroConnectionCreateManyAuthorisationInputEnvelope
+  connect?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+}
+
+export type XeroConnectionUncheckedCreateNestedManyWithoutAuthorisationInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput> | Prisma.XeroConnectionCreateWithoutAuthorisationInput[] | Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput[]
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput | Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput[]
+  createMany?: Prisma.XeroConnectionCreateManyAuthorisationInputEnvelope
+  connect?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+}
+
+export type XeroConnectionUpdateManyWithoutAuthorisationNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput> | Prisma.XeroConnectionCreateWithoutAuthorisationInput[] | Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput[]
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput | Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput[]
+  upsert?: Prisma.XeroConnectionUpsertWithWhereUniqueWithoutAuthorisationInput | Prisma.XeroConnectionUpsertWithWhereUniqueWithoutAuthorisationInput[]
+  createMany?: Prisma.XeroConnectionCreateManyAuthorisationInputEnvelope
+  set?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  disconnect?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  delete?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  connect?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  update?: Prisma.XeroConnectionUpdateWithWhereUniqueWithoutAuthorisationInput | Prisma.XeroConnectionUpdateWithWhereUniqueWithoutAuthorisationInput[]
+  updateMany?: Prisma.XeroConnectionUpdateManyWithWhereWithoutAuthorisationInput | Prisma.XeroConnectionUpdateManyWithWhereWithoutAuthorisationInput[]
+  deleteMany?: Prisma.XeroConnectionScalarWhereInput | Prisma.XeroConnectionScalarWhereInput[]
+}
+
+export type XeroConnectionUncheckedUpdateManyWithoutAuthorisationNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput> | Prisma.XeroConnectionCreateWithoutAuthorisationInput[] | Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput[]
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput | Prisma.XeroConnectionCreateOrConnectWithoutAuthorisationInput[]
+  upsert?: Prisma.XeroConnectionUpsertWithWhereUniqueWithoutAuthorisationInput | Prisma.XeroConnectionUpsertWithWhereUniqueWithoutAuthorisationInput[]
+  createMany?: Prisma.XeroConnectionCreateManyAuthorisationInputEnvelope
+  set?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  disconnect?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  delete?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  connect?: Prisma.XeroConnectionWhereUniqueInput | Prisma.XeroConnectionWhereUniqueInput[]
+  update?: Prisma.XeroConnectionUpdateWithWhereUniqueWithoutAuthorisationInput | Prisma.XeroConnectionUpdateWithWhereUniqueWithoutAuthorisationInput[]
+  updateMany?: Prisma.XeroConnectionUpdateManyWithWhereWithoutAuthorisationInput | Prisma.XeroConnectionUpdateManyWithWhereWithoutAuthorisationInput[]
+  deleteMany?: Prisma.XeroConnectionScalarWhereInput | Prisma.XeroConnectionScalarWhereInput[]
+}
+
+export type Enumpayroll_regionFieldUpdateOperationsInput = {
+  set?: $Enums.payroll_region
+}
+
 export type Enumxero_connection_statusFieldUpdateOperationsInput = {
   set?: $Enums.xero_connection_status
 }
 
-export type XeroConnectionCreateNestedOneWithoutXero_tenantInput = {
-  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutXero_tenantInput, Prisma.XeroConnectionUncheckedCreateWithoutXero_tenantInput>
-  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutXero_tenantInput
+export type XeroConnectionCreateNestedOneWithoutSync_cursorsInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_cursorsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_cursorsInput>
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutSync_cursorsInput
   connect?: Prisma.XeroConnectionWhereUniqueInput
 }
 
-export type XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput = {
-  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutXero_tenantInput, Prisma.XeroConnectionUncheckedCreateWithoutXero_tenantInput>
-  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutXero_tenantInput
-  upsert?: Prisma.XeroConnectionUpsertWithoutXero_tenantInput
+export type XeroConnectionUpdateOneRequiredWithoutSync_cursorsNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_cursorsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_cursorsInput>
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutSync_cursorsInput
+  upsert?: Prisma.XeroConnectionUpsertWithoutSync_cursorsInput
   connect?: Prisma.XeroConnectionWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.XeroConnectionUpdateToOneWithWhereWithoutXero_tenantInput, Prisma.XeroConnectionUpdateWithoutXero_tenantInput>, Prisma.XeroConnectionUncheckedUpdateWithoutXero_tenantInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.XeroConnectionUpdateToOneWithWhereWithoutSync_cursorsInput, Prisma.XeroConnectionUpdateWithoutSync_cursorsInput>, Prisma.XeroConnectionUncheckedUpdateWithoutSync_cursorsInput>
+}
+
+export type XeroConnectionCreateNestedOneWithoutLeave_balancesInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutLeave_balancesInput, Prisma.XeroConnectionUncheckedCreateWithoutLeave_balancesInput>
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutLeave_balancesInput
+  connect?: Prisma.XeroConnectionWhereUniqueInput
+}
+
+export type XeroConnectionUpdateOneWithoutLeave_balancesNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutLeave_balancesInput, Prisma.XeroConnectionUncheckedCreateWithoutLeave_balancesInput>
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutLeave_balancesInput
+  upsert?: Prisma.XeroConnectionUpsertWithoutLeave_balancesInput
+  disconnect?: Prisma.XeroConnectionWhereInput | boolean
+  delete?: Prisma.XeroConnectionWhereInput | boolean
+  connect?: Prisma.XeroConnectionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.XeroConnectionUpdateToOneWithWhereWithoutLeave_balancesInput, Prisma.XeroConnectionUpdateWithoutLeave_balancesInput>, Prisma.XeroConnectionUncheckedUpdateWithoutLeave_balancesInput>
+}
+
+export type XeroConnectionCreateNestedOneWithoutSync_runsInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_runsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_runsInput>
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutSync_runsInput
+  connect?: Prisma.XeroConnectionWhereUniqueInput
+}
+
+export type XeroConnectionUpdateOneWithoutSync_runsNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_runsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_runsInput>
+  connectOrCreate?: Prisma.XeroConnectionCreateOrConnectWithoutSync_runsInput
+  upsert?: Prisma.XeroConnectionUpsertWithoutSync_runsInput
+  disconnect?: Prisma.XeroConnectionWhereInput | boolean
+  delete?: Prisma.XeroConnectionWhereInput | boolean
+  connect?: Prisma.XeroConnectionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.XeroConnectionUpdateToOneWithWhereWithoutSync_runsInput, Prisma.XeroConnectionUpdateWithoutSync_runsInput>, Prisma.XeroConnectionUncheckedUpdateWithoutSync_runsInput>
 }
 
 export type XeroConnectionCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
-  xero_tenant?: Prisma.XeroTenantCreateNestedOneWithoutXero_connectionInput
+  authorisation?: Prisma.XeroAuthorisationCreateNestedOneWithoutConnectionsInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_connectionInput
 }
 
 export type XeroConnectionUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  xero_authorisation_id?: string | null
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
-  xero_tenant?: Prisma.XeroTenantUncheckedCreateNestedOneWithoutXero_connectionInput
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_connectionInput
 }
 
 export type XeroConnectionCreateOrConnectWithoutOrganisationInput = {
@@ -932,348 +1316,1253 @@ export type XeroConnectionUpdateToOneWithWhereWithoutOrganisationInput = {
 
 export type XeroConnectionUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  xero_tenant?: Prisma.XeroTenantUpdateOneWithoutXero_connectionNestedInput
+  authorisation?: Prisma.XeroAuthorisationUpdateOneWithoutConnectionsNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_connectionNestedInput
 }
 
 export type XeroConnectionUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_authorisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  xero_tenant?: Prisma.XeroTenantUncheckedUpdateOneWithoutXero_connectionNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_connectionNestedInput
 }
 
-export type XeroConnectionCreateWithoutXero_tenantInput = {
+export type XeroConnectionCreateWithoutAuthorisationInput = {
   id?: string
-  clerk_org_id: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_connectionInput
 }
 
-export type XeroConnectionUncheckedCreateWithoutXero_tenantInput = {
+export type XeroConnectionUncheckedCreateWithoutAuthorisationInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
   status?: $Enums.xero_connection_status
-  access_token_encrypted?: string
-  access_token_iv?: string | null
-  access_token_auth_tag?: string | null
-  refresh_token_encrypted?: string
-  refresh_token_iv?: string | null
-  refresh_token_auth_tag?: string | null
-  xero_authorisation_connection_id?: string | null
-  token_key_version?: number
-  token_encrypted_at?: Date | string | null
-  expires_at: Date | string
-  last_refreshed_at?: Date | string | null
+  sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
-  last_error_code?: string | null
-  last_error_message?: string | null
-  stale_since?: Date | string | null
-  revoked_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionCreateOrConnectWithoutAuthorisationInput = {
+  where: Prisma.XeroConnectionWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput>
+}
+
+export type XeroConnectionCreateManyAuthorisationInputEnvelope = {
+  data: Prisma.XeroConnectionCreateManyAuthorisationInput | Prisma.XeroConnectionCreateManyAuthorisationInput[]
+  skipDuplicates?: boolean
+}
+
+export type XeroConnectionUpsertWithWhereUniqueWithoutAuthorisationInput = {
+  where: Prisma.XeroConnectionWhereUniqueInput
+  update: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedUpdateWithoutAuthorisationInput>
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedCreateWithoutAuthorisationInput>
+}
+
+export type XeroConnectionUpdateWithWhereUniqueWithoutAuthorisationInput = {
+  where: Prisma.XeroConnectionWhereUniqueInput
+  data: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutAuthorisationInput, Prisma.XeroConnectionUncheckedUpdateWithoutAuthorisationInput>
+}
+
+export type XeroConnectionUpdateManyWithWhereWithoutAuthorisationInput = {
+  where: Prisma.XeroConnectionScalarWhereInput
+  data: Prisma.XOR<Prisma.XeroConnectionUpdateManyMutationInput, Prisma.XeroConnectionUncheckedUpdateManyWithoutAuthorisationInput>
+}
+
+export type XeroConnectionScalarWhereInput = {
+  AND?: Prisma.XeroConnectionScalarWhereInput | Prisma.XeroConnectionScalarWhereInput[]
+  OR?: Prisma.XeroConnectionScalarWhereInput[]
+  NOT?: Prisma.XeroConnectionScalarWhereInput | Prisma.XeroConnectionScalarWhereInput[]
+  id?: Prisma.UuidFilter<"XeroConnection"> | string
+  clerk_org_id?: Prisma.StringFilter<"XeroConnection"> | string
+  organisation_id?: Prisma.UuidFilter<"XeroConnection"> | string
+  xero_authorisation_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  xero_tenant_id?: Prisma.StringFilter<"XeroConnection"> | string
+  remote_connection_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  tenant_name?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  tenant_type?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  auth_event_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFilter<"XeroConnection"> | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFilter<"XeroConnection"> | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_connected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  disconnected_by_user_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_leave_balances_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  people_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  leave_records_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  leave_balances_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  approval_state_stale_since?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_sync_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  last_sync_error_message?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
+  initial_sync_requested_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  initial_sync_completed_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_full_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  balance_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
+  leave_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
+  created_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
+  updated_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
+}
+
+export type XeroConnectionCreateWithoutSync_cursorsInput = {
+  id?: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
+  authorisation?: Prisma.XeroAuthorisationCreateNestedOneWithoutConnectionsInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionUncheckedCreateWithoutSync_cursorsInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_authorisation_id?: string | null
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionCreateOrConnectWithoutSync_cursorsInput = {
+  where: Prisma.XeroConnectionWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_cursorsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_cursorsInput>
+}
+
+export type XeroConnectionUpsertWithoutSync_cursorsInput = {
+  update: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutSync_cursorsInput, Prisma.XeroConnectionUncheckedUpdateWithoutSync_cursorsInput>
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_cursorsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_cursorsInput>
+  where?: Prisma.XeroConnectionWhereInput
+}
+
+export type XeroConnectionUpdateToOneWithWhereWithoutSync_cursorsInput = {
+  where?: Prisma.XeroConnectionWhereInput
+  data: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutSync_cursorsInput, Prisma.XeroConnectionUncheckedUpdateWithoutSync_cursorsInput>
+}
+
+export type XeroConnectionUpdateWithoutSync_cursorsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
+  authorisation?: Prisma.XeroAuthorisationUpdateOneWithoutConnectionsNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionUncheckedUpdateWithoutSync_cursorsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_authorisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionCreateWithoutLeave_balancesInput = {
+  id?: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
+  authorisation?: Prisma.XeroAuthorisationCreateNestedOneWithoutConnectionsInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionUncheckedCreateWithoutLeave_balancesInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_authorisation_id?: string | null
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionCreateOrConnectWithoutLeave_balancesInput = {
+  where: Prisma.XeroConnectionWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutLeave_balancesInput, Prisma.XeroConnectionUncheckedCreateWithoutLeave_balancesInput>
+}
+
+export type XeroConnectionUpsertWithoutLeave_balancesInput = {
+  update: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutLeave_balancesInput, Prisma.XeroConnectionUncheckedUpdateWithoutLeave_balancesInput>
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutLeave_balancesInput, Prisma.XeroConnectionUncheckedCreateWithoutLeave_balancesInput>
+  where?: Prisma.XeroConnectionWhereInput
+}
+
+export type XeroConnectionUpdateToOneWithWhereWithoutLeave_balancesInput = {
+  where?: Prisma.XeroConnectionWhereInput
+  data: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutLeave_balancesInput, Prisma.XeroConnectionUncheckedUpdateWithoutLeave_balancesInput>
+}
+
+export type XeroConnectionUpdateWithoutLeave_balancesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
+  authorisation?: Prisma.XeroAuthorisationUpdateOneWithoutConnectionsNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionUncheckedUpdateWithoutLeave_balancesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_authorisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionCreateWithoutSync_runsInput = {
+  id?: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
+  authorisation?: Prisma.XeroAuthorisationCreateNestedOneWithoutConnectionsInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionUncheckedCreateWithoutSync_runsInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_authorisation_id?: string | null
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
+  created_at?: Date | string
+  updated_at?: Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_connectionInput
+}
+
+export type XeroConnectionCreateOrConnectWithoutSync_runsInput = {
+  where: Prisma.XeroConnectionWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_runsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_runsInput>
+}
+
+export type XeroConnectionUpsertWithoutSync_runsInput = {
+  update: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutSync_runsInput, Prisma.XeroConnectionUncheckedUpdateWithoutSync_runsInput>
+  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutSync_runsInput, Prisma.XeroConnectionUncheckedCreateWithoutSync_runsInput>
+  where?: Prisma.XeroConnectionWhereInput
+}
+
+export type XeroConnectionUpdateToOneWithWhereWithoutSync_runsInput = {
+  where?: Prisma.XeroConnectionWhereInput
+  data: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutSync_runsInput, Prisma.XeroConnectionUncheckedUpdateWithoutSync_runsInput>
+}
+
+export type XeroConnectionUpdateWithoutSync_runsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
+  authorisation?: Prisma.XeroAuthorisationUpdateOneWithoutConnectionsNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionUncheckedUpdateWithoutSync_runsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_authorisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionCreateManyAuthorisationInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_tenant_id: string
+  remote_connection_id?: string | null
+  tenant_name?: string | null
+  tenant_type?: string | null
+  auth_event_id?: string | null
+  payroll_region: $Enums.payroll_region
+  status?: $Enums.xero_connection_status
+  sync_paused_at?: Date | string | null
+  last_connected_at?: Date | string | null
+  last_disconnected_at?: Date | string | null
+  disconnected_at?: Date | string | null
+  disconnected_by_user_id?: string | null
+  last_error_code?: string | null
+  last_error_message?: string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  initial_sync_requested_at?: Date | string | null
+  initial_sync_completed_at?: Date | string | null
+  last_full_people_sync_at?: Date | string | null
+  last_full_leave_records_sync_at?: Date | string | null
+  balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
 }
 
-export type XeroConnectionCreateOrConnectWithoutXero_tenantInput = {
-  where: Prisma.XeroConnectionWhereUniqueInput
-  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutXero_tenantInput, Prisma.XeroConnectionUncheckedCreateWithoutXero_tenantInput>
-}
-
-export type XeroConnectionUpsertWithoutXero_tenantInput = {
-  update: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutXero_tenantInput, Prisma.XeroConnectionUncheckedUpdateWithoutXero_tenantInput>
-  create: Prisma.XOR<Prisma.XeroConnectionCreateWithoutXero_tenantInput, Prisma.XeroConnectionUncheckedCreateWithoutXero_tenantInput>
-  where?: Prisma.XeroConnectionWhereInput
-}
-
-export type XeroConnectionUpdateToOneWithWhereWithoutXero_tenantInput = {
-  where?: Prisma.XeroConnectionWhereInput
-  data: Prisma.XOR<Prisma.XeroConnectionUpdateWithoutXero_tenantInput, Prisma.XeroConnectionUncheckedUpdateWithoutXero_tenantInput>
-}
-
-export type XeroConnectionUpdateWithoutXero_tenantInput = {
+export type XeroConnectionUpdateWithoutAuthorisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_connectionNestedInput
 }
 
-export type XeroConnectionUncheckedUpdateWithoutXero_tenantInput = {
+export type XeroConnectionUncheckedUpdateWithoutAuthorisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
   status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
-  access_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  access_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  access_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_encrypted?: Prisma.StringFieldUpdateOperationsInput | string
-  refresh_token_iv?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  xero_authorisation_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
-  token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  last_refreshed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  revoked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_connectionNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_connectionNestedInput
+}
+
+export type XeroConnectionUncheckedUpdateManyWithoutAuthorisationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  remote_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_type?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  auth_event_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  status?: Prisma.Enumxero_connection_statusFieldUpdateOperationsInput | $Enums.xero_connection_status
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initial_sync_requested_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  initial_sync_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+
+/**
+ * Count Type XeroConnectionCountOutputType
+ */
+
+export type XeroConnectionCountOutputType = {
+  sync_cursors: number
+  leave_balances: number
+  sync_runs: number
+}
+
+export type XeroConnectionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  sync_cursors?: boolean | XeroConnectionCountOutputTypeCountSync_cursorsArgs
+  leave_balances?: boolean | XeroConnectionCountOutputTypeCountLeave_balancesArgs
+  sync_runs?: boolean | XeroConnectionCountOutputTypeCountSync_runsArgs
+}
+
+/**
+ * XeroConnectionCountOutputType without action
+ */
+export type XeroConnectionCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroConnectionCountOutputType
+   */
+  select?: Prisma.XeroConnectionCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * XeroConnectionCountOutputType without action
+ */
+export type XeroConnectionCountOutputTypeCountSync_cursorsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.XeroSyncCursorWhereInput
+}
+
+/**
+ * XeroConnectionCountOutputType without action
+ */
+export type XeroConnectionCountOutputTypeCountLeave_balancesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LeaveBalanceWhereInput
+}
+
+/**
+ * XeroConnectionCountOutputType without action
+ */
+export type XeroConnectionCountOutputTypeCountSync_runsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.SyncRunWhereInput
+}
 
 
 export type XeroConnectionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_authorisation_id?: boolean
+  xero_tenant_id?: boolean
+  remote_connection_id?: boolean
+  tenant_name?: boolean
+  tenant_type?: boolean
+  auth_event_id?: boolean
+  payroll_region?: boolean
   status?: boolean
-  access_token_encrypted?: boolean
-  access_token_iv?: boolean
-  access_token_auth_tag?: boolean
-  refresh_token_encrypted?: boolean
-  refresh_token_iv?: boolean
-  refresh_token_auth_tag?: boolean
-  xero_authorisation_connection_id?: boolean
-  token_key_version?: boolean
-  token_encrypted_at?: boolean
-  expires_at?: boolean
-  last_refreshed_at?: boolean
+  sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
-  last_error_code?: boolean
-  last_error_message?: boolean
-  stale_since?: boolean
-  revoked_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
+  last_error_code?: boolean
+  last_error_message?: boolean
+  last_people_sync_at?: boolean
+  last_leave_records_sync_at?: boolean
+  last_leave_balances_sync_at?: boolean
+  last_approval_state_reconciled_at?: boolean
+  people_stale_since?: boolean
+  leave_records_stale_since?: boolean
+  leave_balances_stale_since?: boolean
+  approval_state_stale_since?: boolean
+  last_sync_error_code?: boolean
+  last_sync_error_message?: boolean
+  initial_sync_requested_at?: boolean
+  initial_sync_completed_at?: boolean
+  last_full_people_sync_at?: boolean
+  last_full_leave_records_sync_at?: boolean
+  balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroConnection$xero_tenantArgs<ExtArgs>
+  authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
+  sync_cursors?: boolean | Prisma.XeroConnection$sync_cursorsArgs<ExtArgs>
+  leave_balances?: boolean | Prisma.XeroConnection$leave_balancesArgs<ExtArgs>
+  sync_runs?: boolean | Prisma.XeroConnection$sync_runsArgs<ExtArgs>
+  _count?: boolean | Prisma.XeroConnectionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["xeroConnection"]>
 
 export type XeroConnectionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_authorisation_id?: boolean
+  xero_tenant_id?: boolean
+  remote_connection_id?: boolean
+  tenant_name?: boolean
+  tenant_type?: boolean
+  auth_event_id?: boolean
+  payroll_region?: boolean
   status?: boolean
-  access_token_encrypted?: boolean
-  access_token_iv?: boolean
-  access_token_auth_tag?: boolean
-  refresh_token_encrypted?: boolean
-  refresh_token_iv?: boolean
-  refresh_token_auth_tag?: boolean
-  xero_authorisation_connection_id?: boolean
-  token_key_version?: boolean
-  token_encrypted_at?: boolean
-  expires_at?: boolean
-  last_refreshed_at?: boolean
+  sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
-  last_error_code?: boolean
-  last_error_message?: boolean
-  stale_since?: boolean
-  revoked_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
+  last_error_code?: boolean
+  last_error_message?: boolean
+  last_people_sync_at?: boolean
+  last_leave_records_sync_at?: boolean
+  last_leave_balances_sync_at?: boolean
+  last_approval_state_reconciled_at?: boolean
+  people_stale_since?: boolean
+  leave_records_stale_since?: boolean
+  leave_balances_stale_since?: boolean
+  approval_state_stale_since?: boolean
+  last_sync_error_code?: boolean
+  last_sync_error_message?: boolean
+  initial_sync_requested_at?: boolean
+  initial_sync_completed_at?: boolean
+  last_full_people_sync_at?: boolean
+  last_full_leave_records_sync_at?: boolean
+  balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
 }, ExtArgs["result"]["xeroConnection"]>
 
 export type XeroConnectionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_authorisation_id?: boolean
+  xero_tenant_id?: boolean
+  remote_connection_id?: boolean
+  tenant_name?: boolean
+  tenant_type?: boolean
+  auth_event_id?: boolean
+  payroll_region?: boolean
   status?: boolean
-  access_token_encrypted?: boolean
-  access_token_iv?: boolean
-  access_token_auth_tag?: boolean
-  refresh_token_encrypted?: boolean
-  refresh_token_iv?: boolean
-  refresh_token_auth_tag?: boolean
-  xero_authorisation_connection_id?: boolean
-  token_key_version?: boolean
-  token_encrypted_at?: boolean
-  expires_at?: boolean
-  last_refreshed_at?: boolean
+  sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
-  last_error_code?: boolean
-  last_error_message?: boolean
-  stale_since?: boolean
-  revoked_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
+  last_error_code?: boolean
+  last_error_message?: boolean
+  last_people_sync_at?: boolean
+  last_leave_records_sync_at?: boolean
+  last_leave_balances_sync_at?: boolean
+  last_approval_state_reconciled_at?: boolean
+  people_stale_since?: boolean
+  leave_records_stale_since?: boolean
+  leave_balances_stale_since?: boolean
+  approval_state_stale_since?: boolean
+  last_sync_error_code?: boolean
+  last_sync_error_message?: boolean
+  initial_sync_requested_at?: boolean
+  initial_sync_completed_at?: boolean
+  last_full_people_sync_at?: boolean
+  last_full_leave_records_sync_at?: boolean
+  balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
 }, ExtArgs["result"]["xeroConnection"]>
 
 export type XeroConnectionSelectScalar = {
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_authorisation_id?: boolean
+  xero_tenant_id?: boolean
+  remote_connection_id?: boolean
+  tenant_name?: boolean
+  tenant_type?: boolean
+  auth_event_id?: boolean
+  payroll_region?: boolean
   status?: boolean
-  access_token_encrypted?: boolean
-  access_token_iv?: boolean
-  access_token_auth_tag?: boolean
-  refresh_token_encrypted?: boolean
-  refresh_token_iv?: boolean
-  refresh_token_auth_tag?: boolean
-  xero_authorisation_connection_id?: boolean
-  token_key_version?: boolean
-  token_encrypted_at?: boolean
-  expires_at?: boolean
-  last_refreshed_at?: boolean
+  sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
-  last_error_code?: boolean
-  last_error_message?: boolean
-  stale_since?: boolean
-  revoked_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
+  last_error_code?: boolean
+  last_error_message?: boolean
+  last_people_sync_at?: boolean
+  last_leave_records_sync_at?: boolean
+  last_leave_balances_sync_at?: boolean
+  last_approval_state_reconciled_at?: boolean
+  people_stale_since?: boolean
+  leave_records_stale_since?: boolean
+  leave_balances_stale_since?: boolean
+  approval_state_stale_since?: boolean
+  last_sync_error_code?: boolean
+  last_sync_error_message?: boolean
+  initial_sync_requested_at?: boolean
+  initial_sync_completed_at?: boolean
+  last_full_people_sync_at?: boolean
+  last_full_leave_records_sync_at?: boolean
+  balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
+  leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type XeroConnectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "status" | "access_token_encrypted" | "access_token_iv" | "access_token_auth_tag" | "refresh_token_encrypted" | "refresh_token_iv" | "refresh_token_auth_tag" | "xero_authorisation_connection_id" | "token_key_version" | "token_encrypted_at" | "expires_at" | "last_refreshed_at" | "last_connected_at" | "last_disconnected_at" | "last_error_code" | "last_error_message" | "stale_since" | "revoked_at" | "disconnected_at" | "disconnected_by_user_id" | "created_at" | "updated_at", ExtArgs["result"]["xeroConnection"]>
+export type XeroConnectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_authorisation_id" | "xero_tenant_id" | "remote_connection_id" | "tenant_name" | "tenant_type" | "auth_event_id" | "payroll_region" | "status" | "sync_paused_at" | "last_connected_at" | "last_disconnected_at" | "disconnected_at" | "disconnected_by_user_id" | "last_error_code" | "last_error_message" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "initial_sync_requested_at" | "initial_sync_completed_at" | "last_full_people_sync_at" | "last_full_leave_records_sync_at" | "balance_next_person_id" | "balance_sweep_failed" | "leave_next_person_id" | "leave_sweep_failed" | "created_at" | "updated_at", ExtArgs["result"]["xeroConnection"]>
 export type XeroConnectionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroConnection$xero_tenantArgs<ExtArgs>
+  authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
+  sync_cursors?: boolean | Prisma.XeroConnection$sync_cursorsArgs<ExtArgs>
+  leave_balances?: boolean | Prisma.XeroConnection$leave_balancesArgs<ExtArgs>
+  sync_runs?: boolean | Prisma.XeroConnection$sync_runsArgs<ExtArgs>
+  _count?: boolean | Prisma.XeroConnectionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type XeroConnectionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
 }
 export type XeroConnectionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
 }
 
 export type $XeroConnectionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "XeroConnection"
   objects: {
     organisation: Prisma.$OrganisationPayload<ExtArgs>
-    xero_tenant: Prisma.$XeroTenantPayload<ExtArgs> | null
+    authorisation: Prisma.$XeroAuthorisationPayload<ExtArgs> | null
+    sync_cursors: Prisma.$XeroSyncCursorPayload<ExtArgs>[]
+    leave_balances: Prisma.$LeaveBalancePayload<ExtArgs>[]
+    sync_runs: Prisma.$SyncRunPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
     organisation_id: string
+    xero_authorisation_id: string | null
+    xero_tenant_id: string
+    remote_connection_id: string | null
+    tenant_name: string | null
+    tenant_type: string | null
+    auth_event_id: string | null
+    payroll_region: $Enums.payroll_region
     status: $Enums.xero_connection_status
-    access_token_encrypted: string
-    access_token_iv: string | null
-    access_token_auth_tag: string | null
-    refresh_token_encrypted: string
-    refresh_token_iv: string | null
-    refresh_token_auth_tag: string | null
-    xero_authorisation_connection_id: string | null
-    token_key_version: number
-    token_encrypted_at: Date | null
-    expires_at: Date
-    last_refreshed_at: Date | null
+    sync_paused_at: Date | null
     last_connected_at: Date | null
     last_disconnected_at: Date | null
-    last_error_code: string | null
-    last_error_message: string | null
-    stale_since: Date | null
-    revoked_at: Date | null
     disconnected_at: Date | null
     disconnected_by_user_id: string | null
+    last_error_code: string | null
+    last_error_message: string | null
+    last_people_sync_at: Date | null
+    last_leave_records_sync_at: Date | null
+    last_leave_balances_sync_at: Date | null
+    last_approval_state_reconciled_at: Date | null
+    people_stale_since: Date | null
+    leave_records_stale_since: Date | null
+    leave_balances_stale_since: Date | null
+    approval_state_stale_since: Date | null
+    last_sync_error_code: string | null
+    last_sync_error_message: string | null
+    initial_sync_requested_at: Date | null
+    initial_sync_completed_at: Date | null
+    last_full_people_sync_at: Date | null
+    last_full_leave_records_sync_at: Date | null
+    balance_next_person_id: string | null
+    balance_sweep_failed: boolean
+    leave_next_person_id: string | null
+    leave_sweep_failed: boolean
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["xeroConnection"]>
@@ -1671,7 +2960,10 @@ readonly fields: XeroConnectionFieldRefs;
 export interface Prisma__XeroConnectionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  xero_tenant<T extends Prisma.XeroConnection$xero_tenantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnection$xero_tenantArgs<ExtArgs>>): Prisma.Prisma__XeroTenantClient<runtime.Types.Result.GetResult<Prisma.$XeroTenantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  authorisation<T extends Prisma.XeroConnection$authorisationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnection$authorisationArgs<ExtArgs>>): Prisma.Prisma__XeroAuthorisationClient<runtime.Types.Result.GetResult<Prisma.$XeroAuthorisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  sync_cursors<T extends Prisma.XeroConnection$sync_cursorsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnection$sync_cursorsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroSyncCursorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  leave_balances<T extends Prisma.XeroConnection$leave_balancesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnection$leave_balancesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LeaveBalancePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  sync_runs<T extends Prisma.XeroConnection$sync_runsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnection$sync_runsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SyncRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1704,26 +2996,39 @@ export interface XeroConnectionFieldRefs {
   readonly id: Prisma.FieldRef<"XeroConnection", 'String'>
   readonly clerk_org_id: Prisma.FieldRef<"XeroConnection", 'String'>
   readonly organisation_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly xero_authorisation_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly xero_tenant_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly remote_connection_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly tenant_name: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly tenant_type: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly auth_event_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly payroll_region: Prisma.FieldRef<"XeroConnection", 'payroll_region'>
   readonly status: Prisma.FieldRef<"XeroConnection", 'xero_connection_status'>
-  readonly access_token_encrypted: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly access_token_iv: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly access_token_auth_tag: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly refresh_token_encrypted: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly refresh_token_iv: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly refresh_token_auth_tag: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly xero_authorisation_connection_id: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly token_key_version: Prisma.FieldRef<"XeroConnection", 'Int'>
-  readonly token_encrypted_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
-  readonly expires_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
-  readonly last_refreshed_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly sync_paused_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly last_connected_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly last_disconnected_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
-  readonly last_error_code: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly last_error_message: Prisma.FieldRef<"XeroConnection", 'String'>
-  readonly stale_since: Prisma.FieldRef<"XeroConnection", 'DateTime'>
-  readonly revoked_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly disconnected_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly disconnected_by_user_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly last_error_code: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly last_error_message: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly last_people_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly last_leave_records_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly last_leave_balances_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly last_approval_state_reconciled_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly people_stale_since: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly leave_records_stale_since: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly leave_balances_stale_since: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly approval_state_stale_since: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly last_sync_error_code: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly last_sync_error_message: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly initial_sync_requested_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly initial_sync_completed_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly last_full_people_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly last_full_leave_records_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly balance_next_person_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly balance_sweep_failed: Prisma.FieldRef<"XeroConnection", 'Boolean'>
+  readonly leave_next_person_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly leave_sweep_failed: Prisma.FieldRef<"XeroConnection", 'Boolean'>
   readonly created_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
 }
@@ -2127,22 +3432,94 @@ export type XeroConnectionDeleteManyArgs<ExtArgs extends runtime.Types.Extension
 }
 
 /**
- * XeroConnection.xero_tenant
+ * XeroConnection.authorisation
  */
-export type XeroConnection$xero_tenantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type XeroConnection$authorisationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
-   * Select specific fields to fetch from the XeroTenant
+   * Select specific fields to fetch from the XeroAuthorisation
    */
-  select?: Prisma.XeroTenantSelect<ExtArgs> | null
+  select?: Prisma.XeroAuthorisationSelect<ExtArgs> | null
   /**
-   * Omit specific fields from the XeroTenant
+   * Omit specific fields from the XeroAuthorisation
    */
-  omit?: Prisma.XeroTenantOmit<ExtArgs> | null
+  omit?: Prisma.XeroAuthorisationOmit<ExtArgs> | null
   /**
    * Choose, which related nodes to fetch as well
    */
-  include?: Prisma.XeroTenantInclude<ExtArgs> | null
-  where?: Prisma.XeroTenantWhereInput
+  include?: Prisma.XeroAuthorisationInclude<ExtArgs> | null
+  where?: Prisma.XeroAuthorisationWhereInput
+}
+
+/**
+ * XeroConnection.sync_cursors
+ */
+export type XeroConnection$sync_cursorsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroSyncCursor
+   */
+  select?: Prisma.XeroSyncCursorSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the XeroSyncCursor
+   */
+  omit?: Prisma.XeroSyncCursorOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.XeroSyncCursorInclude<ExtArgs> | null
+  where?: Prisma.XeroSyncCursorWhereInput
+  orderBy?: Prisma.XeroSyncCursorOrderByWithRelationInput | Prisma.XeroSyncCursorOrderByWithRelationInput[]
+  cursor?: Prisma.XeroSyncCursorWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.XeroSyncCursorScalarFieldEnum | Prisma.XeroSyncCursorScalarFieldEnum[]
+}
+
+/**
+ * XeroConnection.leave_balances
+ */
+export type XeroConnection$leave_balancesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LeaveBalance
+   */
+  select?: Prisma.LeaveBalanceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LeaveBalance
+   */
+  omit?: Prisma.LeaveBalanceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LeaveBalanceInclude<ExtArgs> | null
+  where?: Prisma.LeaveBalanceWhereInput
+  orderBy?: Prisma.LeaveBalanceOrderByWithRelationInput | Prisma.LeaveBalanceOrderByWithRelationInput[]
+  cursor?: Prisma.LeaveBalanceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LeaveBalanceScalarFieldEnum | Prisma.LeaveBalanceScalarFieldEnum[]
+}
+
+/**
+ * XeroConnection.sync_runs
+ */
+export type XeroConnection$sync_runsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the SyncRun
+   */
+  select?: Prisma.SyncRunSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the SyncRun
+   */
+  omit?: Prisma.SyncRunOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.SyncRunInclude<ExtArgs> | null
+  where?: Prisma.SyncRunWhereInput
+  orderBy?: Prisma.SyncRunOrderByWithRelationInput | Prisma.SyncRunOrderByWithRelationInput[]
+  cursor?: Prisma.SyncRunWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.SyncRunScalarFieldEnum | Prisma.SyncRunScalarFieldEnum[]
 }
 
 /**

@@ -72,7 +72,7 @@ const LeaveBalanceSchema = z
     LeaveName: z.string().optional().nullable(),
     LeaveTypeID: z.string().optional().nullable(),
     LeaveTypeId: z.string().optional().nullable(),
-    NumberOfUnits: z.number().optional().nullable(),
+    NumberOfUnits: z.number(),
     TypeOfUnits: z.string().optional().nullable(),
   })
   .passthrough();
@@ -81,28 +81,31 @@ const EmployeeWithLeaveBalancesSchema = z
   .object({
     EmployeeID: z.string().optional().nullable(),
     EmployeeId: z.string().optional().nullable(),
-    LeaveBalances: z.array(LeaveBalanceSchema).optional().nullable(),
+    LeaveBalances: z.array(LeaveBalanceSchema),
   })
-  .passthrough();
+  .passthrough()
+  .refine(
+    (employee) => text(employee.EmployeeID ?? employee.EmployeeId).length > 0,
+    {
+      message: "Employee balance detail requires an Employee ID",
+    }
+  );
 
 const EmployeesResponseSchema = z
   .object({
-    Employees: z.array(EmployeeWithLeaveBalancesSchema),
+    Employees: z.array(EmployeeWithLeaveBalancesSchema).min(1),
   })
   .passthrough();
 
 export function mapXeroLeaveBalances(payload: unknown): XeroLeaveBalance[] {
-  const parsed = EmployeesResponseSchema.safeParse(payload);
-  if (!parsed.success) {
-    return [];
-  }
+  const parsed = EmployeesResponseSchema.parse(payload);
 
-  return parsed.data.Employees.flatMap((employee) => {
+  return parsed.Employees.flatMap((employee) => {
     const employeeId = text(employee.EmployeeID ?? employee.EmployeeId);
-    return (employee.LeaveBalances ?? []).map((balance) => {
+    return employee.LeaveBalances.map((balance) => {
       const unitType = normaliseUnitType(balance.TypeOfUnits);
       return {
-        balance: balance.NumberOfUnits ?? 0,
+        balance: balance.NumberOfUnits,
         currencyCode:
           unitType === "currency"
             ? nullableUppercaseText(balance.CurrencyCode)

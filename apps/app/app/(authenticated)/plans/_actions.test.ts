@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   deleteDraftRecord: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  listSubmitRecoveryCandidates: vi.fn(),
   organisationFindFirst: vi.fn(),
   restoreRecord: vi.fn(),
   retrySubmission: vi.fn(),
@@ -20,7 +21,6 @@ const mocks = vi.hoisted(() => ({
   updateRecord: vi.fn(),
   withdrawSubmission: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
@@ -42,6 +42,7 @@ vi.mock("@repo/availability", () => ({
   archiveRecord: mocks.archiveRecord,
   createRecord: mocks.createRecord,
   deleteDraftRecord: mocks.deleteDraftRecord,
+  listSubmitRecoveryCandidates: mocks.listSubmitRecoveryCandidates,
   restoreRecord: mocks.restoreRecord,
   retrySubmission: mocks.retrySubmission,
   revertToDraft: mocks.revertToDraft,
@@ -55,16 +56,15 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
-
 const {
   createRecordAction,
+  listSubmitRecoveryCandidatesAction,
   retrySubmissionAction,
   revertToDraftAction,
   submitForApprovalAction,
   updateRecordAction,
   withdrawSubmissionAction,
 } = await import("./_actions");
-
 const validInput = {
   allDay: true,
   contactabilityStatus: "contactable",
@@ -78,7 +78,6 @@ const validInput = {
   startsAt: "2026-05-04",
   startTime: "",
 } as const;
-
 describe("plans actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,60 +104,88 @@ describe("plans actions", () => {
       },
     });
   });
-
   it("rejects unauthorised callers", async () => {
     mocks.auth.mockResolvedValue({ orgRole: null });
-
     const result = await createRecordAction(validInput);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("not_authorised");
     }
   });
-
+  it.each(["org:viewer", "org:manager"])(
+    "denies imported recovery reads for %s",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      await expect(
+        listSubmitRecoveryCandidatesAction({
+          organisationId: validInput.organisationId,
+          recordId: "00000000-0000-4000-8000-000000000099",
+        })
+      ).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      expect(mocks.listSubmitRecoveryCandidates).not.toHaveBeenCalled();
+    }
+  );
+  it.each(["org:admin", "org:owner"])(
+    "scopes imported recovery reads for %s",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.listSubmitRecoveryCandidates.mockResolvedValue({
+        ok: true,
+        value: { candidates: [] },
+      });
+      await listSubmitRecoveryCandidatesAction({
+        organisationId: validInput.organisationId,
+        recordId: "00000000-0000-4000-8000-000000000099",
+      });
+      expect(mocks.listSubmitRecoveryCandidates).toHaveBeenCalledWith(
+        {
+          actingOrgRole: orgRole,
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          organisationId: validInput.organisationId,
+          recordId: "00000000-0000-4000-8000-000000000099",
+        },
+        {}
+      );
+    }
+  );
   it("rejects malformed input", async () => {
     const result = await createRecordAction({
       ...validInput,
       personId: "not-a-uuid",
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
-
   it("revalidates expected paths on create success", async () => {
     mocks.createRecord.mockResolvedValue({
       ok: true,
       value: { id: "00000000-0000-4000-8000-000000000099" },
     });
-
     const result = await createRecordAction(validInput);
-
     expect(result.ok).toBe(true);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/plans");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/calendar");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
   });
-
   it("revalidates plans and calendar on update success", async () => {
     mocks.updateRecord.mockResolvedValue({
       ok: true,
       value: { id: "00000000-0000-4000-8000-000000000099" },
     });
-
     const result = await updateRecordAction({
       ...validInput,
       recordId: "00000000-0000-4000-8000-000000000099",
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/plans");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/calendar");
   });
-
   it("saves a 09:00 selected slot in the authoritative organisation timezone", async () => {
     mocks.createRecord.mockResolvedValue({ ok: true, value: { id: "record" } });
     const result = await createRecordAction({
@@ -187,7 +214,6 @@ describe("plans actions", () => {
       })
     );
   });
-
   it("rejects nonexistent local times without writing a record", async () => {
     mocks.organisationFindFirst.mockResolvedValue({
       timezone: "Australia/Sydney",
@@ -206,7 +232,6 @@ describe("plans actions", () => {
     });
     expect(mocks.createRecord).not.toHaveBeenCalled();
   });
-
   it("preserves original timed instants on a note-only edit during a repeated DST hour", async () => {
     mocks.organisationFindFirst.mockResolvedValue({
       timezone: "Australia/Sydney",
@@ -244,7 +269,6 @@ describe("plans actions", () => {
       })
     );
   });
-
   it.each(["", "Changed note"])(
     "preserves a valid interval crossing the repeated hour while saving notes %s",
     async (notesInternal) => {
@@ -282,7 +306,6 @@ describe("plans actions", () => {
       expect(endsAt.getTime() - startsAt.getTime()).toBe(20 * 60_000);
     }
   );
-
   it.each(["create", "update"])(
     "rejects a reversed new repeated-hour interval on %s before writing",
     async (mode) => {
@@ -316,7 +339,6 @@ describe("plans actions", () => {
       expect(mocks.updateRecord).not.toHaveBeenCalled();
     }
   );
-
   it("rejects an actually reversed edit of an existing cross-fold interval", async () => {
     mocks.organisationFindFirst.mockResolvedValue({
       timezone: "Australia/Sydney",
@@ -345,7 +367,6 @@ describe("plans actions", () => {
     });
     expect(mocks.updateRecord).not.toHaveBeenCalled();
   });
-
   it("preserves inclusive same-midnight all-day endpoints on a note-only edit", async () => {
     const instant = new Date("2026-04-15T00:00:00Z");
     mocks.availabilityFindFirst.mockResolvedValue({
@@ -374,7 +395,6 @@ describe("plans actions", () => {
       })
     );
   });
-
   it.each(["create", "update"])(
     "rejects reversed inclusive all-day dates on %s before writing",
     async (mode) => {
@@ -407,7 +427,6 @@ describe("plans actions", () => {
       expect(mocks.updateRecord).not.toHaveBeenCalled();
     }
   );
-
   it.each(["create", "update"])(
     "rejects zero-length timed intervals on %s before writing",
     async (mode) => {
@@ -443,7 +462,6 @@ describe("plans actions", () => {
       expect(mocks.updateRecord).not.toHaveBeenCalled();
     }
   );
-
   it("revalidates expected paths on submit success", async () => {
     mocks.submitDraftRecord.mockResolvedValue({
       ok: true,
@@ -454,12 +472,10 @@ describe("plans actions", () => {
         xero_write_error: null,
       },
     });
-
     const result = await submitForApprovalAction({
       organisationId: validInput.organisationId,
       recordId: "00000000-0000-4000-8000-000000000099",
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.submitDraftRecord).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -475,7 +491,6 @@ describe("plans actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/notifications");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
   });
-
   it("passes retry, revert and withdraw through typed service results", async () => {
     const value = {
       approval_status: "xero_sync_failed",
@@ -491,12 +506,10 @@ describe("plans actions", () => {
       ok: true,
       value: { ...value, approval_status: "withdrawn", xero_write_error: null },
     });
-
     const input = {
       organisationId: validInput.organisationId,
       recordId: "00000000-0000-4000-8000-000000000099",
     };
-
     await expect(retrySubmissionAction(input)).resolves.toMatchObject({
       ok: true,
     });
@@ -507,25 +520,38 @@ describe("plans actions", () => {
       ok: true,
     });
   });
-
+  it("returns an inline failure when Xero refuses withdrawal and approval is retained", async () => {
+    mocks.withdrawSubmission.mockResolvedValue({
+      ok: true,
+      value: {
+        approval_status: "approved",
+        id: "00000000-0000-4000-8000-000000000099",
+        xero_write_error:
+          "Xero cannot withdraw leave already included in a pay run.",
+      },
+    });
+    await expect(
+      withdrawSubmissionAction({
+        organisationId: validInput.organisationId,
+        recordId: "00000000-0000-4000-8000-000000000099",
+      })
+    ).resolves.toMatchObject({
+      error: {
+        code: "xero_write_failed",
+        message: "Xero cannot withdraw leave already included in a pay run.",
+      },
+      ok: false,
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/plans");
+  });
   it("returns validation errors for malformed submission action input", async () => {
     const result = await submitForApprovalAction({
       organisationId: validInput.organisationId,
       recordId: "not-a-uuid",
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
 });
-
-vi.mock("@/lib/server/xero-campaign-action", () => ({
-  withAuthenticatedXeroCampaignAction: (
-    _id: unknown,
-    _scope: unknown,
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

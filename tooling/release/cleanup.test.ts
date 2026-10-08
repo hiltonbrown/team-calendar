@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("inactivity report fixture cleanup registration", () => {
+describe("scoped fixture cleanup registration", () => {
   it("uses the same scoped child-table inventory for counting, deletion and residue read-back", () => {
     const source = readFileSync(
       new URL("./cleanup.ts", import.meta.url),
@@ -11,11 +11,9 @@ describe("inactivity report fixture cleanup registration", () => {
       source.indexOf("const scopedTables = ["),
       source.indexOf("] as const;")
     );
-    expect(
-      inventory.indexOf('"xero_inactivity_classifications"')
-    ).toBeGreaterThan(-1);
-    expect(inventory.indexOf('"xero_inactivity_classifications"')).toBeLessThan(
-      inventory.indexOf('"xero_tenants"')
+    expect(inventory.indexOf('"xero_sync_cursors"')).toBeGreaterThan(-1);
+    expect(inventory.indexOf('"xero_connections"')).toBeGreaterThan(
+      inventory.indexOf('"xero_sync_cursors"')
     );
     expect(inventory.indexOf('"feed_event_publications"')).toBeGreaterThan(-1);
     expect(inventory.indexOf('"feed_event_publications"')).toBeLessThan(

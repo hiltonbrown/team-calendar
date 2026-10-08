@@ -257,7 +257,6 @@ describe("XeroRateLimiter", () => {
 it("bounds a hanging Redis reservation by the admission wait budget", async () => {
   const { RedisSharedXeroRateStore } = await import("./shared-store");
   const store = new RedisSharedXeroRateStore({
-    epoch: "test",
     fetchImpl: () =>
       new Promise(() => {
         /* Ignoring AbortSignal deliberately. */
@@ -268,6 +267,7 @@ it("bounds a hanging Redis reservation by the admission wait budget", async () =
       callsPerMinutePerOrg: 10,
       concurrentRequestsPerOrg: 5,
     },
+    namespace: "test",
     token: "test",
     url: "https://invalid.example",
   });
@@ -312,7 +312,6 @@ it("refreshes remaining operation lease with exactly one margin after waiting", 
       (
         await limiter.acquire(tenant("one"), {
           deadline: { expiresAtMs: 10_000 },
-          leaseMs: 14_000,
           maxWaitMs: 5000,
         })
       ).ok
@@ -331,7 +330,6 @@ it("preserves the last denial when the wait expires before another reserve", asy
     Response.json({ result: ["minute"] })
   );
   const store = new RedisSharedXeroRateStore({
-    epoch: "test",
     fetchImpl,
     limits: {
       appCallsPerMinute: 10,
@@ -339,6 +337,7 @@ it("preserves the last denial when the wait expires before another reserve", asy
       callsPerMinutePerOrg: 10,
       concurrentRequestsPerOrg: 5,
     },
+    namespace: "test",
     token: "test",
     url: "https://invalid.example",
   });
@@ -361,9 +360,8 @@ describe("admission lifecycle metrics", () => {
     "concurrency",
     "cooldown",
     "infrastructure",
-    "credential_domain_mismatch",
   ] as const)(
-    "records %s without treating ordinary denial or domain mismatch as store outage",
+    "records %s without treating ordinary denial as store outage",
     async (reason) => {
       const reserve = vi
         .fn()

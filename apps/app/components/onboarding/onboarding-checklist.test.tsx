@@ -4,10 +4,8 @@ import type { OnboardingState } from "@/lib/server/load-onboarding-state";
 import { OnboardingChecklist } from "./onboarding-checklist";
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-
 describe("OnboardingChecklist", () => {
   afterEach(cleanup);
-
   it("promotes one next action and discloses quieter remaining groups", () => {
     const { container } = render(
       <OnboardingChecklist
@@ -15,14 +13,12 @@ describe("OnboardingChecklist", () => {
         state={incompleteState}
       />
     );
-
     const progress = screen.getByRole("progressbar", {
       name: "Required setup progress",
     });
     expect(progress.getAttribute("value")).toBe("1");
     expect(progress.getAttribute("max")).toBe("4");
     expect(screen.getByText("1 of 4 required steps complete.")).toBeDefined();
-
     const nextAction = screen.getByRole("link", { name: "Add people" });
     expect(nextAction.getAttribute("href")).toBe(
       `/people?org=${organisationId}`
@@ -32,19 +28,16 @@ describe("OnboardingChecklist", () => {
     );
     expect(primaryActions).toHaveLength(1);
     expect(primaryActions[0]).toBe(nextAction);
-
     expect(screen.getByText("Completed (1)")).toBeDefined();
     expect(screen.getByText("Optional and later (3)")).toBeDefined();
     expect(screen.getByText("Done")).toBeDefined();
     expect(screen.getByText("Next")).toBeDefined();
     expect(screen.getByText("Optional")).toBeDefined();
     expect(screen.getAllByText("Later")).toHaveLength(2);
-
     for (const link of container.querySelectorAll("a")) {
       expect(link.getAttribute("href")).toContain(`org=${organisationId}`);
     }
   });
-
   it("gives completed setup one clear return-to-work action", () => {
     const { container } = render(
       <OnboardingChecklist
@@ -52,7 +45,6 @@ describe("OnboardingChecklist", () => {
         state={completeState}
       />
     );
-
     expect(
       screen.getByText("Setup complete. 4 of 4 required steps complete.")
     ).toBeDefined();
@@ -73,7 +65,6 @@ describe("OnboardingChecklist", () => {
     ).toHaveLength(1);
   });
 });
-
 const incompleteState: OnboardingState = {
   activeFeedCount: 0,
   completedRequiredCount: 1,
@@ -127,7 +118,6 @@ const incompleteState: OnboardingState = {
   ],
   xeroConnectionState: "not_connected",
 };
-
 const completeState: OnboardingState = {
   ...incompleteState,
   activeFeedCount: 1,

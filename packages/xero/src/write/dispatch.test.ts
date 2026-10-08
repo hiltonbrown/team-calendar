@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-
 vi.mock("../adapter/auth-recovery", () => ({
   executeWithXeroAuthRecovery: (
     tenant: unknown,
@@ -18,43 +17,36 @@ import {
 
 const baseTenant = {
   accessToken: "access-token",
-  bindingGeneration: 1,
   clerk_org_id: "org_1",
   deadline: { expiresAtMs: Date.now() + 120_000 },
   id: "tenant_1",
   organisation_id: "00000000-0000-4000-8000-000000000001",
-  tokenVersion: 1,
   xero_tenant_id: "xero-tenant-1",
 };
-
 const submitInput = {
   endsAt: new Date("2026-05-05T00:00:00.000Z"),
   startsAt: new Date("2026-05-04T00:00:00.000Z"),
   units: 2,
+  xeroConnection: { ...baseTenant, payroll_region: "NZ" as const },
   xeroEmployeeId: "employee-1",
   xeroLeaveTypeId: "type-1",
-  xeroTenant: { ...baseTenant, payroll_region: "NZ" as const },
 };
-
 const approveInput = {
+  xeroConnection: { ...baseTenant, payroll_region: "NZ" as const },
   xeroEmployeeId: "employee-1",
   xeroLeaveApplicationId: "app-1",
-  xeroTenant: { ...baseTenant, payroll_region: "NZ" as const },
 };
-
 const declineInput = {
   reason: "reason",
+  xeroConnection: { ...baseTenant, payroll_region: "NZ" as const },
   xeroEmployeeId: "employee-1",
   xeroLeaveApplicationId: "app-1",
-  xeroTenant: { ...baseTenant, payroll_region: "NZ" as const },
 };
-
 const withdrawInput = {
+  xeroConnection: { ...baseTenant, payroll_region: "NZ" as const },
   xeroEmployeeId: "employee-1",
   xeroLeaveApplicationId: "app-1",
-  xeroTenant: { ...baseTenant, payroll_region: "NZ" as const },
 };
-
 describe("write dispatch", () => {
   describe("NZ region", () => {
     it("routes submit to the NZ write-back stub", async () => {
@@ -67,7 +59,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("routes approve to the NZ write-back stub", async () => {
       const result = await approveLeaveApplicationForRegion("NZ", approveInput);
       expect(result).toEqual({
@@ -78,7 +69,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("routes decline to the NZ write-back stub", async () => {
       const result = await declineLeaveApplicationForRegion("NZ", declineInput);
       expect(result).toEqual({
@@ -89,7 +79,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("routes withdraw to the NZ write-back stub", async () => {
       const result = await withdrawLeaveApplicationForRegion(
         "NZ",
@@ -104,28 +93,35 @@ describe("write dispatch", () => {
       });
     });
   });
-
   describe("UK region", () => {
     const ukSubmit = {
       ...submitInput,
-      xeroTenant: { ...submitInput.xeroTenant, payroll_region: "UK" as const },
-    };
-    const ukApprove = {
-      ...approveInput,
-      xeroTenant: { ...approveInput.xeroTenant, payroll_region: "UK" as const },
-    };
-    const ukDecline = {
-      ...declineInput,
-      xeroTenant: { ...declineInput.xeroTenant, payroll_region: "UK" as const },
-    };
-    const ukWithdraw = {
-      ...withdrawInput,
-      xeroTenant: {
-        ...withdrawInput.xeroTenant,
+      xeroConnection: {
+        ...submitInput.xeroConnection,
         payroll_region: "UK" as const,
       },
     };
-
+    const ukApprove = {
+      ...approveInput,
+      xeroConnection: {
+        ...approveInput.xeroConnection,
+        payroll_region: "UK" as const,
+      },
+    };
+    const ukDecline = {
+      ...declineInput,
+      xeroConnection: {
+        ...declineInput.xeroConnection,
+        payroll_region: "UK" as const,
+      },
+    };
+    const ukWithdraw = {
+      ...withdrawInput,
+      xeroConnection: {
+        ...withdrawInput.xeroConnection,
+        payroll_region: "UK" as const,
+      },
+    };
     it("routes submit to the UK write-back stub", async () => {
       const result = await submitLeaveApplicationForRegion("UK", ukSubmit);
       expect(result).toEqual({
@@ -136,7 +132,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("routes approve to the UK write-back stub", async () => {
       const result = await approveLeaveApplicationForRegion("UK", ukApprove);
       expect(result).toEqual({
@@ -147,7 +142,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("routes decline to the UK write-back stub", async () => {
       const result = await declineLeaveApplicationForRegion("UK", ukDecline);
       expect(result).toEqual({
@@ -158,7 +152,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("routes withdraw to the UK write-back stub", async () => {
       const result = await withdrawLeaveApplicationForRegion("UK", ukWithdraw);
       expect(result).toEqual({
@@ -170,7 +163,6 @@ describe("write dispatch", () => {
       });
     });
   });
-
   describe("unsupported regions", () => {
     it("returns region_not_supported_error for unsupported regions on submit", async () => {
       const result = await submitLeaveApplicationForRegion("US", submitInput);
@@ -182,7 +174,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("returns region_not_supported_error for unsupported regions on approve", async () => {
       const result = await approveLeaveApplicationForRegion("US", approveInput);
       expect(result).toEqual({
@@ -193,7 +184,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("returns region_not_supported_error for unsupported regions on decline", async () => {
       const result = await declineLeaveApplicationForRegion("US", declineInput);
       expect(result).toEqual({
@@ -204,7 +194,6 @@ describe("write dispatch", () => {
         ok: false,
       });
     });
-
     it("returns region_not_supported_error for unsupported regions on withdraw", async () => {
       const result = await withdrawLeaveApplicationForRegion(
         "US",

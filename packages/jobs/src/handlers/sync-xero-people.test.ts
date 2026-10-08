@@ -18,10 +18,12 @@ const mocks = vi.hoisted(() => ({
   syncRunFindFirst: vi.fn(),
   syncRunUpdateMany: vi.fn(),
   toPlainLanguageMessage: vi.fn(() => "Xero request failed"),
-  xeroTenantFindFirst: vi.fn(),
-  xeroTenantUpdateMany: vi.fn(),
+  xeroConnectionFindFirst: vi.fn(),
+  xeroConnectionUpdateMany: vi.fn(),
+  xeroSyncCursorCreateMany: vi.fn(),
+  xeroSyncCursorFindFirst: vi.fn(),
+  xeroSyncCursorUpdateMany: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
@@ -29,7 +31,6 @@ vi.mock("../client", () => ({
     send: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   },
 }));
-
 vi.mock("@repo/database", () => ({
   database: {
     failedRecord: { create: mocks.failedRecordCreate },
@@ -44,19 +45,22 @@ vi.mock("@repo/database", () => ({
       findFirst: mocks.syncRunFindFirst,
       updateMany: mocks.syncRunUpdateMany,
     },
-    xeroTenant: {
-      findFirst: mocks.xeroTenantFindFirst,
-      updateMany: mocks.xeroTenantUpdateMany,
+    xeroConnection: {
+      findFirst: mocks.xeroConnectionFindFirst,
+      updateMany: mocks.xeroConnectionUpdateMany,
+    },
+    xeroSyncCursor: {
+      createMany: mocks.xeroSyncCursorCreateMany,
+      findFirst: mocks.xeroSyncCursorFindFirst,
+      updateMany: mocks.xeroSyncCursorUpdateMany,
     },
   },
   scopedTo: mocks.scopedTo,
 }));
-
 vi.mock("@repo/notifications", () => ({
   publishOrganisationNotificationEvent:
     mocks.publishOrganisationNotificationEvent,
 }));
-
 vi.mock("@repo/observability/log", () => ({
   log: {
     error: vi.fn(),
@@ -64,7 +68,6 @@ vi.mock("@repo/observability/log", () => ({
     warn: vi.fn(),
   },
 }));
-
 vi.mock("@repo/xero", async () => ({
   classifyXeroFailure: (
     await vi.importActual<typeof import("@repo/xero")>("@repo/xero")
@@ -75,56 +78,44 @@ vi.mock("@repo/xero", async () => ({
     if (!result?.ok) {
       return result;
     }
-    const tenant = await mocks.xeroTenantFindFirst.mock.results.at(-1)?.value;
+    const tenant =
+      await mocks.xeroConnectionFindFirst.mock.results.at(-1)?.value;
     return {
       ok: true,
       value: {
         ...result.value,
         accessToken: "fake-access",
-        bindingGeneration: scope.expectedBindingGeneration,
         capability: scope.capability,
+        connectionId: tenant.id,
         deadline: scope.deadline,
         payrollRegion: tenant.payroll_region,
-        tokenVersion: 1,
-        xeroTenantDatabaseId: tenant.id,
-        xeroTenantId: tenant.xero_tenant_id ?? "fake-tenant",
+        providerTenantId: tenant.xero_tenant_id ?? "fake-tenant",
       },
     };
   },
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
-  toResolvedXeroTenant: (scope, value) => ({
+  toResolvedXeroConnection: (scope, value) => ({
     ...value,
     clerk_org_id: scope.clerkOrgId,
-    id: value.xeroTenantDatabaseId,
+    id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
-    xero_tenant_id: value.xeroTenantId,
+    xero_tenant_id: value.providerTenantId,
   }),
 }));
 
 import { syncXeroPeople } from "./sync-xero-people";
 
-function buildTenant(region: "AU" | "NZ" | "UK" = "NZ") {
+function buildConnection(region: "AU" | "NZ" | "UK" = "NZ") {
   return {
     clerk_org_id: "org_1",
     id: "00000000-0000-4000-8000-000000000003",
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: region,
     sync_paused_at: null,
-    xero_connection: {
-      access_token_auth_tag: "tag",
-      access_token_encrypted: "enc",
-      access_token_iv: "iv",
-      expires_at: new Date(Date.now() + 3_600_000),
-      last_refreshed_at: new Date(),
-      revoked_at: null,
-      status: "active",
-    },
-    xero_connection_id: "00000000-0000-4000-8000-000000000002",
     xero_tenant_id: "xt_1",
   };
 }
-
 describe("syncXeroPeople unit tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -133,10 +124,15 @@ describe("syncXeroPeople unit tests", () => {
       $queryRaw: vi.fn(async () => []),
       $transaction: vi.fn(async (callback) => callback(database)),
     });
-    mocks.syncRunFindFirst.mockResolvedValue(null);
+    mocks.syncRunFindFirst.mockImplementation(
+      async (args: { select?: { status?: boolean } }) =>
+        args.select?.status
+          ? { cancel_requested_at: null, status: "running" }
+          : null
+    );
     mocks.syncRunCreate.mockResolvedValue({ id: "run_1" });
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.xeroTenantFindFirst.mockResolvedValue(buildTenant("NZ"));
+    mocks.xeroConnectionFindFirst.mockResolvedValue(buildConnection("NZ"));
     mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
@@ -144,23 +140,22 @@ describe("syncXeroPeople unit tests", () => {
     mocks.personFindMany.mockResolvedValue([]);
     mocks.personUpdateMany.mockResolvedValue({ count: 0 });
     mocks.personUpsert.mockResolvedValue({ id: "person_1" });
-    mocks.xeroTenantUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroConnectionUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
+    mocks.xeroSyncCursorCreateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 1 });
   });
-
   it("rejects invalid input schema with validation_error", async () => {
     const result = await syncXeroPeople({
-      bindingGeneration: 1,
       clerkOrgId: "",
+      connectionId: "invalid-uuid",
       organisationId: "invalid-uuid",
-      xeroTenantId: "invalid-uuid",
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
-
   it("rejects non-object input", async () => {
     const result = await syncXeroPeople(null);
     expect(result.ok).toBe(false);
@@ -168,9 +163,8 @@ describe("syncXeroPeople unit tests", () => {
       expect(result.error.code).toBe("validation_error");
     }
   });
-
   it("syncs NZ employees and records counts", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue(buildTenant("NZ"));
+    mocks.xeroConnectionFindFirst.mockResolvedValue(buildConnection("NZ"));
     mocks.fetchEmployeesForRegion.mockResolvedValueOnce({
       ok: true,
       value: {
@@ -194,15 +188,12 @@ describe("syncXeroPeople unit tests", () => {
         seenEmployeeIds: ["11111111-1111-4111-8111-111111111111"],
       },
     });
-
     const result = await syncXeroPeople({
-      bindingGeneration: 1,
       clerkOrgId: "org_1",
+      connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
-      xeroTenantId: "00000000-0000-4000-8000-000000000003",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("succeeded");
@@ -232,9 +223,8 @@ describe("syncXeroPeople unit tests", () => {
       })
     );
   });
-
   it("syncs UK employees and handles case-insensitive ACTIVE status", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue(buildTenant("UK"));
+    mocks.xeroConnectionFindFirst.mockResolvedValue(buildConnection("UK"));
     mocks.fetchEmployeesForRegion.mockResolvedValueOnce({
       ok: true,
       value: {
@@ -258,15 +248,12 @@ describe("syncXeroPeople unit tests", () => {
         seenEmployeeIds: ["22222222-2222-4222-8222-222222222222"],
       },
     });
-
     const result = await syncXeroPeople({
-      bindingGeneration: 1,
       clerkOrgId: "org_1",
+      connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
-      xeroTenantId: "00000000-0000-4000-8000-000000000003",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("succeeded");
@@ -288,7 +275,6 @@ describe("syncXeroPeople unit tests", () => {
       })
     );
   });
-
   it("does not fail a person when an adapter supplies an invalid optional start date", async () => {
     mocks.fetchEmployeesForRegion.mockResolvedValueOnce({
       ok: true,
@@ -313,15 +299,12 @@ describe("syncXeroPeople unit tests", () => {
         seenEmployeeIds: ["33333333-3333-4333-8333-333333333333"],
       },
     });
-
     const result = await syncXeroPeople({
-      bindingGeneration: 1,
       clerkOrgId: "org_1",
+      connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
-      xeroTenantId: "00000000-0000-4000-8000-000000000003",
     });
-
     expect(result).toMatchObject({
       ok: true,
       value: { failed: 0, status: "succeeded", upserted: 1 },
@@ -333,9 +316,8 @@ describe("syncXeroPeople unit tests", () => {
       })
     );
   });
-
   it("handles regional fetch blanket error", async () => {
-    mocks.xeroTenantFindFirst.mockResolvedValue(buildTenant("NZ"));
+    mocks.xeroConnectionFindFirst.mockResolvedValue(buildConnection("NZ"));
     mocks.fetchEmployeesForRegion.mockResolvedValueOnce({
       error: {
         code: "auth_error",
@@ -344,15 +326,12 @@ describe("syncXeroPeople unit tests", () => {
       },
       ok: false,
     });
-
     const result = await syncXeroPeople({
-      bindingGeneration: 1,
       clerkOrgId: "org_1",
+      connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
-      xeroTenantId: "00000000-0000-4000-8000-000000000003",
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("failed");
@@ -365,10 +344,9 @@ describe("syncXeroPeople unit tests", () => {
       })
     );
   });
-
-  it("cancels generation changed after fake fetch without persisting people", async () => {
-    mocks.xeroTenantFindFirst
-      .mockResolvedValueOnce(buildTenant())
+  it("cancels connection disconnected after fake fetch without persisting people", async () => {
+    mocks.xeroConnectionFindFirst
+      .mockResolvedValueOnce(buildConnection())
       .mockResolvedValue(null);
     mocks.fetchEmployeesForRegion.mockResolvedValue({
       ok: true,
@@ -381,45 +359,21 @@ describe("syncXeroPeople unit tests", () => {
       },
     });
     const result = await syncXeroPeople({
-      bindingGeneration: 1,
       clerkOrgId: "org_1",
+      connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
-      xeroTenantId: "00000000-0000-4000-8000-000000000003",
     });
     expect(result).toMatchObject({ ok: true, value: { status: "cancelled" } });
     expect(mocks.personUpsert).not.toHaveBeenCalled();
     expect(mocks.personUpdateMany).not.toHaveBeenCalled();
-    expect(mocks.xeroTenantUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.xeroConnectionUpdateMany).not.toHaveBeenCalled();
     expect(mocks.syncRunUpdateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          error_summary: "generation_changed",
+          error_summary: "connection_changed",
           status: "cancelled",
         }),
       })
     );
   });
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

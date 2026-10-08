@@ -17,12 +17,10 @@ const mocks = vi.hoisted(() => ({
   teamFindMany: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
-
 const XERO_NOT_CONNECTED_COPY = /Xero is not connected/;
 const LEAVE_SYNCED_REGEX = /Leave synced/;
 const UNLINKED_PERSON_COPY =
   /Your account is not linked to a person in this organisation/;
-
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -36,7 +34,7 @@ vi.mock("@repo/database", () => ({
     organisation: { findFirst: mocks.organisationFindFirst },
     person: { findFirst: mocks.personFindFirst },
     team: { findMany: mocks.teamFindMany },
-    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
+    xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
   scopedQuery: mocks.scopedQuery,
 }));
@@ -78,12 +76,9 @@ vi.mock("@/components/calendar/calendar-week-view", () => ({
 vi.mock("@/components/calendar/calendar-month-view", () => ({
   CalendarMonthView: () => <div>Month view</div>,
 }));
-
 const Page = (await import("./page")).default;
-
 describe("CalendarPage", () => {
   afterEach(() => cleanup());
-
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
@@ -107,10 +102,8 @@ describe("CalendarPage", () => {
       value: calendarRange(),
     });
   });
-
   it("uses viewer default scope my_self", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
-
     expect(mocks.getCalendarRange).toHaveBeenCalledWith(
       expect.objectContaining({
         scope: { type: "my_self" },
@@ -119,12 +112,9 @@ describe("CalendarPage", () => {
     expect(screen.getByRole("region", { name: "Calendar" })).toBeDefined();
     expect(screen.queryByText("Today in view")).toBeNull();
   });
-
   it("uses admin default scope all_teams", async () => {
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
-
     render(await Page({ searchParams: Promise.resolve({}) }));
-
     expect(mocks.getCalendarRange).toHaveBeenCalledWith(
       expect.objectContaining({
         role: "admin",
@@ -132,47 +122,36 @@ describe("CalendarPage", () => {
       })
     );
   });
-
   it("renders the disconnected Xero banner", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
-
     expect(screen.getByText(XERO_NOT_CONNECTED_COPY)).toBeDefined();
   });
-
   it("normalises the legacy coverage URL to the integrated runway", async () => {
     render(
       await Page({ searchParams: Promise.resolve({ surface: "coverage" }) })
     );
-
     expect(screen.getByRole("region", { name: "Calendar" })).toBeDefined();
     expect(screen.queryByText("Week view")).toBeNull();
   });
-
   it("preserves the focused day view with scan context", async () => {
     mocks.getCalendarRange.mockResolvedValue({
       ok: true,
       value: { ...calendarRange(), view: "day" },
     });
-
     render(await Page({ searchParams: Promise.resolve({ view: "day" }) }));
-
     expect(screen.getByText("Day view")).toBeDefined();
     expect(screen.getByText("Today in view")).toBeDefined();
     expect(screen.queryByRole("region", { name: "Calendar" })).toBeNull();
   });
-
   it("renders FetchErrorState on loader failure", async () => {
     mocks.getCalendarRange.mockResolvedValue({
       error: { code: "unknown_error", message: "Nope" },
       ok: false,
     });
-
     render(await Page({ searchParams: Promise.resolve({}) }));
-
     expect(screen.getByText("Unable to load calendar")).toBeDefined();
     expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
   });
-
   it("renders connected Xero sync status when connected", async () => {
     mocks.getCalendarRange.mockResolvedValue({
       ok: true,
@@ -185,14 +164,11 @@ describe("CalendarPage", () => {
       sync_paused_at: null,
       tenant_name: "Acme Payroll AU",
     });
-
     render(await Page({ searchParams: Promise.resolve({}) }));
-
     expect(screen.queryByText(XERO_NOT_CONNECTED_COPY)).toBeNull();
     expect(screen.getByText("Acme Payroll AU")).toBeDefined();
     expect(screen.getByText(LEAVE_SYNCED_REGEX)).toBeDefined();
   });
-
   it("renders unlinked person notice when current user is not linked to an employee", async () => {
     mocks.getCalendarRange.mockResolvedValue({
       ok: true,
@@ -206,13 +182,10 @@ describe("CalendarPage", () => {
       sync_paused_at: null,
       tenant_name: "Acme Payroll AU",
     });
-
     render(await Page({ searchParams: Promise.resolve({}) }));
-
     expect(screen.getByText(UNLINKED_PERSON_COPY)).toBeDefined();
   });
 });
-
 function calendarRange() {
   return {
     days: [

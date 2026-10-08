@@ -1,178 +1,109 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  captureInitialSyncCompleted: vi.fn(),
-  inngestCreateFunction: vi.fn(
-    (config: { id: string }, handler: (...args: unknown[]) => unknown) => {
-      const fn = { fn: handler, opts: config };
-      return fn;
-    }
-  ),
-  inngestSend: vi.fn(async () => ({ ids: ["event_1"] })),
-  syncXeroLeaveBalances: vi.fn(),
-  syncXeroLeaveRecords: vi.fn(),
-  syncXeroPeople: vi.fn(),
+  balances: vi.fn(),
+  capture: vi.fn(),
+  complete: vi.fn(),
+  leave: vi.fn(),
+  people: vi.fn(),
+  request: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
-  inngest: {
-    createFunction: mocks.inngestCreateFunction,
-    send: mocks.inngestSend,
-  },
+  inngest: { createFunction: (opts: unknown, fn: unknown) => ({ fn, opts }) },
 }));
 vi.mock("../activation", () => ({
-  captureInitialSyncCompleted: mocks.captureInitialSyncCompleted,
+  captureInitialSyncCompleted: mocks.capture,
 }));
-vi.mock("./sync-xero-people", () => ({
-  syncXeroPeople: mocks.syncXeroPeople,
-  syncXeroPeopleFunction: { id: "sync-xero-people" },
+vi.mock("@repo/database/queries/xero-sync-cursors", () => ({
+  completeXeroInitialSync: mocks.complete,
+  ensureXeroInitialSyncRequested: mocks.request,
 }));
+vi.mock("./sync-xero-people", () => ({ syncXeroPeople: mocks.people }));
 vi.mock("./sync-xero-leave-records", () => ({
-  syncXeroLeaveRecords: mocks.syncXeroLeaveRecords,
-  syncXeroLeaveRecordsFunction: { id: "sync-xero-leave-records" },
+  syncXeroLeaveRecords: mocks.leave,
 }));
 vi.mock("./sync-xero-leave-balances", () => ({
-  syncXeroLeaveBalances: mocks.syncXeroLeaveBalances,
-  syncXeroLeaveBalancesFunction: { id: "sync-xero-leave-balances" },
+  syncXeroLeaveBalances: mocks.balances,
 }));
-
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_id: unknown, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-}));
-
 const { initialXeroSync, initialXeroSyncFunction } = await import(
   "./initial-xero-sync"
 );
-const { functions } = await import("../functions");
-
-describe("initialXeroSyncFunction", () => {
+const input = {
+  clerkOrgId: "org_1",
+  connectionId: "33333333-3333-4333-8333-333333333333",
+  organisationId: "11111111-1111-4111-8111-111111111111",
+  requestedAt: "2026-10-07T12:00:00.000Z",
+  runId: "22222222-2222-4222-8222-222222222222",
+};
+describe("one durable full initial import", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.syncXeroPeople.mockResolvedValue({
+    mocks.request.mockResolvedValue(input.requestedAt);
+    mocks.people.mockResolvedValue({
       ok: true,
-      value: { upserted: 5 },
+      value: { status: "succeeded" },
     });
-    mocks.syncXeroLeaveRecords.mockResolvedValue({
+    mocks.leave.mockResolvedValue({ ok: true, value: { status: "succeeded" } });
+    mocks.balances.mockResolvedValue({
       ok: true,
-      value: { upserted: 10 },
+      value: { hasMore: false, status: "succeeded" },
     });
-    mocks.syncXeroLeaveBalances.mockResolvedValue({
-      ok: true,
-      value: { upserted: 15 },
-    });
-    mocks.captureInitialSyncCompleted.mockResolvedValue(undefined);
+    mocks.complete.mockResolvedValue(new Date("2026-10-07T12:03:00Z"));
   });
-
-  it("is registered with id initial-xero-sync in functions list", () => {
-    expect(functions).toContain(initialXeroSyncFunction);
-    expect(initialXeroSyncFunction.opts.id).toBe("initial-xero-sync");
-    expect(initialXeroSyncFunction.opts.triggers).toEqual({
-      event: "initial-xero-sync",
+  it("imports all 81 balance people in three durable pages before completing", async () => {
+    let imported = 0;
+    mocks.balances.mockImplementation(() => {
+      const count = Math.min(40, 81 - imported);
+      imported += count;
+      return Promise.resolve({
+        ok: true,
+        value: { hasMore: imported < 81, status: "succeeded", upserted: count },
+      });
     });
-  });
-
-  it("executes the four stages in strict durable order: people, records, balances, activation", async () => {
-    const handler: unknown = Reflect.get(initialXeroSyncFunction, "fn");
-    if (typeof handler !== "function") {
-      throw new Error("Expected registered Inngest handler");
-    }
-
-    const stepOrder: string[] = [];
-    const mockStep = {
-      run: vi.fn(async (stepName: string, stepFn: () => Promise<unknown>) => {
-        stepOrder.push(stepName);
-        return await stepFn();
-      }),
-    };
-
-    const eventPayload = {
-      bindingGeneration: 1,
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-      runId: "22222222-2222-4222-8222-222222222222",
-      triggeredByUserId: "user_1",
-      triggerType: "manual" as const,
-      xeroTenantId: "33333333-3333-4333-8333-333333333333",
-    };
-
-    const result = await handler({
-      event: { data: eventPayload },
-      runId: "worker-run-1",
-      step: mockStep,
+    const stages: string[] = [];
+    const handler = Reflect.get(initialXeroSyncFunction, "fn");
+    await handler({
+      event: { data: input },
+      step: {
+        run: (name: string, operation: () => Promise<unknown>) => {
+          stages.push(name);
+          return operation();
+        },
+      },
     });
-
-    expect(stepOrder).toEqual([
+    expect(imported).toBe(81);
+    expect(stages).toEqual([
       "sync-people",
       "sync-leave-records",
-      "sync-leave-balances",
-      "finalise-activation",
+      "sync-leave-balances-0",
+      "sync-leave-balances-1",
+      "sync-leave-balances-2",
+      "complete-initial-import",
     ]);
-
-    expect(mocks.syncXeroPeople).toHaveBeenCalledWith(
-      eventPayload,
-      "worker-run-1"
-    );
-    expect(mocks.syncXeroLeaveRecords).toHaveBeenCalledWith(
-      eventPayload,
-      "worker-run-1"
-    );
-    expect(mocks.syncXeroLeaveBalances).toHaveBeenCalledWith(
-      eventPayload,
-      "worker-run-1"
-    );
-    expect(mocks.captureInitialSyncCompleted).toHaveBeenCalledWith(
-      eventPayload
-    );
-
-    expect(result).toMatchObject({
-      leaveBalances: { ok: true, value: { upserted: 15 } },
-      leaveRecords: { ok: true, value: { upserted: 10 } },
-      people: { ok: true, value: { upserted: 5 } },
+    expect(mocks.people.mock.calls[0][0]).toMatchObject({
+      mode: "full",
+      requestedAt: input.requestedAt,
     });
-  });
-
-  it("direct invocation runs all stages sequentially and returns results", async () => {
-    const input = {
-      bindingGeneration: 2,
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-      xeroTenantId: "33333333-3333-4333-8333-333333333333",
-    };
-
-    const result = await initialXeroSync(input);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-
-    expect(mocks.syncXeroPeople).toHaveBeenCalledWith(
-      expect.objectContaining({
-        bindingGeneration: 2,
-        clerkOrgId: "org_1",
-      }),
-      null
+    expect(mocks.people.mock.calls[0][0].runId).not.toBe(input.runId);
+    expect(mocks.leave.mock.calls[0][0].runId).not.toBe(
+      mocks.people.mock.calls[0][0].runId
     );
-    expect(mocks.syncXeroLeaveRecords).toHaveBeenCalled();
-    expect(mocks.syncXeroLeaveBalances).toHaveBeenCalled();
-    expect(mocks.captureInitialSyncCompleted).toHaveBeenCalled();
-    expect(result.value.completedAt).toBeInstanceOf(Date);
+    expect(mocks.complete).toHaveBeenCalledOnce();
   });
-
-  it("direct invocation validates required inputs", async () => {
-    const invalid = {
-      clerkOrgId: "org_1",
-    };
-
-    const result = await initialXeroSync(invalid);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.code).toBe("validation_error");
+  it.each(["failed", "partial_success", "cancelled"])(
+    "does not complete or continue a %s phase",
+    async (status) => {
+      mocks.people.mockResolvedValue({ ok: true, value: { status } });
+      const result = await initialXeroSync(input);
+      expect(result.ok).toBe(false);
+      expect(mocks.leave).not.toHaveBeenCalled();
+      expect(mocks.complete).not.toHaveBeenCalled();
     }
+  );
+  it("cannot complete an old requestedAt after reconnect", async () => {
+    mocks.complete.mockResolvedValue(null);
+    expect((await initialXeroSync(input)).ok).toBe(false);
+    expect(mocks.capture).not.toHaveBeenCalled();
   });
 });

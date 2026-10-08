@@ -16,7 +16,6 @@ interface EmployeeViewProps {
   personId: string;
   view: EmployeeDashboardView;
 }
-
 export function EmployeeView({
   view,
   orgQueryValue,
@@ -27,7 +26,6 @@ export function EmployeeView({
     now: new Date(),
     timezone: view.header.timezone ?? "Australia/Brisbane",
   });
-
   return (
     <DashboardScaffold
       banner={

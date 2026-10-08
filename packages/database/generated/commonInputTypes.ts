@@ -368,72 +368,21 @@ export type Enumavailability_contactabilityWithAggregatesFilter<$PrismaModel = n
   _max?: Prisma.NestedEnumavailability_contactabilityFilter<$PrismaModel>
 }
 
-export type Enumxero_connection_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel> | $Enums.xero_connection_status
+export type Enumxero_authorisation_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_authorisation_status | Prisma.Enumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_authorisation_statusFilter<$PrismaModel> | $Enums.xero_authorisation_status
 }
 
-export type Enumxero_connection_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_connection_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_connection_status
+export type Enumxero_authorisation_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_authorisation_status | Prisma.Enumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_authorisation_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_authorisation_status
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
-}
-
-export type Enumxero_credential_usabilityFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_credential_usability | Prisma.Enumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_credential_usabilityFilter<$PrismaModel> | $Enums.xero_credential_usability
-}
-
-export type Enumxero_credential_usabilityWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_credential_usability | Prisma.Enumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_credential_usabilityWithAggregatesFilter<$PrismaModel> | $Enums.xero_credential_usability
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_credential_usabilityFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_credential_usabilityFilter<$PrismaModel>
-}
-
-export type Enumxero_refresh_attempt_outcomeFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_refresh_attempt_outcome | Prisma.Enumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel> | $Enums.xero_refresh_attempt_outcome
-}
-
-export type Enumxero_refresh_attempt_outcomeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_refresh_attempt_outcome | Prisma.Enumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_refresh_attempt_outcomeWithAggregatesFilter<$PrismaModel> | $Enums.xero_refresh_attempt_outcome
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel>
-}
-
-export type Enumxero_provider_connection_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_provider_connection_status | Prisma.Enumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_provider_connection_statusFilter<$PrismaModel> | $Enums.xero_provider_connection_status
-}
-
-export type Enumxero_provider_connection_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_provider_connection_status | Prisma.Enumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_provider_connection_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_provider_connection_status
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_provider_connection_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_provider_connection_statusFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_authorisation_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_authorisation_statusFilter<$PrismaModel>
 }
 
 export type Enumpayroll_regionFilter<$PrismaModel = never> = {
@@ -441,6 +390,13 @@ export type Enumpayroll_regionFilter<$PrismaModel = never> = {
   in?: $Enums.payroll_region[] | Prisma.ListEnumpayroll_regionFieldRefInput<$PrismaModel>
   notIn?: $Enums.payroll_region[] | Prisma.ListEnumpayroll_regionFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumpayroll_regionFilter<$PrismaModel> | $Enums.payroll_region
+}
+
+export type Enumxero_connection_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel> | $Enums.xero_connection_status
 }
 
 export type Enumpayroll_regionWithAggregatesFilter<$PrismaModel = never> = {
@@ -453,25 +409,21 @@ export type Enumpayroll_regionWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumpayroll_regionFilter<$PrismaModel>
 }
 
+export type Enumxero_connection_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_connection_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_connection_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
+}
+
 export type Enumxero_oauth_session_statusFilter<$PrismaModel = never> = {
   equals?: $Enums.xero_oauth_session_status | Prisma.Enumxero_oauth_session_statusFieldRefInput<$PrismaModel>
   in?: $Enums.xero_oauth_session_status[] | Prisma.ListEnumxero_oauth_session_statusFieldRefInput<$PrismaModel>
   notIn?: $Enums.xero_oauth_session_status[] | Prisma.ListEnumxero_oauth_session_statusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumxero_oauth_session_statusFilter<$PrismaModel> | $Enums.xero_oauth_session_status
-}
-
-export type Enumxero_oauth_intent_kindNullableFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_oauth_intent_kind | Prisma.Enumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel> | $Enums.xero_oauth_intent_kind | null
-}
-
-export type Enumxero_token_exchange_statusNullableFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_token_exchange_status | Prisma.Enumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel> | $Enums.xero_token_exchange_status | null
 }
 
 export type JsonNullableFilter<$PrismaModel = never> =
@@ -515,26 +467,6 @@ export type Enumxero_oauth_session_statusWithAggregatesFilter<$PrismaModel = nev
   _max?: Prisma.NestedEnumxero_oauth_session_statusFilter<$PrismaModel>
 }
 
-export type Enumxero_oauth_intent_kindNullableWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_oauth_intent_kind | Prisma.Enumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_oauth_intent_kindNullableWithAggregatesFilter<$PrismaModel> | $Enums.xero_oauth_intent_kind | null
-  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel>
-}
-
-export type Enumxero_token_exchange_statusNullableWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_token_exchange_status | Prisma.Enumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_token_exchange_statusNullableWithAggregatesFilter<$PrismaModel> | $Enums.xero_token_exchange_status | null
-  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel>
-}
-
 export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
 | Prisma.PatchUndefined<
     Prisma.Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
@@ -572,21 +504,21 @@ export type Enumpayroll_regionNullableWithAggregatesFilter<$PrismaModel = never>
   _max?: Prisma.NestedEnumpayroll_regionNullableFilter<$PrismaModel>
 }
 
-export type Enumxero_sync_entity_typeFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+export type Enumxero_cursor_entity_typeFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cursor_entity_type | Prisma.Enumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cursor_entity_typeFilter<$PrismaModel> | $Enums.xero_cursor_entity_type
 }
 
-export type Enumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+export type Enumxero_cursor_entity_typeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cursor_entity_type | Prisma.Enumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cursor_entity_typeWithAggregatesFilter<$PrismaModel> | $Enums.xero_cursor_entity_type
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_cursor_entity_typeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_cursor_entity_typeFilter<$PrismaModel>
 }
 
 export type Enumavailability_record_typeFilter<$PrismaModel = never> = {
@@ -1007,11 +939,28 @@ export type Enumxero_sync_entity_typeNullableWithAggregatesFilter<$PrismaModel =
   _max?: Prisma.NestedEnumxero_sync_entity_typeNullableFilter<$PrismaModel>
 }
 
+export type Enumxero_sync_entity_typeFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+}
+
 export type Enumsync_failed_record_typeFilter<$PrismaModel = never> = {
   equals?: $Enums.sync_failed_record_type | Prisma.Enumsync_failed_record_typeFieldRefInput<$PrismaModel>
   in?: $Enums.sync_failed_record_type[] | Prisma.ListEnumsync_failed_record_typeFieldRefInput<$PrismaModel>
   notIn?: $Enums.sync_failed_record_type[] | Prisma.ListEnumsync_failed_record_typeFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumsync_failed_record_typeFilter<$PrismaModel> | $Enums.sync_failed_record_type
+}
+
+export type Enumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
 }
 
 export type Enumsync_failed_record_typeWithAggregatesFilter<$PrismaModel = never> = {
@@ -1073,74 +1022,6 @@ export type Enumstripe_event_delivery_stateWithAggregatesFilter<$PrismaModel = n
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
   _max?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
-}
-
-export type Enumxero_cleanup_data_action_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
-}
-
-export type Enumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
-}
-
-export type Enumxero_cleanup_attempt_stateFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
-}
-
-export type Enumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
-}
-
-export type Enumxero_inactivity_kindFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel> | $Enums.xero_inactivity_kind
-}
-
-export type Enumxero_inactivity_review_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
-}
-
-export type Enumxero_inactivity_kindWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_kindWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_kind
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
-}
-
-export type Enumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
 }
 
 export type NestedUuidFilter<$PrismaModel = never> = {
@@ -1506,72 +1387,21 @@ export type NestedEnumavailability_contactabilityWithAggregatesFilter<$PrismaMod
   _max?: Prisma.NestedEnumavailability_contactabilityFilter<$PrismaModel>
 }
 
-export type NestedEnumxero_connection_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel> | $Enums.xero_connection_status
+export type NestedEnumxero_authorisation_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_authorisation_status | Prisma.Enumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_authorisation_statusFilter<$PrismaModel> | $Enums.xero_authorisation_status
 }
 
-export type NestedEnumxero_connection_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_connection_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_connection_status
+export type NestedEnumxero_authorisation_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_authorisation_status | Prisma.Enumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_authorisation_status[] | Prisma.ListEnumxero_authorisation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_authorisation_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_authorisation_status
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_credential_usabilityFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_credential_usability | Prisma.Enumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_credential_usabilityFilter<$PrismaModel> | $Enums.xero_credential_usability
-}
-
-export type NestedEnumxero_credential_usabilityWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_credential_usability | Prisma.Enumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_credential_usability[] | Prisma.ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_credential_usabilityWithAggregatesFilter<$PrismaModel> | $Enums.xero_credential_usability
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_credential_usabilityFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_credential_usabilityFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_refresh_attempt_outcome | Prisma.Enumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel> | $Enums.xero_refresh_attempt_outcome
-}
-
-export type NestedEnumxero_refresh_attempt_outcomeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_refresh_attempt_outcome | Prisma.Enumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_refresh_attempt_outcome[] | Prisma.ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_refresh_attempt_outcomeWithAggregatesFilter<$PrismaModel> | $Enums.xero_refresh_attempt_outcome
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_refresh_attempt_outcomeFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_provider_connection_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_provider_connection_status | Prisma.Enumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_provider_connection_statusFilter<$PrismaModel> | $Enums.xero_provider_connection_status
-}
-
-export type NestedEnumxero_provider_connection_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_provider_connection_status | Prisma.Enumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_provider_connection_status[] | Prisma.ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_provider_connection_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_provider_connection_status
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_provider_connection_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_provider_connection_statusFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_authorisation_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_authorisation_statusFilter<$PrismaModel>
 }
 
 export type NestedEnumpayroll_regionFilter<$PrismaModel = never> = {
@@ -1579,6 +1409,13 @@ export type NestedEnumpayroll_regionFilter<$PrismaModel = never> = {
   in?: $Enums.payroll_region[] | Prisma.ListEnumpayroll_regionFieldRefInput<$PrismaModel>
   notIn?: $Enums.payroll_region[] | Prisma.ListEnumpayroll_regionFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumpayroll_regionFilter<$PrismaModel> | $Enums.payroll_region
+}
+
+export type NestedEnumxero_connection_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel> | $Enums.xero_connection_status
 }
 
 export type NestedEnumpayroll_regionWithAggregatesFilter<$PrismaModel = never> = {
@@ -1591,25 +1428,21 @@ export type NestedEnumpayroll_regionWithAggregatesFilter<$PrismaModel = never> =
   _max?: Prisma.NestedEnumpayroll_regionFilter<$PrismaModel>
 }
 
+export type NestedEnumxero_connection_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_connection_status | Prisma.Enumxero_connection_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_connection_status[] | Prisma.ListEnumxero_connection_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_connection_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_connection_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_connection_statusFilter<$PrismaModel>
+}
+
 export type NestedEnumxero_oauth_session_statusFilter<$PrismaModel = never> = {
   equals?: $Enums.xero_oauth_session_status | Prisma.Enumxero_oauth_session_statusFieldRefInput<$PrismaModel>
   in?: $Enums.xero_oauth_session_status[] | Prisma.ListEnumxero_oauth_session_statusFieldRefInput<$PrismaModel>
   notIn?: $Enums.xero_oauth_session_status[] | Prisma.ListEnumxero_oauth_session_statusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumxero_oauth_session_statusFilter<$PrismaModel> | $Enums.xero_oauth_session_status
-}
-
-export type NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_oauth_intent_kind | Prisma.Enumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel> | $Enums.xero_oauth_intent_kind | null
-}
-
-export type NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_token_exchange_status | Prisma.Enumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel> | $Enums.xero_token_exchange_status | null
 }
 
 export type NestedEnumpayroll_regionNullableFilter<$PrismaModel = never> = {
@@ -1627,26 +1460,6 @@ export type NestedEnumxero_oauth_session_statusWithAggregatesFilter<$PrismaModel
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumxero_oauth_session_statusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumxero_oauth_session_statusFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_oauth_intent_kindNullableWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_oauth_intent_kind | Prisma.Enumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_oauth_intent_kind[] | Prisma.ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_oauth_intent_kindNullableWithAggregatesFilter<$PrismaModel> | $Enums.xero_oauth_intent_kind | null
-  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_oauth_intent_kindNullableFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_token_exchange_statusNullableWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_token_exchange_status | Prisma.Enumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  in?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  notIn?: $Enums.xero_token_exchange_status[] | Prisma.ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> | null
-  not?: Prisma.NestedEnumxero_token_exchange_statusNullableWithAggregatesFilter<$PrismaModel> | $Enums.xero_token_exchange_status | null
-  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_token_exchange_statusNullableFilter<$PrismaModel>
 }
 
 export type NestedJsonNullableFilter<$PrismaModel = never> =
@@ -1683,21 +1496,21 @@ export type NestedEnumpayroll_regionNullableWithAggregatesFilter<$PrismaModel = 
   _max?: Prisma.NestedEnumpayroll_regionNullableFilter<$PrismaModel>
 }
 
-export type NestedEnumxero_sync_entity_typeFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+export type NestedEnumxero_cursor_entity_typeFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cursor_entity_type | Prisma.Enumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cursor_entity_typeFilter<$PrismaModel> | $Enums.xero_cursor_entity_type
 }
 
-export type NestedEnumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+export type NestedEnumxero_cursor_entity_typeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cursor_entity_type | Prisma.Enumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cursor_entity_type[] | Prisma.ListEnumxero_cursor_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cursor_entity_typeWithAggregatesFilter<$PrismaModel> | $Enums.xero_cursor_entity_type
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_cursor_entity_typeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_cursor_entity_typeFilter<$PrismaModel>
 }
 
 export type NestedEnumavailability_record_typeFilter<$PrismaModel = never> = {
@@ -2118,11 +1931,28 @@ export type NestedEnumxero_sync_entity_typeNullableWithAggregatesFilter<$PrismaM
   _max?: Prisma.NestedEnumxero_sync_entity_typeNullableFilter<$PrismaModel>
 }
 
+export type NestedEnumxero_sync_entity_typeFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+}
+
 export type NestedEnumsync_failed_record_typeFilter<$PrismaModel = never> = {
   equals?: $Enums.sync_failed_record_type | Prisma.Enumsync_failed_record_typeFieldRefInput<$PrismaModel>
   in?: $Enums.sync_failed_record_type[] | Prisma.ListEnumsync_failed_record_typeFieldRefInput<$PrismaModel>
   notIn?: $Enums.sync_failed_record_type[] | Prisma.ListEnumsync_failed_record_typeFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumsync_failed_record_typeFilter<$PrismaModel> | $Enums.sync_failed_record_type
+}
+
+export type NestedEnumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_sync_entity_type | Prisma.Enumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_sync_entity_type[] | Prisma.ListEnumxero_sync_entity_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_sync_entity_typeWithAggregatesFilter<$PrismaModel> | $Enums.xero_sync_entity_type
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_sync_entity_typeFilter<$PrismaModel>
 }
 
 export type NestedEnumsync_failed_record_typeWithAggregatesFilter<$PrismaModel = never> = {
@@ -2184,74 +2014,6 @@ export type NestedEnumstripe_event_delivery_stateWithAggregatesFilter<$PrismaMod
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
   _max?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
-}
-
-export type NestedEnumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
-}
-
-export type NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_inactivity_kindFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel> | $Enums.xero_inactivity_kind
-}
-
-export type NestedEnumxero_inactivity_review_statusFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
-}
-
-export type NestedEnumxero_inactivity_kindWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_kindWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_kind
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
-}
-
-export type NestedEnumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
 }
 
 

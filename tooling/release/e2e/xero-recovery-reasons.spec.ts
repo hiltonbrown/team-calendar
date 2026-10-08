@@ -3,7 +3,7 @@ import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { releaseEnvironment } from "./environment.js";
 import { expect, test, useRole } from "./fixture.js";
 
-// Written for Plan 160, NOT_VERIFIED. The campaign must seed these scenarios
+// Written for Plan 160, NOT_VERIFIED. Controlled fixtures must seed these scenarios
 // in manifest-owned organisations and use only fake Xero responses. This spec
 // reads rendered recovery states and never triggers a provider operation.
 const messages = [
@@ -26,7 +26,6 @@ const messages = [
     "unavailable",
     "We cannot reach Xero right now. Try again later or contact support.",
   ],
-  ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
   ["reauthorisation_required", "Xero access needs to be renewed."],
   ["not_connected", "Xero is not connected."],
 ] as const;

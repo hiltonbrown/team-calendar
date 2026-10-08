@@ -1,5 +1,4 @@
 import "server-only";
-
 import { createHash } from "node:crypto";
 import type {
   ExternalWritePort,
@@ -11,13 +10,12 @@ import { xeroRecoveryMessage } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
   database,
+  getSubmitOperation,
   hasUnresolvedSubmitOperation,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
-  markSubmitDispatchStarted,
   markSubmitOutcomeUnknown,
   markSubmitProviderAccepted,
-  prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects,
   scopedTo as scoped,
 } from "@repo/database";
@@ -46,22 +44,54 @@ import {
   XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
 import { completeSubmitSideEffects } from "./submit-side-effects";
-
+import {
+  completeXeroWriteSideEffects,
+  isDefinitiveWriteFailure,
+  prepareXeroWrite as prepareJournaledWrite,
+  recordXeroWriteOutcome,
+} from "./write-operation";
 export type SubmitServiceError =
-  | { code: "invalid_state_for_retry"; message: string }
-  | { code: "invalid_state_for_revert"; message: string }
-  | { code: "invalid_state_for_submit"; message: string }
-  | { code: "invalid_state_for_withdraw"; message: string }
-  | { code: "not_a_leave_type"; message: string }
-  | { code: "not_authorised"; message: string }
-  | { code: "record_not_found"; message: string }
+  | {
+      code: "invalid_state_for_retry";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_revert";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_submit";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_withdraw";
+      message: string;
+    }
+  | {
+      code: "not_a_leave_type";
+      message: string;
+    }
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "record_not_found";
+      message: string;
+    }
   | {
       code: "submission_blocked_resolution";
       message: string;
       resolutionError: ProviderResolutionError;
     }
-  | { code: "submission_outcome_unknown"; message: string }
-  | { code: "unknown_error"; message: string }
+  | {
+      code: "submission_outcome_unknown";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
   | {
       code: "xero_not_connected";
       message: string;
@@ -71,7 +101,6 @@ export type SubmitServiceError =
       message: string;
       xeroError: ProviderWriteError;
     };
-
 const RecordActionSchema = z.object({
   actingOrgRole: z.string().nullable().optional(),
   actingUserId: z.string().min(1),
@@ -79,7 +108,6 @@ const RecordActionSchema = z.object({
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
 });
-
 type RecordActionInput = z.infer<typeof RecordActionSchema>;
 type LoadedRecord = NonNullable<Awaited<ReturnType<typeof loadScopedRecord>>>;
 type JsonValue =
@@ -88,15 +116,15 @@ type JsonValue =
   | number
   | string
   | JsonValue[]
-  | { [key: string]: JsonValue };
-
+  | {
+      [key: string]: JsonValue;
+    };
 export async function submitDraftRecord(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
   return await transitionLocalSubmission(input, "draft", externalWritePort);
 }
-
 export async function retrySubmission(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
@@ -107,7 +135,6 @@ export async function retrySubmission(
     externalWritePort
   );
 }
-
 async function transitionLocalSubmission(
   input: RecordActionInput,
   expectedStatus: "draft" | "xero_sync_failed",
@@ -234,11 +261,12 @@ async function transitionLocalSubmission(
       : unknownError("Failed to submit this record.");
   }
 }
-
 // The approver service checks manager scope before invoking the provider create.
 // The durable operation is an approval, even though the provider port calls its create method submit.
 export async function createLeaveOnApproval(
-  input: RecordActionInput & { actingPersonId: string | null },
+  input: RecordActionInput & {
+    actingPersonId: string | null;
+  },
   externalWritePort: ExternalWritePort,
   retry = false
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
@@ -256,7 +284,6 @@ export async function createLeaveOnApproval(
     validStatus: retry ? "xero_sync_failed" : "submitted",
   });
 }
-
 export async function revertToDraft(
   input: RecordActionInput
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
@@ -264,13 +291,11 @@ export async function revertToDraft(
   if (!parsed.success) {
     return unknownError("Invalid submission request.");
   }
-
   try {
     const authorised = await loadAndAuthorise(parsed.data, "manager_allowed");
     if (!authorised.ok) {
       return authorised;
     }
-
     if (
       authorised.value.approval_status !== "xero_sync_failed" ||
       authorised.value.failed_action !== "submit"
@@ -286,7 +311,6 @@ export async function revertToDraft(
     ) {
       return submissionOutcomeUnknown();
     }
-
     await database.$transaction(async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
@@ -307,7 +331,6 @@ export async function revertToDraft(
       if (update.count !== 1) {
         throw new OptimisticConflictError();
       }
-
       await tx.auditEvent.create({
         data: auditData(
           parsed.data,
@@ -316,7 +339,6 @@ export async function revertToDraft(
         ),
       });
     });
-
     const updated = await loadBareRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
@@ -330,7 +352,7 @@ export async function revertToDraft(
     return unknownError("Failed to revert this record to draft.");
   }
 }
-
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep local withdrawal and journalled remote withdrawal uncertainty beside their scoped transitions.
 export async function withdrawSubmission(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
@@ -339,24 +361,39 @@ export async function withdrawSubmission(
   if (!parsed.success) {
     return unknownError("Invalid submission request.");
   }
-
   let claimedAt: Date | null = null;
+  let journalAttempt:
+    | import("@repo/database").OutboundOperationAttemptScope
+    | null = null;
   try {
     const authorised = await loadAndAuthorise(parsed.data, "owner_only");
     if (!authorised.ok) {
       return authorised;
     }
     const record = authorised.value;
-
+    if (
+      record.approval_status === "withdrawn" &&
+      (
+        await getSubmitOperation({
+          action: "withdraw",
+          availabilityRecordId: record.id,
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        })
+      )?.status === "completed"
+    ) {
+      return { ok: true, value: record };
+    }
     if (!canWithdrawRecord(record)) {
       return invalidState("invalid_state_for_withdraw");
     }
     if (
-      await hasUnresolvedSubmitOperation({
+      !record.source_remote_id &&
+      (await hasUnresolvedSubmitOperation({
         availabilityRecordId: record.id,
         clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
-      })
+      }))
     ) {
       return submissionOutcomeUnknown();
     }
@@ -366,27 +403,76 @@ export async function withdrawSubmission(
     if (prepared && !prepared.ok) {
       return prepared;
     }
-
-    claimedAt = await acquireXeroWriteClaim({
-      ...parsed.data,
-      expectedFailedAction: record.failed_action,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: record.approval_status,
-    });
+    const journal =
+      record.source_remote_id && prepared?.ok
+        ? await prepareJournaledWrite(
+            {
+              action: "withdraw",
+              actorUserId: parsed.data.actingUserId,
+              ...parsed.data,
+              employeeId: prepared.value.xeroEmployeeId,
+              endsAt: record.ends_at,
+              expectedFailedAction:
+                record.failed_action === "withdraw" ? "withdraw" : null,
+              expectedSequence: record.derived_sequence,
+              expectedStatus: record.approval_status,
+              remoteId: record.source_remote_id,
+              startsAt: record.starts_at,
+              title: record.title,
+              units: 0,
+            },
+            externalWritePort
+          )
+        : null;
+    if (journal && !journal.ok) {
+      return submissionOutcomeUnknown();
+    }
+    if (journal?.ok) {
+      journalAttempt = {
+        action: "withdraw",
+        attemptGeneration: journal.value.attemptGeneration,
+        availabilityRecordId: record.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      };
+    }
+    claimedAt = journal?.ok
+      ? journal.value.claimedAt
+      : await acquireXeroWriteClaim({
+          ...parsed.data,
+          expectedFailedAction: record.failed_action,
+          expectedSequence: record.derived_sequence,
+          expectedStatus: record.approval_status,
+          localAction: "withdraw",
+        });
     if (!claimedAt) {
       return invalidState("invalid_state_for_withdraw");
     }
     const ownerClaim = claimedAt;
-
     const xeroLeaveApplicationId = record.source_remote_id;
     if (xeroLeaveApplicationId) {
-      const response = await externalWritePort.withdrawLeaveApplication({
-        clerkOrgId: parsed.data.clerkOrgId,
-        employeeId: prepared?.ok ? prepared.value.xeroEmployeeId : "",
-        organisationId: parsed.data.organisationId,
-        remoteId: xeroLeaveApplicationId,
-      });
-
+      const response =
+        journal?.ok && journal.value.providerAccepted
+          ? { ok: true as const, value: undefined }
+          : await externalWritePort.withdrawLeaveApplication({
+              clerkOrgId: parsed.data.clerkOrgId,
+              employeeId: prepared?.ok ? prepared.value.xeroEmployeeId : "",
+              mutation: journal?.ok ? journal.value.mutation : undefined,
+              organisationId: parsed.data.organisationId,
+              remoteId: xeroLeaveApplicationId,
+            });
+      if (
+        !(journal?.ok && journal.value.providerAccepted) &&
+        journalAttempt &&
+        !(await recordXeroWriteOutcome(
+          journalAttempt,
+          response,
+          xeroLeaveApplicationId,
+          journal?.ok ? journal.value.replayedUnknown : false
+        ))
+      ) {
+        throw new Error("Xero journal outcome changed.");
+      }
       if (!response.ok) {
         return await persistXeroFailure({
           actionUrl: `/plans?recordId=${record.id}`,
@@ -396,6 +482,10 @@ export async function withdrawSubmission(
           expectedStatus: record.approval_status,
           failedAction: "withdraw",
           input: parsed.data,
+          preserveApproved:
+            record.approval_status === "approved" &&
+            !(journal?.ok && journal.value.replayedUnknown) &&
+            isDefinitiveWriteFailure(response.error),
           record,
         });
       }
@@ -406,7 +496,9 @@ export async function withdrawSubmission(
           approval_status: "withdrawn",
           derived_sequence: { increment: 1 },
           failed_action: null,
-          updated_by_user_id: parsed.data.actingUserId,
+          updated_by_user_id: journal?.ok
+            ? journal.value.actorUserId
+            : parsed.data.actingUserId,
           withdrawn_at: new Date(),
           xero_write_claimed_at: null,
           xero_write_error: null,
@@ -423,23 +515,52 @@ export async function withdrawSubmission(
       if (update.count !== 1) {
         throw new OptimisticConflictError();
       }
-
       await tx.auditEvent.create({
-        data: auditData(parsed.data, "availability_records.withdrawn", {
-          ...(xeroLeaveApplicationId ? { xeroLeaveApplicationId } : {}),
-        }),
+        data: auditData(
+          {
+            ...parsed.data,
+            actingUserId: journal?.ok
+              ? journal.value.actorUserId
+              : parsed.data.actingUserId,
+          },
+          "availability_records.withdrawn",
+          {
+            ...(xeroLeaveApplicationId ? { xeroLeaveApplicationId } : {}),
+          }
+        ),
       });
     });
-
-    await notifyManagerBestEffort(parsed.data, record, "leave_withdrawn", {
-      actionUrl: `/leave-approvals?recordId=${record.id}`,
-    });
-
+    if (journal?.ok && journalAttempt) {
+      if (
+        !(await completeXeroWriteSideEffects({
+          actorUserId: journal.value.actorUserId,
+          attempt: journalAttempt,
+          clerkOrgId: parsed.data.clerkOrgId,
+          manager: record.person.manager?.clerk_user_id
+            ? {
+                clerkUserId: record.person.manager.clerk_user_id,
+                personId: record.person.manager.id,
+              }
+            : null,
+          organisationId: parsed.data.organisationId,
+          recipient: null,
+          recordId: record.id,
+        }))
+      ) {
+        return submissionOutcomeUnknown();
+      }
+    } else {
+      await notifyManagerBestEffort(parsed.data, record, "leave_withdrawn", {
+        actionUrl: `/leave-approvals?recordId=${record.id}`,
+      });
+    }
     const updated = await loadBareRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
     }
-    await materialiseSubmitPublication(parsed.data);
+    if (!journalAttempt) {
+      await materialiseSubmitPublication(parsed.data);
+    }
     return { ok: true, value: updated };
   } catch (error) {
     if (claimedAt) {
@@ -451,7 +572,6 @@ export async function withdrawSubmission(
     return unknownError("Failed to withdraw this submission.");
   }
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Submission deliberately keeps durable operation transitions beside the synchronous provider call so reviewers can verify every uncertainty edge in one ordered path.
 async function performApprovalCreation(
   input: RecordActionInput,
@@ -468,7 +588,6 @@ async function performApprovalCreation(
   if (!parsed.success) {
     return unknownError("Invalid submission request.");
   }
-
   let record: LoadedRecord | null = null;
   let claimedAt: Date | null = null;
   let dispatchStarted = false;
@@ -515,7 +634,19 @@ async function performApprovalCreation(
         };
       }
     }
-
+    if (
+      record.approval_status === "approved" &&
+      (
+        await getSubmitOperation({
+          action: "approve",
+          availabilityRecordId: record.id,
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        })
+      )?.status === "completed"
+    ) {
+      return { ok: true, value: record };
+    }
     if (
       record.source_type !== "team_calendar_leave" ||
       record.source_remote_id !== null ||
@@ -534,7 +665,6 @@ async function performApprovalCreation(
         ok: false,
       };
     }
-
     const organisation = await database.organisation.findFirst({
       select: { country_code: true },
       where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
@@ -549,7 +679,6 @@ async function performApprovalCreation(
         ok: false,
       };
     }
-
     const prepared = await prepareXeroWrite(
       parsed.data,
       record,
@@ -558,74 +687,80 @@ async function performApprovalCreation(
     if (!prepared.ok) {
       return prepared;
     }
-
     const operationScope = {
       action: "approve" as const,
       availabilityRecordId: record.id,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     };
-    const preparedOperation = await prepareAndClaimSubmitOperation({
-      ...operationScope,
-      actorUserId: parsed.data.actingUserId,
-      claimableBefore: new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
-      expectedFailedAction:
-        options.validStatus === "xero_sync_failed" ? "approve" : null,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: options.validStatus,
-      requestEmployeeId: prepared.value.xeroEmployeeId,
-      requestEndsAt: record.ends_at,
-      requestFingerprint: submitRequestFingerprint({
+    const journal = await prepareJournaledWrite(
+      {
+        action: "approve",
+        actorUserId: parsed.data.actingUserId,
+        ...parsed.data,
         employeeId: prepared.value.xeroEmployeeId,
         endsAt: record.ends_at,
+        expectedFailedAction:
+          options.validStatus === "xero_sync_failed" ? "approve" : null,
+        expectedSequence: record.derived_sequence,
+        expectedStatus: options.validStatus,
         leaveTypeId: prepared.value.xeroLeaveTypeId,
+        requestFingerprint: submitRequestFingerprint({
+          employeeId: prepared.value.xeroEmployeeId,
+          endsAt: record.ends_at,
+          leaveTypeId: prepared.value.xeroLeaveTypeId,
+          startsAt: record.starts_at,
+          title: record.title ?? "Leave request",
+          units: prepared.value.units,
+        }),
         startsAt: record.starts_at,
         title: record.title ?? "Leave request",
         units: prepared.value.units,
-      }),
-      requestLeaveTypeId: prepared.value.xeroLeaveTypeId,
-      requestStartsAt: record.starts_at,
-      requestTitle: record.title ?? "Leave request",
-      requestUnits: prepared.value.units,
-    });
-    if (!preparedOperation) {
+      },
+      externalWritePort
+    );
+    if (!journal.ok) {
       return submissionOutcomeUnknown();
     }
+    const preparedOperation = journal.value;
     ({ attemptGeneration, claimedAt } = preparedOperation);
     const operationAttempt = { ...operationScope, attemptGeneration };
-
-    // Fence the immutable create attempt before dispatch. An uncertain response
-    // requires provider evidence before another create may be attempted.
-    dispatchStarted = await markSubmitDispatchStarted(operationAttempt);
-    if (!dispatchStarted) {
-      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
-      claimedAt = null;
-      return submissionOutcomeUnknown();
-    }
-
+    dispatchStarted = !preparedOperation.providerAccepted;
     let submission: Awaited<
       ReturnType<ExternalWritePort["submitLeaveApplication"]>
     >;
     try {
-      submission = await externalWritePort.submitLeaveApplication({
-        clerkOrgId: parsed.data.clerkOrgId,
-        employeeId: prepared.value.xeroEmployeeId,
-        endsAt: record.ends_at,
-        leaveTypeId: prepared.value.xeroLeaveTypeId,
-        organisationId: parsed.data.organisationId,
-        startsAt: record.starts_at,
-        title: record.title ?? "Leave request",
-        units: prepared.value.units,
-      });
+      submission =
+        preparedOperation.providerAccepted && preparedOperation.knownRemoteId
+          ? {
+              ok: true,
+              value: {
+                rawResponse: {},
+                remoteId: preparedOperation.knownRemoteId,
+              },
+            }
+          : await externalWritePort.submitLeaveApplication({
+              clerkOrgId: parsed.data.clerkOrgId,
+              employeeId: prepared.value.xeroEmployeeId,
+              endsAt: record.ends_at,
+              leaveTypeId: prepared.value.xeroLeaveTypeId,
+              mutation: preparedOperation.mutation,
+              organisationId: parsed.data.organisationId,
+              startsAt: record.starts_at,
+              title: record.title ?? "Leave request",
+              units: prepared.value.units,
+            });
     } catch {
       await markSubmitOutcomeUnknown(operationAttempt, "transport_exception");
       await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
       claimedAt = null;
       return submissionOutcomeUnknown();
     }
-
     if (!submission.ok) {
-      if (isDefinitiveWriteFailure(submission.error)) {
+      if (
+        !preparedOperation.replayedUnknown &&
+        isDefinitiveWriteFailure(submission.error)
+      ) {
         await markSubmitDefinitiveFailure(
           operationAttempt,
           submission.error.code
@@ -644,32 +779,43 @@ async function performApprovalCreation(
         record,
       });
     }
-
-    const accepted = await markSubmitProviderAccepted(
-      operationAttempt,
-      submission.value.remoteId
-    );
+    const accepted =
+      preparedOperation.providerAccepted ||
+      (await markSubmitProviderAccepted(
+        operationAttempt,
+        submission.value.remoteId
+      ));
     if (!accepted) {
       return submissionOutcomeUnknown();
     }
-
     // `record` is a `let` narrowed above; alias it to a const so the
     // transaction closure (evaluated later, from TypeScript's perspective)
     // keeps the non-null type instead of widening back to LoadedRecord | null.
     const claimedRecord = record;
-
+    const originalApproverId =
+      preparedOperation.actorUserId === parsed.data.actingUserId
+        ? (actingPerson?.id ?? null)
+        : ((
+            await database.person.findFirst({
+              select: { id: true },
+              where: {
+                ...scoped(parsed.data),
+                archived_at: null,
+                clerk_user_id: preparedOperation.actorUserId,
+              },
+            })
+          )?.id ?? null);
     await database.$transaction(async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "approved",
           approved_at: new Date(),
-          approved_by_person_id: actingPerson?.id ?? null,
+          approved_by_person_id: originalApproverId,
           derived_sequence: { increment: 1 },
           failed_action: null,
           source_payload_json: toPrismaJsonValue(submission.value.rawResponse),
           source_remote_id: submission.value.remoteId,
-
-          updated_by_user_id: parsed.data.actingUserId,
+          updated_by_user_id: preparedOperation.actorUserId,
           xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
@@ -685,15 +831,17 @@ async function performApprovalCreation(
       if (update.count !== 1) {
         throw new OptimisticConflictError();
       }
-
       await tx.auditEvent.create({
-        data: auditData(parsed.data, options.successAuditAction, {
-          xeroLeaveApplicationId: submission.value.remoteId,
-        }),
+        data: auditData(
+          { ...parsed.data, actingUserId: preparedOperation.actorUserId },
+          options.successAuditAction,
+          {
+            xeroLeaveApplicationId: submission.value.remoteId,
+          }
+        ),
       });
     });
     claimedAt = null;
-
     const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
       operationAttempt,
       new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
@@ -702,7 +850,7 @@ async function performApprovalCreation(
       return submissionOutcomeUnknown();
     }
     const sideEffects = await completeSubmitSideEffects({
-      actorUserId: parsed.data.actingUserId,
+      actorUserId: preparedOperation.actorUserId,
       approvalRecipient: record.person.clerk_user_id
         ? {
             clerkUserId: record.person.clerk_user_id,
@@ -732,7 +880,6 @@ async function performApprovalCreation(
     if (!(await markSubmitCompleted(operationAttempt, database))) {
       return submissionOutcomeUnknown();
     }
-
     const updated = await loadBareRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
@@ -760,7 +907,6 @@ async function performApprovalCreation(
     return unknownError("Failed to approve this record.");
   }
 }
-
 export const submitRequestFingerprint = (input: {
   employeeId: string;
   endsAt: Date;
@@ -781,7 +927,6 @@ export const submitRequestFingerprint = (input: {
       })
     )
     .digest("hex");
-
 const submissionOutcomeUnknown = (): Result<never, SubmitServiceError> => ({
   error: {
     code: "submission_outcome_unknown",
@@ -790,20 +935,6 @@ const submissionOutcomeUnknown = (): Result<never, SubmitServiceError> => ({
   },
   ok: false,
 });
-
-const isDefinitiveWriteFailure = (error: ProviderWriteError): boolean =>
-  error.certainty === "definitive_failure" ||
-  (error.certainty === undefined &&
-    [
-      "auth_error",
-      "conflict_error",
-      "not_found_error",
-      "permission_error",
-      "rate_limit_error",
-      "region_not_supported_error",
-      "validation_error",
-    ].includes(error.code));
-
 async function prepareXeroWrite(
   input: RecordActionInput,
   record: LoadedRecord,
@@ -853,7 +984,6 @@ async function prepareXeroWrite(
       ok: false,
     };
   }
-
   const employee = await externalWritePort.resolveEmployeeId({
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
@@ -862,7 +992,6 @@ async function prepareXeroWrite(
   if (!employee.ok) {
     return resolutionBlocked(employee.error);
   }
-
   const leaveType = await externalWritePort.resolveLeaveTypeId({
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
@@ -872,7 +1001,6 @@ async function prepareXeroWrite(
   if (!leaveType.ok) {
     return resolutionBlocked(leaveType.error);
   }
-
   const duration = await computeWorkingDays({
     allDay: record.all_day,
     clerkOrgId: input.clerkOrgId,
@@ -884,7 +1012,6 @@ async function prepareXeroWrite(
   if (!duration.ok) {
     return unknownError(duration.error.message);
   }
-
   return {
     ok: true,
     value: {
@@ -894,7 +1021,6 @@ async function prepareXeroWrite(
     },
   };
 }
-
 async function persistXeroFailure(input: {
   actionUrl: string;
   auditAction: string;
@@ -902,6 +1028,7 @@ async function persistXeroFailure(input: {
   failedAction: "submit" | "approve" | "withdraw";
   input: RecordActionInput;
   claimedAt: Date;
+  preserveApproved?: boolean;
   record: LoadedRecord;
   error: ProviderWriteError;
 }): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
@@ -909,12 +1036,17 @@ async function persistXeroFailure(input: {
   await database.$transaction(async (tx) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
-        approval_status: "xero_sync_failed",
+        approval_status: input.preserveApproved
+          ? "approved"
+          : "xero_sync_failed",
         failed_action: input.failedAction,
         updated_by_user_id: input.input.actingUserId,
         xero_write_claimed_at: null,
         xero_write_error: plainMessage,
         xero_write_error_raw: {
+          ...(input.error.certainty
+            ? { certainty: input.error.certainty }
+            : {}),
           code: input.error.code,
           correlationId: input.error.correlationId ?? null,
           httpStatus: input.error.httpStatus ?? null,
@@ -934,21 +1066,18 @@ async function persistXeroFailure(input: {
     if (update.count !== 1) {
       throw new OptimisticConflictError();
     }
-
     await tx.auditEvent.create({
       data: auditData(input.input, input.auditAction, {
         errorCode: input.error.code,
       }),
     });
   });
-
   await notifySubmitFailureBestEffort(
     input.input,
     input.record,
     "leave_xero_sync_failed",
     { actionUrl: input.actionUrl }
   );
-
   const updated = await loadBareRecord(input.input);
   if (!updated) {
     return recordNotFound();
@@ -956,7 +1085,6 @@ async function persistXeroFailure(input: {
   await materialiseSubmitPublication(input.input);
   return { ok: true, value: updated };
 }
-
 function loadScopedRecord(input: RecordActionInput) {
   return database.availabilityRecord.findFirst({
     include: {
@@ -984,7 +1112,6 @@ function loadScopedRecord(input: RecordActionInput) {
     },
   });
 }
-
 function loadBareRecord(input: RecordActionInput) {
   return database.availabilityRecord.findFirst({
     where: {
@@ -993,7 +1120,6 @@ function loadBareRecord(input: RecordActionInput) {
     },
   });
 }
-
 async function materialiseSubmitPublication(
   input: RecordActionInput
 ): Promise<void> {
@@ -1014,7 +1140,6 @@ async function materialiseSubmitPublication(
     });
   }
 }
-
 async function loadAndAuthorise(
   input: RecordActionInput,
   mode: "manager_allowed" | "owner_only"
@@ -1030,11 +1155,9 @@ async function loadAndAuthorise(
       },
     }),
   ]);
-
   if (!record) {
     return recordNotFound();
   }
-
   const isOwner = record.person.clerk_user_id === input.actingUserId;
   const isManager =
     Boolean(actingPerson) &&
@@ -1043,7 +1166,6 @@ async function loadAndAuthorise(
     isAdminOrOwner(input.actingOrgRole) ||
     isOwner ||
     (mode === "manager_allowed" && isManager);
-
   if (!isAllowed) {
     return {
       error: {
@@ -1053,16 +1175,17 @@ async function loadAndAuthorise(
       ok: false,
     };
   }
-
   return { ok: true, value: record };
 }
-
 async function notifyManager(
   tx: NotificationDispatchDatabase,
   input: RecordActionInput,
   record: LoadedRecord,
   type: "leave_submitted" | "leave_withdrawn",
-  options: { actionUrl: string; publishRealtime?: boolean }
+  options: {
+    actionUrl: string;
+    publishRealtime?: boolean;
+  }
 ) {
   const recipientUserId = record.person.manager?.clerk_user_id;
   if (!recipientUserId) {
@@ -1096,12 +1219,13 @@ async function notifyManager(
   }
   return result.value.notificationId;
 }
-
 async function notifyManagerBestEffort(
   input: RecordActionInput,
   record: LoadedRecord,
   type: "leave_submitted" | "leave_withdrawn",
-  options: { actionUrl: string }
+  options: {
+    actionUrl: string;
+  }
 ): Promise<void> {
   try {
     await notifyManager(database, input, record, type, options);
@@ -1115,12 +1239,13 @@ async function notifyManagerBestEffort(
     });
   }
 }
-
 async function notifySubmitFailureBestEffort(
   input: RecordActionInput,
   record: LoadedRecord,
   type: "leave_xero_sync_failed",
-  options: { actionUrl: string }
+  options: {
+    actionUrl: string;
+  }
 ): Promise<void> {
   try {
     await notifyOwnerAndManager(database, input, record, type, options);
@@ -1134,13 +1259,14 @@ async function notifySubmitFailureBestEffort(
     });
   }
 }
-
 async function notifyOwnerAndManager(
   tx: NotificationDispatchDatabase,
   input: RecordActionInput,
   record: LoadedRecord,
   type: "leave_xero_sync_failed",
-  options: { actionUrl: string }
+  options: {
+    actionUrl: string;
+  }
 ) {
   const recipients = [
     {
@@ -1152,11 +1278,14 @@ async function notifyOwnerAndManager(
       userId: record.person.manager?.clerk_user_id ?? null,
     },
   ].filter(
-    (recipient): recipient is { personId: string | null; userId: string } =>
-      Boolean(recipient.userId)
+    (
+      recipient
+    ): recipient is {
+      personId: string | null;
+      userId: string;
+    } => Boolean(recipient.userId)
   );
   const seen = new Set<string>();
-
   for (const recipient of recipients) {
     if (seen.has(recipient.userId)) {
       continue;
@@ -1183,7 +1312,6 @@ async function notifyOwnerAndManager(
     }
   }
 }
-
 function auditData(
   input: RecordActionInput,
   action: string,
@@ -1202,11 +1330,9 @@ function auditData(
     resource_type: "availability_record",
   };
 }
-
 function isAdminOrOwner(role?: string | null): boolean {
   return role === "org:admin" || role === "org:owner";
 }
-
 function resolutionBlocked(
   resolutionError: ProviderResolutionError
 ): Result<never, SubmitServiceError> {
@@ -1219,7 +1345,6 @@ function resolutionBlocked(
     ok: false,
   };
 }
-
 function invalidState(
   code:
     | "invalid_state_for_retry"
@@ -1243,7 +1368,6 @@ function invalidState(
     ok: false,
   };
 }
-
 function recordNotFound(): Result<never, SubmitServiceError> {
   return {
     error: {
@@ -1253,7 +1377,6 @@ function recordNotFound(): Result<never, SubmitServiceError> {
     ok: false,
   };
 }
-
 function unknownError(message: string): Result<never, SubmitServiceError> {
   return {
     error: {
@@ -1263,7 +1386,6 @@ function unknownError(message: string): Result<never, SubmitServiceError> {
     ok: false,
   };
 }
-
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || value === undefined) {
     return null;
@@ -1290,26 +1412,22 @@ function toJsonValue(value: unknown): JsonValue {
   }
   return String(value);
 }
-
 function toPrismaJsonValue(
   value: unknown
 ): Exclude<JsonValue, null> | typeof Prisma.JsonNull {
   const jsonValue = toJsonValue(value);
   return jsonValue === null ? Prisma.JsonNull : jsonValue;
 }
-
 class OptimisticConflictError extends Error {
   constructor() {
     super("Record changed before the state transition completed.");
   }
 }
-
 class NotificationCreateError extends Error {
   constructor() {
     super("Notification could not be created.");
   }
 }
-
 function canWithdrawRecord(record: LoadedRecord): boolean {
   if (record.source_type !== "team_calendar_leave") {
     return false;

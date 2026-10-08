@@ -71,7 +71,7 @@ export interface Slice14Fixture {
     status: "failed" | "partial_success" | "succeeded";
   }>;
   teams: Array<{ id: string; name: string; organisationId: string }>;
-  xeroTenants: Array<{
+  xeroConnections: Array<{
     id: string;
     organisationId: string;
     tenantName: string;
@@ -190,7 +190,7 @@ export function createSlice14Fixture(): Slice14Fixture {
       { id: fixtureId("700", 3), organisationId: ORG_B, status: "failed" },
     ],
     teams,
-    xeroTenants: [
+    xeroConnections: [
       { id: fixtureId("800", 1), organisationId: ORG_A, tenantName: "AU One" },
       { id: fixtureId("800", 2), organisationId: ORG_A, tenantName: "AU Two" },
       { id: fixtureId("800", 3), organisationId: ORG_B, tenantName: "NZ One" },

@@ -1,4 +1,5 @@
 generator client {
+  previewFeatures = ["partialIndexes"]
   provider        = "prisma-client"
   output          = "../generated"
 }
@@ -33,17 +34,16 @@ enum payroll_region {
 }
 
 enum xero_connection_status {
-  pending
-  pending_tenant_selection
   active
-  stale
+  reconnect_required
   disconnected
 }
 
 enum xero_oauth_session_status {
   pending
+  exchanging
+  selecting
   completed
-  expired
   cancelled
 }
 
@@ -51,6 +51,11 @@ enum xero_person_match_status {
   pending
   matched
   ignored
+}
+
+enum xero_cursor_entity_type {
+  people
+  leave_records
 }
 
 enum xero_sync_entity_type {
@@ -155,8 +160,9 @@ enum availability_failed_action {
 }
 
 enum outbound_operation_action {
-  submit
   approve
+  decline
+  withdraw
 }
 
 enum outbound_operation_status {
@@ -292,34 +298,32 @@ model Organisation {
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
 
-  teams                           Team[]
-  locations                       Location[]
-  people                          Person[]
-  leave_balances                  LeaveBalance[]
-  alternative_contacts            AlternativeContact[]
-  availability_records            AvailabilityRecord[]
-  availability_publications       AvailabilityPublication[]
-  feeds                           Feed[]
-  feed_tokens                     FeedToken[]
-  public_holiday_jurisdictions    PublicHolidayJurisdiction[]
-  public_holidays                 PublicHoliday[]
-  public_holiday_assignments      PublicHolidayAssignment[]
-  xero_connection                 XeroConnection?
-  xero_inactivity_classifications XeroInactivityClassification[]
-  xero_cleanup_requests           XeroCleanupRequest[]
-  xero_tenants                    XeroTenant[]
-  xero_oauth_sessions             XeroOAuthSession[]
-  xero_person_matches             XeroPersonMatch[]
-  xero_sync_cursors               XeroSyncCursor[]
-  sync_runs                       SyncRun[]
-  failed_records                  FailedRecord[]
-  audit_events                    AuditEvent[]
-  notifications                   Notification[]
-  notification_preferences        NotificationPreference[]
-  notification_email_queue        NotificationEmailQueue[]
-  outbound_operations             OutboundOperation[]
-  organisation_settings           OrganisationSettings?
+  teams                        Team[]
+  locations                    Location[]
+  people                       Person[]
+  leave_balances               LeaveBalance[]
+  alternative_contacts         AlternativeContact[]
+  availability_records         AvailabilityRecord[]
+  availability_publications    AvailabilityPublication[]
+  feeds                        Feed[]
+  feed_tokens                  FeedToken[]
+  public_holiday_jurisdictions PublicHolidayJurisdiction[]
+  public_holidays              PublicHoliday[]
+  public_holiday_assignments   PublicHolidayAssignment[]
+  xero_connection              XeroConnection?
+  xero_oauth_sessions          XeroOAuthSession[]
+  xero_person_matches          XeroPersonMatch[]
+  xero_sync_cursors            XeroSyncCursor[]
+  sync_runs                    SyncRun[]
+  failed_records               FailedRecord[]
+  audit_events                 AuditEvent[]
+  notifications                Notification[]
+  notification_preferences     NotificationPreference[]
+  notification_email_queue     NotificationEmailQueue[]
+  outbound_operations          OutboundOperation[]
+  organisation_settings        OrganisationSettings?
 
+  @@unique([id, clerk_org_id])
   @@index([clerk_org_id])
   @@map("organisations")
 }
@@ -407,7 +411,6 @@ model Person {
   default_privacy_mode        availability_privacy_mode   @default(named)
   include_in_feeds_by_default Boolean                     @default(true)
   archived_at                 DateTime?
-  xero_missing_since          DateTime?
   created_at                  DateTime                    @default(now())
   updated_at                  DateTime                    @updatedAt
 
@@ -461,76 +464,15 @@ model AlternativeContact {
   @@map("alternative_contacts")
 }
 
-model XeroConnection {
-  id                               String                 @id @default(uuid()) @db.Uuid
-  clerk_org_id                     String
-  organisation_id                  String                 @unique @db.Uuid
-  status                           xero_connection_status @default(pending)
-  access_token_encrypted           String                 @default("")
-  access_token_iv                  String?
-  access_token_auth_tag            String?
-  refresh_token_encrypted          String                 @default("")
-  refresh_token_iv                 String?
-  refresh_token_auth_tag           String?
-  xero_authorisation_connection_id String?
-  token_key_version                Int                    @default(1)
-  token_encrypted_at               DateTime?
-  expires_at                       DateTime
-  last_refreshed_at                DateTime?
-  last_connected_at                DateTime?
-  last_disconnected_at             DateTime?
-  last_error_code                  String?
-  last_error_message               String?
-  stale_since                      DateTime?
-  revoked_at                       DateTime?
-  disconnected_at                  DateTime?
-  disconnected_by_user_id          String?
-  created_at                       DateTime               @default(now())
-  updated_at                       DateTime               @updatedAt
-
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  xero_tenant  XeroTenant?
-
-  @@index([clerk_org_id])
-  @@map("xero_connections")
+enum xero_authorisation_status {
+  active
+  reconnect_required
 }
 
-enum xero_credential_usability {
-  usable
-  reauthorisation_required
-}
-
-enum xero_refresh_attempt_outcome {
-  pending
-  superseded
-  committed
-  lost_response
-  failed
-}
-
-enum xero_provider_connection_status {
-  present
-  absent_confirmed
-  unknown
-}
-
-enum xero_oauth_intent_kind {
-  initial_binding
-  same_file_reauthorisation
-}
-
-enum xero_token_exchange_status {
-  not_started
-  dispatching
-  exchanged
-  unknown
-}
-
-model XeroCredentialOwner {
+model XeroAuthorisation {
   id                      String                    @id @default(uuid()) @db.Uuid
   provider_app_id         String
   xero_user_id            String
-  identity_evidence       String // "access_token_jwt" | "legacy_access_token_jwt"
   access_token_encrypted  String
   access_token_iv         String
   access_token_auth_tag   String
@@ -538,87 +480,41 @@ model XeroCredentialOwner {
   refresh_token_iv        String
   refresh_token_auth_tag  String
   token_key_version       Int
-  token_version           Int                       @default(1)
-  last_refresh_attempt_id String?                   @db.Uuid
-  token_expires_at        DateTime
+  token_encrypted_at      DateTime
+  access_token_expires_at DateTime
   granted_scopes          String[]
-  granted_scopes_known    Boolean                   @default(false)
-  usability               xero_credential_usability @default(usable)
-  last_verified_at        DateTime?
-  last_adopted_at         DateTime?
-  last_rotated_at         DateTime?
+  status                  xero_authorisation_status @default(active)
+  last_refreshed_at       DateTime
+  last_refresh_error_code String?
+  last_refresh_error_at   DateTime?
   created_at              DateTime                  @default(now())
   updated_at              DateTime                  @updatedAt
-  refresh_attempts        XeroRefreshAttempt[]
-  provider_connections    XeroProviderConnection[]
-  tenants                 XeroTenant[]
+  connections             XeroConnection[]
+  sessions                XeroOAuthSession[]
 
   @@unique([provider_app_id, xero_user_id])
-  @@map("xero_credential_owners")
+  @@map("xero_authorisations")
 }
 
-model XeroRefreshAttempt {
-  id                       String                       @id @default(uuid()) @db.Uuid
-  xero_credential_owner_id String                       @db.Uuid
-  expected_token_version   Int
-  dispatched_at            DateTime?
-  uncertain_since          DateTime?
-  recovery_deadline        DateTime?
-  outcome                  xero_refresh_attempt_outcome @default(pending)
-  // Previous refresh token kept only for Xero's 30-minute retry grace window; scrubbed after.
-  recovery_token_encrypted String?
-  recovery_token_iv        String?
-  recovery_token_auth_tag  String?
-  recovery_key_version     Int?
-  created_at               DateTime                     @default(now())
-  updated_at               DateTime                     @updatedAt
-  owner                    XeroCredentialOwner          @relation(fields: [xero_credential_owner_id], references: [id])
-
-  @@index([outcome, recovery_deadline])
-  @@index([xero_credential_owner_id])
-  @@map("xero_refresh_attempts")
-}
-
-model XeroProviderConnection {
-  id                       String                          @id @default(uuid()) @db.Uuid
-  provider_app_id          String
-  remote_connection_id     String
-  xero_tenant_id           String
-  tenant_type              String?
-  xero_credential_owner_id String?                         @db.Uuid
-  auth_event_id            String?
-  provider_created_at      DateTime?
-  provider_updated_at      DateTime?
-  observed_at              DateTime
-  observed_via             String // "user_inventory" | "management_inventory"
-  remote_status            xero_provider_connection_status @default(present)
-  created_at               DateTime                        @default(now())
-  updated_at               DateTime                        @updatedAt
-  owner                    XeroCredentialOwner?            @relation(fields: [xero_credential_owner_id], references: [id])
-  tenants                  XeroTenant[]
-
-  @@unique([provider_app_id, remote_connection_id])
-  @@index([provider_app_id, xero_tenant_id])
-  @@index([xero_credential_owner_id])
-  @@map("xero_provider_connections")
-}
-
-model XeroTenant {
-  id                                String         @id @default(uuid()) @db.Uuid
+model XeroConnection {
+  id                                String                 @id @default(uuid()) @db.Uuid
   clerk_org_id                      String
-  organisation_id                   String         @db.Uuid
-  xero_credential_owner_id          String?        @db.Uuid
-  xero_provider_connection_id       String?        @db.Uuid
-  xero_connection_id                String         @unique @db.Uuid
-  xero_tenant_id                    String
-  provider_app_id                   String
-  active_slot                       Int?
-  binding_generation                Int            @default(1)
-  retired_at                        DateTime?
-  retirement_reason                 String?
+  organisation_id                   String                 @unique @db.Uuid
+  xero_authorisation_id             String?                @db.Uuid
+  xero_tenant_id                    String                 @unique
+  remote_connection_id              String?                @unique
   tenant_name                       String?
+  tenant_type                       String?
+  auth_event_id                     String?
   payroll_region                    payroll_region
+  status                            xero_connection_status @default(active)
   sync_paused_at                    DateTime?
+  last_connected_at                 DateTime?
+  last_disconnected_at              DateTime?
+  disconnected_at                   DateTime?
+  disconnected_by_user_id           String?
+  last_error_code                   String?
+  last_error_message                String?
   last_people_sync_at               DateTime?
   last_leave_records_sync_at        DateTime?
   last_leave_balances_sync_at       DateTime?
@@ -629,58 +525,49 @@ model XeroTenant {
   approval_state_stale_since        DateTime?
   last_sync_error_code              String?
   last_sync_error_message           String?
-  created_at                        DateTime       @default(now())
-  updated_at                        DateTime       @updatedAt
+  initial_sync_requested_at         DateTime?
+  initial_sync_completed_at         DateTime?
+  last_full_people_sync_at          DateTime?
+  last_full_leave_records_sync_at   DateTime?
+  balance_next_person_id            String?                @db.Uuid
+  balance_sweep_failed              Boolean                @default(false)
+  leave_next_person_id              String?                @db.Uuid
+  leave_sweep_failed                Boolean                @default(false)
+  created_at                        DateTime               @default(now())
+  updated_at                        DateTime               @updatedAt
+  organisation                      Organisation           @relation(fields: [organisation_id, clerk_org_id], references: [id, clerk_org_id])
+  authorisation                     XeroAuthorisation?     @relation(fields: [xero_authorisation_id], references: [id])
+  sync_cursors                      XeroSyncCursor[]
+  leave_balances                    LeaveBalance[]
+  sync_runs                         SyncRun[]
 
-  organisation               Organisation                   @relation(fields: [organisation_id], references: [id])
-  xero_connection            XeroConnection                 @relation(fields: [xero_connection_id], references: [id])
-  credential_owner           XeroCredentialOwner?           @relation(fields: [xero_credential_owner_id], references: [id])
-  provider_connection        XeroProviderConnection?        @relation(fields: [xero_provider_connection_id], references: [id])
-  inactivity_classifications XeroInactivityClassification[]
-  cleanup_requests           XeroCleanupRequest[]
-  sync_cursors               XeroSyncCursor[]
-  leave_balances             LeaveBalance[]
-  sync_runs                  SyncRun[]
-
-  @@unique([provider_app_id, xero_tenant_id, active_slot], map: "xero_tenants_reserved_binding_key")
+  @@unique([id, clerk_org_id, organisation_id])
+  @@unique([organisation_id, clerk_org_id])
   @@index([clerk_org_id])
-  @@index([organisation_id])
-  @@index([xero_tenant_id])
-  @@index([xero_credential_owner_id])
-  @@index([xero_provider_connection_id])
-  @@map("xero_tenants")
+  @@map("xero_connections")
 }
 
 model XeroOAuthSession {
-  id                          String                      @id @default(uuid()) @db.Uuid
-  clerk_org_id                String
-  organisation_id             String?                     @db.Uuid
-  created_by_user_id          String?
-  status                      xero_oauth_session_status   @default(pending)
-  return_to                   String
-  access_token_encrypted      String                      @default("")
-  access_token_iv             String?
-  access_token_auth_tag       String?
-  refresh_token_encrypted     String                      @default("")
-  refresh_token_iv            String?
-  refresh_token_auth_tag      String?
-  token_key_version           Int                         @default(1)
-  token_encrypted_at          DateTime?
-  requested_scopes            String[]                    @default([])
-  intent_kind                 xero_oauth_intent_kind?
-  nonce_hash                  String?
-  token_exchange_status       xero_token_exchange_status?
-  token_expires_at            DateTime?
-  available_tenants_json      Json?
-  selected_tenant_id          String?
-  selected_tenant_name        String?
-  selected_payroll_region     payroll_region?
-  expected_binding_generation Int?
-  expires_at                  DateTime
-  created_at                  DateTime                    @default(now())
-  updated_at                  DateTime                    @updatedAt
-
-  organisation Organisation? @relation(fields: [organisation_id], references: [id])
+  id                      String                    @id @default(uuid()) @db.Uuid
+  clerk_org_id            String
+  organisation_id         String?                   @db.Uuid
+  created_by_user_id      String?
+  status                  xero_oauth_session_status @default(pending)
+  return_to               String
+  state_hash              String?                   @unique
+  nonce_hash              String?
+  callback_claimed_at     DateTime?
+  requested_scopes        String[]                  @default([])
+  xero_authorisation_id   String?                   @db.Uuid
+  available_tenants_json  Json?
+  selected_tenant_id      String?
+  selected_tenant_name    String?
+  selected_payroll_region payroll_region?
+  expires_at              DateTime
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime                  @updatedAt
+  organisation            Organisation?             @relation(fields: [organisation_id, clerk_org_id], references: [id, clerk_org_id])
+  authorisation           XeroAuthorisation?        @relation(fields: [xero_authorisation_id], references: [id])
 
   @@index([clerk_org_id])
   @@index([organisation_id])
@@ -689,22 +576,21 @@ model XeroOAuthSession {
 }
 
 model XeroSyncCursor {
-  id              String                @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
-  organisation_id String                @db.Uuid
-  xero_tenant_id  String                @db.Uuid
-  entity_type     xero_sync_entity_type
-  cursor_value    String?
-  created_at      DateTime              @default(now())
-  updated_at      DateTime              @updatedAt
+  id                 String                  @id @default(uuid()) @db.Uuid
+  clerk_org_id       String
+  organisation_id    String                  @db.Uuid
+  xero_connection_id String                  @db.Uuid
+  entity_type        xero_cursor_entity_type
+  modified_since     DateTime?
+  created_at         DateTime                @default(now())
+  updated_at         DateTime                @updatedAt
+  organisation       Organisation            @relation(fields: [organisation_id], references: [id])
+  xero_connection    XeroConnection          @relation(fields: [xero_connection_id, clerk_org_id, organisation_id], references: [id, clerk_org_id, organisation_id])
 
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  xero_tenant  XeroTenant   @relation(fields: [xero_tenant_id], references: [id])
-
-  @@unique([xero_tenant_id, entity_type])
+  @@unique([xero_connection_id, entity_type])
   @@index([clerk_org_id])
   @@index([organisation_id])
-  @@index([xero_tenant_id])
+  @@index([xero_connection_id])
   @@map("xero_sync_cursors")
 }
 
@@ -743,12 +629,10 @@ model AvailabilityRecord {
   approved_at              DateTime?
   xero_write_error         String?
   xero_write_error_raw     Json?
-  // Set immediately before an outbound Xero write and cleared once the write
-  // has been recorded. A second request that finds a live claim stops before
-  // calling Xero, because the create endpoint has no idempotency key and a
-  // duplicate call creates a duplicate leave application in payroll. Claims
-  // older than the TTL in submit-service.ts are treated as abandoned so a
-  // crashed process cannot wedge a record permanently.
+  // Domain ownership fence shared by local transitions, provider writes,
+  // inbound sync and disconnect. Provider duplicate prevention uses the
+  // OutboundOperation idempotency key. An expired claim does not resolve an
+  // uncertain operation or permit a new key.
   xero_write_claimed_at    DateTime?
   // When the Xero approval reconciler last checked this record against Xero Payroll.
   // Nullable; null indicates the record has never been checked by the reconciler.
@@ -758,20 +642,14 @@ model AvailabilityRecord {
   created_at               DateTime                     @default(now())
   updated_at               DateTime                     @updatedAt
 
-  organisation Organisation             @relation(fields: [organisation_id], references: [id])
-  person       Person                   @relation(fields: [person_id], references: [id])
-  approved_by  Person?                  @relation("ApprovedBy", fields: [approved_by_person_id], references: [id])
-  publication  AvailabilityPublication?
+  organisation        Organisation             @relation(fields: [organisation_id], references: [id])
+  person              Person                   @relation(fields: [person_id], references: [id])
+  approved_by         Person?                  @relation("ApprovedBy", fields: [approved_by_person_id], references: [id])
+  publication         AvailabilityPublication?
   outbound_operations OutboundOperation[]
 
-  // Manual records have source_remote_id = NULL, which the composite unique above cannot
-  // guard because PostgreSQL treats NULL as distinct. A partial unique index on
-  // (organisation_id, person_id, record_type, starts_at, ends_at)
-  // WHERE source_type = 'manual' AND source_remote_id IS NULL AND archived_at IS NULL
-  // prevents duplicate manual entries (and the duplicate ICS events they would produce);
-  // it is added via raw SQL in migration 00000000000000_init
-  // because Prisma @@unique cannot express a WHERE clause. Keep both in sync; see that
-  // migration for the index definition.
+  // Preserve the existing active manual-record identity invariant in generated migrations.
+  @@unique([organisation_id, person_id, record_type, starts_at, ends_at], map: "availability_records_manual_identity_key", where: raw("source_type = 'manual' AND source_remote_id IS NULL AND archived_at IS NULL"))
   @@unique([organisation_id, source_type, source_remote_id], map: "availability_records_source_identity_key")
   @@index([clerk_org_id])
   @@index([organisation_id])
@@ -786,34 +664,42 @@ model AvailabilityRecord {
 }
 
 model OutboundOperation {
-  id                     String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id           String
-  organisation_id        String                    @db.Uuid
-  availability_record_id String                    @db.Uuid
-  action                 outbound_operation_action
-  status                 outbound_operation_status
-  request_fingerprint    String
-  request_employee_id    String?
-  request_leave_type_id  String?
-  request_starts_at      DateTime?
-  request_ends_at        DateTime?
-  request_title          String?
-  request_units          Decimal?                  @db.Decimal(12, 4)
-  actor_user_id          String
-  attempt_generation     Int                       @default(1)
-  safe_error_code        String?
-  known_remote_id        String?
-  merged_record_id       String?                   @db.Uuid
-  side_effect_claimed_at DateTime?
-  prepared_at            DateTime                  @default(now())
-  dispatch_started_at    DateTime?
-  provider_accepted_at   DateTime?
-  completed_at           DateTime?
-  created_at             DateTime                  @default(now())
-  updated_at             DateTime                  @updatedAt
+  id                              String                    @id @default(uuid()) @db.Uuid
+  clerk_org_id                    String
+  organisation_id                 String                    @db.Uuid
+  availability_record_id          String                    @db.Uuid
+  action                          outbound_operation_action
+  status                          outbound_operation_status
+  idempotency_key                 String?                   @unique @db.Uuid
+  request_xero_tenant_id          String?
+  request_method                  String?
+  request_url                     String?
+  request_body_json               String?
+  request_reason                  String?
+  idempotency_first_dispatched_at DateTime?
+  idempotency_replay_before       DateTime?
+  request_fingerprint             String
+  request_employee_id             String?
+  request_leave_type_id           String?
+  request_starts_at               DateTime?
+  request_ends_at                 DateTime?
+  request_title                   String?
+  request_units                   Decimal?                  @db.Decimal(12, 4)
+  actor_user_id                   String
+  attempt_generation              Int                       @default(1)
+  safe_error_code                 String?
+  known_remote_id                 String?
+  merged_record_id                String?                   @db.Uuid
+  side_effect_claimed_at          DateTime?
+  prepared_at                     DateTime                  @default(now())
+  dispatch_started_at             DateTime?
+  provider_accepted_at            DateTime?
+  completed_at                    DateTime?
+  created_at                      DateTime                  @default(now())
+  updated_at                      DateTime                  @updatedAt
 
   availability_record AvailabilityRecord @relation(fields: [availability_record_id], references: [id])
-  organisation       Organisation       @relation(fields: [organisation_id], references: [id])
+  organisation        Organisation       @relation(fields: [organisation_id], references: [id])
 
   @@unique([availability_record_id, action])
   @@index([clerk_org_id])
@@ -854,7 +740,7 @@ model LeaveBalance {
   organisation_id     String                    @db.Uuid
   person_id           String                    @db.Uuid
   // Nullable to support admin-managed manual balances when Xero is not connected.
-  xero_tenant_id      String?                   @db.Uuid
+  xero_connection_id  String?                   @db.Uuid
   leave_type_xero_id  String
   leave_type_name     String?
   record_type         availability_record_type?
@@ -875,23 +761,18 @@ model LeaveBalance {
   created_at          DateTime                  @default(now())
   updated_at          DateTime                  @updatedAt
 
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  person       Person       @relation(fields: [person_id], references: [id])
+  organisation    Organisation    @relation(fields: [organisation_id], references: [id])
+  person          Person          @relation(fields: [person_id], references: [id])
   // Keep the existing Restrict behaviour so the nullable migration is just DROP NOT NULL,
   // rather than Prisma's optional-relation default of SetNull (which would force an FK rewrite).
-  xero_tenant  XeroTenant?  @relation(fields: [xero_tenant_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  xero_connection XeroConnection? @relation(fields: [xero_connection_id, clerk_org_id, organisation_id], references: [id, clerk_org_id, organisation_id], onDelete: Restrict, onUpdate: Cascade)
 
-  // This composite unique guards Xero-sourced rows. Because PostgreSQL treats NULL as
-  // distinct, it does NOT prevent duplicate manual balances once xero_tenant_id is null.
-  // A partial unique index on (person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL
-  // covers the manual case; it is added via raw SQL in migration
-  // 00000000000000_init because Prisma @@unique cannot express a
-  // WHERE clause. Keep both in sync; see that migration for the index definition.
-  @@unique([person_id, xero_tenant_id, leave_type_xero_id])
+  @@unique([person_id, xero_connection_id, leave_type_xero_id])
+  @@unique([person_id, leave_type_xero_id], map: "leave_balances_person_id_leave_type_xero_id_manual_key", where: raw("xero_connection_id IS NULL"))
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@index([person_id])
-  @@index([xero_tenant_id])
+  @@index([xero_connection_id])
   @@map("leave_balances")
 }
 
@@ -1098,9 +979,7 @@ model FeedToken {
   rotated_from_token FeedToken?   @relation("FeedTokenRotation", fields: [rotated_from_token_id], references: [id])
   rotated_tokens     FeedToken[]  @relation("FeedTokenRotation")
 
-  // PostgreSQL enforces at most one active token per feed with the partial
-  // unique index feed_tokens_one_active_per_feed_key. Prisma cannot express a
-  // partial index, so keep this invariant aligned with the dedicated migration.
+  @@unique([feed_id], map: "feed_tokens_one_active_per_feed_key", where: raw("status = 'active'"))
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@index([feed_id])
@@ -1196,7 +1075,7 @@ model SyncRun {
   id                   String                 @id @default(uuid()) @db.Uuid
   clerk_org_id         String
   organisation_id      String                 @db.Uuid
-  xero_tenant_id       String?                @db.Uuid
+  xero_connection_id   String?                @db.Uuid
   status               sync_run_status        @default(running)
   run_type             sync_run_type
   trigger_type         sync_trigger_type      @default(scheduled)
@@ -1215,14 +1094,14 @@ model SyncRun {
   created_at           DateTime               @default(now())
   updated_at           DateTime               @updatedAt
 
-  organisation   Organisation   @relation(fields: [organisation_id], references: [id])
-  xero_tenant    XeroTenant?    @relation(fields: [xero_tenant_id], references: [id])
-  failed_records FailedRecord[]
+  organisation    Organisation    @relation(fields: [organisation_id], references: [id])
+  xero_connection XeroConnection? @relation(fields: [xero_connection_id, clerk_org_id, organisation_id], references: [id, clerk_org_id, organisation_id], onDelete: Restrict, onUpdate: Cascade)
+  failed_records  FailedRecord[]
 
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@index([organisation_id, started_at])
-  @@index([clerk_org_id, organisation_id, xero_tenant_id, run_type, status, started_at])
+  @@index([clerk_org_id, organisation_id, xero_connection_id, run_type, status, started_at])
   @@map("sync_runs")
 }
 
@@ -1371,103 +1250,4 @@ model StripeEvent {
   @@index([clerk_org_id, delivery_state, event_created_at])
   @@index([delivery_state, updated_at])
   @@map("stripe_events")
-}
-
-model XeroCleanupRequest {
-  id                   String                          @id @default(uuid()) @db.Uuid
-  clerk_org_id         String
-  organisation_id      String                          @db.Uuid
-  xero_tenant_id       String                          @db.Uuid // internal XeroTenant.id (FK below)
-  binding_generation   Int // XeroTenant.binding_generation after the disconnect increment
-  requested_by_user_id String
-  destructive          Boolean
-  data_action_status   xero_cleanup_data_action_status
-  created_at           DateTime                        @default(now())
-  updated_at           DateTime                        @updatedAt
-  attempts             XeroCleanupAttempt[]
-  organisation         Organisation                    @relation(fields: [organisation_id], references: [id])
-  xero_tenant          XeroTenant                      @relation(fields: [xero_tenant_id], references: [id])
-
-  @@index([clerk_org_id])
-  @@index([organisation_id])
-  @@map("xero_cleanup_requests")
-}
-
-model XeroCleanupAttempt {
-  id                          String                     @id @default(uuid()) @db.Uuid
-  clerk_org_id                String
-  organisation_id             String                     @db.Uuid
-  xero_cleanup_request_id     String                     @db.Uuid
-  provider_app_id             String
-  remote_connection_id        String
-  expected_binding_generation Int
-  state                       xero_cleanup_attempt_state @default(pending)
-  lease_owner                 String?
-  lease_expires_at            DateTime?
-  dispatched_at               DateTime?
-  deadline_at                 DateTime?
-  next_attempt_at             DateTime?
-  retry_count                 Int                        @default(0)
-  outcome_reason              String? // safe, allowlisted code; never a raw payload
-  correlation_id              String?
-  created_at                  DateTime                   @default(now())
-  updated_at                  DateTime                   @updatedAt
-  request                     XeroCleanupRequest         @relation(fields: [xero_cleanup_request_id], references: [id])
-
-  @@unique([xero_cleanup_request_id, remote_connection_id])
-  @@index([state, next_attempt_at])
-  @@index([organisation_id])
-  @@index([clerk_org_id])
-  @@map("xero_cleanup_attempts")
-}
-
-enum xero_cleanup_data_action_status {
-  not_requested
-  pending
-  completed
-  failed
-}
-
-enum xero_cleanup_attempt_state {
-  pending
-  claimed
-  dispatching
-  confirmed_deleted
-  confirmed_absent
-  unknown
-  blocked_authorisation
-  cancelled
-}
-
-enum xero_inactivity_kind {
-  active
-  unknown
-  candidate
-}
-
-enum xero_inactivity_review_status {
-  unreviewed
-  reviewed_keep
-  reviewed_escalate
-}
-
-model XeroInactivityClassification {
-  id              String                        @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
-  organisation_id String                        @db.Uuid
-  xero_tenant_id  String                        @db.Uuid
-  policy_version  Int
-  kind            xero_inactivity_kind
-  reason          String
-  review_status   xero_inactivity_review_status @default(unreviewed)
-  classified_at   DateTime                      @default(now())
-  created_at      DateTime                      @default(now())
-  updated_at      DateTime                      @updatedAt
-  organisation    Organisation                  @relation(fields: [organisation_id], references: [id])
-  xero_tenant     XeroTenant                    @relation(fields: [xero_tenant_id], references: [id])
-
-  @@index([clerk_org_id])
-  @@index([organisation_id])
-  @@index([xero_tenant_id])
-  @@map("xero_inactivity_classifications")
 }

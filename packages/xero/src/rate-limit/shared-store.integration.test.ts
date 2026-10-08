@@ -1,12 +1,7 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
-
 import { randomUUID } from "node:crypto";
-import { executeRedisRestCommand } from "@repo/core";
 import {
-  initialiseLiveCampaignFixture,
-  isProtectedLiveRun,
-} from "@repo/database/live-campaign-fixture";
-import {
+  countSharedStoreFixtureKeys,
   deleteSharedStoreFixtureKeys,
   sharedStoreFixtureEpoch,
 } from "@repo/database/live-shared-store-fixture";
@@ -21,16 +16,7 @@ import {
 } from "./shared-store";
 
 vi.mock("server-only", () => ({}));
-const applications: string[] = [];
-
-describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
-  if (!isProtectedLiveRun()) {
-    it.skip("requires the protected live runner", () => {
-      /* Collection does not allocate fixtures outside protected runs. */
-    });
-    return;
-  }
-
+describe("guarded shared-store integration", () => {
   const fixture = allocateLiveTestFixture(
     "packages/xero/src/rate-limit/shared-store.integration.test.ts"
   );
@@ -55,19 +41,16 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
   }
   function store(config = limits) {
     return new RedisSharedXeroRateStore({
-      credentialDomainId: fixture.id("credential-domain"),
-      epoch,
       limits: config,
+      namespace: epoch,
       token,
       url,
     });
   }
-  async function application(config = limits) {
+  function application(config = limits) {
     const appId = `fixture-${epoch}-${appSequence}`;
     appSequence += 1;
-    applications.push(appId);
     const first = store(config);
-    await first.initialiseNamespace(appId, false);
     return { appId, first, second: store(config) };
   }
   const reserve = (
@@ -105,18 +88,78 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
     if (!authorised) {
       return;
     }
-    await deleteSharedStoreFixtureKeys({
+    const ownedStore = {
       globalKeys: [
         `shared_store_namespace:${fixture.globalKey("shared_store_namespace")}`,
       ],
       token,
       url,
-    });
+    };
+    await deleteSharedStoreFixtureKeys(ownedStore);
+    expect(await countSharedStoreFixtureKeys(ownedStore)).toBe(0);
   });
-
   describe("owned Redis REST atomic admission", () => {
+    it.each(["token", "user_inventory"] as const)(
+      "%s uses only app limits and provider cooldowns",
+      async (kind) => {
+        const { appId, first, second } = application({
+          ...limits,
+          appCallsPerMinute: 100,
+        });
+        const rateClass = { kind, providerAppId: appId };
+        await first.observe({
+          headers: new Headers({
+            "X-DayLimit-Remaining": "0",
+            "X-MinLimit-Remaining": "0",
+          }),
+          rateClass,
+        });
+        for (let index = 0; index < 61; index += 1) {
+          expect((await reserve(second, rateClass)).ok).toBe(true);
+        }
+        await first.observe({
+          headers: new Headers({ "Retry-After": "2" }),
+          rateClass,
+        });
+        expect(await reserve(second, rateClass)).toMatchObject({
+          error: { reason: "cooldown" },
+          ok: false,
+        });
+      }
+    );
+    it("allocates only owned quota keys and isolates application budgets", async () => {
+      const config = { ...limits, callsPerMinutePerOrg: 1 };
+      const firstApp = application(config);
+      const secondApp = application(config);
+      const rateClass = tenant(firstApp.appId);
+      expect(
+        xeroRateKeys(rateClass, epoch).every((key) =>
+          key.startsWith(
+            `xero:{${encodeURIComponent(firstApp.appId)}}:${epoch}:`
+          )
+        )
+      ).toBe(true);
+      expect((await reserve(firstApp.first, rateClass)).ok).toBe(true);
+      expect(await reserve(firstApp.second, rateClass)).toMatchObject({
+        error: { reason: "minute" },
+        ok: false,
+      });
+      expect((await reserve(secondApp.first, tenant(secondApp.appId))).ok).toBe(
+        true
+      );
+      expect(
+        await countSharedStoreFixtureKeys({
+          globalKeys: [
+            `shared_store_namespace:${fixture.globalKey("shared_store_namespace")}`,
+          ],
+          token,
+          url,
+        })
+      ).toBeGreaterThan(0);
+    });
+
     it("shares minute exhaustion between two instances without consuming denied app budget", async () => {
-      const { appId, first, second } = await application({
+      const { appId, first, second } = application({
         ...limits,
         appCallsPerMinute: 3,
         callsPerMinutePerOrg: 2,
@@ -131,7 +174,7 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
     });
     it("shares daily exhaustion across instances and simulated restart", async () => {
       const config = { ...limits, callsPerDayPerOrg: 2 };
-      const { appId, first, second } = await application(config);
+      const { appId, first, second } = application(config);
       await reserve(first, tenant(appId));
       await reserve(second, tenant(appId));
       expect(await reserve(store(config), tenant(appId))).toMatchObject({
@@ -143,7 +186,7 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       ).toBe(true);
     });
     it("aggregates app-wide minute windows across external tenants", async () => {
-      const { appId, first, second } = await application({
+      const { appId, first, second } = application({
         ...limits,
         appCallsPerMinute: 2,
       });
@@ -155,7 +198,7 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       });
     });
     it("enforces five concurrent leases with idempotent release and expiry", async () => {
-      const { appId, first, second } = await application();
+      const { appId, first, second } = application();
       const rateClass = tenant(appId);
       const admissions = await Promise.all(
         Array.from({ length: 5 }, () => reserve(first, rateClass, 2000))
@@ -184,7 +227,7 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       expect((await reserve(second, rateClass)).ok).toBe(true);
     });
     it("replays reservations atomically across two store instances", async () => {
-      const { appId, first, second } = await application({
+      const { appId, first, second } = application({
         ...limits,
         callsPerMinutePerOrg: 1,
       });
@@ -201,7 +244,7 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       });
     });
     it("clamps tenant and app headers downward without replenishment", async () => {
-      const { appId, first, second } = await application();
+      const { appId, first, second } = application();
       const rateClass = tenant(appId);
       await first.observe({
         headers: new Headers({
@@ -230,7 +273,7 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       });
     });
     it("keeps cooldown monotonic and accepts fractional seconds", async () => {
-      const { appId, first, second } = await application();
+      const { appId, first, second } = application();
       const rateClass = tenant(appId);
       await first.observe({
         headers: new Headers({ "Retry-After": "2" }),
@@ -246,12 +289,12 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       });
     });
     it("fails closed when transport is unavailable", async () => {
-      const { appId } = await application();
+      const { appId } = application();
       const unavailable = new RedisSharedXeroRateStore({
-        epoch,
         fetchImpl: () =>
           Promise.reject(new Error("Synthetic transport outage")),
         limits,
+        namespace: epoch,
         token,
         url,
       });
@@ -260,158 +303,19 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
         ok: false,
       });
     });
-    it("never admits without namespace sentinel", async () => {
-      const appId = `fixture-${epoch}-closed`;
-      applications.push(appId);
-      expect(await reserve(store(), tenant(appId))).toMatchObject({
-        error: { reason: "infrastructure" },
-        ok: false,
-      });
-    });
-    it("conservatively closes newly seen tenant daily windows", async () => {
-      const appId = `fixture-${epoch}-conservative`;
-      applications.push(appId);
-      const first = store();
-      await first.initialiseNamespace(appId, true);
-      expect(await reserve(first, tenant(appId, "unseen"))).toMatchObject({
-        error: { reason: "daily" },
-        ok: false,
-      });
-      expect(
-        (await reserve(first, { kind: "token", providerAppId: appId })).ok
-      ).toBe(true);
-    });
-  });
-
-  describe("owned Redis credential domain fence", () => {
-    it("initialisation is immutable and idempotent without resetting allowance", async () => {
-      const { appId, first } = await application({
+    it("initialises first-use quota keys atomically across concurrent clients", async () => {
+      const { appId, first, second } = application({
         ...limits,
-        callsPerDayPerOrg: 1,
+        callsPerMinutePerOrg: 1,
       });
-      const rateClass = tenant(appId);
-      const replay = { leaseMs: 1000, rateClass, reservationId: randomUUID() };
-      expect((await first.reserve(replay)).ok).toBe(true);
-      expect(await first.initialiseNamespace(appId, true)).toBe(false);
-      const foreign = new RedisSharedXeroRateStore({
-        credentialDomainId: fixture.id("foreign-domain"),
-        epoch,
-        limits,
-        token,
-        url,
-      });
-      await expect(foreign.initialiseNamespace(appId, false)).rejects.toThrow(
-        "credential domain mismatch"
-      );
-      for (const kind of [
-        "tenant",
-        "token",
-        "user_inventory",
-        "app_management",
-      ] as const) {
-        const scoped: XeroRateClass =
-          kind === "tenant" ? rateClass : { kind, providerAppId: appId };
-        expect(
-          await foreign.reserve({ ...replay, rateClass: scoped })
-        ).toMatchObject({
-          error: { reason: "credential_domain_mismatch" },
-          ok: false,
-        });
-      }
-      expect((await first.reserve(replay)).ok).toBe(true);
-      expect(await reserve(first, rateClass)).toMatchObject({
-        error: { reason: "daily" },
-        ok: false,
-      });
+      const results = await Promise.all([
+        reserve(first, tenant(appId)),
+        reserve(second, tenant(appId)),
+      ]);
+      expect(results.filter((result) => result.ok)).toHaveLength(1);
+      expect(results.filter((result) => !result.ok)).toEqual([
+        { error: { reason: "minute" }, ok: false },
+      ]);
     });
   });
-
-  describe("owned Redis sentinel integrity", () => {
-    async function command(values: readonly (string | number)[]) {
-      const result = await executeRedisRestCommand({
-        command: values,
-        token,
-        url,
-      });
-      if (!result.ok) {
-        throw new Error("Owned Redis fixture command failed");
-      }
-      return result.value;
-    }
-    function snapshot(rateClass: XeroRateClass) {
-      const keys = xeroRateKeys(rateClass, epoch);
-      return Promise.all(
-        keys.map((key, index) =>
-          command([
-            index === 0 || index === 5 || index === 6 ? "GET" : "ZCARD",
-            key,
-          ])
-        )
-      );
-    }
-    it("mismatch leaves sentinel, counters and conservative allowance unchanged", async () => {
-      const appId = `fixture-${epoch}-immutable`;
-      applications.push(appId);
-      const first = store();
-      await first.initialiseNamespace(appId, true);
-      const rateClass = tenant(appId);
-      const before = await snapshot(rateClass);
-      const foreign = new RedisSharedXeroRateStore({
-        credentialDomainId: fixture.id("foreign-domain"),
-        epoch,
-        limits,
-        token,
-        url,
-      });
-      await expect(foreign.initialiseNamespace(appId, false)).rejects.toThrow(
-        "credential domain mismatch"
-      );
-      await reserve(foreign, rateClass);
-      expect(await snapshot(rateClass)).toEqual(before);
-    });
-    it.each(["1", "malformed"])(
-      "legacy/malformed sentinel %s denies all classes and cannot be rewritten",
-      async (value) => {
-        const appId = `fixture-${epoch}-sentinel-${value}`;
-        applications.push(appId);
-        const rateClass = tenant(appId);
-        await command(["SET", xeroRateKeys(rateClass, epoch)[0] ?? "", value]);
-        const before = await snapshot(rateClass);
-        const first = store();
-        await expect(first.initialiseNamespace(appId, false)).rejects.toThrow(
-          "credential domain mismatch"
-        );
-        for (const kind of [
-          "tenant",
-          "token",
-          "user_inventory",
-          "app_management",
-        ] as const) {
-          const scoped: XeroRateClass =
-            kind === "tenant" ? rateClass : { kind, providerAppId: appId };
-          expect(await reserve(first, scoped)).toMatchObject({
-            error: { reason: "credential_domain_mismatch" },
-            ok: false,
-          });
-        }
-        expect(await snapshot(rateClass)).toEqual(before);
-      }
-    );
-    it("missing deployment domain fails closed even in test mode", async () => {
-      const { appId } = await application();
-      const missing = new RedisSharedXeroRateStore({
-        epoch,
-        limits,
-        token,
-        url,
-      });
-      expect(await reserve(missing, tenant(appId))).toMatchObject({
-        error: { reason: "credential_domain_mismatch" },
-        ok: false,
-      });
-    });
-  });
-
-  // The protected runner owns this real isolated campaign control namespace.
-  beforeAll(() => initialiseLiveCampaignFixture(fixture));
 });

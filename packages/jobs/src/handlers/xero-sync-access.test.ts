@@ -14,7 +14,7 @@ vi.mock("@repo/database", () => {
     $executeRaw: mocks.execute,
     $queryRaw: mocks.query,
     person: { updateMany: mocks.writes },
-    xeroTenant: { findFirst: mocks.find },
+    xeroConnection: { findFirst: mocks.find },
   };
   return {
     database: {
@@ -30,7 +30,7 @@ vi.mock("@repo/xero", async () => ({
     await vi.importActual<typeof import("@repo/xero")>("@repo/xero")
   ).classifyXeroFailure,
   resolveXeroAccess: mocks.resolve,
-  toResolvedXeroTenant: (routingScope, value) => ({
+  toResolvedXeroConnection: (routingScope, value) => ({
     ...routingScope,
     ...value,
   }),
@@ -43,17 +43,15 @@ const {
   XeroBindingChangedError,
 } = await import("./xero-sync-access");
 const scope = {
-  bindingGeneration: 3,
   clerkOrgId: "org_a",
+  connectionId: "00000000-0000-4000-8000-000000000002",
   organisationId: "00000000-0000-4000-8000-000000000001",
-  xeroTenantId: "00000000-0000-4000-8000-000000000002",
 };
-
-describe("Xero sync generation fence", () => {
+describe("Xero sync connection lock", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.find.mockResolvedValue({
-      id: scope.xeroTenantId,
+      id: scope.connectionId,
       sync_paused_at: null,
     });
   });
@@ -61,17 +59,16 @@ describe("Xero sync generation fence", () => {
     await withXeroBinding(scope, async (tx) => {
       expect(mocks.query).toHaveBeenCalledWith(
         expect.anything(),
-        `xero-binding:${scope.xeroTenantId}`
+        scope.connectionId,
+        scope.clerkOrgId,
+        scope.organisationId
       );
       expect(mocks.find).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            active_slot: 1,
-            binding_generation: 3,
             clerk_org_id: scope.clerkOrgId,
-            id: scope.xeroTenantId,
+            id: scope.connectionId,
             organisation_id: scope.organisationId,
-            retired_at: null,
           }),
         })
       );
@@ -90,7 +87,18 @@ describe("Xero sync generation fence", () => {
     expect(mocks.query).toHaveBeenCalledTimes(1);
     expect(mocks.writes).toHaveBeenCalledTimes(1);
   });
-  it("cancels a changed or disconnected generation before any batch mutation", async () => {
+  it("checks the captured external file before allowing persistence", async () => {
+    await withXeroBinding(
+      { ...scope, expectedXeroTenantId: "captured-file" },
+      async () => undefined
+    );
+    expect(mocks.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ xero_tenant_id: "captured-file" }),
+      })
+    );
+  });
+  it("cancels a changed or disconnected connection before any batch mutation", async () => {
     mocks.find.mockResolvedValue(null);
     await expect(
       withXeroBinding(scope, async (tx) =>
@@ -109,31 +117,37 @@ describe("Xero sync generation fence", () => {
     ).rejects.toBeInstanceOf(XeroBindingChangedError);
     expect(mocks.writes).not.toHaveBeenCalled();
   });
-  it("rejects a resolver database tenant mismatch before any provider consumer", async () => {
+  it("rejects a resolver local connection mismatch before any provider consumer", async () => {
     mocks.resolve.mockResolvedValue({
       ok: true,
-      value: { xeroTenantDatabaseId: "sibling" },
+      value: { connectionId: "sibling" },
     });
     await expect(
       resolveSyncTenant(scope, "payroll.employees.read")
     ).rejects.toBeInstanceOf(XeroBindingChangedError);
   });
-  it("passes exact scope capability generation and one absolute deadline to resolution", async () => {
-    mocks.resolve.mockResolvedValue({
-      ok: true,
-      value: { xeroTenantDatabaseId: scope.xeroTenantId },
-    });
-    await resolveSyncTenant(scope, "payroll.employees.read");
-    expect(mocks.resolve).toHaveBeenCalledWith(
-      expect.objectContaining({
-        capability: "payroll.employees.read",
-        clerkOrgId: scope.clerkOrgId,
-        deadline: { expiresAtMs: expect.any(Number) },
-        expectedBindingGeneration: 3,
-        organisationId: scope.organisationId,
-      })
-    );
-  });
+  it.each([
+    { capability: "payroll.employees.read" },
+    { capability: ["payroll.employees", "payroll.employees.read"] },
+  ])(
+    "passes exact connection and capability $capability with one absolute deadline",
+    async ({ capability }) => {
+      mocks.resolve.mockResolvedValue({
+        ok: true,
+        value: { connectionId: scope.connectionId },
+      });
+      await resolveSyncTenant(scope, capability);
+      expect(mocks.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          capability,
+          clerkOrgId: scope.clerkOrgId,
+          connectionId: scope.connectionId,
+          deadline: { expiresAtMs: expect.any(Number) },
+          organisationId: scope.organisationId,
+        })
+      );
+    }
+  );
   it("rejects retryable service Results at the registered job boundary", async () => {
     await expect(
       rejectRetryableSyncResult(
@@ -147,10 +161,9 @@ describe("Xero sync generation fence", () => {
     ).resolves.toMatchObject({ ok: false });
   });
 });
-
-it("projects only after canonical commit and reacquires the generation fence", async () => {
+it("projects only after canonical commit and reacquires the connection lock", async () => {
   vi.clearAllMocks();
-  mocks.find.mockResolvedValue({ id: scope.xeroTenantId });
+  mocks.find.mockResolvedValue({ id: scope.connectionId });
   let committed = false;
   const baseTransaction = mocks.transaction.getMockImplementation();
   if (!baseTransaction) {
@@ -173,11 +186,10 @@ it("projects only after canonical commit and reacquires the generation fence", a
   });
   expect(effect).toHaveBeenCalledTimes(1);
 });
-
-it("cancels deferred projection when binding generation changed after canonical commit", async () => {
+it("cancels deferred projection when connection disconnected after canonical commit", async () => {
   vi.clearAllMocks();
   mocks.find
-    .mockResolvedValueOnce({ id: scope.xeroTenantId })
+    .mockResolvedValueOnce({ id: scope.connectionId })
     .mockResolvedValue(null);
   const effect = vi.fn(async () => undefined);
   await expect(
@@ -185,26 +197,3 @@ it("cancels deferred projection when binding generation changed after canonical 
   ).rejects.toBeInstanceOf(XeroBindingChangedError);
   expect(effect).not.toHaveBeenCalled();
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

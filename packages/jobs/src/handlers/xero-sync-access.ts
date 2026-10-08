@@ -1,9 +1,4 @@
-import {
-  assertXeroCampaignAccess,
-  lockXeroCampaignPersistence,
-} from "@repo/database/xero-campaign-access";
 import "server-only";
-
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
@@ -11,20 +6,19 @@ import type { Prisma } from "@repo/database/generated/client";
 import {
   classifyXeroFailure,
   resolveXeroAccess,
-  toResolvedXeroTenant,
+  toResolvedXeroConnection,
   type XeroWriteError,
 } from "@repo/xero";
-
 export interface XeroSyncScope {
-  bindingGeneration: number;
   clerkOrgId: string;
+  connectionId: string;
+  expectedXeroTenantId?: string;
   organisationId: string;
-  xeroTenantId: string;
+  requestedAt?: string;
 }
-
 export class XeroBindingChangedError extends Error {
   constructor() {
-    super("generation_changed");
+    super("connection_changed");
   }
 }
 export class XeroSyncRetryError extends Error {
@@ -34,22 +28,18 @@ export class XeroSyncRetryError extends Error {
     this.recoveryReason = recoveryReason;
   }
 }
-
 const bindingTransactions = new AsyncLocalStorage<{
   scope: XeroSyncScope;
   tx: Prisma.TransactionClient;
   afterCommit: Array<() => Promise<void>>;
 }>();
-
 function sameBinding(a: XeroSyncScope, b: XeroSyncScope) {
   return (
     a.clerkOrgId === b.clerkOrgId &&
     a.organisationId === b.organisationId &&
-    a.xeroTenantId === b.xeroTenantId &&
-    a.bindingGeneration === b.bindingGeneration
+    a.connectionId === b.connectionId
   );
 }
-
 /** The comparison and actual batch writes share the disconnect/reconnect lock. */
 export async function withXeroBinding<T>(
   scope: XeroSyncScope,
@@ -65,55 +55,32 @@ export async function withXeroBinding<T>(
   const afterCommit: Array<() => Promise<void>> = [];
   const result = await database.$transaction(
     async (tx) => {
-      await lockXeroCampaignPersistence(scope, tx);
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-binding:${scope.xeroTenantId}`}, 0))::text AS acquired`;
-      const tenant = await tx.xeroTenant.findFirst({
-        select: {
-          id: true,
-          xero_connection: { select: { last_error_code: true, status: true } },
-          xero_credential_owner_id: true,
-        },
+      await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${scope.connectionId}::uuid AND clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
+      const connection = await tx.xeroConnection.findFirst({
+        select: { id: true },
         where: {
-          active_slot: 1,
-          binding_generation: scope.bindingGeneration,
+          authorisation: { status: "active" },
           clerk_org_id: scope.clerkOrgId,
-          id: scope.xeroTenantId,
-          OR: [
-            { xero_credential_owner_id: null },
-            { credential_owner: { usability: "usable" } },
-          ],
+          id: scope.connectionId,
           organisation_id: scope.organisationId,
-          retired_at: null,
+          status: "active",
           sync_paused_at: null,
-          xero_connection: {
-            disconnected_at: null,
-            revoked_at: null,
-            status: { in: ["active", "stale"] },
-          },
+          ...(scope.expectedXeroTenantId
+            ? { xero_tenant_id: scope.expectedXeroTenantId }
+            : {}),
+          ...(scope.requestedAt
+            ? { initial_sync_requested_at: new Date(scope.requestedAt) }
+            : {}),
         },
       });
-      if (
-        tenant &&
-        !tenant.xero_credential_owner_id &&
-        tenant.xero_connection?.status === "stale" &&
-        [
-          "invalid_grant",
-          "refresh_invalid_grant",
-          "refresh_token_invalid",
-          "reauthorisation_required",
-        ].includes(tenant.xero_connection.last_error_code ?? "")
-      ) {
-        throw new XeroBindingChangedError();
-      }
-      if (!tenant) {
+      if (!connection) {
         throw new XeroBindingChangedError();
       }
       const committedResult = await bindingTransactions.run(
         { afterCommit, scope, tx },
         () => operation(tx)
       );
-      await assertXeroCampaignAccess(scope);
       return committedResult;
     },
     { maxWait: 10_000, timeout: 30_000 }
@@ -123,26 +90,23 @@ export async function withXeroBinding<T>(
   }
   return result;
 }
-
 export async function resolveSyncTenant(
   scope: XeroSyncScope,
   capability: string | readonly string[]
 ) {
-  await assertXeroCampaignAccess(scope);
-  const loaded = await database.xeroTenant.findFirst({
+  const loaded = await database.xeroConnection.findFirst({
     select: {
       approval_state_stale_since: true,
       id: true,
       leave_balances_stale_since: true,
       leave_records_stale_since: true,
       people_stale_since: true,
+      sync_cursors: { select: { entity_type: true, modified_since: true } },
       sync_paused_at: true,
     },
     where: {
-      active_slot: 1,
-      binding_generation: scope.bindingGeneration,
       clerk_org_id: scope.clerkOrgId,
-      id: scope.xeroTenantId,
+      id: scope.connectionId,
       organisation_id: scope.organisationId,
     },
   });
@@ -152,13 +116,13 @@ export async function resolveSyncTenant(
   const resolved = await resolveXeroAccess({
     capability,
     clerkOrgId: scope.clerkOrgId,
+    connectionId: scope.connectionId,
     deadline: { expiresAtMs: Date.now() + 120_000 },
-    expectedBindingGeneration: scope.bindingGeneration,
     organisationId: scope.organisationId,
   });
   if (!resolved.ok) {
     if (
-      ["not_connected", "disconnected", "generation_changed"].includes(
+      ["not_connected", "disconnected", "connection_changed"].includes(
         resolved.error.code
       )
     ) {
@@ -176,14 +140,14 @@ export async function resolveSyncTenant(
       ok: false as const,
     };
   }
-  if (resolved.value.xeroTenantDatabaseId !== scope.xeroTenantId) {
+  if (resolved.value.connectionId !== scope.connectionId) {
     throw new XeroBindingChangedError();
   }
   return {
     ok: true as const,
     value: {
       ...loaded,
-      ...toResolvedXeroTenant(
+      ...toResolvedXeroConnection(
         {
           capability,
           clerkOrgId: scope.clerkOrgId,
@@ -194,7 +158,6 @@ export async function resolveSyncTenant(
     },
   };
 }
-
 export function syncFailureReason(error: XeroWriteError): string {
   if (error.recoveryReason) {
     return error.recoveryReason;
@@ -208,7 +171,6 @@ export function syncFailureReason(error: XeroWriteError): string {
   return classifyXeroFailure({ dispatched: false, error, isMutation: false })
     .recoveryReason;
 }
-
 /** Publication reads must see committed canonical records, under the same current binding fence. */
 export async function afterXeroBindingCommit(
   scope: XeroSyncScope,
@@ -227,11 +189,13 @@ export function throwRetryableXeroFailure(error: XeroWriteError) {
     throw new XeroSyncRetryError(reason);
   }
 }
-
 /** Results are service contracts; Inngest retries only a rejected step. */
-export async function rejectRetryableSyncResult<T, E extends { code: string }>(
-  operation: Promise<Result<T, E>>
-): Promise<Result<T, E>> {
+export async function rejectRetryableSyncResult<
+  T,
+  E extends {
+    code: string;
+  },
+>(operation: Promise<Result<T, E>>): Promise<Result<T, E>> {
   const result = await operation;
   if (!result.ok && result.error.code !== "validation_error") {
     throw new Error("retry_later");

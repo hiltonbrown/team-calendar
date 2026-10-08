@@ -76,7 +76,6 @@ export function matchRawProviderLeave(
 export async function readIndependentAuLeave(input: {
   clerkOrgId: string;
   organisationId: string;
-  bindingGeneration: number;
   expectedTenantId: string;
   providerAppId: string;
   remoteId: string | null;
@@ -87,28 +86,21 @@ export async function readIndependentAuLeave(input: {
     !(
       process.env.KV_REST_API_URL &&
       process.env.KV_REST_API_TOKEN &&
-      process.env.XERO_APP_TIER &&
-      process.env.XERO_RATE_NAMESPACE_EPOCH &&
-      process.env.XERO_CREDENTIAL_DOMAIN_ID
+      process.env.XERO_APP_TIER
     )
   ) {
-    throw new Error(
-      "LIVE oracle requires actual shared quota and credential-domain configuration"
-    );
+    throw new Error("LIVE oracle requires actual shared quota configuration");
   }
   const { keys } = await import("../../../packages/xero/keys.js");
   if (keys().XERO_CLIENT_ID !== input.providerAppId) {
     throw new Error("LIVE oracle provider app identity is mismatched");
   }
-  if (
-    process.env.XERO_API_BASE_URL ||
-    process.env.TC_XERO_RESPONSE_INTERCEPTION
-  ) {
+  if (process.env.XERO_API_BASE_URL) {
     throw new Error("LIVE oracle rejects provider overrides and interception");
   }
   const [{ resolveXeroAccess }, { createXeroDeadline }, { xeroFetch }] =
     await Promise.all([
-      import("../../../packages/xero/src/oauth/credential-owner.js"),
+      import("../../../packages/xero/src/oauth/authorisation.js"),
       import("../../../packages/xero/src/rate-limit/deadline.js"),
       import("../../../packages/xero/src/rate-limit/xero-fetch.js"),
     ]);
@@ -118,7 +110,6 @@ export async function readIndependentAuLeave(input: {
     capability: ["payroll.employees.read", "payroll.settings.read"],
     clerkOrgId: input.clerkOrgId,
     deadline,
-    expectedBindingGeneration: input.bindingGeneration,
     organisationId: input.organisationId,
   });
   if (
@@ -187,7 +178,6 @@ export async function readIndependentAuLeave(input: {
 export async function readIndependentAuImport(input: {
   clerkOrgId: string;
   organisationId: string;
-  bindingGeneration: number;
   expectedTenantId: string;
   providerAppId: string;
   ownedEmployeeIds: readonly string[];
@@ -198,7 +188,7 @@ export async function readIndependentAuImport(input: {
   const leave = await readIndependentAuLeave({ ...input, remoteId: null });
   const [{ resolveXeroAccess }, { createXeroDeadline }, { xeroFetch }] =
     await Promise.all([
-      import("../../../packages/xero/src/oauth/credential-owner.js"),
+      import("../../../packages/xero/src/oauth/authorisation.js"),
       import("../../../packages/xero/src/rate-limit/deadline.js"),
       import("../../../packages/xero/src/rate-limit/xero-fetch.js"),
     ]);
@@ -208,7 +198,6 @@ export async function readIndependentAuImport(input: {
     capability: ["payroll.employees.read", "payroll.settings.read"],
     clerkOrgId: input.clerkOrgId,
     deadline,
-    expectedBindingGeneration: input.bindingGeneration,
     organisationId: input.organisationId,
   });
   if (

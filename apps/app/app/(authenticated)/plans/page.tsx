@@ -23,20 +23,16 @@ import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { type PlansFilterInput, PlansFilterSchema } from "./_schemas";
 import { PlansClient, type PlansClientRecord } from "./plans-client";
-
 export const metadata: Metadata = {
   description: "Plan leave and availability across calendars.",
   title: "Plans - Team Calendar",
 };
-
 interface PlansPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Authentication, scope and filter failures are rendered at the route boundary.
 const PlansPage = async ({ searchParams }: PlansPageProps) => {
   await requirePageRole("org:viewer");
-
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
@@ -49,16 +45,13 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
   };
   const { orgRole } = await auth();
   const user = await currentUser();
-
   if (!user) {
     redirect("/");
   }
-
   const canViewTeam = isManagerOrAbove(orgRole);
   if (filters.tab === "team" && !canViewTeam) {
     redirect(withOrg("/plans?tab=my", orgQueryValue));
   }
-
   const currentPersonResult = await ensureCurrentUserPerson(
     {
       clerkOrgId,
@@ -76,7 +69,6 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
       lastName: user.lastName,
     }
   );
-
   if (!currentPersonResult.ok) {
     return (
       <>
@@ -97,7 +89,6 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
       </>
     );
   }
-
   const serviceFilters = {
     approvalStatus: filters.approvalStatus,
     dateRange: {
@@ -114,7 +105,6 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     recordTypeCategory: filters.recordTypeCategory,
     sourceType: filters.sourceType,
   };
-
   const [recordsResult, xeroStateResult] = await Promise.all([
     filters.tab === "team"
       ? listTeamRecordsPage({
@@ -138,9 +128,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         }),
     getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
   ]);
-
   const xeroConnectionState = toXeroConnectionDisplayState(xeroStateResult);
-
   if (!recordsResult.ok) {
     return (
       <>
@@ -154,7 +142,6 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
       </>
     );
   }
-
   const durationInputs = recordsResult.value.items.map((record) => ({
     allDay: record.allDay,
     clerkOrgId,
@@ -173,14 +160,12 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
       durationInput,
       durationReference
     );
-
     return toClientRecord(
       record,
       duration.ok ? duration.value : null,
       duration.ok ? null : duration.error.message
     );
   });
-
   return (
     <>
       <Header page="Plans" />
@@ -263,9 +248,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     </>
   );
 };
-
 export default PlansPage;
-
 function toClientRecord(
   record: RecordListItem,
   workingDays: number | null,
@@ -296,15 +279,12 @@ function toClientRecord(
     xeroWriteError: record.xeroWriteError,
   };
 }
-
 function isManagerOrAbove(role: string | null | undefined): boolean {
   return role === "org:manager" || role === "org:admin" || role === "org:owner";
 }
-
 function isAdminOrOwner(role: string | null | undefined): boolean {
   return role === "org:admin" || role === "org:owner";
 }
-
 function filtersAreDefault(filters: PlansFilterInput): boolean {
   return (
     filters.tab === "my" &&
@@ -319,7 +299,6 @@ function filtersAreDefault(filters: PlansFilterInput): boolean {
     !filters.sourceType
   );
 }
-
 function emptyStateDescription(filters: PlansFilterInput): string {
   if (filtersAreDefault(filters)) {
     return "There are no leave or availability records in the current window. Create a plan or view all history.";

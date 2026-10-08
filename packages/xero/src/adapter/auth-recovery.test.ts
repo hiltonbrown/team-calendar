@@ -1,24 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { XeroTenantForWrite, XeroWriteError } from "../write/types";
+import type { XeroAccessContext, XeroWriteError } from "../write/types";
 
-const mocks = vi.hoisted(() => ({ resolve: vi.fn() }));
-vi.mock("../oauth/credential-owner", () => ({
+vi.mock("server-only", () => ({}));
+
+const mocks = vi.hoisted(() => ({ resolve: vi.fn(), verify: vi.fn() }));
+vi.mock("../oauth/authorisation", () => ({
   resolveXeroAccess: mocks.resolve,
+}));
+
+vi.mock("../oauth/provider-connection", () => ({
+  verifyXeroProviderConnection: mocks.verify,
 }));
 
 import { executeWithXeroAuthRecovery } from "./auth-recovery";
 
-function tenant(): XeroTenantForWrite {
+function tenant(): XeroAccessContext {
   return {
     accessToken: "old-token",
-    bindingGeneration: 2,
     capability: "payroll.employees",
     clerk_org_id: "clerk",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "binding",
     organisation_id: "organisation",
     payroll_region: "AU",
-    tokenVersion: 1,
     xero_tenant_id: "payroll-file",
   };
 }
@@ -36,15 +40,14 @@ function rejected(error: Partial<XeroWriteError> = {}) {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.verify.mockResolvedValue("inconclusive");
   mocks.resolve.mockImplementation(async (input) => ({
     ok: true,
     value: {
       accessToken: "new-token",
-      bindingGeneration: 2,
+      connectionId: "binding",
       deadline: input.deadline,
       payrollRegion: "AU",
-      tokenVersion: 2,
-      xeroTenantDatabaseId: "binding",
       xeroTenantId: "payroll-file",
     },
   }));
@@ -63,11 +66,9 @@ describe("bounded Xero auth recovery", () => {
     expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         clerkOrgId: "clerk",
+        connectionId: "binding",
         deadline: current.deadline,
-        expectedBindingGeneration: 2,
-        forceRefresh: true,
         organisationId: "organisation",
-        previousTokenVersion: 1,
       })
     );
     expect(operation).toHaveBeenCalledTimes(2);
@@ -77,6 +78,8 @@ describe("bounded Xero auth recovery", () => {
     });
   });
   it.each([
+    ["non-auth401", { code: "validation_error" }],
+    ["operational401", { recoveryReason: "operational_incident" }],
     ["scope401", { recoveryReason: "update_permissions" }],
     [
       "generic403",
@@ -104,6 +107,7 @@ describe("bounded Xero auth recovery", () => {
     ).toEqual(failure);
     expect(operation).toHaveBeenCalledOnce();
     expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.verify).not.toHaveBeenCalled();
   });
   it("classifies a scope failure on the single retry without further refresh", async () => {
     const second = rejected({
@@ -119,13 +123,57 @@ describe("bounded Xero auth recovery", () => {
     ).toEqual(second);
     expect(mocks.resolve).toHaveBeenCalledOnce();
     expect(operation).toHaveBeenCalledTimes(2);
+    expect(mocks.verify).not.toHaveBeenCalled();
   });
-  it("returns reauthorise on the second401 without further refresh or state mutation", async () => {
+  it.each([
+    { code: "validation_error" as const },
+    { recoveryReason: "operational_incident" as const },
+    { recoveryReason: "outcome_unknown" as const },
+    { dispatchPhase: "before_dispatch" as const },
+    {
+      code: "permission_error" as const,
+      httpStatus: 403,
+      recoveryReason: "access_denied" as const,
+    },
+  ])("does not probe a non-authentication replay failure %j", async (error) => {
+    const second = rejected(error);
+    const operation = vi
+      .fn()
+      .mockResolvedValueOnce(rejected())
+      .mockResolvedValueOnce(second);
+    expect(
+      await executeWithXeroAuthRecovery(tenant(), operation, true)
+    ).toEqual(second);
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
+  it("checks one authoritative inventory after the second definite401 without further refresh", async () => {
     const operation = vi.fn().mockResolvedValue(rejected());
     expect(await executeWithXeroAuthRecovery(tenant(), operation)).toEqual(
       rejected()
     );
     expect(mocks.resolve).toHaveBeenCalledOnce();
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(mocks.verify).toHaveBeenCalledOnce();
+    expect(mocks.verify).toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: "new-token", id: "binding" }),
+      true
+    );
+  });
+  it("surfaces a plain reconnect action when the provider check confirms unusable access", async () => {
+    mocks.verify.mockResolvedValue("reconnect_required");
+    const operation = vi.fn().mockResolvedValue(rejected());
+    expect(
+      await executeWithXeroAuthRecovery(tenant(), operation)
+    ).toMatchObject({
+      error: {
+        code: "auth_error",
+        message: "Reconnect Xero to continue.",
+        recoveryReason: "reauthorise",
+      },
+      ok: false,
+    });
+    expect(mocks.resolve).toHaveBeenCalledOnce();
+    expect(mocks.verify).toHaveBeenCalledOnce();
     expect(operation).toHaveBeenCalledTimes(2);
   });
   it("retains an operational refresh failure as a definite non-attempt", async () => {
@@ -145,8 +193,8 @@ describe("bounded Xero auth recovery", () => {
     });
     expect(operation).toHaveBeenCalledOnce();
   });
-  it("uses rejected plaintext only for legacy concurrency comparison inside the resolver", async () => {
-    const current = { ...tenant(), tokenVersion: null };
+  it("passes the rejected token for canonical concurrent-refresh comparison", async () => {
+    const current = { ...tenant() };
     const operation = vi
       .fn()
       .mockResolvedValueOnce(rejected())
@@ -155,21 +203,7 @@ describe("bounded Xero auth recovery", () => {
     expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         previousAccessToken: "old-token",
-        previousTokenVersion: null,
       })
     );
   });
 });
-
-// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignCredentialScope: (
-    _scope: unknown,
-    _tenant: string,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignProviderEffect: (
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

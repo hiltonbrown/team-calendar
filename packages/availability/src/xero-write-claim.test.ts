@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  lockActiveScopedXeroConnection: vi.fn(async () => true),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -10,7 +11,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: { availabilityRecord: { updateMany: mocks.updateMany } },
+  database: {
+    $transaction: async (work: (tx: unknown) => unknown) =>
+      work({ availabilityRecord: { updateMany: mocks.updateMany } }),
+    availabilityRecord: { updateMany: mocks.updateMany },
+  },
+  lockActiveScopedXeroConnection: mocks.lockActiveScopedXeroConnection,
   scopedTo: mocks.scopedTo,
 }));
 

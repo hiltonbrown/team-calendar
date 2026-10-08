@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { XeroFetchError } from "../rate-limit/xero-fetch";
 import {
   classifyXeroFailure,
@@ -69,7 +69,7 @@ describe("Xero failure classifier", () => {
         recoveryReason: "reauthorise",
       })
   );
-  it.each(["not_connected", "disconnected", "generation_changed"])(
+  it.each(["not_connected", "disconnected", "connection_changed"])(
     "preserves %s",
     (code) =>
       expect(classify({ code })).toMatchObject({
@@ -134,16 +134,3 @@ describe("Xero failure classifier", () => {
     }
   });
 });
-
-// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignCredentialScope: (
-    _scope: unknown,
-    _tenant: string,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignProviderEffect: (
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

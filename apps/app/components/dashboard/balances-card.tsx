@@ -11,7 +11,6 @@ interface BalancesCardProps {
   personId: string;
   state: EmployeeDashboardView["balances"];
 }
-
 export function BalancesCard({
   state,
   personId,
@@ -30,9 +29,7 @@ export function BalancesCard({
       </DashboardCardShell>
     );
   }
-
   let content: ReactNode;
-
   if (state.data.xeroConnectionState !== "connected") {
     content = (
       <EmptyState
@@ -81,7 +78,6 @@ export function BalancesCard({
       </div>
     );
   }
-
   return (
     <DashboardCardShell
       ctaHref={`/people/${personId}`}

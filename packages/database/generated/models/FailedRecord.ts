@@ -573,6 +573,10 @@ export type FailedRecordUncheckedUpdateManyWithoutSync_runNestedInput = {
   deleteMany?: Prisma.FailedRecordScalarWhereInput | Prisma.FailedRecordScalarWhereInput[]
 }
 
+export type Enumxero_sync_entity_typeFieldUpdateOperationsInput = {
+  set?: $Enums.xero_sync_entity_type
+}
+
 export type Enumsync_failed_record_typeFieldUpdateOperationsInput = {
   set?: $Enums.sync_failed_record_type
 }

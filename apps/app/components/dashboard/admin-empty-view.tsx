@@ -8,7 +8,6 @@ interface AdminEmptyViewProps {
   roleLabel: "Admin" | "Owner";
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
-
 export function AdminEmptyView({
   xeroConnectionState,
   orgQueryValue,

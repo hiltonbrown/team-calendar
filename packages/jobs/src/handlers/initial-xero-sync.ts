@@ -1,7 +1,10 @@
 import "server-only";
-
+import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
+import {
+  completeXeroInitialSync,
+  ensureXeroInitialSyncRequested,
+} from "@repo/database/queries/xero-sync-cursors";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
@@ -9,32 +12,78 @@ import { inngest } from "../client";
 import { syncXeroLeaveBalances } from "./sync-xero-leave-balances";
 import { syncXeroLeaveRecords } from "./sync-xero-leave-records";
 import { syncXeroPeople } from "./sync-xero-people";
-import { rejectRetryableSyncResult } from "./xero-sync-access";
 
-const InitialXeroSyncInputSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative(),
-  campaign: XeroCampaignEventSchema.optional(),
+const InputSchema = z.object({
   clerkOrgId: z.string().min(1),
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
+  requestedAt: z.string().datetime().optional(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
-  xeroTenantId: z.string().uuid(),
 });
-
-export type InitialXeroSyncInput = z.infer<typeof InitialXeroSyncInputSchema>;
-
-export type InitialXeroSyncError =
-  | { code: "validation_error"; message: string }
-  | { code: "unknown_error"; message: string };
-
+export type InitialXeroSyncInput = z.infer<typeof InputSchema>;
+export interface InitialXeroSyncError {
+  code: "validation_error" | "unknown_error";
+  message: string;
+}
 export interface InitialXeroSyncResult {
   completedAt: Date;
   leaveBalances: unknown;
   leaveRecords: unknown;
   people: unknown;
 }
-
+type RunStep = <T>(name: string, operation: () => Promise<T>) => Promise<T>;
+function successfulPhase<T extends { status: string }>(
+  result: Result<T, { code: string; message: string }>
+): T {
+  if (!result.ok || result.value.status !== "succeeded") {
+    throw new Error("Initial Xero import phase did not complete successfully.");
+  }
+  return result.value;
+}
+async function executeInitialSync(
+  input: InitialXeroSyncInput,
+  runStep: RunStep
+): Promise<InitialXeroSyncResult> {
+  const requestedAt =
+    input.requestedAt ?? (await ensureXeroInitialSyncRequested(input));
+  if (!requestedAt) {
+    throw new Error("Initial Xero import request is no longer active.");
+  }
+  const phaseInput = { ...input, mode: "full" as const, requestedAt };
+  // Each phase/page is its own sync run; a successful people run cannot short-circuit leave or balances.
+  const people = await runStep("sync-people", async () =>
+    successfulPhase(
+      await syncXeroPeople({ ...phaseInput, runId: randomUUID() })
+    )
+  );
+  const leaveRecords = await runStep("sync-leave-records", async () =>
+    successfulPhase(
+      await syncXeroLeaveRecords({ ...phaseInput, runId: randomUUID() })
+    )
+  );
+  const leaveBalances: unknown[] = [];
+  let hasMore = true;
+  for (let page = 0; hasMore; page += 1) {
+    const result = await runStep(`sync-leave-balances-${page}`, async () =>
+      successfulPhase(
+        await syncXeroLeaveBalances({ ...phaseInput, runId: randomUUID() })
+      )
+    );
+    leaveBalances.push(result);
+    hasMore = result.hasMore === true;
+  }
+  const completedAt = await runStep("complete-initial-import", async () => {
+    const completed = await completeXeroInitialSync({ ...input, requestedAt });
+    if (!completed) {
+      throw new Error("Initial Xero import request changed.");
+    }
+    await captureInitialSyncCompleted(input);
+    return completed;
+  });
+  return { completedAt, leaveBalances, leaveRecords, people };
+}
 export const initialXeroSyncFunction: InngestFunction.Any =
   inngest.createFunction(
     {
@@ -44,48 +93,19 @@ export const initialXeroSyncFunction: InngestFunction.Any =
           if: "async.data.runId == event.data.runId",
         },
       ],
+      concurrency: { key: "event.data.connectionId", limit: 1 },
       id: "initial-xero-sync",
       triggers: { event: "initial-xero-sync" },
     },
-    async ({ event, step, runId: workerRunId }) => {
-      const peopleResult = await step.run("sync-people", async () =>
-        rejectRetryableSyncResult(syncXeroPeople(event.data, workerRunId))
-      );
-
-      const leaveRecordsResult = await step.run(
-        "sync-leave-records",
-        async () =>
-          rejectRetryableSyncResult(
-            syncXeroLeaveRecords(event.data, workerRunId)
-          )
-      );
-
-      const leaveBalancesResult = await step.run(
-        "sync-leave-balances",
-        async () =>
-          rejectRetryableSyncResult(
-            syncXeroLeaveBalances(event.data, workerRunId)
-          )
-      );
-
-      await step.run("finalise-activation", async () =>
-        captureInitialSyncCompleted(event.data)
-      );
-
-      return {
-        completedAt: new Date(),
-        leaveBalances: leaveBalancesResult,
-        leaveRecords: leaveRecordsResult,
-        people: peopleResult,
-      };
-    }
+    async ({ event, step }) =>
+      executeInitialSync(InputSchema.parse(event.data), (name, operation) =>
+        step.run(name, operation)
+      )
   );
-
 export async function initialXeroSync(
-  input: unknown,
-  workerRunId: string | null = null
+  input: unknown
 ): Promise<Result<InitialXeroSyncResult, InitialXeroSyncError>> {
-  const parsed = InitialXeroSyncInputSchema.safeParse(input);
+  const parsed = InputSchema.safeParse(input);
   if (!parsed.success) {
     return {
       error: {
@@ -96,26 +116,20 @@ export async function initialXeroSync(
       ok: false,
     };
   }
-
-  const peopleResult = await syncXeroPeople(parsed.data, workerRunId);
-  const leaveRecordsResult = await syncXeroLeaveRecords(
-    parsed.data,
-    workerRunId
-  );
-  const leaveBalancesResult = await syncXeroLeaveBalances(
-    parsed.data,
-    workerRunId
-  );
-
-  await captureInitialSyncCompleted(parsed.data);
-
-  return {
-    ok: true,
-    value: {
-      completedAt: new Date(),
-      leaveBalances: leaveBalancesResult,
-      leaveRecords: leaveRecordsResult,
-      people: peopleResult,
-    },
-  };
+  try {
+    return {
+      ok: true,
+      value: await executeInitialSync(parsed.data, async (_, operation) =>
+        operation()
+      ),
+    };
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Initial Xero import did not complete.",
+      },
+      ok: false,
+    };
+  }
 }

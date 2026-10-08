@@ -10,14 +10,11 @@ import type { OnboardingState } from "@/lib/server/load-onboarding-state";
 import { DismissibleOnboardingPanel } from "./dismissible-onboarding-panel";
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-
 describe("DismissibleOnboardingPanel", () => {
   beforeEach(() => window.localStorage.clear());
   afterEach(cleanup);
-
   it("shows a concise dashboard summary instead of the full checklist", () => {
     renderPanel(incompleteState);
-
     expect(screen.getByText("Continue setup")).toBeDefined();
     expect(
       screen.getByText(
@@ -30,7 +27,6 @@ describe("DismissibleOnboardingPanel", () => {
     expect(screen.queryByText("Review organisation profile")).toBeNull();
     expect(screen.queryByRole("link", { name: "Add people" })).toBeNull();
   });
-
   it("preserves dashboard dismissal", async () => {
     renderPanel(incompleteState);
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
@@ -38,13 +34,11 @@ describe("DismissibleOnboardingPanel", () => {
       expect(screen.queryByText("Continue setup")).toBeNull()
     );
   });
-
   it("stays hidden after required setup is complete", () => {
     renderPanel({ ...incompleteState, isComplete: true });
     expect(screen.queryByText("Continue setup")).toBeNull();
   });
 });
-
 function renderPanel(onboarding: OnboardingState) {
   return render(
     <DismissibleOnboardingPanel
@@ -56,7 +50,6 @@ function renderPanel(onboarding: OnboardingState) {
     />
   );
 }
-
 const incompleteState: OnboardingState = {
   activeFeedCount: 0,
   completedRequiredCount: 1,

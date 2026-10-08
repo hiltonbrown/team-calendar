@@ -208,13 +208,13 @@ export type FeedAggregateArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   _avg?: FeedAvgAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   *
+   * 
    * Select which fields to sum
   **/
   _sum?: FeedSumAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   *
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: FeedMinAggregateInputType

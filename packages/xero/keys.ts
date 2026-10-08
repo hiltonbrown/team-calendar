@@ -2,7 +2,6 @@ import { log } from "@repo/observability/log";
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
-const NAMESPACE_EPOCH_REGEX = /^[a-z0-9-]{1,32}$/;
 const POSITIVE_VERSION_REGEX = /^[1-9]\d*$/;
 const BASE64_REGEX = /^[a-zA-Z0-9+/]*={0,2}$/;
 
@@ -80,10 +79,7 @@ export const keys = () =>
       XERO_APP_TIER: process.env.XERO_APP_TIER,
       XERO_CLIENT_ID: process.env.XERO_CLIENT_ID,
       XERO_CLIENT_SECRET: process.env.XERO_CLIENT_SECRET,
-      XERO_CREDENTIAL_DOMAIN_ID: process.env.XERO_CREDENTIAL_DOMAIN_ID,
-      XERO_RATE_NAMESPACE_EPOCH: process.env.XERO_RATE_NAMESPACE_EPOCH,
       XERO_REDIRECT_URI: process.env.XERO_REDIRECT_URI,
-      XERO_REMOTE_CLEANUP_MODE: process.env.XERO_REMOTE_CLEANUP_MODE,
       XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION:
         process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION,
       XERO_TOKEN_ENCRYPTION_KEY: process.env.XERO_TOKEN_ENCRYPTION_KEY,
@@ -99,19 +95,11 @@ export const keys = () =>
         .optional(),
       XERO_CLIENT_ID: z.string().optional(),
       XERO_CLIENT_SECRET: z.string().optional(),
-      XERO_CREDENTIAL_DOMAIN_ID: z.string().uuid().optional(),
-      XERO_RATE_NAMESPACE_EPOCH: z
-        .string()
-        .regex(NAMESPACE_EPOCH_REGEX)
-        .optional(),
       // The OAuth redirect URI Xero returns the authorisation code to. It must
       // exactly match a URI pre-registered on the Xero app. When set it pins
       // the callback to the registered production URL regardless of the
       // per-deployment public URLs.
       XERO_REDIRECT_URI: z.string().url().optional(),
-      XERO_REMOTE_CLEANUP_MODE: z
-        .enum(["report_only", "enabled"])
-        .default("report_only"),
       XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: z
         .string()
         .regex(

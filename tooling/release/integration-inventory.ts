@@ -23,20 +23,18 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/database/plan_limits.integration.test.ts",
   "packages/database/public-holidays.integration.test.ts",
   "packages/database/src/seed/seed.integration.test.ts",
-  "packages/database/xero-campaign.integration.test.ts",
-  "packages/database/xero-lifecycle-migration.integration.test.ts",
+  "packages/database/xero-authorisation-locks.integration.test.ts",
+  "packages/database/xero-simplification-schema.integration.test.ts",
+  "packages/database/xero-sync-cursors.integration.test.ts",
   "packages/database/xero-tenancy.integration.test.ts",
   "packages/feeds/index.integration.test.ts",
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts",
-  "packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts",
   "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts",
   "packages/jobs/src/handlers/sync-xero-leave-balances.integration.test.ts",
   "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts",
   "packages/jobs/src/handlers/sync-xero-people.integration.test.ts",
-  "packages/xero/src/oauth/connection-cleanup.integration.test.ts",
-  "packages/xero/src/oauth/credential-owner.integration.test.ts",
   "packages/xero/src/oauth/disconnect.integration.test.ts",
-  "packages/xero/src/oauth/inactivity-report.integration.test.ts",
+  "packages/xero/src/oauth/provider-connection.integration.test.ts",
   "packages/xero/src/oauth/service.integration.test.ts",
   "packages/xero/src/rate-limit/shared-store.integration.test.ts",
 ] as const;
@@ -48,7 +46,7 @@ export const assertExpectedIntegrationInventory = (
     JSON.stringify(inventory) !== JSON.stringify(EXPECTED_INTEGRATION_TESTS)
   ) {
     throw new Error(
-      "Live integration inventory differs from the reviewed 28-suite allowlist"
+      "Live integration inventory differs from the reviewed suite allowlist"
     );
   }
 };

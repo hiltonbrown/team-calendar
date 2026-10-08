@@ -1,7 +1,9 @@
 import { Pool } from "pg";
 import { z } from "zod";
 import { assertLiveDatabaseAuthority } from "../database-guard.js";
+import { redirectObserverDiagnostics } from "./observer-output.js";
 
+redirectObserverDiagnostics();
 const recordId = z.string().uuid().parse(process.argv[2]);
 const manifest = assertLiveDatabaseAuthority({
   acknowledgement: process.env.ALLOW_LIVE_DATABASE_TESTS,
@@ -39,9 +41,13 @@ try {
             op.request_units::text
      FROM availability_records ar
      LEFT JOIN outbound_operations op
-       ON op.availability_record_id = ar.id AND op.action = 'submit'
-     WHERE ar.id = $1::uuid`,
-    [recordId]
+       ON op.availability_record_id = ar.id AND op.action = 'approve'
+       AND op.clerk_org_id = ar.clerk_org_id
+       AND op.organisation_id = ar.organisation_id
+     WHERE ar.id = $1::uuid
+       AND ar.clerk_org_id = ANY($2::text[])
+       AND ar.organisation_id = ANY($3::uuid[])`,
+    [recordId, manifest.owned.clerkOrgIds, manifest.owned.organisationIds]
   );
   if (result.rows.length !== 1) {
     throw new Error("Provider verification record is not exact");
@@ -62,7 +68,12 @@ try {
   if (row.request_units === null) {
     throw new Error("Provider verification operation is incomplete");
   }
-  if (!manifest.owned.organisationIds.includes(row.organisation_id)) {
+  if (
+    !(
+      manifest.owned.organisationIds.includes(row.organisation_id) &&
+      manifest.owned.clerkOrgIds.includes(row.clerk_org_id)
+    )
+  ) {
     throw new Error("Provider verification record is outside the manifest");
   }
   const requestEndsAt = row.request_ends_at;
@@ -80,23 +91,26 @@ try {
   if (!(candidates?.ok && candidates.value.complete)) {
     throw new Error("Provider verification returned an incomplete result");
   }
-  const units = Number(row.request_units);
+  const units = z.number().finite().parse(Number(row.request_units));
+  if (
+    submitRequestFingerprint({
+      employeeId: row.request_employee_id,
+      endsAt: requestEndsAt,
+      leaveTypeId: row.request_leave_type_id,
+      startsAt: requestStartsAt,
+      title: row.request_title,
+      units,
+    }) !== row.request_fingerprint
+  ) {
+    throw new Error("Provider verification request fingerprint is invalid");
+  }
   const matches = candidates.value.candidates.filter(
     (candidate) =>
       candidate.employeeId === row.request_employee_id &&
       candidate.leaveTypeId === row.request_leave_type_id &&
       candidate.startsAt === requestStartsAt.toISOString().slice(0, 10) &&
       candidate.endsAt === requestEndsAt.toISOString().slice(0, 10) &&
-      candidate.units === units &&
-      candidate.title === row.request_title &&
-      submitRequestFingerprint({
-        employeeId: candidate.employeeId,
-        endsAt: requestEndsAt,
-        leaveTypeId: candidate.leaveTypeId,
-        startsAt: requestStartsAt,
-        title: candidate.title,
-        units: candidate.units,
-      }) === row.request_fingerprint
+      candidate.title === row.request_title
   );
   const knownRemoteId = row.known_remote_id ?? row.source_remote_id;
   if (

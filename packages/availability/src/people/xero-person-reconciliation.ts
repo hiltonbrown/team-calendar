@@ -88,7 +88,6 @@ async function findExistingExactMatch(
         start_date: input.startDate ?? exactMatch.start_date,
         updated_at: new Date(),
         xero_employee_id: input.employeeId,
-        xero_missing_since: null,
       },
       where: { id: exactMatch.id },
     });
@@ -119,7 +118,6 @@ async function findExistingExactMatch(
         start_date: input.startDate ?? sourceMatch.start_date,
         updated_at: new Date(),
         xero_employee_id: input.employeeId,
-        xero_missing_since: null,
       },
       where: { id: sourceMatch.id },
     });
@@ -181,7 +179,6 @@ async function tryUpgradeManualCandidate(
           start_date: input.startDate ?? candidate.start_date,
           updated_at: new Date(),
           xero_employee_id: input.employeeId,
-          xero_missing_since: null,
         },
         where: { id: candidate.id },
       });
@@ -259,7 +256,6 @@ async function handleCandidatesOrNewPerson(
       start_date: input.startDate ?? null,
       updated_at: new Date(),
       xero_employee_id: input.employeeId,
-      xero_missing_since: null,
     },
     where: {
       clerk_org_id: context.clerkOrgId,
@@ -577,7 +573,7 @@ async function transferCandidateBalancesAndScopes(
   for (const cb of candidateBalances) {
     const isConflict = xeroBalances.some(
       (xb) =>
-        xb.xero_tenant_id === cb.xero_tenant_id &&
+        xb.xero_connection_id === cb.xero_connection_id &&
         xb.leave_type_xero_id === cb.leave_type_xero_id
     );
     if (isConflict) {

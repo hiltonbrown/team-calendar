@@ -11,7 +11,6 @@ import {
 
 const ORIGINAL_ENV = process.env.XERO_TOKEN_ENCRYPTION_KEY;
 const TEST_ENCRYPTION_KEY = Buffer.alloc(32).toString("base64");
-
 function restoreEncryptionKey() {
   if (ORIGINAL_ENV === undefined) {
     delete process.env.XERO_TOKEN_ENCRYPTION_KEY;
@@ -19,25 +18,20 @@ function restoreEncryptionKey() {
   }
   process.env.XERO_TOKEN_ENCRYPTION_KEY = ORIGINAL_ENV;
 }
-
 function buildXeroTenant() {
   return {
     accessToken: "access-token",
-    bindingGeneration: 1,
     clerk_org_id: "org_uk_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_uk_1",
     organisation_id: "00000000-0000-4000-8000-000000000003",
     payroll_region: "UK" as const,
-    tokenVersion: 1,
     xero_tenant_id: "xero-tenant-uk-1",
   };
 }
-
 function employeeListResponse(items: unknown[]): Response {
   return new Response(JSON.stringify({ employees: items }), { status: 200 });
 }
-
 function validEmployeeItem(employeeId: string, overrides: object = {}) {
   return {
     email: "oliver@example.co.uk",
@@ -51,34 +45,28 @@ function validEmployeeItem(employeeId: string, overrides: object = {}) {
     ...overrides,
   };
 }
-
 function errorResponse(status: number, message: string): Response {
   return new Response(JSON.stringify({ message }), {
     status,
     statusText: message,
   });
 }
-
 function ukLeaveResponse(items: unknown[]): Response {
   return new Response(JSON.stringify({ leave: items }), { status: 200 });
 }
-
 function ukLeaveBalancesResponse(items: unknown[]): Response {
   return new Response(JSON.stringify({ leaveBalances: items }), {
     status: 200,
   });
 }
-
 describe("UK employee reads", () => {
   beforeEach(() => {
     process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     vi.restoreAllMocks();
   });
-
   afterEach(() => {
     restoreEncryptionKey();
   });
-
   it("marks a single short page as complete and preserves valid neighbours of a malformed record", async () => {
     const fetchMock = vi
       .fn()
@@ -90,9 +78,7 @@ describe("UK employee reads", () => {
         ])
       );
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -117,7 +103,6 @@ describe("UK employee reads", () => {
       url: expect.stringContaining("/payroll.xro/2.0/employees?page=1"),
     });
   });
-
   it("uses raw page length, not valid employee count, to continue pagination", async () => {
     const firstPageItems = Array.from({ length: 100 }, (_, index) =>
       index % 2 === 0
@@ -135,9 +120,7 @@ describe("UK employee reads", () => {
         ])
       );
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -152,13 +135,10 @@ describe("UK employee reads", () => {
       expect.stringContaining("/payroll.xro/2.0/employees?page=2"),
     ]);
   });
-
   it("handles empty page correctly", async () => {
     const fetchMock = vi.fn().mockResolvedValue(employeeListResponse([]));
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -168,7 +148,6 @@ describe("UK employee reads", () => {
     expect(result.value.rawItemCount).toBe(0);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
-
   it("returns complete: false and preserves gathered employees when a page envelope cannot be read", async () => {
     const fullFirstPage = Array.from({ length: 100 }, (_, index) =>
       validEmployeeItem(
@@ -184,9 +163,7 @@ describe("UK employee reads", () => {
         })
       );
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -195,35 +172,28 @@ describe("UK employee reads", () => {
     expect(result.value.employees).toHaveLength(100);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
-
   it("maps 401 to auth_error", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(errorResponse(401, "Unauthorised"));
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("auth_error");
     }
   });
-
   it("maps 403 to permission_error", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(errorResponse(403, "Forbidden"));
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("permission_error");
     }
   });
-
   it("maps 429 to rate_limit_error", async () => {
     const fetchMock = vi
       .fn()
@@ -231,43 +201,36 @@ describe("UK employee reads", () => {
         Promise.resolve(errorResponse(429, "Too Many Requests"))
       );
     vi.stubGlobal("fetch", fetchMock);
-
-    const result = await fetchEmployees({ xeroTenant: buildXeroTenant() });
-
+    const result = await fetchEmployees({ xeroConnection: buildXeroTenant() });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("rate_limit_error");
     }
   });
-
   it("returns an incident without dispatch when resolved access is missing", async () => {
     const tenant = buildXeroTenant();
     tenant.accessToken = "";
-
-    await expect(fetchEmployees({ xeroTenant: tenant })).resolves.toMatchObject(
-      {
-        error: {
-          code: "unknown_error",
-          dispatchPhase: "before_dispatch",
-          message: "Xero access is unavailable.",
-          recoveryReason: "operational_incident",
-        },
-        ok: false,
-      }
-    );
+    await expect(
+      fetchEmployees({ xeroConnection: tenant })
+    ).resolves.toMatchObject({
+      error: {
+        code: "unknown_error",
+        dispatchPhase: "before_dispatch",
+        message: "Xero access is unavailable.",
+        recoveryReason: "operational_incident",
+      },
+      ok: false,
+    });
   });
 });
-
 describe("UK leave record reads", () => {
   beforeEach(() => {
     process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     vi.restoreAllMocks();
   });
-
   afterEach(() => {
     restoreEncryptionKey();
   });
-
   it("fetches and maps multi-period leave records for an employee", async () => {
     const rawLeave = [
       {
@@ -294,15 +257,12 @@ describe("UK leave record reads", () => {
         updatedDateUTC: "2026-07-01T04:00:00.000Z",
       },
     ];
-
     const fetchMock = vi.fn().mockResolvedValue(ukLeaveResponse(rawLeave));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -335,7 +295,6 @@ describe("UK leave record reads", () => {
       url: expect.stringContaining("/payroll.xro/2.0/employees/emp-uk-1/leave"),
     });
   });
-
   it("maps Completed and Estimated period statuses to APPROVED and maps other statuses correctly", () => {
     const records = mapUkLeaveRecords(
       {
@@ -386,7 +345,6 @@ describe("UK leave record reads", () => {
       },
       "emp-1"
     );
-
     expect(records.map((r) => r.status)).toEqual([
       "APPROVED",
       "APPROVED",
@@ -396,23 +354,19 @@ describe("UK leave record reads", () => {
       "DELETED",
     ]);
   });
-
   it("handles empty leave array gracefully", async () => {
     const fetchMock = vi.fn().mockResolvedValue(ukLeaveResponse([]));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.complete).toBe(true);
       expect(result.value.leaveRecords).toEqual([]);
     }
   });
-
   it("returns complete: false when envelope is unparseable", async () => {
     const fetchMock = vi
       .fn()
@@ -420,31 +374,26 @@ describe("UK leave record reads", () => {
         new Response(JSON.stringify({ leave: "not an array" }), { status: 200 })
       );
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.complete).toBe(false);
       expect(result.value.leaveRecords).toEqual([]);
     }
   });
-
   it("returns validation_error when xeroEmployeeId is missing", async () => {
     const result = await fetchUkLeaveForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
-
   it("maps 400, 401, 403, and 404 for leave reads", async () => {
     const fetchMock = vi
       .fn()
@@ -453,46 +402,40 @@ describe("UK leave record reads", () => {
       .mockResolvedValueOnce(errorResponse(403, "Forbidden"))
       .mockResolvedValueOnce(errorResponse(404, "Employee not found"));
     vi.stubGlobal("fetch", fetchMock);
-
     const tenant = buildXeroTenant();
-
     const r400 = await fetchUkLeaveForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r400.ok).toBe(false);
     if (!r400.ok) {
       expect(r400.error.code).toBe("validation_error");
     }
-
     const r401 = await fetchUkLeaveForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r401.ok).toBe(false);
     if (!r401.ok) {
       expect(r401.error.code).toBe("auth_error");
     }
-
     const r403 = await fetchUkLeaveForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r403.ok).toBe(false);
     if (!r403.ok) {
       expect(r403.error.code).toBe("permission_error");
     }
-
     const r404 = await fetchUkLeaveForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r404.ok).toBe(false);
     if (!r404.ok) {
       expect(r404.error.code).toBe("not_found_error");
     }
   });
-
   it("maps 429 to rate_limit_error for leave reads", async () => {
     const fetchMock = vi
       .fn()
@@ -500,29 +443,24 @@ describe("UK leave record reads", () => {
         Promise.resolve(errorResponse(429, "Rate limited"))
       );
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("rate_limit_error");
     }
   });
 });
-
 describe("UK leave balance reads", () => {
   beforeEach(() => {
     process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     vi.restoreAllMocks();
   });
-
   afterEach(() => {
     restoreEncryptionKey();
   });
-
   it("maps ordinary Hours and Days balances with null currencyCode", async () => {
     const rawBalances = [
       {
@@ -540,17 +478,14 @@ describe("UK leave balance reads", () => {
         typeOfUnits: "Days",
       },
     ];
-
     const fetchMock = vi
       .fn()
       .mockResolvedValue(ukLeaveBalancesResponse(rawBalances));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -582,7 +517,6 @@ describe("UK leave balance reads", () => {
       expect.any(Object)
     );
   });
-
   it("fails closed with validation_error when unexpected monetary unit is present", async () => {
     const rawBalances = [
       {
@@ -593,24 +527,20 @@ describe("UK leave balance reads", () => {
         typeOfUnits: "Pounds",
       },
     ];
-
     const fetchMock = vi
       .fn()
       .mockResolvedValue(ukLeaveBalancesResponse(rawBalances));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
       expect(result.error.message).toContain("could not be parsed");
     }
   });
-
   it("fails closed with validation_error when unexpected currencyCode is present", async () => {
     const rawBalances = [
       {
@@ -622,23 +552,19 @@ describe("UK leave balance reads", () => {
         typeOfUnits: "Hours",
       },
     ];
-
     const fetchMock = vi
       .fn()
       .mockResolvedValue(ukLeaveBalancesResponse(rawBalances));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
-
   it("fails closed in mapUkLeaveBalances when unexpected unit is present", () => {
     const balances = mapUkLeaveBalances(
       {
@@ -655,7 +581,6 @@ describe("UK leave balance reads", () => {
     );
     expect(balances).toEqual([]);
   });
-
   it("handles null or empty typeOfUnits safely with null unitType and null currencyCode", async () => {
     const rawBalances = [
       {
@@ -666,17 +591,14 @@ describe("UK leave balance reads", () => {
         typeOfUnits: null,
       },
     ];
-
     const fetchMock = vi
       .fn()
       .mockResolvedValue(ukLeaveBalancesResponse(rawBalances));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -693,22 +615,18 @@ describe("UK leave balance reads", () => {
       },
     ]);
   });
-
   it("handles empty balance array", async () => {
     const fetchMock = vi.fn().mockResolvedValue(ukLeaveBalancesResponse([]));
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.leaveBalances).toEqual([]);
     }
   });
-
   it("returns validation_error when balances envelope is invalid", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ leaveBalances: "not an array" }), {
@@ -716,18 +634,15 @@ describe("UK leave balance reads", () => {
       })
     );
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
-
   it("maps 400, 401, 403, and 404 for balance reads", async () => {
     const fetchMock = vi
       .fn()
@@ -736,46 +651,40 @@ describe("UK leave balance reads", () => {
       .mockResolvedValueOnce(errorResponse(403, "Forbidden"))
       .mockResolvedValueOnce(errorResponse(404, "Employee not found"));
     vi.stubGlobal("fetch", fetchMock);
-
     const tenant = buildXeroTenant();
-
     const r400 = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r400.ok).toBe(false);
     if (!r400.ok) {
       expect(r400.error.code).toBe("validation_error");
     }
-
     const r401 = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r401.ok).toBe(false);
     if (!r401.ok) {
       expect(r401.error.code).toBe("auth_error");
     }
-
     const r403 = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r403.ok).toBe(false);
     if (!r403.ok) {
       expect(r403.error.code).toBe("permission_error");
     }
-
     const r404 = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
     expect(r404.ok).toBe(false);
     if (!r404.ok) {
       expect(r404.error.code).toBe("not_found_error");
     }
   });
-
   it("maps 429 to rate_limit_error for balance reads", async () => {
     const fetchMock = vi
       .fn()
@@ -783,29 +692,24 @@ describe("UK leave balance reads", () => {
         Promise.resolve(errorResponse(429, "Rate limited"))
       );
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveBalancesForEmployee({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("rate_limit_error");
     }
   });
 });
-
 describe("UK leave application status reads", () => {
   beforeEach(() => {
     process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     vi.restoreAllMocks();
   });
-
   afterEach(() => {
     restoreEncryptionKey();
   });
-
   it("fetches single application status using employeeId and leaveApplicationId", async () => {
     const rawPayload = {
       leaveID: "leave-app-uk-1",
@@ -819,20 +723,17 @@ describe("UK leave application status reads", () => {
       ],
       updatedDateUTC: "2026-09-02T10:00:00.000Z",
     };
-
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
         new Response(JSON.stringify(rawPayload), { status: 200 })
       );
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveApplicationStatus({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-uk-1",
       xeroLeaveApplicationId: "leave-app-uk-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -848,42 +749,37 @@ describe("UK leave application status reads", () => {
       expect.any(Object)
     );
   });
-
   it("requires xeroEmployeeId on generic fetchLeaveApplicationStatus caller", async () => {
     const result = await fetchLeaveApplicationStatus({
+      xeroConnection: buildXeroTenant(),
       xeroLeaveApplicationId: "leave-app-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
       expect(result.error.message).toContain("requires xeroEmployeeId");
     }
   });
-
   it("requires both xeroEmployeeId and xeroLeaveApplicationId on fetchUkLeaveApplicationStatus", async () => {
     const resultMissingEmp = await fetchUkLeaveApplicationStatus({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "",
       xeroLeaveApplicationId: "leave-app-1",
-      xeroTenant: buildXeroTenant(),
     });
     expect(resultMissingEmp.ok).toBe(false);
     if (!resultMissingEmp.ok) {
       expect(resultMissingEmp.error.code).toBe("validation_error");
     }
-
     const resultMissingLeave = await fetchUkLeaveApplicationStatus({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-1",
       xeroLeaveApplicationId: "",
-      xeroTenant: buildXeroTenant(),
     });
     expect(resultMissingLeave.ok).toBe(false);
     if (!resultMissingLeave.ok) {
       expect(resultMissingLeave.error.code).toBe("validation_error");
     }
   });
-
   it("maps 401, 403, and 404 for status reads", async () => {
     const fetchMock = vi
       .fn()
@@ -891,40 +787,35 @@ describe("UK leave application status reads", () => {
       .mockResolvedValueOnce(errorResponse(403, "Forbidden"))
       .mockResolvedValueOnce(errorResponse(404, "Leave not found"));
     vi.stubGlobal("fetch", fetchMock);
-
     const tenant = buildXeroTenant();
-
     const r401 = await fetchUkLeaveApplicationStatus({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant: tenant,
     });
     expect(r401.ok).toBe(false);
     if (!r401.ok) {
       expect(r401.error.code).toBe("auth_error");
     }
-
     const r403 = await fetchUkLeaveApplicationStatus({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant: tenant,
     });
     expect(r403.ok).toBe(false);
     if (!r403.ok) {
       expect(r403.error.code).toBe("permission_error");
     }
-
     const r404 = await fetchUkLeaveApplicationStatus({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant: tenant,
     });
     expect(r404.ok).toBe(false);
     if (!r404.ok) {
       expect(r404.error.code).toBe("not_found_error");
     }
   });
-
   it("maps 429 to rate_limit_error for status reads", async () => {
     const fetchMock = vi
       .fn()
@@ -932,29 +823,14 @@ describe("UK leave application status reads", () => {
         Promise.resolve(errorResponse(429, "Rate limited"))
       );
     vi.stubGlobal("fetch", fetchMock);
-
     const result = await fetchUkLeaveApplicationStatus({
+      xeroConnection: buildXeroTenant(),
       xeroEmployeeId: "emp-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant: buildXeroTenant(),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("rate_limit_error");
     }
   });
 });
-
-// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignCredentialScope: (
-    _scope: unknown,
-    _tenant: string,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignProviderEffect: (
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));
