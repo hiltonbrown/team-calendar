@@ -1,3 +1,16 @@
+vi.mock("../oauth/authorisation", () => ({
+  resolveXeroAccess: vi.fn(async (input) => ({
+    ok: true,
+    value: {
+      accessToken: "access-token",
+      connectionId: input.connectionId,
+      deadline: input.deadline,
+      payrollRegion: "AU",
+      xeroTenantId: "xero-tenant-1",
+    },
+  })),
+}));
+
 import { randomUUID } from "node:crypto";
 import type { XeroMutationIdentity } from "@repo/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

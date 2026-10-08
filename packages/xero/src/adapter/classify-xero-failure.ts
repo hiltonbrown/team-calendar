@@ -1,4 +1,8 @@
-import { parseRetryAfter, XeroFetchError } from "../rate-limit/xero-fetch";
+import {
+  parseRetryAfter,
+  XeroAccessDispatchError,
+  XeroFetchError,
+} from "../rate-limit/xero-fetch";
 import type { XeroRecoveryReason, XeroWriteError } from "../write/types";
 
 interface FailureClassification {
@@ -185,6 +189,18 @@ export function mapXeroTransportError(
   error: unknown,
   isMutation: boolean
 ): XeroWriteError {
+  if (error instanceof XeroAccessDispatchError) {
+    return {
+      ...classifyXeroFailure({
+        dispatched: false,
+        error: error.accessError,
+        isMutation,
+      }),
+      dispatchPhase: "before_dispatch",
+      message: error.accessError.message,
+      retryAfterMs: error.accessError.retryAfterMs,
+    };
+  }
   const dispatched = error instanceof XeroFetchError ? error.dispatched : true;
   return {
     ...classifyXeroFailure({ dispatched, error, isMutation }),

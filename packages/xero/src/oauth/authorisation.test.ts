@@ -165,6 +165,92 @@ describe("one scoped canonical access resolver", () => {
       expect(Object.isFrozen(result.value)).toBe(true);
     }
   });
+  it("uses the rotated credential observed by its final scoped reread", async () => {
+    const initial = current;
+    const access = encryptXeroToken("concurrent-access");
+    const rotated = {
+      ...current,
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
+      updated_at: new Date("2026-10-08T00:00:00Z"),
+    };
+    let reads = 0;
+    mocks.scoped.mockImplementation(() => {
+      reads += 1;
+      return {
+        ok: true,
+        value: {
+          authorisation: reads === 1 ? initial : rotated,
+          id: "connection",
+          payroll_region: "AU",
+          remote_connection_id: "remote",
+          status: "active",
+          xero_authorisation_id: "grant",
+          xero_tenant_id: "external",
+        },
+      };
+    });
+    expect(await resolveXeroAccess(input())).toMatchObject({
+      ok: true,
+      value: {
+        accessToken: "concurrent-access",
+        providerConnection: { authorisationUpdatedAt: rotated.updated_at },
+      },
+    });
+    expect(mocks.http).not.toHaveBeenCalled();
+  });
+
+  it.each(["revoked", "permissions"])(
+    "rejects %s discovered during its final scoped reread",
+    async (change) => {
+      let reads = 0;
+      mocks.scoped.mockImplementation(() => {
+        reads += 1;
+        return {
+          ok: true,
+          value: {
+            authorisation:
+              reads === 1
+                ? current
+                : {
+                    ...current,
+                    ...(change === "revoked"
+                      ? { status: "reconnect_required" }
+                      : { granted_scopes: [] }),
+                  },
+            id: "connection",
+            payroll_region: "AU",
+            status: "active",
+            xero_authorisation_id: "grant",
+            xero_tenant_id: "external",
+          },
+        };
+      });
+      expect(await resolveXeroAccess(input())).toMatchObject({ ok: false });
+    }
+  );
+
+  it.each([false, true])(
+    "fails safely on unreadable credentials (401 recovery: %s)",
+    async (recovery) => {
+      current.access_token_auth_tag = Buffer.alloc(16, 1).toString("base64");
+      expect(
+        await resolveXeroAccess({
+          ...input(),
+          ...(recovery ? { previousAccessToken: "old-access" } : {}),
+        })
+      ).toMatchObject({
+        error: {
+          code: "decryption_failed",
+          message: "Xero credentials could not be read.",
+        },
+        ok: false,
+      });
+      expect(mocks.http).not.toHaveBeenCalled();
+    }
+  );
+
   it("requires all capabilities before any refresh", async () => {
     current = {
       ...grant(Date.now() - 1000),
@@ -337,6 +423,63 @@ describe("one scoped canonical access resolver", () => {
 });
 
 describe("canonical dormant maintenance", () => {
+  const dormantNow = new Date("2026-10-08T12:00:00Z");
+  const dormantThreshold = 45 * 24 * 60 * 60 * 1000;
+
+  function selectCurrentGrant() {
+    mocks.due.mockResolvedValue({ ok: true, value: [current] });
+  }
+
+  it.each([-1, 0, 1])(
+    "rotates only when the locked grant reaches 45 days, with elapsed offset %i ms",
+    async (offset) => {
+      // Access-token expiry alone must not make scheduled maintenance refresh.
+      current = grant(Date.now() - 1000);
+      current.last_refreshed_at = new Date(
+        dormantNow.getTime() - dormantThreshold - offset
+      );
+      selectCurrentGrant();
+      const oldRefresh = current.refresh_token_encrypted;
+      const result = await refreshDormantXeroAuthorisations(dormantNow);
+      const due = offset >= 0;
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          failed: 0,
+          refreshed: due ? 1 : 0,
+          scanned: 1,
+          skipped: due ? 0 : 1,
+        },
+      });
+      expect(mocks.http).toHaveBeenCalledTimes(due ? 1 : 0);
+      if (due) {
+        expect(
+          decryptXeroToken({
+            authTag: current.refresh_token_auth_tag,
+            encrypted: current.refresh_token_encrypted,
+            iv: current.refresh_token_iv,
+            keyVersion: current.token_key_version,
+          })
+        ).toBe("new-refresh");
+      } else {
+        expect(current.refresh_token_encrypted).toBe(oldRefresh);
+      }
+    }
+  );
+
+  it("skips an enumerated due grant when no eligible Organisation connection remains under the lock", async () => {
+    current.last_refreshed_at = new Date(0);
+    selectCurrentGrant();
+    const oldRefresh = current.refresh_token_encrypted;
+    mocks.connection.findFirst.mockResolvedValue(null);
+    expect(await refreshDormantXeroAuthorisations(dormantNow)).toEqual({
+      ok: true,
+      value: { failed: 0, refreshed: 0, scanned: 1, skipped: 1 },
+    });
+    expect(current.refresh_token_encrypted).toBe(oldRefresh);
+    expect(mocks.http).not.toHaveBeenCalled();
+  });
+
   it("exposes only safe maintenance counters", async () => {
     expect(refreshDormantXeroAuthorisations).toBeTypeOf("function");
     const result = await refreshDormantXeroAuthorisations(new Date());

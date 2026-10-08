@@ -15,11 +15,16 @@ import {
 import type {
   Prisma,
   XeroAuthorisation,
+  XeroConnection,
 } from "@repo/database/generated/client";
 import type { XeroProviderConnectionCapture } from "@repo/database/queries/xero-connections";
 import { getScopedXeroConnection } from "@repo/database/queries/xero-connections";
 import { keys } from "../../keys";
-import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
+import {
+  decryptXeroToken,
+  encryptXeroToken,
+  tryDecryptXeroToken,
+} from "../crypto/tokens";
 import type { XeroDeadline } from "../rate-limit/deadline";
 import {
   verifyXeroAccessTokenIdentity,
@@ -30,6 +35,9 @@ import type { XeroOAuthError } from "./service";
 import { exchangeToken } from "./token";
 
 export const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+// Demand-driven access is primary. Xero expires unused refresh tokens at 60 days;
+// 45 days since successful issuance leaves 15 days for maintenance interruptions.
+// https://developer.xero.com/faq/oauth2 (reviewed 2026-10-08)
 const DORMANT_REFRESH_MS = 45 * 24 * 60 * 60 * 1000;
 
 function tokenDeadline(deadline: XeroDeadline): XeroDeadline {
@@ -123,12 +131,9 @@ function needsRotation(
   current: XeroAuthorisation,
   input: XeroRefreshInput
 ): boolean {
-  if (
-    input.previousAccessToken &&
-    authorisationAccessToken(current) !== input.previousAccessToken
-  ) {
-    return false;
-  }
+  const tokenChanged =
+    input.previousAccessToken !== undefined &&
+    authorisationAccessToken(current) !== input.previousAccessToken;
   if (input.reason === "dormant") {
     return (
       current.last_refreshed_at.getTime() <=
@@ -136,7 +141,7 @@ function needsRotation(
     );
   }
   return (
-    input.reason === "401" ||
+    (input.reason === "401" && !tokenChanged) ||
     current.access_token_expires_at.getTime() <=
       Date.now() + TOKEN_REFRESH_BUFFER_MS
   );
@@ -258,6 +263,24 @@ export interface XeroAccessError {
   message: string;
   retryAfterMs?: number;
 }
+function captureProviderConnection(
+  connection: Pick<
+    XeroConnection,
+    "last_connected_at" | "remote_connection_id"
+  >,
+  authorisation: XeroAuthorisation
+): XeroProviderConnectionCapture | undefined {
+  if (!connection.remote_connection_id) {
+    return undefined;
+  }
+  return Object.freeze({
+    authorisationId: authorisation.id,
+    authorisationUpdatedAt: authorisation.updated_at,
+    lastConnectedAt: connection.last_connected_at,
+    remoteConnectionId: connection.remote_connection_id,
+  });
+}
+
 export async function resolveXeroAccess(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -309,10 +332,27 @@ export async function resolveXeroAccess(input: {
       ok: false,
     };
   }
+  const initialToken =
+    input.previousAccessToken === undefined
+      ? { ok: true as const, token: undefined }
+      : tryDecryptXeroToken({
+          authTag: connection.authorisation.access_token_auth_tag,
+          encrypted: connection.authorisation.access_token_encrypted,
+          iv: connection.authorisation.access_token_iv,
+          keyVersion: connection.authorisation.token_key_version,
+        });
+  if (!initialToken.ok) {
+    return {
+      error: {
+        code: "decryption_failed",
+        message: "Xero credentials could not be read.",
+      },
+      ok: false,
+    };
+  }
   const rejectedCurrentToken =
     input.previousAccessToken !== undefined &&
-    authorisationAccessToken(connection.authorisation) ===
-      input.previousAccessToken;
+    initialToken.token === input.previousAccessToken;
   const needsRefresh =
     rejectedCurrentToken ||
     connection.authorisation.access_token_expires_at.getTime() <=
@@ -328,20 +368,14 @@ export async function resolveXeroAccess(input: {
   if (!grant.ok) {
     return grant;
   }
-  if (!hasXeroCapability(grant.value.granted_scopes, required)) {
-    return {
-      error: {
-        code: "capability_missing",
-        message: "Update Xero permissions.",
-      },
-      ok: false,
-    };
-  }
   const current = await getScopedXeroConnection(input);
   if (
     !current.ok ||
     current.value.id !== connection.id ||
     current.value.status !== "active" ||
+    current.value.authorisation?.status !== "active" ||
+    current.value.authorisation.access_token_expires_at.getTime() <=
+      Date.now() + TOKEN_REFRESH_BUFFER_MS ||
     current.value.xero_authorisation_id !== grant.value.id ||
     current.value.xero_tenant_id !== connection.xero_tenant_id ||
     current.value.payroll_region !== connection.payroll_region
@@ -354,23 +388,46 @@ export async function resolveXeroAccess(input: {
       ok: false,
     };
   }
+  if (
+    !hasXeroCapability(current.value.authorisation.granted_scopes, required)
+  ) {
+    return {
+      error: {
+        code: "capability_missing",
+        message: "Update Xero permissions.",
+      },
+      ok: false,
+    };
+  }
+  // A sibling execution may have rotated this shared grant during resolution.
+  // Return the credential and capture from the same final canonical snapshot.
+  const currentGrant = current.value.authorisation;
+  const currentToken = tryDecryptXeroToken({
+    authTag: currentGrant.access_token_auth_tag,
+    encrypted: currentGrant.access_token_encrypted,
+    iv: currentGrant.access_token_iv,
+    keyVersion: currentGrant.token_key_version,
+  });
+  if (!currentToken.ok) {
+    return {
+      error: {
+        code: "decryption_failed",
+        message: "Xero credentials could not be read.",
+      },
+      ok: false,
+    };
+  }
   return {
     ok: true,
     value: Object.freeze({
-      accessToken: authorisationAccessToken(grant.value),
+      accessToken: currentToken.token,
       connectionId: connection.id,
       deadline,
       payrollRegion: connection.payroll_region,
-      ...(current.value.remote_connection_id
-        ? {
-            providerConnection: Object.freeze({
-              authorisationId: grant.value.id,
-              authorisationUpdatedAt: grant.value.updated_at,
-              lastConnectedAt: current.value.last_connected_at,
-              remoteConnectionId: current.value.remote_connection_id,
-            }),
-          }
-        : {}),
+      providerConnection: captureProviderConnection(
+        current.value,
+        currentGrant
+      ),
       xeroTenantId: connection.xero_tenant_id,
     }),
   };

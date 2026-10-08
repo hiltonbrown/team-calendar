@@ -1041,3 +1041,169 @@ it("never retries an ambiguous unsupported mutation without recorded identity", 
   expect(response.status).toBe(503);
   expect(fetchImpl).toHaveBeenCalledOnce();
 });
+
+describe("scoped credentials at dispatch", () => {
+  const context = () => ({
+    accessToken: "captured",
+    clerk_org_id: "clerk",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
+    id: "conn",
+    organisation_id: "org",
+    payroll_region: "AU" as const,
+    xero_tenant_id: "org-a",
+  });
+  it("re-reads current credentials for every retry after another worker rotates", async () => {
+    let token = "first";
+    const access = context();
+    const resolveAccess = vi.fn(async () => ({
+      ok: true as const,
+      value: {
+        accessToken: token,
+        connectionId: access.id,
+        deadline: access.deadline,
+        payrollRegion: access.payroll_region,
+        xeroTenantId: access.xero_tenant_id,
+      },
+    }));
+    const sent: string[] = [];
+    const fetchImpl = vi.fn((_url, init) => {
+      sent.push(new Headers(init?.headers).get("Authorization") ?? "");
+      token = "rotated";
+      return Promise.resolve(
+        new Response(null, { status: sent.length === 1 ? 503 : 200 })
+      );
+    });
+    await xeroFetch(
+      {
+        accessContext: access,
+        init: {
+          headers: {
+            Authorization: "Bearer captured",
+            "Xero-Tenant-Id": "org-a",
+          },
+        },
+        rateClass,
+        url: "https://api.xero.com/payroll.xro/1.0/Employees",
+      },
+      {
+        fetchImpl,
+        limiter: permissiveLimiter(),
+        resolveAccess,
+        sleep: () => Promise.resolve(),
+      }
+    );
+    expect(sent).toEqual(["Bearer first", "Bearer rotated"]);
+  });
+  it("fails before dispatch if the scoped tenant changed", async () => {
+    const access = context();
+    const fetchImpl = vi.fn();
+    const resolveAccess = vi.fn(async () => ({
+      ok: true as const,
+      value: {
+        accessToken: "new",
+        connectionId: access.id,
+        deadline: access.deadline,
+        payrollRegion: access.payroll_region,
+        xeroTenantId: "other",
+      },
+    }));
+    await expect(
+      xeroFetch(
+        {
+          accessContext: access,
+          init: { headers: { "Xero-Tenant-Id": "org-a" } },
+          rateClass,
+          url: "https://api.xero.com/payroll.xro/1.0/Employees",
+        },
+        { fetchImpl, limiter: permissiveLimiter(), resolveAccess }
+      )
+    ).rejects.toMatchObject({ dispatched: false });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe("pending OAuth credentials at dispatch", () => {
+  it("re-resolves pending consent credentials after admission on every inventory retry", async () => {
+    let token = "first";
+    const sent: string[] = [];
+    const limiter = permissiveLimiter();
+    const acquire = limiter.acquire.bind(limiter);
+    vi.spyOn(limiter, "acquire").mockImplementation((...args) => {
+      if (!sent.length) {
+        token = "admitted";
+      }
+      return acquire(...args);
+    });
+    const resolveBootstrapAccess = vi.fn(() =>
+      Promise.resolve({ ok: true as const, value: { accessToken: token } })
+    );
+    const fetchImpl = vi.fn((_url, init) => {
+      sent.push(new Headers(init?.headers).get("Authorization") ?? "");
+      token = "rotated";
+      return Promise.resolve(
+        new Response(null, { status: sent.length === 1 ? 503 : 200 })
+      );
+    });
+    await xeroFetch(
+      {
+        rateClass: { kind: "user_inventory", providerAppId: "app" },
+        resolveBootstrapAccess,
+        url: "https://api.xero.com/connections",
+      },
+      {
+        fetchImpl,
+        limiter,
+        sleep: () => Promise.resolve(),
+      }
+    );
+    expect(sent).toEqual(["Bearer admitted", "Bearer rotated"]);
+  });
+  it("refuses a pending consent callback on arbitrary provider endpoints", async () => {
+    const fetchImpl = vi.fn();
+    const resolveBootstrapAccess = vi.fn(() =>
+      Promise.resolve({ ok: true as const, value: { accessToken: "secret" } })
+    );
+    await expect(
+      xeroFetch(
+        {
+          rateClass,
+          resolveBootstrapAccess,
+          url: "https://api.xero.com/payroll.xro/1.0/Employees",
+        },
+        { fetchImpl, limiter: permissiveLimiter() }
+      )
+    ).rejects.toMatchObject({ dispatched: false });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(resolveBootstrapAccess).not.toHaveBeenCalled();
+  });
+});
+
+it("rejects conflicting connected and pending consent access before either resolver", async () => {
+  const resolveBootstrapAccess = vi.fn(() =>
+    Promise.resolve({ ok: true as const, value: { accessToken: "bootstrap" } })
+  );
+  const resolveAccess = vi.fn();
+  const fetchImpl = vi.fn();
+  await expect(
+    xeroFetch(
+      {
+        accessContext: {
+          accessToken: "captured",
+          clerk_org_id: "clerk",
+          deadline: { expiresAtMs: Date.now() + 120_000 },
+          id: "conn",
+          organisation_id: "org",
+          payroll_region: "AU",
+          xero_tenant_id: "org-a",
+        },
+        rateClass: { kind: "user_inventory", providerAppId: "app" },
+        resolveBootstrapAccess,
+        url: "https://api.xero.com/connections",
+      },
+      { fetchImpl, limiter: permissiveLimiter(), resolveAccess }
+    )
+  ).rejects.toMatchObject({ dispatched: false });
+  expect(resolveBootstrapAccess).not.toHaveBeenCalled();
+  expect(resolveAccess).not.toHaveBeenCalled();
+  expect(fetchImpl).not.toHaveBeenCalled();
+});

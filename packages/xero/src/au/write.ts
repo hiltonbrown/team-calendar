@@ -202,6 +202,7 @@ async function xeroRequest(
   const frozen = mutation.request;
   try {
     const response = await xeroFetch({
+      accessContext: xeroConnection,
       attemptBudget: xeroConnection.mutationAttemptBudget,
       deadline: xeroConnection.deadline,
       init: {

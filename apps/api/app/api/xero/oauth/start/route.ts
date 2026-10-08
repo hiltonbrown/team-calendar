@@ -51,6 +51,13 @@ export async function GET(request: Request) {
     );
   }
 
+  if (!organisationId) {
+    return NextResponse.json(
+      { error: "Select a Team Calendar Organisation before connecting Xero." },
+      { status: 400 }
+    );
+  }
+
   const result = await buildXeroOAuthStartUrl({
     clerkOrgId: authenticatedClerkOrgId,
     organisationId,

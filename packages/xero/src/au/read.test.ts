@@ -1,3 +1,22 @@
+vi.mock("../oauth/authorisation", () => ({
+  resolveXeroAccess: vi.fn(async (input) => ({
+    ok: true,
+    value: {
+      accessToken: "access-token",
+      connectionId: input.connectionId,
+      deadline: input.deadline,
+      payrollRegion: "AU",
+      xeroTenantId:
+        (
+          {
+            "sibling-binding": "sibling-payroll",
+            tenant_1: "xero-tenant-1",
+          } as Record<string, string>
+        )[input.connectionId] ?? input.connectionId,
+    },
+  })),
+}));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchEmployees, fetchLeaveBalances, fetchLeaveRecords } from "./read";
 
@@ -738,5 +757,40 @@ describe("AU scoped read rejection and response validation", () => {
     expect(
       new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get("Xero-Tenant-Id")
     ).toBe("sibling-payroll");
+  });
+});
+
+describe("current scoped credentials throughout AU reads", () => {
+  it("uses the current token for the next employee in a roster", async () => {
+    const { resolveXeroAccess } = await import("../oauth/authorisation");
+    const context = buildXeroTenant();
+    let token = "before-rotation";
+    vi.mocked(resolveXeroAccess).mockImplementation(async () => ({
+      ok: true,
+      value: {
+        accessToken: token,
+        connectionId: context.id,
+        deadline: context.deadline,
+        payrollRegion: "AU",
+        xeroTenantId: context.xero_tenant_id,
+      },
+    }));
+    const sent: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url, init) => {
+        sent.push(new Headers(init?.headers).get("Authorization") ?? "");
+        token = "after-rotation";
+        return Promise.resolve(employeeResponse(`employee-${sent.length}`, 10));
+      })
+    );
+    expect(
+      await fetchLeaveBalances({
+        employeeIds: ["employee-1", "employee-2"],
+        readIntervalMs: 0,
+        xeroConnection: context,
+      })
+    ).toMatchObject({ ok: true });
+    expect(sent).toEqual(["Bearer before-rotation", "Bearer after-rotation"]);
   });
 });

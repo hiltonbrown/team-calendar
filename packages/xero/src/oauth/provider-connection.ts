@@ -24,8 +24,8 @@ export type XeroProviderConnectionStatus =
   | "connection_changed"
   | "inconclusive";
 
-// No refresh authority here: callers supply the access resolved for their one
-// allowed replay. An unreadable inventory never establishes loss of access.
+// Dispatch rechecks scoped access through the central resolver. An unreadable
+// inventory never establishes loss of access.
 export async function verifyXeroProviderConnection(
   context: XeroAccessContext,
   definiteTenantAuthFailure = false
@@ -60,6 +60,7 @@ export async function verifyXeroProviderConnection(
       return "connection_changed";
     }
     const response = await xeroFetch({
+      accessContext: context,
       deadline: context.deadline,
       init: {
         headers: { Authorization: `Bearer ${context.accessToken}` },

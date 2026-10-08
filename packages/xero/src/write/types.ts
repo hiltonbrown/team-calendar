@@ -50,6 +50,7 @@ export interface XeroAccessContext {
   capability?: string | readonly string[];
   clerk_org_id: string;
   deadline: XeroDeadline;
+  dispatchState?: { accessToken: string };
   id: string;
   mutationAttemptBudget?: { remaining: number };
   organisation_id: string;

@@ -1,13 +1,37 @@
 import type { XeroMutationIdentity } from "@repo/core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
+  currentAccess: undefined as ReturnType<typeof freshAccess> | undefined,
   resolveXeroAccess: vi.fn(),
   verifyXeroProviderConnection: vi.fn(),
 }));
 vi.mock("../oauth/authorisation", () => ({
-  resolveXeroAccess: mocks.resolveXeroAccess,
+  resolveXeroAccess: async (scope: {
+    previousAccessToken?: string;
+    deadline: { expiresAtMs: number };
+  }) => {
+    if (scope.previousAccessToken !== undefined) {
+      const result = await mocks.resolveXeroAccess(scope);
+      if (result?.ok) {
+        mocks.currentAccess = result;
+      }
+      return result;
+    }
+    return (
+      mocks.currentAccess ?? {
+        ok: true,
+        value: {
+          accessToken: "old-access",
+          connectionId: "connection-1",
+          deadline: scope.deadline,
+          payrollRegion: "AU",
+          xeroTenantId: "xero-tenant-1",
+        },
+      }
+    );
+  },
 }));
 vi.mock("../oauth/provider-connection", () => ({
   verifyXeroProviderConnection: mocks.verifyXeroProviderConnection,
@@ -55,6 +79,10 @@ function freshAccess(xeroTenantId = "xero-tenant-1") {
     },
   };
 }
+
+beforeEach(() => {
+  mocks.currentAccess = undefined;
+});
 
 describe("journaled AU authentication replay", () => {
   afterEach(() => {

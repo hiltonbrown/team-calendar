@@ -125,6 +125,8 @@ export async function disconnectXeroOAuthConnection(input: {
             "Finish or resolve the current Xero payroll write before disconnecting."
           );
         }
+        // Delete this Organisation's remote link; revoking a shared grant would
+        // also disconnect sibling Organisations. Unknown outcomes retain local state.
         const response = await xeroFetch({
           deadline: { expiresAtMs: Date.now() + 10_000 },
           init: {
