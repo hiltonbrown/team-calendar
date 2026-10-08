@@ -209,7 +209,7 @@ describe("XeroWriteAdapter", () => {
     }
   });
 });
-describe("161g recovery regression", () => {
+describe("Xero write authentication recovery", () => {
   it.each([
     ["admission_unavailable", "operational_incident"],
     ["configuration_error", "operational_incident"],

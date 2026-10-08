@@ -1,5 +1,38 @@
 # Current work
 
+## Prompt 7 renewed HTTP and obsolete-infrastructure check
+
+- [x] Recheck the existing `e5fe001f` implementation at baseline `47c75872` against current provider limits and all Prompt 7 requirements.
+- [x] Remove or supersede confirmed remaining obsolete runtime, test, release-tool or documentation references; preserve required Plan 160 behavior.
+- [x] Obtain independent source/documentation review and fix Critical/Important findings.
+- [x] Run targeted Xero, check, typecheck, boundaries, unit, integration and build gates; run release-tool gates after fixture cleanup.
+- [x] Record retained-control justifications and verification for the focused completion commit.
+
+Reuse the approved simplification plan Tasks 3, 11 and 12 in this branch and
+worktree. No new architecture, compatibility/backfill, provider mutation,
+worktree or merge. Retain only controls justified by current Xero limits,
+deployed workers, security or Plan 160 domain rules. Stop when all requested
+requirements hold, required gates are green and review has no Critical/Important
+findings. The existing phase-7 commit is evidence, not a reason to ignore a gap.
+
+Review: corrected the verified Important unreadable-429 response defect with four
+RED/GREEN regressions. Provider guidance is recorded before bounded body reads,
+rejection metadata survives, and earlier write uncertainty remains protected.
+Removed obsolete campaign environment setup, renamed three Plan 161 test labels
+without deleting useful coverage, and removed unsupported backfill-job wording.
+Both fresh independent reviews have no remaining findings. Shared atomic quotas,
+expiry slots and deadlines remain justified by deployed workers and current
+provider/security requirements; no speculative control plane was added.
+
+Fresh gates passed: 273 targeted tests; 1,155 linted files; 19 uncached typecheck
+tasks; 1,084 boundary files/21 packages; 3,058 unit tests/18 uncached tasks;
+273 owned-local integration tests/six uncached tasks; all four build tasks,
+including Prisma generation; 196 release-tool tests with four existing Chromium
+static-browser skips; release-tool typecheck. The initial targeted fixture timeout
+was corrected using actual quota values with unchanged assertions, then the full
+targeted command passed. Live provider/browser/Neon proof remains NOT VERIFIED.
+Details: `docs/reports/2026-10-08-xero-http-follow-up.md`.
+
 ## PR129 review corrections
 
 - [x] Evaluate all review comments against explicit pre-production/no-recovery-architecture scope.

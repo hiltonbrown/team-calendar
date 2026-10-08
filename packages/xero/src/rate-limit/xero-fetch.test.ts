@@ -559,6 +559,112 @@ it("reports operation expiry before admission infrastructure failure", async () 
     vi.useRealTimers();
   }
 });
+it("retains real 429 guidance when its response body exceeds the size cap", async () => {
+  const limiter = permissiveLimiter();
+  const observe = vi.spyOn(limiter, "observe");
+  const fetchImpl = vi.fn().mockResolvedValue(
+    new Response("oversized", {
+      headers: {
+        "Retry-After": "60",
+        "X-Rate-Limit-Problem": "minute",
+        "Xero-Correlation-Id": "throttled-request",
+      },
+      status: 429,
+    })
+  );
+  const response = await xeroFetch(
+    {
+      maxAttempts: 1,
+      maxBodyBytes: 2,
+      rateClass,
+      url: "https://api.xero.com/x",
+    },
+    { fetchImpl, limiter }
+  );
+  expect(response.status).toBe(429);
+  expect(response.headers.get("Retry-After")).toBe("60");
+  expect(response.headers.get("X-Rate-Limit-Problem")).toBe("minute");
+  expect(response.headers.get("Xero-Correlation-Id")).toBe("throttled-request");
+  expect(await response.text()).toBe("");
+  expect(observe).toHaveBeenCalledOnce();
+  expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(await limiter.acquire(rateClass, { maxWaitMs: 0 })).toMatchObject({
+    ok: false,
+    reason: "cooldown",
+  });
+});
+it("records real 429 guidance before a stalled body consumes the deadline", async () => {
+  vi.useFakeTimers();
+  try {
+    const limiter = new XeroRateLimiter(
+      { maxWaitMs: 0 },
+      {
+        store: new MemorySharedXeroRateStore({
+          limits: {
+            appCallsPerMinute: 10_000,
+            callsPerDayPerOrg: 5000,
+            callsPerMinutePerOrg: 60,
+            concurrentRequestsPerOrg: 5,
+          },
+        }),
+      }
+    );
+    const observe = vi.spyOn(limiter, "observe");
+    const cancel = vi.fn();
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        new ReadableStream({
+          cancel,
+          pull() {
+            return new Promise(() => {
+              /* Provider body stalls after authoritative throttling headers. */
+            });
+          },
+        }),
+        {
+          headers: {
+            "Retry-After": "60",
+            "X-MinLimit-Remaining": "0",
+            "Xero-Correlation-Id": "stalled-throttle",
+          },
+          status: 429,
+        }
+      )
+    );
+    const pending = xeroFetch(
+      {
+        deadline: { expiresAtMs: Date.now() + 25 },
+        maxAttempts: 1,
+        rateClass,
+        url: "https://api.xero.com/x",
+      },
+      { fetchImpl, limiter }
+    ).then(
+      (received) => received,
+      () => undefined
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    const observedBeforeDeadline = observe.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(25);
+    const response = await pending;
+    expect(response?.status).toBe(429);
+    expect(response?.headers.get("Retry-After")).toBe("60");
+    expect(response?.headers.get("Xero-Correlation-Id")).toBe(
+      "stalled-throttle"
+    );
+    expect(await response?.text()).toBe("");
+    expect(observedBeforeDeadline).toBe(1);
+    expect(observe).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(await limiter.acquire(rateClass, { maxWaitMs: 0 })).toMatchObject({
+      ok: false,
+      reason: "cooldown",
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+});
 it.each([401, 403])(
   "preserves %i authoritative headers when its body stalls within the absolute deadline",
   async (status) => {
@@ -768,6 +874,35 @@ describe("recorded mutation replay", () => {
       expect(fetchImpl).toHaveBeenCalledTimes(2);
     }
   );
+  it("retains earlier write uncertainty and metadata after an oversized real 429", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("response lost"))
+      .mockResolvedValueOnce(
+        new Response("oversized", {
+          headers: {
+            "Retry-After": "60",
+            "Xero-Correlation-Id": "retry-throttle",
+          },
+          status: 429,
+        })
+      );
+    const result = await xeroFetch(
+      { ...input(), maxBodyBytes: 2 },
+      {
+        fetchImpl,
+        limiter: permissiveLimiter(),
+        sleep: () => Promise.resolve(),
+      }
+    ).catch((error: unknown) => mapXeroTransportError(error, true));
+    expect(result).toMatchObject({
+      correlationId: "retry-throttle",
+      dispatchPhase: "after_dispatch",
+      httpStatus: 429,
+      recoveryReason: "outcome_unknown",
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
   it("retains uncertainty when local admission denies a retry after dispatch", async () => {
     const limiter = permissiveLimiter();
     const acquire = vi.spyOn(limiter, "acquire");

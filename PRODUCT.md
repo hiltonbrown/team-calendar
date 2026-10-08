@@ -305,7 +305,7 @@ Outbound write failures are surfaced synchronously to the user in plain language
 
 Rate limiting, backoff, and retry logic live inside this package. A small shared, atomic Redis store coordinates serverless app, API and job workers so they collectively respect tenant quotas and the five-request concurrency limit. Successful requests release their concurrency leases; lease expiry recovers capacity after a crashed worker. Ordinary quota keys initialise atomically on first use, without a namespace bootstrap or manual admission command. A fixture namespace is test isolation only. Token and user-connection inventory calls conservatively share the app-wide counter as application policy, without an invented per-tenant or 60/minute non-tenant cap. Store failures deny calls as infrastructure failures; local admission failures do not manufacture provider HTTP 429 responses or rate-limit headers.
 
-The HTTP boundary retains an absolute deadline, a 5 MiB response-body cap, allowed-origin checks and redirect rejection to bound worker resource use and prevent credential disclosure. Provider responses, including real 429s and their `Retry-After` values, remain distinguishable from local admission failures.
+The HTTP boundary retains an absolute deadline, a 5 MiB response-body cap, allowed-origin checks and redirect rejection to bound worker resource use and prevent credential disclosure. Provider responses, including real 429s and their `Retry-After` values, remain distinguishable from local admission failures. A genuine 429 records rate guidance before reading its bounded body; an unreadable body preserves the rejection status, retry guidance and correlation ID. A rejection of a retry cannot erase an earlier uncertain mutation outcome.
 
 ### `packages/availability`
 
@@ -317,7 +317,7 @@ Turns canonical availability into stable ICS output via `ical-generator`. Handle
 
 ### `packages/jobs`
 
-Inngest job definitions and scheduling: tenant sync scheduling, feed rebuild scheduling, backfill jobs, nightly reconciliation, dead-letter handling. Jobs carry `clerk_org_id` and `organisation_id` in their event payloads.
+Inngest job definitions and scheduling: tenant sync scheduling, feed rebuild scheduling, nightly reconciliation, dead-letter handling. Jobs carry `clerk_org_id` and `organisation_id` in their event payloads.
 
 ### `packages/notifications`
 

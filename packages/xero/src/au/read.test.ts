@@ -675,7 +675,7 @@ describe("AU leave balance reads", () => {
     });
   });
 });
-describe("161g AU scoped read evidence", () => {
+describe("AU scoped read rejection and response validation", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("keeps read capability usable after write permission failure", async () => {
     const module = await import("./write");
