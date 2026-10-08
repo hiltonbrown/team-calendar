@@ -463,17 +463,21 @@ async function performAttempt(
         });
         throw new XeroFetchError("redirect_rejected", true);
       }
+      if (fetched.status === 429) {
+        // Provider retry guidance is authoritative even when its body stalls.
+        await limiter.observe(input.rateClass, fetched.headers, deadline);
+      }
       const buffered = await bufferWithRejectionEvidence(
         fetched,
         signal,
         input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
       );
-      const headers = new Headers(buffered.headers);
       if (buffered.status !== 429) {
+        const headers = new Headers(buffered.headers);
         headers.delete("Retry-After");
-      }
-      if (remainingMs(deadline) > 0) {
-        await limiter.observe(input.rateClass, headers, deadline);
+        if (remainingMs(deadline) > 0) {
+          await limiter.observe(input.rateClass, headers, deadline);
+        }
       }
       return buffered;
     })();
@@ -496,7 +500,11 @@ async function bufferWithRejectionEvidence(
   try {
     return await bufferResponse(fetched, signal, maxBodyBytes);
   } catch (error) {
-    if (fetched.status !== 401 && fetched.status !== 403) {
+    if (
+      fetched.status !== 401 &&
+      fetched.status !== 403 &&
+      fetched.status !== 429
+    ) {
       throw error;
     }
     // An authoritative rejection survives an unreadable bounded body. The raw

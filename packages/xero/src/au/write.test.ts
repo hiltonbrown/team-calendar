@@ -364,42 +364,60 @@ describe("AU payroll write path", () => {
     });
   });
 });
-describe("161g AU mutation evidence", () => {
+describe("AU mutation rejection and response validation", () => {
   afterEach(() => vi.unstubAllGlobals());
-  it("keeps scope rejection through a stalled401 body without replay", async () => {
-    vi.useFakeTimers();
-    const stream = new ReadableStream({
-      pull() {
-        return new Promise(() => {
-          /* Provider body stalls. */
-        });
-      },
-    });
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(stream, {
-        headers: { "WWW-Authenticate": 'Bearer error="insufficient_scope"' },
-        status: 401,
-      })
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const current = {
-      ...buildXeroTenant(),
-      deadline: { expiresAtMs: Date.now() + 25 },
-    };
-    const result = approveLeaveApplication(
-      withAuMutation("approve", {
-        xeroConnection: current,
-        xeroEmployeeId: "employee",
-        xeroLeaveApplicationId: "leave",
-      })
-    );
-    await vi.advanceTimersByTimeAsync(25);
-    expect(await result).toMatchObject({
-      error: { code: "permission_error", recoveryReason: "update_permissions" },
-      ok: false,
-    });
-    expect(fetchMock).toHaveBeenCalledOnce();
-  });
+  it.each([401, 429])(
+    "keeps rejection through a stalled %i body without replay",
+    async (status) => {
+      vi.useFakeTimers();
+      const stream = new ReadableStream({
+        pull() {
+          return new Promise(() => {
+            /* Provider body stalls. */
+          });
+        },
+      });
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(stream, {
+          headers:
+            status === 401
+              ? { "WWW-Authenticate": 'Bearer error="insufficient_scope"' }
+              : {
+                  "Retry-After": "60",
+                  "Xero-Correlation-Id": "rejected-write",
+                },
+          status,
+        })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const current = {
+        ...buildXeroTenant(),
+        deadline: { expiresAtMs: Date.now() + 25 },
+      };
+      const result = approveLeaveApplication(
+        withAuMutation("approve", {
+          xeroConnection: current,
+          xeroEmployeeId: "employee",
+          xeroLeaveApplicationId: "leave",
+        })
+      );
+      await vi.advanceTimersByTimeAsync(25);
+      expect(await result).toMatchObject({
+        error:
+          status === 401
+            ? { code: "permission_error", recoveryReason: "update_permissions" }
+            : {
+                code: "rate_limit_error",
+                correlationId: "rejected-write",
+                httpStatus: 429,
+                recoveryReason: "retry_later",
+                retryAfterMs: 60_000,
+              },
+        ok: false,
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+    }
+  );
   it("reports an unusable successful remote ID as outcome_unknown", async () => {
     const fetchMock = vi
       .fn()
