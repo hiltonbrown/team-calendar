@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const execute = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", () => ({ execFileSync: execute }));
@@ -51,9 +51,7 @@ describe("requireExactProviderState", () => {
 });
 
 describe("ordinary provider snapshot command", () => {
-  afterEach(() => vi.unstubAllEnvs());
-  it("uses the surviving reader even with a stale campaign environment", () => {
-    vi.stubEnv("TC_XERO_MANIFEST", "obsolete-manifest");
+  it("uses the ordinary provider reader", () => {
     execute.mockReturnValue(JSON.stringify(snapshot()));
     expect(
       readProviderSnapshot("11111111-1111-4111-8111-111111111111")

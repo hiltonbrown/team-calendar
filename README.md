@@ -40,7 +40,9 @@ Xero consent requests exactly `offline_access accounting.settings.read payroll.e
 
 Remote leave mutations reuse a durable UUID idempotency key for five minutes from first dispatch. Uncertain writes after that boundary require provider inspection and administrator recovery. Disconnect removes the selected remote connection before committing local teardown; failed or uncertain deletion preserves retryable state and sibling connections.
 
-Xero calls use small shared, atomic Redis quota counters and expiring concurrency leases across serverless app, API and job workers. They enforce the five-request tenant concurrency limit and documented tenant/app quotas; lease expiry restores capacity after a worker crash. Keys initialise on first use, with no namespace bootstrap. Store failures deny calls as infrastructure failures; provider 429 responses remain separate. Fixture namespaces isolate tests only.
+Xero calls use small shared, atomic Redis quota counters and expiring concurrency leases across serverless app, API and job workers. They enforce the five-request tenant concurrency limit and documented tenant/app quotas; lease expiry restores capacity after a worker crash. Keys initialise on first use, with no namespace bootstrap. Store failures deny calls as infrastructure failures; provider 429 responses remain separate and retain retry guidance even when their bodies are unreadable. Fixture namespaces isolate tests only.
+
+The [HTTP simplification follow-up](docs/reports/2026-10-08-xero-http-follow-up.md) records the retained-control requirements and current verification.
 
 ## Covers everyone who affects cover, not just payroll
 
