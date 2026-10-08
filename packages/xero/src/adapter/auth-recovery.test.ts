@@ -207,3 +207,39 @@ describe("bounded Xero auth recovery", () => {
     );
   });
 });
+
+it("refreshes the actual rejected dispatch credential after a concurrent rotation", async () => {
+  const current = tenant();
+  const operation = vi.fn((context) => {
+    if (operation.mock.calls.length === 1) {
+      context.dispatchState.accessToken = "concurrently-rotated-rejected";
+      return {
+        error: {
+          code: "auth_error" as const,
+          httpStatus: 401,
+          message: "Expired",
+        },
+        ok: false as const,
+      };
+    }
+    return Promise.resolve({ ok: true as const, value: null });
+  });
+  mocks.resolve.mockResolvedValue({
+    ok: true,
+    value: {
+      accessToken: "fresh",
+      connectionId: current.id,
+      deadline: current.deadline,
+      payrollRegion: current.payroll_region,
+      xeroTenantId: current.xero_tenant_id,
+    },
+  });
+  expect(await executeWithXeroAuthRecovery(current, operation)).toMatchObject({
+    ok: true,
+  });
+  expect(mocks.resolve).toHaveBeenCalledWith(
+    expect.objectContaining({
+      previousAccessToken: "concurrently-rotated-rejected",
+    })
+  );
+});

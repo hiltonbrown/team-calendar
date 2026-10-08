@@ -1,3 +1,16 @@
+vi.mock("../oauth/authorisation", () => ({
+  resolveXeroAccess: vi.fn(async (input) => ({
+    ok: true,
+    value: {
+      accessToken: "access-token",
+      connectionId: input.connectionId,
+      deadline: input.deadline,
+      payrollRegion: "NZ",
+      xeroTenantId: "xero-tenant-nz-1",
+    },
+  })),
+}));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchEmployees,

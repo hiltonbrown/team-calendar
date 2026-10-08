@@ -87,6 +87,7 @@ export async function fetchEmployees(input: {
     let rawResponse: unknown = null;
     while (page <= XERO_MAX_PAGES) {
       const response = await xeroFetch({
+        accessContext: input.xeroConnection,
         deadline: input.xeroConnection.deadline,
         init: {
           headers: {
@@ -209,6 +210,7 @@ export async function fetchLeaveRecords(input: {
     const maxPages = input.maxPages ?? XERO_MAX_PAGES;
     while (page <= maxPages) {
       const response = await xeroFetch({
+        accessContext: input.xeroConnection,
         deadline: input.xeroConnection.deadline,
         init: {
           headers: {
@@ -312,6 +314,7 @@ async function fetchAuLeaveTypeNames(input: {
   xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<ReadonlyMap<string, string>>> {
   const response = await xeroFetch({
+    accessContext: input.xeroConnection,
     deadline: input.xeroConnection.deadline,
     init: {
       headers: {
@@ -389,6 +392,7 @@ export async function fetchLeaveBalances(input: {
     let response: Response;
     try {
       response = await xeroFetch({
+        accessContext: input.xeroConnection,
         deadline: input.xeroConnection.deadline,
         init: {
           headers: {
@@ -469,6 +473,7 @@ export async function fetchLeaveApplicationStatus(
   const decryptedAccessToken = tokenResult.token;
   try {
     const response = await xeroFetch({
+      accessContext: input.xeroConnection,
       deadline: input.xeroConnection.deadline,
       init: {
         headers: {

@@ -577,6 +577,17 @@ scoped selection page; a single file needs only a Team Calendar target choice
 when that account has several payroll organisations. Completing connection
 consumes the temporary session and persists one initial full-import request. Its Inngest job imports people, leave and the entire provider balance roster in order; scheduler recovery redispatches an uncompleted request. Only the job whose `requestedAt` still matches `initial_sync_requested_at` can set `initial_sync_completed_at`. Reconnect preserves canonical IDs and feeds and requests a new full reconciliation.
 
+Any current Team Calendar owner/admin with suitable Xero permissions may reconnect
+the Organisation, even when its previous application user or Xero authorisation
+is unavailable. Fresh OAuth verifies the replacement Xero authorising principal
+and provider inventory. Reconnect must select the existing `xero_tenant_id`; the
+Organisation's connection is atomically rebound to the new authorisation under
+its existing lock and snapshot checks. The previous authorisation is not required
+to prove removal of its remote link and is retained until a successful rebind;
+session cleanup removes only grants with no remaining connection/session references.
+Cancellation or code-exchange failure leaves the existing connection untouched.
+The initiating application user is audit provenance, not the integration owner.
+
 The requested scopes are exactly `offline_access accounting.settings.read
 payroll.employees payroll.settings.read`. Organisation country discovery requires
 accounting settings reads; employee/leave reads and leave writes require employee
@@ -587,8 +598,16 @@ One server-only scoped access resolver performs automatic refresh within two min
 rechecks canonical credentials under the authorisation lock and saves the rotated
 pair atomically from the validated, authenticated token-endpoint response. Initial
 authorisation verifies Xero identity; refresh does not add another JWKS request
-after rotation. Dormant grants with active connections, including paused sync,
-are refreshed at 45 days through the same implementation. An uncertain response
+after rotation. Demand-driven refresh is primary; background maintenance does not
+refresh merely because the 30-minute access token has expired. Xero documents a
+[60-day refresh-token inactivity limit](https://developer.xero.com/faq/oauth2)
+(reviewed 2026-10-08). Dormant grants with active connections on active, unarchived
+Organisations, including paused sync, are refreshed after 45 days since successful
+token issuance. This leaves a 15-day margin for scheduler interruptions. The
+existing 15-minute scheduler only checks eligibility: once rotated, a grant is
+not due again for 45 days. Maintenance rechecks eligibility and successful rotation
+time inside the same central refresh implementation and database lock used by
+normal access; shared grants rotate once, rather than once per connection. An uncertain response
 keeps the stored pair for the next normal attempt within Xero's documented
 30-minute grace period. Invalid grants require reconnect. Token refresh has no
 customer control or manual server action.
@@ -785,9 +804,18 @@ Each step produces a deployable, testable vertical slice.
 
 Connection states are `active`, `reconnect_required` and `disconnected`.
 An owner or admin confirms the target Organisation before disconnecting its
-Xero connection. The scoped canonical user authorisation deletes that specific
+Xero connection. The Organisation's scoped canonical authorisation deletes that specific
 remote connection first. HTTP 204 or 404 permits local teardown; a transient or
 uncertain provider failure retains the connection and credentials for retry.
+Xero's [tenant disconnect documentation](https://developer.xero.com/documentation/guides/oauth2/tenants/)
+specifies deleting the remote **connection ID**, rather than the Xero tenant ID.
+Whole-grant token revocation would remove sibling tenant connections, so it is
+not used for this Organisation-level operation. A retry after a lost response
+can confirm remote absence via 404. Only confirmed teardown marks the local
+connection disconnected and prevents subsequent scoped access. The initiating
+user is recorded for audit; disconnect uses the Organisation's existing grant
+independently of its original Team Calendar user. A later owner/admin may reconnect the
+same Organisation and Xero tenant using a freshly verified authorisation.
 Local teardown and its required audit commit together. Remove the authorisation
 only when no other connection or live selecting OAuth session references it.
 The existing closed-session purge removes credentials once that final temporary

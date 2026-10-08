@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const CREDENTIAL_PATTERN =
+  /access_token|refresh_token|client.secret|Authorization/;
+
 const mocks = vi.hoisted(() => ({
   auth: vi.fn().mockResolvedValue({
     orgId: "org_1",
@@ -197,6 +200,55 @@ describe("Xero OAuth callback route", () => {
     expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
     expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
   });
+
+  it.each(["org:viewer", "org:manager", null])(
+    "rejects lost callback privilege %s before any provider work",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValueOnce({
+        orgId: "org_1",
+        orgRole,
+        userId: "user_1",
+      });
+      const response = await GET(
+        new Request(callbackUrl, {
+          headers: { cookie: "xero_oauth_nonce=nonce" },
+        })
+      );
+      expect(response.status).toBe(403);
+      expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+      expect(mocks.cancelXeroOAuth).not.toHaveBeenCalled();
+      expect(mocks.dispatchInitialXeroSync).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { orgId: null, userId: "user_1" },
+    { orgId: "org_1", userId: null },
+  ])("rejects lost membership or authentication %j", async (identity) => {
+    mocks.auth.mockResolvedValueOnce({ ...identity, orgRole: "org:admin" });
+    const response = await GET(new Request(callbackUrl));
+    expect(response.status).toBe(401);
+    expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+  });
+
+  it("accepts the owner role without returning credentials", async () => {
+    mocks.auth.mockResolvedValueOnce({
+      orgId: "org_1",
+      orgRole: "org:owner",
+      userId: "user_1",
+    });
+    const response = await GET(
+      new Request(callbackUrl, {
+        headers: { cookie: "xero_oauth_nonce=nonce" },
+      })
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain(
+      "/settings/integrations/xero/connect?session=session_1"
+    );
+    expect(await response.text()).not.toMatch(CREDENTIAL_PATTERN);
+  });
+
   it("clears the nonce on terminal callback validation failure", async () => {
     const response = await GET(
       new Request("https://api.example.com/api/xero/oauth/callback?state=state")

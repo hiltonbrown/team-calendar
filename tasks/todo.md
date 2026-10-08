@@ -514,3 +514,71 @@ scoped fixtures, the shared quota limiter and the guarded release runner.
 Historical source results do not verify the current candidate. Live Xero,
 application browser, deployment and recovery observations remain NOT VERIFIED
 until explicitly authorised safe fixtures and valid sessions are available.
+
+## 2026-10-08 Organisation-owned OAuth hardening
+
+- [x] Inspect current implementation; restore merged PR #129 baseline because the selected workspace predates it.
+- [x] Reproduce missing Organisation/user binding with failing tests.
+- [x] Require an existing scoped Organisation and initiating user before consent; remove OAuth Organisation creation and preserve canonical encrypted authorisation.
+- [x] Add targeted privilege-loss, replay, state expiry/forgery/actor isolation, return-path safety, tenant substitution and credential-isolation coverage. Database-backed assertions remain unverified below.
+- [x] Run unit, integration, lint, typecheck, boundary and build checks; independently review the focused diff. Integration execution is blocked by local service access below.
+
+Scope: standard confidential server-side Authorization Code flow. No PKCE, Plan 161 machinery, credential mirrors, backfills or new abstraction. Existing callback role checks are retained. Initiating application user is transaction/audit provenance only; runtime access resolves the Organisation connection.
+
+## 2026-10-08 Centralised Xero refresh hardening
+
+- [x] Inspect the PR #129 canonical authorisation and PostgreSQL transaction/advisory locks. Retain the existing lock; reread and expiry checks already run inside it.
+- [x] Reproduce and fix 401 recovery incorrectly accepting a newer token that is itself near expiry. A changed safely valid token is reused; expiry still requires rotation.
+- [x] Add regression coverage for the expiry defect, fresh concurrent credentials, subsequent use of the rotated refresh token, response-derived expiry, encrypted persistence and safe logs; extend transient HTTP cases to 429/500/503.
+- [x] Strengthen the database concurrency test to five simultaneous callers, one provider rotation and the new access token returned to every caller.
+
+Verification: focused refresh/recovery/authorisation suite passed (118 tests); lint, all 19 typecheck tasks and boundaries (1,084 files / 21 packages) passed. All four build tasks passed using synthetic build-only Clerk keys because the injected publishable-key placeholder was not valid for compilation. The final full unit run passed all 3,067 tests across 18 tasks (including 677 Xero tests and 264 API tests).
+
+Database integration verification is NOT COMPLETE: the full six-task integration command was attempted and failed in database/Redis fixture setup. Loopback PostgreSQL/Redis were unavailable to this sandbox (including EPERM at localhost:5432); starting the local Docker services required a permission request that the user aborted. No safety guard was weakened and no production data was used. The real PostgreSQL concurrency, persistence rollback and Organisation identity-deletion assertions have been added/retained but are not verified by this run. No live Xero or Clerk session was exercised.
+
+## 2026-10-08 Dormant Xero authorisation review
+
+- [x] Verify the current provider limit: Xero OAuth FAQ documents expiry after 60 days of refresh-token non-use (https://developer.xero.com/faq/oauth2, reviewed 2026-10-08).
+- [x] Inspect due selection, under-lock rechecks, scheduler and demand-driven access. Existing 45-day threshold provides a 15-day margin; retain it.
+- [x] Document the 60-day limit / 15-day margin in code and PRODUCT.md; add locked 45-day boundary and lost-eligibility unit tests, a disconnected/archived/inactive database matrix and shared-maintenance credential-reuse assertions. Runtime logic and threshold are unchanged.
+- [x] Run focused tests and relevant checks; record integration verification limits.
+
+Dormant review verification: focused unit suite passed 35 tests; all 19 typecheck tasks and boundaries passed. Focused database integrations were attempted: six cases failed before exercising their assertions because local PostgreSQL remains inaccessible. Real due selection, eligibility filtering and advisory-lock concurrency remain unverified in this environment. Independent review found no concrete defects. Final full unit run passed all 3,071 tests across 18 tasks; lint passed (1,155 files), and git diff --check passed. No build rerun was needed: this review changed only comments/docs/tests, and the preceding build passed all four tasks.
+
+## 2026-10-08 Organisation-owned reconnect hardening
+
+- [x] Inspect current reconnect: previous-link validation wrongly requires the original Xero grant before rebinding to a different authoriser.
+- [x] Reproduce the blocker (two failing regressions), delete previous-authoriser/link-removal requirements, and retain same-tenant scoped atomic connection rebinding.
+- [x] Add same/different admin, original identity absent, cancellation/exchange failure, substitution and concurrent reconnect coverage. The database-backed assertions remain unverified below.
+- [x] Independently review and run unit, integration, typecheck, lint, boundary and build checks; report unavailable local integration services honestly.
+
+Design: the owner/admin and fresh actor-bound OAuth session authorise reconnect. Verified new Xero identity plus authenticated provider inventory establishes the replacement grant. Existing Organisation connection identity and Xero tenant remain fixed; existing snapshot/row/advisory locks and session consumption atomically rebind the authorisation. No old-principal dependency, remote-link cleanup campaign, parallel connection, schema or migration is introduced.
+
+Reconnect review: focused OAuth/service/route suite passed 107 tests. Lint, all 19 typecheck tasks and boundary checks passed; independent review found no additional concrete defect. Targeted integration command was attempted: 13 reconnect/old-link cases failed in local database fixture setup, before exercising their assertions. PostgreSQL remains inaccessible in this sandbox, so actual atomic rollback, competing-session serialization and original identity-deletion flows are NOT VERIFIED. No production credentials/data were used, and no database guard was weakened. Final full unit rerun passed all 3,073 tests across 18 tasks; build passed all four tasks. See the initial intermittent feed failure and integration limits below.
+
+The initial full reconnect unit run passed 3,072 tests but failed one unrelated existing UI test: apps/app/components/feed/feed-detail.test.tsx > FeedDetail > lets refreshed archive, restored no-token and replacement props supersede a rotation receipt (archive rerender still showed the rotated textbox). All ten tests in that file passed in an isolated rerun; no feed source/test was changed. The fresh complete unit rerun passed all 3,073 tests across 18 tasks, including all 711 app tests and 683 Xero tests. This intermittent feed test failure is recorded; no feed code or test was changed. Build passed all four tasks with synthetic build-only Clerk keys (the injected placeholder key is not valid for compilation).
+
+## 2026-10-08 Organisation-level disconnect review
+
+- [x] Inspect current PR #129 remote-first disconnect, owner/admin action boundary, scoped locks, business-data handling and grant pruning.
+- [x] Verify provider mechanism: Xero documents DELETE /connections/{connectionId} for one tenant link; token revocation removes all connections for that grant (https://developer.xero.com/documentation/guides/oauth2/tenants/ and /token-types/, reviewed 2026-10-08).
+- [x] Retain runtime after review found no defect; add 14 service unit cases, strengthen owner/admin actor assertions and add confirmed-disconnect/denied-access/later-admin OAuth reconnect coverage.
+- [x] Independently review and run relevant verification; preserve local integration-service limits.
+
+Design: delete the exact stored remote connection ID, retain scoped local connection and encrypted grant until provider absence is confirmed (204/404), commit local teardown/audit together, and prune only unused grants. Whole-grant revocation is inappropriate for an Organisation-level disconnect when sibling connections use the same grant. Soft disconnect keeps business data; the separate explicitly selected purge affects only Xero-imported data. No new lifecycle machinery.
+
+Disconnect verification: new actual-service unit suite passed 14 tests; app server-action suites passed 165 tests across 17 files, including member denial and scoped administrative disconnect. Lint passed (1,156 files), all 19 typecheck tasks passed and boundaries passed (1,085 files / 21 packages). Independent review found no concrete runtime defect. Targeted database integration run attempted six cases and failed in fixture setup because local PostgreSQL remains inaccessible; real transaction rollback, locking and later-admin reconnect assertions remain NOT VERIFIED. This review changes only comments/docs/tests, so the preceding four-task build result remains applicable. Final full unit suite passed 3,087 tests across all 18 tasks, including 697 Xero tests and 711 app tests. git diff --check passed.
+
+## 2026-10-08 Repository-wide Xero call-path audit
+
+- [x] Inventory production, lifecycle, jobs, scripts and test/helper HTTP paths and trace both scope keys and tenant headers.
+- [x] Reproduce stale final resolver snapshots and stale tokens across pagination/retries; fix through the existing central resolver without independent refresh logic.
+- [x] Verify remaining source boundaries, record a complete call-path table, and run all requested gates; database/IPC verification limits are recorded below.
+
+Design: keep XeroConnection as the Organisation boundary and XeroAuthorisation as the sole encrypted credential store. Re-resolve at dispatch when a prior context may be stale. OAuth bootstrap uses the authenticated, actor-bound Organisation session before a connection exists; provider inventory selects the tenant. No new ownership or lifecycle infrastructure.
+
+Audit verification: final full unit run passed 3,108 tests across 18 tasks, including 718 Xero tests and 711 app tests. The 14 targeted release observation tests passed. Lint passed (1,156 files); all 19 application/package typecheck tasks, separate release tooling typecheck and boundary checks (1,085 files / 21 packages) passed. Independent review confirmed the pending OAuth limiter/retry gap was closed; all audited source paths are recorded as Compliant in docs/xero-call-path-audit.md.
+
+Integration limits: all 90 cases in the three relevant database suites failed during fixture setup before assertions, because local PostgreSQL remains inaccessible. Real tenant-query isolation, grant locking, transaction rollback and concurrent mutation assertions remain NOT VERIFIED. The broader release tooling suite passed 196 tests with five skipped, but deny-network.test.ts:51 failed because sandbox policy prevents its local IPC operation. No live Xero/Clerk or production data was exercised.
+
+Final audit build passed all four tasks with synthetic build-only Clerk keys because the injected placeholder key is unsuitable for compilation. git diff --check passed. No schema, migrations, new connection abstraction, token mirrors or independent refresh implementation were added.
