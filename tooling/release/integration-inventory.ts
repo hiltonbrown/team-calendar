@@ -21,6 +21,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/database/billing.integration.test.ts",
   "packages/database/leave_balances.integration.test.ts",
   "packages/database/live-rollback.integration.test.ts",
+  "packages/database/onboarding.integration.test.ts",
   "packages/database/plan_limits.integration.test.ts",
   "packages/database/public-holidays.integration.test.ts",
   "packages/database/src/seed/seed.integration.test.ts",

@@ -8,6 +8,14 @@ datasource db {
   provider = "postgresql"
 }
 
+enum onboarding_step {
+  details
+  xero
+  people
+  invites
+  finish
+}
+
 enum source_system {
   XERO
   MANUAL
@@ -283,20 +291,25 @@ enum stripe_event_delivery_state {
 }
 
 model Organisation {
-  id                    String    @id @default(uuid()) @db.Uuid
-  clerk_org_id          String
-  name                  String
-  country_code          String
-  region_code           String?
-  is_active             Boolean   @default(true)
-  timezone              String?
-  locale                String?
-  fiscal_year_start     Int?
-  working_hours_per_day Decimal?  @db.Decimal(4, 2)
-  reporting_unit        String?
-  archived_at           DateTime?
-  created_at            DateTime  @default(now())
-  updated_at            DateTime  @updatedAt
+  id                      String          @id @default(uuid()) @db.Uuid
+  clerk_org_id            String
+  name                    String
+  country_code            String
+  region_code             String?
+  is_active               Boolean         @default(true)
+  timezone                String?
+  locale                  String?
+  fiscal_year_start       Int?
+  working_hours_per_day   Decimal?        @db.Decimal(4, 2)
+  reporting_unit          String?
+  /// Furthest setup wizard step reached; see docs/superpowers/specs/2026-10-09-onboarding-design.md.
+  onboarding_step         onboarding_step @default(details)
+  onboarding_completed_at DateTime?
+  /// Set when an admin chooses "Set up without Xero"; cleared when Xero connects.
+  xero_setup_skipped_at   DateTime?
+  archived_at             DateTime?
+  created_at              DateTime        @default(now())
+  updated_at              DateTime        @updatedAt
 
   teams                        Team[]
   locations                    Location[]
@@ -410,6 +423,7 @@ model Person {
   default_contactability      availability_contactability @default(contactable)
   default_privacy_mode        availability_privacy_mode   @default(named)
   include_in_feeds_by_default Boolean                     @default(true)
+  welcome_completed_at        DateTime?
   archived_at                 DateTime?
   created_at                  DateTime                    @default(now())
   updated_at                  DateTime                    @updatedAt

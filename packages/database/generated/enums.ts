@@ -9,6 +9,17 @@
 * 🟢 You can import this file directly.
 */
 
+export const onboarding_step = {
+  details: 'details',
+  xero: 'xero',
+  people: 'people',
+  invites: 'invites',
+  finish: 'finish'
+} as const
+
+export type onboarding_step = (typeof onboarding_step)[keyof typeof onboarding_step]
+
+
 export const source_system = {
   XERO: 'XERO',
   MANUAL: 'MANUAL'

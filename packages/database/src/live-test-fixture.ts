@@ -27,6 +27,7 @@ export const LIVE_FIXTURE_SUITES = {
   },
   "packages/database/leave_balances.integration.test.ts": { tenants: 1 },
   "packages/database/live-rollback.integration.test.ts": { tenants: 2 },
+  "packages/database/onboarding.integration.test.ts": { tenants: 2 },
   "packages/database/plan_limits.integration.test.ts": {
     globalKeys: { plan_id: 1, plan_key: 1 },
     tenants: 0,
