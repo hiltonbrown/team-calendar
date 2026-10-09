@@ -22,9 +22,7 @@ export function OnboardingChecklist({
   const deferredSteps = state.steps.filter(
     (step) => step.status === "optional" || step.status === "pending"
   );
-  const progressLabel = state.isComplete
-    ? `Setup complete. ${state.requiredCount} of ${state.requiredCount} required steps complete.`
-    : `${state.completedRequiredCount} of ${state.requiredCount} required steps complete.`;
+  const progressLabel = `${state.completedRequiredCount} of ${state.requiredCount} recommended steps complete.`;
 
   return (
     <section
@@ -36,19 +34,19 @@ export function OnboardingChecklist({
           className="font-semibold text-headline-md tracking-tight"
           id="setup-checklist-title"
         >
-          {state.isComplete ? "Setup complete" : "Finish the essentials"}
+          {state.isComplete ? "You're all set" : "Recommended next steps"}
         </h2>
         <p className="mt-2 text-body-sm text-muted-foreground">
-          Team Calendar works without Xero or completed onboarding. Complete the
-          useful steps now, or return whenever you are ready.
+          Setup is complete. These steps are recommended next, and you can come
+          back to them at any time.
         </p>
         <div className="mt-5 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-label-lg">
-            <span className="font-medium">Required setup progress</span>
+            <span className="font-medium">Recommended steps</span>
             <span className="text-muted-foreground">{progressLabel}</span>
           </div>
           <progress
-            aria-label="Required setup progress"
+            aria-label="Recommended steps progress"
             className="h-2 w-full overflow-hidden rounded-full accent-primary"
             max={state.requiredCount}
             value={state.completedRequiredCount}

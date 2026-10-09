@@ -3,18 +3,21 @@ import {
   getAdminView,
   getEmployeeView,
   getManagerView,
+  getXeroConnectionStateForScope,
   resolveDashboardRole,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import {
+  type ClerkOrgId,
+  type OrganisationId,
+  toXeroConnectionDisplayState,
+} from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { AdminEmptyView } from "@/components/dashboard/admin-empty-view";
 import { AdminView } from "@/components/dashboard/admin-view";
 import { EmployeeView } from "@/components/dashboard/employee-view";
 import { ManagerView } from "@/components/dashboard/manager-view";
 import { ViewerView } from "@/components/dashboard/viewer-view";
-import { DismissibleOnboardingPanel } from "@/components/onboarding/dismissible-onboarding-panel";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
-import { loadOnboardingState } from "@/lib/server/load-onboarding-state";
 
 interface DashboardBodyProps {
   clerkOrgId: ClerkOrgId;
@@ -35,7 +38,7 @@ export async function DashboardBody({
   organisationId,
   userId,
 }: DashboardBodyProps) {
-  const [actingPerson, roleResult, onboarding] = await Promise.all([
+  const [actingPerson, roleResult] = await Promise.all([
     database.person.findFirst({
       select: { id: true },
       where: {
@@ -50,44 +53,26 @@ export async function DashboardBody({
       orgRole,
       userId,
     }),
-    loadOnboardingState({ clerkOrgId, organisationId, userId }),
   ]);
   if (!roleResult.ok) {
     return <FetchErrorState entityName="dashboard" />;
   }
-  const canManageOnboarding =
-    roleResult.value === "owner" || roleResult.value === "admin";
   const cache = createDashboardCache();
   const content = await renderDashboard({
     actingPersonId: actingPerson?.id ?? null,
     cache,
     clerkOrgId,
-    onboarding,
     organisationId,
     orgQueryValue,
     role: roleResult.value,
     userId,
   });
-  return (
-    <>
-      {canManageOnboarding ? (
-        <DismissibleOnboardingPanel
-          clerkOrgId={clerkOrgId}
-          onboarding={onboarding}
-          organisationId={organisationId}
-          orgQueryValue={orgQueryValue}
-          userId={userId}
-        />
-      ) : null}
-      {content}
-    </>
-  );
+  return content;
 }
 interface RenderDashboardInput {
   actingPersonId: string | null;
   cache: ReturnType<typeof createDashboardCache>;
   clerkOrgId: string;
-  onboarding: Awaited<ReturnType<typeof loadOnboardingState>>;
   organisationId: string;
   orgQueryValue: string | null;
   role: "admin" | "employee" | "manager" | "owner" | "viewer";
@@ -98,18 +83,21 @@ async function renderDashboard({
   actingPersonId,
   cache,
   clerkOrgId,
-  onboarding,
   organisationId,
   orgQueryValue,
   userId,
 }: RenderDashboardInput) {
   if (!actingPersonId) {
     if (role === "owner" || role === "admin") {
+      const connection = await getXeroConnectionStateForScope({
+        clerkOrgId,
+        organisationId,
+      });
       return (
         <AdminEmptyView
           orgQueryValue={orgQueryValue}
           roleLabel={role === "owner" ? "Owner" : "Admin"}
-          xeroConnectionState={onboarding.xeroConnectionState}
+          xeroConnectionState={toXeroConnectionDisplayState(connection)}
         />
       );
     }
