@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   restoreHolidayAction: vi.fn(),
   setFilterParams: vi.fn(),
   setHolidayClassificationAction: vi.fn(),
+  setLocalHolidayEnabledAction: vi.fn(),
 }));
 
 vi.mock("@/lib/url-state/use-filter-params", () => ({
@@ -24,6 +25,7 @@ vi.mock("./_actions", () => ({
   hideHolidayAction: mocks.hideHolidayAction,
   restoreHolidayAction: mocks.restoreHolidayAction,
   setHolidayClassificationAction: mocks.setHolidayClassificationAction,
+  setLocalHolidayEnabledAction: mocks.setLocalHolidayEnabledAction,
 }));
 
 const { PublicHolidaysList } = await import("./public-holidays-list");
@@ -87,6 +89,7 @@ describe("PublicHolidaysList", () => {
       mocks.hideHolidayAction,
       mocks.restoreHolidayAction,
       mocks.setHolidayClassificationAction,
+      mocks.setLocalHolidayEnabledAction,
     ]) {
       action.mockResolvedValue({ ok: true, value: { message: "Done." } });
     }
@@ -238,6 +241,58 @@ describe("PublicHolidaysList", () => {
       expect(mocks.restoreHolidayAction).toHaveBeenCalledWith({
         holidayKey: "au-national-2026-01-26-australia-day",
         locationId: null,
+        organisationId,
+      });
+    });
+  });
+
+  it("keeps administration links on the selected organisation", () => {
+    renderList();
+
+    expect(
+      screen
+        .getByRole("link", { name: "Settings, Holidays" })
+        .getAttribute("href")
+    ).toBe(`/settings/holidays?org=${organisationId}`);
+    expect(
+      screen
+        .getByRole("link", { name: "Add custom holiday" })
+        .getAttribute("href")
+    ).toBe(`/public-holidays/holidays/new?org=${organisationId}`);
+  });
+
+  it("switches a local day off for its location instead of hiding it", async () => {
+    renderList({
+      groups: [
+        {
+          holidays: [
+            holiday({
+              area: "Brisbane",
+              key: "au-qld-2026-08-12-royal-queensland-show",
+              kind: "local",
+              name: "Royal Queensland Show",
+            }),
+          ],
+          locationId,
+          name: "Brisbane",
+        },
+      ],
+    });
+
+    expect(
+      screen.queryByRole("button", { name: "Hide Royal Queensland Show" })
+    ).toBe(null);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Switch off Royal Queensland Show for this location",
+      })
+    );
+
+    await waitFor(() => {
+      expect(mocks.setLocalHolidayEnabledAction).toHaveBeenCalledWith({
+        enabled: false,
+        holidayKey: "au-qld-2026-08-12-royal-queensland-show",
+        locationId,
         organisationId,
       });
     });

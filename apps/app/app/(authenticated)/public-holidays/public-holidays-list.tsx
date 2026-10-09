@@ -47,6 +47,7 @@ import {
   hideHolidayAction,
   restoreHolidayAction,
   setHolidayClassificationAction,
+  setLocalHolidayEnabledAction,
 } from "./_actions";
 import {
   HOLIDAY_YEAR_OPTIONS,
@@ -160,7 +161,7 @@ export function PublicHolidaysList({
         locations={locations}
         setFilterParams={setFilterParams}
       />
-      {canManage ? <ManagementBar /> : null}
+      {canManage ? <ManagementBar organisationId={organisationId} /> : null}
 
       {isEmpty && !hasOfficialHolidays ? (
         <EmptyState
@@ -401,16 +402,40 @@ function HolidayActions({
           <RotateCcwIcon className="size-4" />
         </Button>
       ) : null}
-      <Button
-        aria-label={`Hide ${holiday.name}`}
-        disabled={disabled}
-        onClick={() => onConfirm({ action: "hide", holiday })}
-        size="icon"
-        title="Hide for all locations"
-        variant="ghost"
-      >
-        <EyeOffIcon className="size-4" />
-      </Button>
+      {holiday.kind === "local" && locationId ? (
+        // Local days are switched on per location, so they are switched off
+        // the same way rather than hidden organisation-wide.
+        <Button
+          aria-label={`Switch off ${holiday.name} for this location`}
+          disabled={disabled}
+          onClick={() =>
+            onRun(() =>
+              setLocalHolidayEnabledAction({
+                enabled: false,
+                holidayKey: holiday.key,
+                locationId,
+                organisationId,
+              })
+            )
+          }
+          size="icon"
+          title="Switch off for this location"
+          variant="ghost"
+        >
+          <EyeOffIcon className="size-4" />
+        </Button>
+      ) : (
+        <Button
+          aria-label={`Hide ${holiday.name}`}
+          disabled={disabled}
+          onClick={() => onConfirm({ action: "hide", holiday })}
+          size="icon"
+          title="Hide for all locations"
+          variant="ghost"
+        >
+          <EyeOffIcon className="size-4" />
+        </Button>
+      )}
       {holiday.origin === "custom" ? (
         <Button
           aria-label={`Delete ${holiday.name}`}
@@ -427,7 +452,7 @@ function HolidayActions({
   );
 }
 
-function ManagementBar() {
+function ManagementBar({ organisationId }: { organisationId: string }) {
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -435,14 +460,17 @@ function ManagementBar() {
         <p className="mt-1 text-body-sm text-muted-foreground">
           Official holidays apply automatically for each location&apos;s state
           or region. Switch on local days in{" "}
-          <Link className="underline" href="/settings/holidays">
+          <Link
+            className="underline"
+            href={`/settings/holidays?org=${organisationId}`}
+          >
             Settings, Holidays
           </Link>
           .
         </p>
       </div>
       <Button asChild>
-        <Link href="/public-holidays/holidays/new">
+        <Link href={`/public-holidays/holidays/new?org=${organisationId}`}>
           <PlusIcon className="size-4" /> Add custom holiday
         </Link>
       </Button>
