@@ -17,7 +17,7 @@
 - Data gaps: ACT, NT, SA, TAS and VIC have no entries (official sites blocked in the sandbox); NSW, WA and NZ cover 2026 to 2027 only (2028 not yet published). QLD and UK cover 2026 to 2028.
 - Deviations from the plan: resolver and reference data live in `@repo/core` and the loader in `@repo/database` (feeds cannot depend on availability); the jurisdiction removal migration is split in two; NZ anniversary days are national `local` entries with the province as the area; QLD Christmas Eve starts at 18:00; WA regional King's Birthday is not modelled; `recursAnnually` was a no-op and is removed; there is no location editing UI, so no location region picker.
 - NOT VERIFIED: visual rendering of the holiday screens (needs Clerk and other services); review the Vercel preview.
-- `bun.lock` shows an unrelated `next` 16.3.6 to 16.3.8 sync from `bun install`; left uncommitted.
+- `bun.lock` synced to `next` 16.3.8 (matches `package.json`) in a separate chore commit.
 
 ## Design system sync (Claude Design System artifact, 9 October 2026)
 
