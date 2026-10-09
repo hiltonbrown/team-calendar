@@ -1,24 +1,19 @@
 import "server-only";
 import {
   type ClerkOrgId,
+  dateKeyInTimeZone,
   type OrganisationId,
   type Result,
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { database } from "@repo/database";
 import type {
   availability_approval_status,
-  availability_contactability,
-  availability_failed_action,
   availability_record_type,
   availability_source_type,
   notification_type,
 } from "@repo/database/generated/enums";
-import {
-  type DashboardFeedSummary,
-  getFeedSummaryForDashboard,
-} from "@repo/feeds";
 import { listForUser } from "@repo/notifications";
 import { z } from "zod";
 import {
@@ -27,38 +22,30 @@ import {
   listForApprover,
 } from "../approvals/approval-service";
 import {
-  type CalendarEvent,
+  type CalendarRange,
+  type CalendarRole,
+  type CalendarScope,
+  type CalendarServiceError,
   getCalendarRange,
 } from "../calendar/calendar-service";
-import { resolvePublicHolidays } from "../holidays/resolve-public-holidays";
 import {
-  type CurrentStatus,
-  computeCurrentStatusForPeople,
-} from "../people/current-status";
+  computeWorkingDaysFromReferenceData,
+  loadWorkingDaysReferenceData,
+} from "../duration/working-days";
+import { resolvePublicHolidays } from "../holidays/resolve-public-holidays";
 import {
   type BalanceRow,
   getPersonProfile,
   listPeople,
-  listUpcomingRecords,
-  type PersonListItem,
 } from "../people/people-service";
-import { listMyRecords } from "../plans/plan-service";
-import { isXeroLeaveType } from "../records/record-type-categories";
-import { listEvents as listAuditLogEvents } from "../settings/audit-log-service";
-import {
-  type DashboardBillingSummary,
-  getBillingSummaryForDashboard,
-} from "../settings/billing-service";
+import { listMyRecords, type RecordListItem } from "../plans/plan-service";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
-import { listRuns, listTenantSummaries } from "../sync/sync-monitor-service";
-import {
-  dedupeEventsByPerson,
-  isAwayEvent,
-  PEAK_AWAY_THRESHOLD_PERCENT,
-} from "../team-coverage/coverage-map";
+import type { CoverageMap } from "../team-coverage/coverage-map";
+import { loadManagerCoverage } from "../team-coverage/load-manager-coverage";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import { createDashboardCache, type DashboardCache } from "./dashboard-cache";
+import { buildTimelineWeek, type TimelineWeek } from "./timeline-week";
 export type DashboardRole =
   | "owner"
   | "admin"
@@ -91,32 +78,45 @@ export type DashboardSection<TData> =
       data: TData;
       status: "ready";
     };
-export interface EmployeeDashboardView {
+export interface DashboardInfoRequest {
+  actionUrl: string | null;
+  body: string;
+  createdAt: Date;
+  notificationId: string;
+  title: string;
+  type: notification_type;
+}
+export interface DashboardMyRequest {
+  approvalStatus: availability_approval_status;
+  canEdit: boolean;
+  canWithdraw: boolean;
+  /** Working days, or null when the duration cannot be computed. */
+  dayCount: number | null;
+  endsAt: Date;
+  recordId: string;
+  recordType: availability_record_type;
+  sourceType: availability_source_type;
+  startsAt: Date;
+}
+export interface DashboardApprovalRow {
+  durationWorkingDays: number | null;
+  endsAt: Date;
+  personFirstName: string;
+  personLastName: string;
+  recordId: string;
+  recordType: availability_record_type;
+  sourceType: string;
+  startsAt: Date;
+  submittedAt: Date | null;
+}
+export interface DashboardApprovalQueue {
+  count: number;
+  /** Oldest submitted first, at most five. */
+  rows: DashboardApprovalRow[];
+}
+interface DashboardBaseView {
   actionItems: DashboardSection<{
-    declinedRecords: Array<{
-      approvalNote: string | null;
-      declinedAt: Date | null;
-      endsAt: Date;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-    }>;
-    infoRequestedNotifications: Array<{
-      actionUrl: string | null;
-      body: string;
-      createdAt: Date;
-      notificationId: string;
-      title: string;
-      type: notification_type;
-    }>;
-    xeroSyncFailedRecords: Array<{
-      endsAt: Date;
-      failedAction: availability_failed_action | null;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-      xeroWriteError: string | null;
-    }>;
+    infoRequestedNotifications: DashboardInfoRequest[];
   }>;
   balances: DashboardSection<{
     xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
@@ -126,7 +126,6 @@ export interface EmployeeDashboardView {
   }>;
   header: {
     firstName: string;
-    xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
     lastName: string;
     locationName: string | null;
     roleLabel: "Admin" | "Employee" | "Manager" | "Owner";
@@ -136,185 +135,27 @@ export interface EmployeeDashboardView {
     daysUntil: number | null;
     next: DashboardHoliday | null;
   }>;
-  quickActions: {
-    canCreatePlan: true;
-    canViewCalendar: true;
-    canViewNotifications: true;
-  };
-  todayStatus: DashboardSection<{
-    activePublicHoliday: {
-      date: Date;
-      id: string;
-      name: string;
-      source: string;
-      type: string;
-    } | null;
-    activeRecord: {
-      approvalStatus: availability_approval_status;
-      endsAt: Date;
-      id: string;
-      recordType: availability_record_type;
-      sourceType: availability_source_type;
-      startsAt: Date;
-      title: string | null;
-    } | null;
-    currentStatus: {
-      approvalStatus: availability_approval_status | null;
-      contactabilityStatus: string | null;
-      label: string;
-      recordType: availability_record_type | null;
-      statusKey: string;
-    };
-  }>;
-  upcoming: DashboardSection<{
-    next14Days: Array<{
-      allDay: boolean;
-      approvalStatus: availability_approval_status;
-      endsAt: Date;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-    }>;
-  }>;
+  timeline: DashboardSection<TimelineWeek>;
 }
-export interface ManagerDashboardView extends EmployeeDashboardView {
-  approvalQueue: DashboardSection<{
-    ctaUrl: string;
-    failedCount: number;
-    mostRecent: Array<{
-      endsAt: Date;
-      personFirstName: string;
-      personLastName: string;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-      submittedAt: Date | null;
-    }>;
-    pendingCount: number;
-  }>;
-  header: EmployeeDashboardView["header"] & {
+export interface EmployeeDashboardView extends DashboardBaseView {
+  myRequests: DashboardSection<{ records: DashboardMyRequest[] }>;
+}
+export interface ManagerDashboardView extends DashboardBaseView {
+  approvalQueue: DashboardSection<DashboardApprovalQueue>;
+  coverage: DashboardSection<CoverageMap>;
+  header: DashboardBaseView["header"] & {
     directReportCount: number;
     roleLabel: "Manager";
     scopeLabel: string;
   };
-  teamThisWeek: DashboardSection<{
-    ctaUrl: string;
-    peopleWithLeaveCount: number;
-    upcomingRecords: Array<{
-      endsAt: Date;
-      personFirstName: string;
-      personLastName: string;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-    }>;
-  }>;
-  teamToday: DashboardSection<{
-    ctaUrl: string;
-    peopleAvailableCount: number;
-    peopleNeedingAttention: Array<{
-      approvalStatus: availability_approval_status | null;
-      contactabilityStatus: availability_contactability | null;
-      endsAt: Date | null;
-      personFirstName: string;
-      personId: string;
-      personLastName: string;
-      recordType: availability_record_type | null;
-      startsAt: Date | null;
-      statusKey: PersonListItem["currentStatus"]["statusKey"];
-      statusLabel: string;
-      xeroSyncFailedCount: number;
-    }>;
-    peopleOnLeaveCount: number;
-    peopleOtherOooCount: number;
-    peopleTravellingCount: number;
-    peopleWithXeroSyncFailedCount: number;
-    peopleWorkingFromHomeCount: number;
-  }>;
-  teamXeroSyncFailed: DashboardSection<{
-    count: number;
-    ctaUrl: string;
-    recentRecords: Array<{
-      failedAction: availability_failed_action | null;
-      personFirstName: string;
-      personLastName: string;
-      recordId: string;
-      recordType: availability_record_type;
-      xeroWriteError: string | null;
-    }>;
-  }>;
-  upcomingPeaks: DashboardSection<{
-    ctaUrl: string;
-    peaks: Array<{
-      date: Date;
-      peopleAwayCount: number;
-      percentage: number;
-      recordTypes: availability_record_type[];
-      totalPeopleInScope: number;
-    }>;
-    totalPeaksCount: number;
-  }>;
 }
-export interface AdminDashboardView extends EmployeeDashboardView {
-  activeFeeds: DashboardSection<
-    DashboardFeedSummary & {
-      ctaUrl: string;
-    }
-  >;
-  header: EmployeeDashboardView["header"] & {
+export interface AdminDashboardView extends DashboardBaseView {
+  approvalQueue: DashboardSection<DashboardApprovalQueue>;
+  header: DashboardBaseView["header"] & {
     organisationName: string;
     roleLabel: "Admin" | "Owner";
     totalActivePeopleCount: number;
   };
-  orgWidePendingApprovals: DashboardSection<{
-    count: number;
-    ctaUrl: string;
-    oldestAgeDays: number | null;
-  }>;
-  orgWideXeroSyncFailed: DashboardSection<{
-    byFailedAction: {
-      approve: number;
-      decline: number;
-      submit: number;
-      withdraw: number;
-    };
-    count: number;
-    ctaUrl: string;
-  }>;
-  recentAuditEvents: DashboardSection<{
-    ctaUrl: string;
-    events: Array<{
-      action: string;
-      actorDisplay: string;
-      createdAt: Date;
-      entityType: string | null;
-      id: string;
-    }>;
-  }>;
-  syncHealth: DashboardSection<{
-    activeTenantCount: number;
-    ctaUrl: string;
-    failedRunsLast24h: number;
-    xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
-    lastSuccessfulSync: Date | null;
-    pendingFailedRecords: number;
-    runsLast24h: number;
-    tenantCount: number;
-  }>;
-  usageVsLimits: DashboardSection<{
-    ctaUrl: string;
-    isOverLimit: boolean;
-    metrics: Array<{
-      currentValue: number;
-      label: string;
-      limit: number | null;
-      metricKey: string;
-      percentage: number | null;
-      unit: string;
-    }>;
-    plan: DashboardBillingSummary["plan"];
-    visibleToAdmin: boolean;
-  }>;
 }
 const ResolveRoleSchema = z.object({
   clerkOrgId: z.string().min(1),
@@ -328,7 +169,10 @@ const ViewSchema = z.object({
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
   userId: z.string().min(1),
+  /** Any date in the timeline week to show; defaults to the current week. */
+  weekAnchor: z.coerce.date().optional(),
 });
+type ViewInput = z.infer<typeof ViewSchema>;
 export interface DashboardHoliday {
   /** UTC midnight of the holiday's calendar date. */
   holidayDate: Date;
@@ -336,37 +180,16 @@ export interface DashboardHoliday {
   /** "HH:mm" for part-day holidays, otherwise null. */
   startsAt: string | null;
 }
-type CalendarRangeData =
-  Awaited<ReturnType<typeof getCalendarRange>> extends Result<
-    infer TValue,
-    infer _
-  >
-    ? TValue
-    : never;
-type SyncHealthCardData =
-  AdminDashboardView["syncHealth"] extends DashboardSection<infer TData>
-    ? TData
-    : never;
-const AUDIT_EVENT_ALLOWLIST = [
-  "availability_records.submitted",
-  "availability_records.approved",
-  "availability_records.declined",
-  "availability_records.reconciled_to_approved",
-  "availability_records.reconciled_to_declined",
-  "availability_records.reconciled_to_submitted",
-  "feeds.created",
-  "feeds.updated",
-  "feeds.archived",
-  "feeds.restored",
-  "feeds.paused",
-  "feeds.resumed",
-  "organisation.updated",
-  "organisation_settings.updated",
-  "xero.connection_refreshed",
-  "xero.connection_disconnected_soft",
-  "xero.connection_disconnected_destructive",
-  "xero.tenant_sync_paused",
-  "xero.tenant_sync_resumed",
+const LIST_ROW_LIMIT = 5;
+const EMPLOYEE_TIMELINE_ROW_LIMIT = 1;
+const MANAGER_TIMELINE_ROW_LIMIT = 12;
+const ADMIN_TIMELINE_ROW_LIMIT = 10;
+const COVERAGE_SECOND_WEEK_OFFSET_DAYS = 7;
+const DEFAULT_TIMEZONE = "Australia/Brisbane";
+const MY_REQUEST_STATUSES: availability_approval_status[] = [
+  "submitted",
+  "approved",
+  "declined",
 ];
 export async function resolveDashboardRole(
   input: z.input<typeof ResolveRoleSchema>
@@ -432,123 +255,83 @@ export async function getManagerView(
     return validationError(parsed.error);
   }
   try {
-    const [employeeResult, settingsResult, directReportCount, scopePersonIds] =
-      await Promise.all([
-        getEmployeeView(parsed.data, cache),
-        getSettings({
-          clerkOrgId: parsed.data.clerkOrgId,
-          organisationId: parsed.data.organisationId,
-        }),
-        database.person.count({
-          where: {
-            archived_at: null,
-            clerk_org_id: parsed.data.clerkOrgId,
-            manager_person_id: parsed.data.personId,
-            organisation_id: parsed.data.organisationId,
-          },
-        }),
-        managerScopePersonIds({
-          actingPersonId: parsed.data.personId,
-          clerkOrgId: parsed.data.clerkOrgId,
-          organisationId: parsed.data.organisationId,
-        }),
-      ]);
-    if (!employeeResult.ok) {
-      return employeeResult;
-    }
-    const managerRole = approvalRole(parsed.data.actingRole);
+    const { data } = parsed;
+    const today = new Date();
+    const currentWeek = loadCalendarWeek(data, {
+      anchorDate: today,
+      role: "manager",
+      scope: { type: "my_team" },
+    });
+    const nextWeek = loadCalendarWeek(data, {
+      anchorDate: addDays(today, COVERAGE_SECOND_WEEK_OFFSET_DAYS),
+      role: "manager",
+      scope: { type: "my_team" },
+    });
+    const timelineWeek = data.weekAnchor
+      ? loadCalendarWeek(data, {
+          anchorDate: data.weekAnchor,
+          role: "manager",
+          scope: { type: "my_team" },
+        })
+      : currentWeek;
     const [
-      peopleResult,
-      approvalItemsResult,
-      weekCalendarResult,
-      monthCalendarResult,
+      baseResult,
+      settingsResult,
+      directReportCount,
+      scopePersonIds,
+      approvalQueue,
+      timeline,
+      coverage,
     ] = await Promise.all([
-      loadTeamTodayPeople({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-        scopePersonIds,
+      loadBaseView(data, cache),
+      getSettings({
+        clerkOrgId: data.clerkOrgId,
+        organisationId: data.organisationId,
       }),
-      listForApprover({
-        actingPersonId: parsed.data.personId,
-        actingUserId: parsed.data.userId,
-        clerkOrgId: parsed.data.clerkOrgId,
-        filters: { status: ["submitted", "xero_sync_failed"] },
-        organisationId: parsed.data.organisationId,
-        pageSize: 200,
-        role: managerRole,
-      }),
-      getCalendarRange({
-        actingPersonId: parsed.data.personId,
-        actingUserId: parsed.data.userId,
-        anchorDate: new Date(),
-        clerkOrgId: parsed.data.clerkOrgId,
-        filters: {
-          approvalStatus: ["approved"],
-          includeDrafts: false,
-          recordTypeCategory: "all",
+      database.person.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: data.clerkOrgId,
+          manager_person_id: data.personId,
+          organisation_id: data.organisationId,
         },
-        organisationId: parsed.data.organisationId,
-        role: "manager",
-        scope: { type: "my_team" },
-        view: "week",
       }),
-      getCalendarRange({
-        actingPersonId: parsed.data.personId,
-        actingUserId: parsed.data.userId,
-        anchorDate: new Date(),
-        clerkOrgId: parsed.data.clerkOrgId,
-        filters: {
-          approvalStatus: ["approved"],
-          includeDrafts: false,
-          recordTypeCategory: "all",
-        },
-        organisationId: parsed.data.organisationId,
-        role: "manager",
-        scope: { type: "my_team" },
-        view: "month",
+      managerScopePersonIds({
+        actingPersonId: data.personId,
+        clerkOrgId: data.clerkOrgId,
+        organisationId: data.organisationId,
       }),
+      loadApprovalQueue(data, approvalRole(data.actingRole)),
+      timelineSection(timelineWeek, {
+        actingPersonId: data.personId,
+        onlyPeopleWithEntries: false,
+        rowLimit: MANAGER_TIMELINE_ROW_LIMIT,
+        today,
+      }),
+      loadCoverageSection(data, [currentWeek, nextWeek], today),
     ]);
+    if (!baseResult.ok) {
+      return baseResult;
+    }
     const includeIndirectReports =
       settingsResult.ok &&
       settingsResult.value.managerVisibilityScope === "all_team_leave";
     const scopeCount = Math.max(scopePersonIds.length - 1, 0);
-    const header: ManagerDashboardView["header"] = {
-      ...employeeResult.value.header,
-      directReportCount,
-      roleLabel: "Manager",
-      scopeLabel: includeIndirectReports
-        ? `${scopeCount} team members (direct + indirect)`
-        : `${directReportCount} direct reports`,
-    };
     return {
       ok: true,
       value: {
-        ...employeeResult.value,
-        approvalQueue: approvalItemsResult.ok
-          ? readySection(
-              buildApprovalQueueCard(
-                unwrapApprovalItems(approvalItemsResult.value)
-              )
-            )
-          : errorSection(approvalItemsResult.error.message),
-        header,
-        teamThisWeek:
-          weekCalendarResult.ok && peopleResult.ok
-            ? readySection(buildTeamThisWeekCard(weekCalendarResult.value))
-            : errorSection(firstErrorMessage(weekCalendarResult, peopleResult)),
-        teamToday: peopleResult.ok
-          ? readySection(buildTeamTodayCard(peopleResult.value.people))
-          : errorSection(peopleResult.error.message),
-        teamXeroSyncFailed: approvalItemsResult.ok
-          ? readySection(
-              buildTeamXeroSyncFailedCard(
-                unwrapApprovalItems(approvalItemsResult.value)
-              )
-            )
-          : errorSection(approvalItemsResult.error.message),
-        upcomingPeaks: monthCalendarResult.ok
-          ? readySection(buildUpcomingPeaksCard(monthCalendarResult.value))
-          : errorSection(monthCalendarResult.error.message),
+        ...baseResult.value,
+        approvalQueue,
+        coverage,
+        header: {
+          ...baseResult.value.header,
+          directReportCount,
+          roleLabel: "Manager",
+          scopeLabel: includeIndirectReports
+            ? `${scopeCount} team members (direct + indirect)`
+            : `${directReportCount} direct reports`,
+        },
+        timeline,
       },
     };
   } catch {
@@ -564,141 +347,69 @@ export async function getAdminView(
     return validationError(parsed.error);
   }
   try {
-    const adminRole = parsed.data.actingRole === "owner" ? "owner" : "admin";
+    const { data } = parsed;
+    const adminRole = data.actingRole === "owner" ? "owner" : "admin";
+    const today = new Date();
     const [
-      employeeResult,
+      baseResult,
       organisation,
       peopleCountResult,
-      syncHealthResult,
-      approvalsResult,
-      feedsResult,
-      billingResult,
-      auditResult,
+      approvalQueue,
+      timeline,
     ] = await Promise.all([
-      getEmployeeView(parsed.data, cache),
+      loadBaseView(data, cache),
       database.organisation.findFirst({
         select: { name: true },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          id: parsed.data.organisationId,
+          clerk_org_id: data.clerkOrgId,
+          id: data.organisationId,
         },
       }),
       listPeople({
-        actingPersonId: parsed.data.personId,
-        clerkOrgId: parsed.data.clerkOrgId,
+        actingPersonId: data.personId,
+        clerkOrgId: data.clerkOrgId,
         filters: {
           includeArchived: false,
           personType: "all",
           xeroLinked: "all",
           xeroSyncFailedOnly: false,
         },
-        organisationId: parsed.data.organisationId,
+        organisationId: data.organisationId,
         pagination: { pageSize: 1 },
         role: adminRole,
       }),
-      loadSyncHealthCard({
-        actingRole: adminRole,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-        userId: parsed.data.userId,
-      }),
-      listForApprover({
-        actingPersonId: parsed.data.personId,
-        actingUserId: parsed.data.userId,
-        clerkOrgId: parsed.data.clerkOrgId,
-        filters: { status: ["submitted", "xero_sync_failed"] },
-        organisationId: parsed.data.organisationId,
-        pageSize: 200,
-        role: approvalRole(adminRole),
-      }),
-      getFeedSummaryForDashboard({
-        actingRole: adminRole,
-        actingUserId: parsed.data.userId,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      }),
-      getBillingSummaryForDashboard({
-        actingRole: adminRole,
-        actingUserId: parsed.data.userId,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      }),
-      listAuditLogEvents({
-        actingRole: adminRole,
-        actingUserId: parsed.data.userId,
-        clerkOrgId: parsed.data.clerkOrgId,
-        filters: { action: AUDIT_EVENT_ALLOWLIST },
-        organisationId: parsed.data.organisationId,
-        pagination: { pageSize: 10 },
-      }),
+      loadApprovalQueue(data, approvalRole(adminRole)),
+      timelineSection(
+        loadCalendarWeek(data, {
+          anchorDate: data.weekAnchor ?? today,
+          role: adminRole,
+          scope: { type: "all_teams" },
+        }),
+        {
+          actingPersonId: data.personId,
+          onlyPeopleWithEntries: true,
+          rowLimit: ADMIN_TIMELINE_ROW_LIMIT,
+          today,
+        }
+      ),
     ]);
-    if (!employeeResult.ok) {
-      return employeeResult;
+    if (!baseResult.ok) {
+      return baseResult;
     }
-    const header: AdminDashboardView["header"] = {
-      ...employeeResult.value.header,
-      organisationName: organisation?.name ?? "Organisation",
-      roleLabel: adminRole === "owner" ? "Owner" : "Admin",
-      totalActivePeopleCount: peopleCountResult.ok
-        ? peopleCountResult.value.totalCount
-        : 0,
-    };
     return {
       ok: true,
       value: {
-        ...employeeResult.value,
-        activeFeeds: feedsResult.ok
-          ? readySection({ ...feedsResult.value, ctaUrl: "/feed" })
-          : errorSection(feedsResult.error.message),
-        header,
-        orgWidePendingApprovals: approvalsResult.ok
-          ? readySection(
-              buildOrgPendingApprovalsCard(
-                unwrapApprovalItems(approvalsResult.value)
-              )
-            )
-          : errorSection(approvalsResult.error.message),
-        orgWideXeroSyncFailed: approvalsResult.ok
-          ? readySection(
-              buildOrgWideXeroSyncFailedCard(
-                unwrapApprovalItems(approvalsResult.value)
-              )
-            )
-          : errorSection(approvalsResult.error.message),
-        recentAuditEvents: auditResult.ok
-          ? readySection({
-              ctaUrl: "/settings/audit-log",
-              events: auditResult.value.events.map((event) => ({
-                action: event.action,
-                actorDisplay: event.actorDisplay,
-                createdAt: event.createdAt,
-                entityType: event.entityType,
-                id: event.id,
-              })),
-            })
-          : errorSection(auditResult.error.message),
-        syncHealth: syncHealthResult.ok
-          ? readySection(syncHealthResult.value)
-          : errorSection(syncHealthResult.error.message),
-        usageVsLimits: billingResult.ok
-          ? readySection({
-              ctaUrl: "/settings/billing",
-              isOverLimit: billingResult.value.isOverLimit,
-              metrics: billingResult.value.usage.map((item) => ({
-                currentValue: item.currentValue,
-                label: item.label,
-                limit: item.limit,
-                metricKey: item.metricKey,
-                percentage:
-                  item.limit === null || item.limit === 0
-                    ? null
-                    : Math.min((item.currentValue / item.limit) * 100, 100),
-                unit: item.unit,
-              })),
-              plan: billingResult.value.plan,
-              visibleToAdmin: billingResult.value.visibleToAdmin,
-            })
-          : errorSection(billingResult.error.message),
+        ...baseResult.value,
+        approvalQueue,
+        header: {
+          ...baseResult.value.header,
+          organisationName: organisation?.name ?? "Organisation",
+          roleLabel: adminRole === "owner" ? "Owner" : "Admin",
+          totalActivePeopleCount: peopleCountResult.ok
+            ? peopleCountResult.value.totalCount
+            : 0,
+        },
+        timeline,
       },
     };
   } catch {
@@ -706,9 +417,60 @@ export async function getAdminView(
   }
 }
 async function buildEmployeeView(
-  input: z.infer<typeof ViewSchema>,
+  input: ViewInput,
   cache: DashboardCache
 ): Promise<Result<EmployeeDashboardView, DashboardServiceError>> {
+  try {
+    const today = new Date();
+    const [baseResult, timeline] = await Promise.all([
+      loadBaseView(input, cache),
+      timelineSection(
+        loadCalendarWeek(input, {
+          anchorDate: input.weekAnchor ?? today,
+          role: "viewer",
+          scope: { type: "my_self" },
+        }),
+        {
+          actingPersonId: input.personId,
+          onlyPeopleWithEntries: false,
+          rowLimit: EMPLOYEE_TIMELINE_ROW_LIMIT,
+          today,
+        }
+      ),
+    ]);
+    if (!baseResult.ok) {
+      return baseResult;
+    }
+    const myRequests = await loadMyRequests(input, {
+      timezone: baseResult.value.header.timezone ?? DEFAULT_TIMEZONE,
+      today,
+    });
+    return {
+      ok: true,
+      value: {
+        ...baseResult.value,
+        myRequests,
+        timeline,
+      },
+    };
+  } catch {
+    return unknownError("Failed to build employee dashboard.");
+  }
+}
+type DashboardBaseData = Omit<DashboardBaseView, "timeline">;
+async function loadBaseView(
+  input: ViewInput,
+  cache: DashboardCache
+): Promise<Result<DashboardBaseData, DashboardServiceError>> {
+  return await cache.getOrLoad(
+    cacheKey("base", input),
+    async () => await buildBaseView(input, cache)
+  );
+}
+async function buildBaseView(
+  input: ViewInput,
+  cache: DashboardCache
+): Promise<Result<DashboardBaseData, DashboardServiceError>> {
   try {
     const [profileResult, xeroStateResult] = await Promise.all([
       getPersonProfile({
@@ -734,14 +496,10 @@ async function buildEmployeeView(
       return unknownError(profileResult.error.message);
     }
     const profile = profileResult.value;
-    const [actionItems, upcoming, publicHolidays] = await Promise.all([
+    const [actionItems, publicHolidays] = await Promise.all([
       cache.getOrLoad(
         cacheKey("action-items", input),
         async () => await loadActionItemsCard(input)
-      ),
-      cache.getOrLoad(
-        cacheKey("upcoming", input),
-        async () => await loadUpcomingCard(input)
       ),
       cache.getOrLoad(
         cacheKey("public-holidays", input),
@@ -753,14 +511,13 @@ async function buildEmployeeView(
           })
       ),
     ]);
-    const lastFetchedAt = profile.balances.balancesLastFetchedAt;
     return {
       ok: true,
       value: {
         actionItems,
         balances: readySection({
           isXeroLinked: profile.balances.xeroLinked,
-          lastFetchedAt,
+          lastFetchedAt: profile.balances.balancesLastFetchedAt,
           rows: profile.balances.rows,
           xeroConnectionState,
         }),
@@ -770,97 +527,31 @@ async function buildEmployeeView(
           locationName: profile.header.location?.name ?? null,
           roleLabel: "Employee",
           timezone: profile.header.location?.timezone ?? null,
-          xeroConnectionState,
         },
         publicHolidays,
-        quickActions: {
-          canCreatePlan: true,
-          canViewCalendar: true,
-          canViewNotifications: true,
-        },
-        todayStatus: readySection({
-          activePublicHoliday: profile.currentStatus.activePublicHoliday,
-          activeRecord: profile.currentStatus.activeRecord,
-          currentStatus: {
-            approvalStatus: profile.currentStatus.approvalStatus,
-            contactabilityStatus: profile.currentStatus.contactabilityStatus,
-            label: profile.currentStatus.label,
-            recordType: profile.currentStatus.recordType,
-            statusKey: profile.currentStatus.statusKey,
-          },
-        }),
-        upcoming,
       },
     };
   } catch {
-    return unknownError("Failed to build employee dashboard.");
+    return unknownError("Failed to build dashboard.");
   }
 }
 async function loadActionItemsCard(
-  input: z.infer<typeof ViewSchema>
-): Promise<EmployeeDashboardView["actionItems"]> {
-  const [failedRecordsResult, declinedRecordsResult, notificationsResult] =
-    await Promise.all([
-      listMyRecords({
-        clerkOrgId: input.clerkOrgId,
-        filters: {
-          approvalStatus: ["xero_sync_failed"],
-          includeArchived: false,
-        },
-        organisationId: input.organisationId,
-        userId: input.userId,
-      }),
-      listMyRecords({
-        clerkOrgId: input.clerkOrgId,
-        filters: {
-          approvalStatus: ["declined"],
-          dateRange: { from: addDays(new Date(), -14) },
-          includeArchived: false,
-        },
-        organisationId: input.organisationId,
-        userId: input.userId,
-      }),
-      listForUser({
-        clerkOrgId: input.clerkOrgId,
-        filters: {
-          type: ["leave_info_requested"],
-          unreadOnly: true,
-        },
-        organisationId: input.organisationId,
-        pagination: { pageSize: 5 },
-        userId: input.userId,
-      }),
-    ]);
-  if (
-    !(
-      failedRecordsResult.ok &&
-      declinedRecordsResult.ok &&
-      notificationsResult.ok
-    )
-  ) {
-    return errorSection(
-      firstErrorMessage(
-        failedRecordsResult,
-        declinedRecordsResult,
-        notificationsResult
-      )
-    );
+  input: ViewInput
+): Promise<DashboardBaseView["actionItems"]> {
+  const notificationsResult = await listForUser({
+    clerkOrgId: input.clerkOrgId,
+    filters: {
+      type: ["leave_info_requested"],
+      unreadOnly: true,
+    },
+    organisationId: input.organisationId,
+    pagination: { pageSize: LIST_ROW_LIMIT },
+    userId: input.userId,
+  });
+  if (!notificationsResult.ok) {
+    return errorSection(notificationsResult.error.message);
   }
   return readySection({
-    declinedRecords: declinedRecordsResult.value
-      .filter(
-        (record) =>
-          record.approvedAt === null ||
-          record.approvedAt >= addDays(new Date(), -14)
-      )
-      .map((record) => ({
-        approvalNote: record.approvalNote,
-        declinedAt: record.approvedAt,
-        endsAt: record.endsAt,
-        recordId: record.id,
-        recordType: record.recordType,
-        startsAt: record.startsAt,
-      })),
     infoRequestedNotifications: notificationsResult.value.notifications.map(
       (notification) => ({
         actionUrl: notification.actionUrl,
@@ -871,88 +562,181 @@ async function loadActionItemsCard(
         type: notification.type,
       })
     ),
-    xeroSyncFailedRecords: failedRecordsResult.value.map((record) => ({
-      endsAt: record.endsAt,
-      failedAction: record.failedAction,
-      recordId: record.id,
-      recordType: record.recordType,
-      startsAt: record.startsAt,
-      xeroWriteError: record.xeroWriteError,
-    })),
   });
 }
-async function loadUpcomingCard(
-  input: z.infer<typeof ViewSchema>
-): Promise<EmployeeDashboardView["upcoming"]> {
-  const today = startOfDay(new Date());
-  const horizon = addDays(today, 14);
-  const [localRecordsResult, profileUpcomingResult] = await Promise.all([
-    listMyRecords({
-      clerkOrgId: input.clerkOrgId,
-      filters: {
-        approvalStatus: ["approved", "draft", "submitted", "xero_sync_failed"],
-        dateRange: { from: today, to: horizon },
-        includeArchived: false,
-      },
-      organisationId: input.organisationId,
-      userId: input.userId,
-    }),
-    listUpcomingRecords({
-      clerkOrgId: input.clerkOrgId,
-      horizonDays: 14,
-      organisationId: input.organisationId,
-      personId: input.personId,
-    }),
-  ]);
-  if (!(localRecordsResult.ok && profileUpcomingResult.ok)) {
-    return errorSection(
-      firstErrorMessage(localRecordsResult, profileUpcomingResult)
-    );
-  }
-  const upcoming = new Map<
-    string,
-    {
-      allDay: boolean;
-      approvalStatus: availability_approval_status;
-      endsAt: Date;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-    }
-  >();
-  for (const record of localRecordsResult.value) {
-    upcoming.set(record.id, {
-      allDay: record.allDay,
-      approvalStatus: record.approvalStatus,
-      endsAt: record.endsAt,
-      recordId: record.id,
-      recordType: record.recordType,
-      startsAt: record.startsAt,
-    });
-  }
-  for (const record of profileUpcomingResult.value.records) {
-    if (
-      !(
-        record.sourceType === "xero_leave" &&
-        record.approvalStatus === "approved"
-      )
-    ) {
-      continue;
-    }
-    upcoming.set(record.id, {
-      allDay: record.allDay,
-      approvalStatus: record.approvalStatus,
-      endsAt: record.endsAt,
-      recordId: record.id,
-      recordType: record.recordType,
-      startsAt: record.startsAt,
-    });
-  }
-  return readySection({
-    next14Days: [...upcoming.values()].sort(
-      (left, right) => left.startsAt.getTime() - right.startsAt.getTime()
-    ),
+/**
+ * The viewer's submitted, approved and declined records that end today or
+ * later, soonest first. Records store wall-clock times in UTC, so "today" is
+ * the person's local date at UTC midnight.
+ */
+async function loadMyRequests(
+  input: ViewInput,
+  options: { timezone: string; today: Date }
+): Promise<EmployeeDashboardView["myRequests"]> {
+  const todayStart = new Date(
+    `${dateKeyInTimeZone(options.today, options.timezone)}T00:00:00.000Z`
+  );
+  const recordsResult = await listMyRecords({
+    clerkOrgId: input.clerkOrgId,
+    filters: {
+      approvalStatus: MY_REQUEST_STATUSES,
+      dateRange: { from: todayStart },
+      includeArchived: false,
+    },
+    organisationId: input.organisationId,
+    userId: input.userId,
   });
+  if (!recordsResult.ok) {
+    return errorSection(recordsResult.error.message);
+  }
+  const records = recordsResult.value
+    .filter((record) => record.endsAt >= todayStart)
+    .sort(
+      (first, second) =>
+        first.startsAt.getTime() - second.startsAt.getTime() ||
+        first.id.localeCompare(second.id)
+    )
+    .slice(0, LIST_ROW_LIMIT);
+  const durationInputs = records.map((record) => ({
+    allDay: record.allDay,
+    clerkOrgId: input.clerkOrgId,
+    endsAt: record.endsAt,
+    locationId: record.person.locationId,
+    organisationId: input.organisationId,
+    startsAt: record.startsAt,
+  }));
+  const referenceData = await loadWorkingDaysReferenceData(durationInputs);
+  return readySection({
+    records: records.map((record, index) => {
+      const durationInput = durationInputs[index];
+      const duration = durationInput
+        ? computeWorkingDaysFromReferenceData(durationInput, referenceData)
+        : null;
+      return toMyRequest(record, duration?.ok ? duration.value : null);
+    }),
+  });
+}
+function toMyRequest(
+  record: RecordListItem,
+  dayCount: number | null
+): DashboardMyRequest {
+  return {
+    approvalStatus: record.approvalStatus,
+    canEdit:
+      record.sourceType === "manual" &&
+      record.approvalStatus === "approved" &&
+      record.editableActions.includes("edit"),
+    canWithdraw:
+      record.approvalStatus === "submitted" &&
+      record.editableActions.includes("withdraw"),
+    dayCount,
+    endsAt: record.endsAt,
+    recordId: record.id,
+    recordType: record.recordType,
+    sourceType: record.sourceType,
+    startsAt: record.startsAt,
+  };
+}
+async function loadApprovalQueue(
+  input: ViewInput,
+  role: ApprovalRole
+): Promise<DashboardSection<DashboardApprovalQueue>> {
+  const result = await listForApprover({
+    actingPersonId: input.personId,
+    actingUserId: input.userId,
+    clerkOrgId: input.clerkOrgId,
+    filters: { status: ["submitted"] },
+    organisationId: input.organisationId,
+    pageSize: 200,
+    role,
+  });
+  if (!result.ok) {
+    return errorSection(result.error.message);
+  }
+  const submitted = unwrapApprovalItems(result.value).filter(
+    (record) => record.approvalStatus === "submitted"
+  );
+  return readySection({
+    count: submitted.length,
+    rows: submitted
+      .sort(
+        (first, second) =>
+          (first.submittedAt ?? first.createdAt).getTime() -
+          (second.submittedAt ?? second.createdAt).getTime()
+      )
+      .slice(0, LIST_ROW_LIMIT)
+      .map((record) => ({
+        durationWorkingDays: record.durationWorkingDays,
+        endsAt: record.endsAt,
+        personFirstName: record.person.firstName,
+        personLastName: record.person.lastName,
+        recordId: record.id,
+        recordType: record.recordType,
+        sourceType: record.sourceType,
+        startsAt: record.startsAt,
+        submittedAt: record.submittedAt,
+      })),
+  });
+}
+type CalendarWeekResult = Result<CalendarRange, CalendarServiceError>;
+/** Approved records for one calendar week in the given scope. */
+function loadCalendarWeek(
+  input: ViewInput,
+  options: { anchorDate: Date; role: CalendarRole; scope: CalendarScope }
+): Promise<CalendarWeekResult> {
+  return getCalendarRange({
+    actingPersonId: input.personId,
+    actingUserId: input.userId,
+    anchorDate: options.anchorDate,
+    clerkOrgId: input.clerkOrgId,
+    filters: {
+      approvalStatus: ["approved"],
+      includeDrafts: false,
+      recordTypeCategory: "all",
+    },
+    organisationId: input.organisationId,
+    role: options.role,
+    scope: options.scope,
+    view: "week",
+  });
+}
+async function timelineSection(
+  week: Promise<CalendarWeekResult>,
+  options: {
+    actingPersonId: string;
+    onlyPeopleWithEntries: boolean;
+    rowLimit: number;
+    today: Date;
+  }
+): Promise<DashboardSection<TimelineWeek>> {
+  const result = await week;
+  if (!result.ok) {
+    return errorSection(result.error.message);
+  }
+  return readySection(buildTimelineWeek({ ...options, range: result.value }));
+}
+async function loadCoverageSection(
+  input: ViewInput,
+  weeks: Promise<CalendarWeekResult>[],
+  today: Date
+): Promise<DashboardSection<CoverageMap>> {
+  const results = await Promise.all(weeks);
+  const ranges: CalendarRange[] = [];
+  for (const result of results) {
+    if (!result.ok) {
+      return errorSection(result.error.message);
+    }
+    ranges.push(result.value);
+  }
+  const coverage = await loadManagerCoverage({
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+    ranges,
+    today,
+  });
+  return coverage.ok
+    ? readySection(coverage.value)
+    : errorSection(coverage.error.message);
 }
 async function loadPublicHolidayCard(input: {
   clerkOrgId: string;
@@ -985,443 +769,6 @@ async function loadPublicHolidayCard(input: {
     daysUntil: next ? dayDiff(next.holidayDate, today) : null,
     next,
   });
-}
-async function loadSyncHealthCard(input: {
-  actingRole: "admin" | "owner";
-  clerkOrgId: string;
-  organisationId: string;
-  userId: string;
-}): Promise<Result<SyncHealthCardData, DashboardServiceError>> {
-  const since = addDays(new Date(), -1);
-  const [summaryResult, runsResult, xeroStateResult] = await Promise.all([
-    listTenantSummaries({
-      actingRole: input.actingRole,
-      actingUserId: input.userId,
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    }),
-    listRuns({
-      actingRole: input.actingRole,
-      actingUserId: input.userId,
-      clerkOrgId: input.clerkOrgId,
-      filters: {
-        dateFrom: since,
-        dateTo: new Date(),
-      },
-      organisationId: input.organisationId,
-      pagination: { pageSize: 200 },
-    }),
-    getXeroConnectionStateForScope({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    }),
-  ]);
-  const xeroConnectionState = xeroStateResult.ok
-    ? xeroStateResult.value.state
-    : "unavailable";
-  if (!(summaryResult.ok && runsResult.ok)) {
-    return {
-      error: {
-        code: "unknown_error",
-        message: firstErrorMessage(summaryResult, runsResult),
-      },
-      ok: false,
-    };
-  }
-  const lastSuccessfulSync =
-    summaryResult.value
-      .flatMap((summary) => [
-        summary.lastApprovalReconciliation,
-        summary.lastLeaveBalancesSync,
-        summary.lastLeaveRecordsSync,
-        summary.lastPeopleSync,
-      ])
-      .filter((value): value is Date => value instanceof Date)
-      .sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
-  return {
-    ok: true,
-    value: {
-      activeTenantCount: summaryResult.value.filter(
-        (summary) => summary.connectionStatus === "active"
-      ).length,
-      ctaUrl: "/sync",
-      failedRunsLast24h: runsResult.value.runs.filter(
-        (run) => run.status === "failed" || run.status === "partial_success"
-      ).length,
-      lastSuccessfulSync,
-      pendingFailedRecords: summaryResult.value.reduce(
-        (total, summary) => total + summary.pendingFailedRecords,
-        0
-      ),
-      runsLast24h: runsResult.value.runs.length,
-      tenantCount: summaryResult.value.length,
-      xeroConnectionState,
-    },
-  };
-}
-interface DashboardTeamTodayPerson {
-  currentStatus: CurrentStatus;
-  firstName: string;
-  id: string;
-  lastName: string;
-  xeroSyncFailedCount: number;
-}
-// Loads the minimal person projection for the manager-dashboard team-today
-// and attention-list cards, scoped to an already-resolved set of visible
-// person ids. This intentionally bypasses `listPeople`/`listAllPeople`: it
-// issues one person read, one grouped Xero-failure read and one batch
-// current-status calculation regardless of how many people are in scope,
-// instead of paging through the full visible population.
-async function loadTeamTodayPeople(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  scopePersonIds: string[];
-}): Promise<
-  Result<
-    {
-      people: DashboardTeamTodayPerson[];
-    },
-    DashboardServiceError
-  >
-> {
-  if (input.scopePersonIds.length === 0) {
-    return { ok: true, value: { people: [] } };
-  }
-  try {
-    const scoped = scopedQuery(
-      input.clerkOrgId as ClerkOrgId,
-      input.organisationId as OrganisationId
-    );
-    const [people, failedCounts] = await Promise.all([
-      database.person.findMany({
-        orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
-        select: {
-          first_name: true,
-          id: true,
-          last_name: true,
-          location_id: true,
-        },
-        where: {
-          ...scoped,
-          archived_at: null,
-          id: { in: input.scopePersonIds },
-        },
-      }),
-      database.availabilityRecord.groupBy({
-        _count: { _all: true },
-        by: ["person_id"],
-        where: {
-          ...scoped,
-          approval_status: "xero_sync_failed",
-          person_id: { in: input.scopePersonIds },
-        },
-      }),
-    ]);
-    const failedCountByPersonId = new Map(
-      failedCounts.map((row) => [row.person_id, row._count._all])
-    );
-    const currentStatusesByPersonId = await computeCurrentStatusForPeople({
-      at: new Date(),
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-      people: people.map((person) => ({
-        locationId: person.location_id,
-        personId: person.id,
-      })),
-    });
-    return {
-      ok: true,
-      value: {
-        people: people.map((person) => {
-          const currentStatus = currentStatusesByPersonId.get(person.id);
-          if (!currentStatus) {
-            throw new Error("Current status missing for dashboard person");
-          }
-          return {
-            currentStatus,
-            firstName: person.first_name,
-            id: person.id,
-            lastName: person.last_name,
-            xeroSyncFailedCount: failedCountByPersonId.get(person.id) ?? 0,
-          };
-        }),
-      },
-    };
-  } catch {
-    return unknownError("Failed to load team availability.");
-  }
-}
-function buildApprovalQueueCard(records: ApprovalListItem[]) {
-  return {
-    ctaUrl: "/leave-approvals?status=submitted",
-    failedCount: records.filter(
-      (record) =>
-        record.approvalStatus === "xero_sync_failed" &&
-        (record.failedAction === "approve" || record.failedAction === "decline")
-    ).length,
-    mostRecent: records
-      .filter((record) => record.approvalStatus === "submitted")
-      .sort(byDateDescending((record) => record.submittedAt))
-      .slice(0, 3)
-      .map((record) => ({
-        endsAt: record.endsAt,
-        personFirstName: record.person.firstName,
-        personLastName: record.person.lastName,
-        recordId: record.id,
-        recordType: record.recordType,
-        startsAt: record.startsAt,
-        submittedAt: record.submittedAt,
-      })),
-    pendingCount: records.filter(
-      (record) => record.approvalStatus === "submitted"
-    ).length,
-  };
-}
-function buildTeamTodayCard(people: DashboardTeamTodayPerson[]) {
-  let peopleOnLeaveCount = 0;
-  let peopleWorkingFromHomeCount = 0;
-  let peopleTravellingCount = 0;
-  let peopleOtherOooCount = 0;
-  let peopleAvailableCount = 0;
-  let peopleWithXeroSyncFailedCount = 0;
-  const peopleNeedingAttention: Array<{
-    approvalStatus: availability_approval_status | null;
-    contactabilityStatus: availability_contactability | null;
-    endsAt: Date | null;
-    personFirstName: string;
-    personId: string;
-    personLastName: string;
-    recordType: availability_record_type | null;
-    startsAt: Date | null;
-    statusKey: PersonListItem["currentStatus"]["statusKey"];
-    statusLabel: string;
-    xeroSyncFailedCount: number;
-  }> = [];
-  for (const person of people) {
-    if (person.xeroSyncFailedCount > 0) {
-      peopleWithXeroSyncFailedCount += 1;
-    }
-    switch (person.currentStatus.statusKey) {
-      case "available":
-        peopleAvailableCount += 1;
-        break;
-      case "on_leave":
-        peopleOnLeaveCount += 1;
-        break;
-      case "travelling":
-        peopleTravellingCount += 1;
-        break;
-      case "wfh":
-        peopleWorkingFromHomeCount += 1;
-        break;
-      default:
-        peopleOtherOooCount += 1;
-        break;
-    }
-    if (
-      person.currentStatus.statusKey !== "available" ||
-      person.xeroSyncFailedCount > 0
-    ) {
-      peopleNeedingAttention.push({
-        approvalStatus: person.currentStatus.approvalStatus,
-        contactabilityStatus: person.currentStatus.contactabilityStatus,
-        endsAt:
-          person.currentStatus.activeRecord?.endsAt ??
-          person.currentStatus.activePublicHoliday?.date ??
-          null,
-        personFirstName: person.firstName,
-        personId: person.id,
-        personLastName: person.lastName,
-        recordType: person.currentStatus.recordType,
-        startsAt:
-          person.currentStatus.activeRecord?.startsAt ??
-          person.currentStatus.activePublicHoliday?.date ??
-          null,
-        statusKey: person.currentStatus.statusKey,
-        statusLabel:
-          person.xeroSyncFailedCount > 0
-            ? "Xero sync failed"
-            : person.currentStatus.label,
-        xeroSyncFailedCount: person.xeroSyncFailedCount,
-      });
-    }
-  }
-  return {
-    ctaUrl: "/people",
-    peopleAvailableCount,
-    peopleNeedingAttention: peopleNeedingAttention
-      .sort(
-        (first, second) =>
-          teamTodaySortWeight(first) - teamTodaySortWeight(second)
-      )
-      .slice(0, 8),
-    peopleOnLeaveCount,
-    peopleOtherOooCount,
-    peopleTravellingCount,
-    peopleWithXeroSyncFailedCount,
-    peopleWorkingFromHomeCount,
-  };
-}
-function teamTodaySortWeight(person: {
-  statusKey: PersonListItem["currentStatus"]["statusKey"];
-  xeroSyncFailedCount: number;
-}) {
-  if (person.xeroSyncFailedCount > 0) {
-    return 0;
-  }
-  if (person.statusKey === "on_leave" || person.statusKey === "pending_leave") {
-    return 1;
-  }
-  if (person.statusKey === "wfh" || person.statusKey === "travelling") {
-    return 2;
-  }
-  return 3;
-}
-function buildTeamThisWeekCard(input: CalendarRangeData) {
-  const peopleWithLeave = new Set<string>();
-  const upcomingRecords = new Map<
-    string,
-    {
-      endsAt: Date;
-      personFirstName: string;
-      personLastName: string;
-      recordId: string;
-      recordType: availability_record_type;
-      startsAt: Date;
-    }
-  >();
-  const peopleById = new Map(
-    input.people.map((person) => [
-      person.id,
-      { firstName: person.firstName, lastName: person.lastName },
-    ])
-  );
-  const rangeStart = input.range.start;
-  const rangeEnd = input.range.end;
-  for (const day of input.days) {
-    for (const event of day.events) {
-      if (
-        !(
-          event.approvalStatus === "approved" &&
-          event.recordType !== "private" &&
-          isXeroLeaveType(event.recordType)
-        )
-      ) {
-        continue;
-      }
-      peopleWithLeave.add(event.personId);
-      if (event.startsAt >= rangeStart && event.startsAt <= rangeEnd) {
-        const person = peopleById.get(event.personId);
-        if (!person) {
-          continue;
-        }
-        upcomingRecords.set(event.id, {
-          endsAt: event.endsAt,
-          personFirstName: person.firstName,
-          personLastName: person.lastName,
-          recordId: event.id,
-          recordType: event.recordType,
-          startsAt: event.startsAt,
-        });
-      }
-    }
-  }
-  return {
-    ctaUrl: "/calendar?scopeType=my_team&view=week",
-    peopleWithLeaveCount: peopleWithLeave.size,
-    upcomingRecords: [...upcomingRecords.values()]
-      .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime())
-      .slice(0, 10),
-  };
-}
-function buildUpcomingPeaksCard(input: CalendarRangeData) {
-  const peaks: Array<{
-    date: Date;
-    peopleAwayCount: number;
-    percentage: number;
-    recordTypes: availability_record_type[];
-    totalPeopleInScope: number;
-  }> = [];
-  for (const day of input.days) {
-    const awayEvents = dedupeEventsByPerson(
-      day.events.filter((event) => isAwayEvent(event))
-    );
-    if (input.totalPeopleInScope === 0) {
-      continue;
-    }
-    const percentage = (awayEvents.length / input.totalPeopleInScope) * 100;
-    if (percentage <= PEAK_AWAY_THRESHOLD_PERCENT) {
-      continue;
-    }
-    peaks.push({
-      date: day.date,
-      peopleAwayCount: awayEvents.length,
-      percentage,
-      recordTypes: uniqueRecordTypes(awayEvents),
-      totalPeopleInScope: input.totalPeopleInScope,
-    });
-  }
-  return {
-    ctaUrl: "/calendar?scopeType=my_team&view=month",
-    peaks,
-    totalPeaksCount: peaks.length,
-  };
-}
-function buildTeamXeroSyncFailedCard(records: ApprovalListItem[]) {
-  const failed = records.filter(
-    (record) => record.approvalStatus === "xero_sync_failed"
-  );
-  return {
-    count: failed.length,
-    ctaUrl: "/people?xeroSyncFailedOnly=true",
-    recentRecords: failed
-      .sort(byDateDescending((record) => record.createdAt))
-      .slice(0, 5)
-      .map((record) => ({
-        failedAction: record.failedAction,
-        personFirstName: record.person.firstName,
-        personLastName: record.person.lastName,
-        recordId: record.id,
-        recordType: record.recordType,
-        xeroWriteError: record.xeroWriteError,
-      })),
-  };
-}
-function buildOrgPendingApprovalsCard(records: ApprovalListItem[]) {
-  const submitted = records.filter(
-    (record) => record.approvalStatus === "submitted"
-  );
-  const oldestSubmittedAt =
-    submitted
-      .map((record) => record.submittedAt)
-      .filter((value): value is Date => value instanceof Date)
-      .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
-  return {
-    count: submitted.length,
-    ctaUrl: "/leave-approvals?status=submitted",
-    oldestAgeDays: oldestSubmittedAt
-      ? dayDiff(startOfDay(new Date()), startOfDay(oldestSubmittedAt))
-      : null,
-  };
-}
-function buildOrgWideXeroSyncFailedCard(records: ApprovalListItem[]) {
-  const failed = records.filter(
-    (record) => record.approvalStatus === "xero_sync_failed"
-  );
-  return {
-    byFailedAction: {
-      approve: failed.filter((record) => record.failedAction === "approve")
-        .length,
-      decline: failed.filter((record) => record.failedAction === "decline")
-        .length,
-      submit: failed.filter((record) => record.failedAction === "submit")
-        .length,
-      withdraw: failed.filter((record) => record.failedAction === "withdraw")
-        .length,
-    },
-    count: failed.length,
-    ctaUrl: "/people?xeroSyncFailedOnly=true",
-  };
 }
 function approvalRole(role: DashboardRole): ApprovalRole {
   if (role === "owner") {
@@ -1488,36 +835,9 @@ function personNotFound(): Result<never, DashboardServiceError> {
 function unknownError(message: string): Result<never, DashboardServiceError> {
   return { error: { code: "unknown_error", message }, ok: false };
 }
-function cacheKey(scope: string, input: z.infer<typeof ViewSchema>) {
-  return `${scope}:${input.clerkOrgId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}`;
-}
-function firstErrorMessage(
-  ...results: Array<
-    | {
-        error: {
-          message: string;
-        };
-        ok: false;
-      }
-    | {
-        ok: true;
-      }
-  >
-) {
-  return (
-    results.find((result) => !result.ok)?.error.message ??
-    "Unable to load this dashboard section."
-  );
-}
-function byDateDescending<TValue>(selector: (value: TValue) => Date | null) {
-  return (left: TValue, right: TValue) =>
-    (selector(right)?.getTime() ?? 0) - (selector(left)?.getTime() ?? 0);
-}
-function uniqueRecordTypes(events: CalendarEvent[]) {
-  return [...new Set(events.map((event) => event.recordType))].filter(
-    (recordType): recordType is availability_record_type =>
-      recordType !== "private"
-  );
+function cacheKey(scope: string, input: ViewInput) {
+  const week = input.weekAnchor ? toDateOnly(input.weekAnchor) : "current";
+  return `${scope}:${input.clerkOrgId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}:${week}`;
 }
 function unwrapApprovalItems(
   value:

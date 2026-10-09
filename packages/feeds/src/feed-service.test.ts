@@ -38,12 +38,9 @@ vi.mock("@repo/database", () => ({
   scopedTo: mocks.scopedTo,
 }));
 
-const {
-  createSignedFeedToken,
-  getFeedDetail,
-  getFeedSummaryForDashboard,
-  listFeeds,
-} = await import("../index");
+const { createSignedFeedToken, getFeedDetail, listFeeds } = await import(
+  "../index"
+);
 
 const baseInput = {
   actingRole: "owner" as const,
@@ -54,50 +51,6 @@ const baseInput = {
 const actingPersonId = "00000000-0000-4000-8000-000000000002";
 const teamId = "00000000-0000-4000-8000-000000000003";
 const scopedPersonId = "00000000-0000-4000-8000-000000000004";
-
-describe("feed-service dashboard summary", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.feedFindMany.mockResolvedValue([
-      {
-        id: "feed_1",
-        last_rendered_at: new Date("2026-04-18T09:00:00.000Z"),
-      },
-      {
-        id: "feed_2",
-        last_rendered_at: new Date("2026-04-17T09:00:00.000Z"),
-      },
-    ]);
-    mocks.feedCount.mockResolvedValue(3);
-  });
-
-  it("returns exact active and paused counts with latest render time", async () => {
-    const result = await getFeedSummaryForDashboard(baseInput);
-
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        activeCount: 2,
-        pausedCount: 3,
-      },
-    });
-    expect(result.ok && result.value.lastRenderedAt).toEqual(
-      new Date("2026-04-18T09:00:00.000Z")
-    );
-  });
-
-  it("rejects non-admin callers", async () => {
-    const result = await getFeedSummaryForDashboard({
-      ...baseInput,
-      actingRole: "viewer",
-    });
-
-    expect(result).toMatchObject({
-      error: { code: "not_authorised" },
-      ok: false,
-    });
-  });
-});
 
 describe("feed-service getFeedDetail cross-tenant behavior", () => {
   beforeEach(() => {

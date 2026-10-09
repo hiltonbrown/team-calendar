@@ -90,6 +90,10 @@ export {
 } from "./src/dashboard/dashboard-cache";
 export {
   type AdminDashboardView,
+  type DashboardApprovalQueue,
+  type DashboardApprovalRow,
+  type DashboardInfoRequest,
+  type DashboardMyRequest,
   type DashboardRole,
   type DashboardSection,
   type DashboardServiceError,
@@ -208,9 +212,7 @@ export {
 export {
   type BillingServiceError,
   type BillingSummary,
-  type DashboardBillingSummary,
   getBillingSummary,
-  getBillingSummaryForDashboard,
 } from "./src/settings/billing-service";
 export {
   defaultOrganisationSettingsPatch,

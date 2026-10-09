@@ -1,48 +1,40 @@
+import { addDaysToDateKey, zonedStartOfDay } from "@repo/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  CalendarDay,
+  CalendarEvent,
+  CalendarPerson,
+  CalendarRange,
+} from "../calendar/calendar-service";
+import type { CoverageMap } from "../team-coverage/coverage-map";
 
 const mocks = vi.hoisted(() => ({
-  availabilityRecordGroupBy: vi.fn(),
-  computeCurrentStatusForPeople: vi.fn(),
-  getBillingSummaryForDashboard: vi.fn(),
+  computeWorkingDaysFromReferenceData: vi.fn(),
   getCalendarRange: vi.fn(),
-  getFeedSummaryForDashboard: vi.fn(),
   getPersonProfile: vi.fn(),
   getSettings: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
-  listEvents: vi.fn(),
   listForApprover: vi.fn(),
   listForUser: vi.fn(),
   listMyRecords: vi.fn(),
   listPeople: vi.fn(),
-  listRuns: vi.fn(),
-  listTenantSummaries: vi.fn(),
-  listUpcomingRecords: vi.fn(),
+  loadManagerCoverage: vi.fn(),
+  loadWorkingDaysReferenceData: vi.fn(),
   managerScopePersonIds: vi.fn(),
   organisationFindFirst: vi.fn(),
   personCount: vi.fn(),
   personFindFirst: vi.fn(),
-  personFindMany: vi.fn(),
   resolvePublicHolidays: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
-    organisation_id: organisationId,
-  })),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
-    availabilityRecord: { groupBy: mocks.availabilityRecordGroupBy },
     organisation: { findFirst: mocks.organisationFindFirst },
     person: {
       count: mocks.personCount,
       findFirst: mocks.personFindFirst,
-      findMany: mocks.personFindMany,
     },
   },
-  scopedQuery: mocks.scopedQuery,
-}));
-vi.mock("@repo/feeds", () => ({
-  getFeedSummaryForDashboard: mocks.getFeedSummaryForDashboard,
 }));
 vi.mock("@repo/notifications", () => ({
   listForUser: mocks.listForUser,
@@ -53,25 +45,20 @@ vi.mock("../approvals/approval-service", () => ({
 vi.mock("../calendar/calendar-service", () => ({
   getCalendarRange: mocks.getCalendarRange,
 }));
+vi.mock("../duration/working-days", () => ({
+  computeWorkingDaysFromReferenceData:
+    mocks.computeWorkingDaysFromReferenceData,
+  loadWorkingDaysReferenceData: mocks.loadWorkingDaysReferenceData,
+}));
 vi.mock("../holidays/resolve-public-holidays", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
-}));
-vi.mock("../people/current-status", () => ({
-  computeCurrentStatusForPeople: mocks.computeCurrentStatusForPeople,
 }));
 vi.mock("../people/people-service", () => ({
   getPersonProfile: mocks.getPersonProfile,
   listPeople: mocks.listPeople,
-  listUpcomingRecords: mocks.listUpcomingRecords,
 }));
 vi.mock("../plans/plan-service", () => ({
   listMyRecords: mocks.listMyRecords,
-}));
-vi.mock("../settings/audit-log-service", () => ({
-  listEvents: mocks.listEvents,
-}));
-vi.mock("../settings/billing-service", () => ({
-  getBillingSummaryForDashboard: mocks.getBillingSummaryForDashboard,
 }));
 vi.mock("../settings/manager-scope", () => ({
   managerScopePersonIds: mocks.managerScopePersonIds,
@@ -79,38 +66,180 @@ vi.mock("../settings/manager-scope", () => ({
 vi.mock("../settings/organisation-settings-service", () => ({
   getSettings: mocks.getSettings,
 }));
-vi.mock("../sync/sync-monitor-service", () => ({
-  listRuns: mocks.listRuns,
-  listTenantSummaries: mocks.listTenantSummaries,
+vi.mock("../team-coverage/load-manager-coverage", () => ({
+  loadManagerCoverage: mocks.loadManagerCoverage,
 }));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
+const { createDashboardCache } = await import("./dashboard-cache");
 const { getAdminView, getEmployeeView, getManagerView, resolveDashboardRole } =
   await import("./dashboard-service");
+
+const TIMEZONE = "Australia/Brisbane";
+const WEEK_START = "2026-10-05";
+const NOW = new Date("2026-10-09T02:00:00.000Z");
+const ids = {
+  peer: "00000000-0000-4000-8000-000000000012",
+  quiet: "00000000-0000-4000-8000-000000000013",
+  self: "00000000-0000-4000-8000-000000000011",
+};
 const baseInput = {
   actingRole: "employee" as const,
   clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
-  personId: "00000000-0000-4000-8000-000000000011",
+  personId: ids.self,
   userId: "user_1",
 };
+
+function buildPerson(overrides: Partial<CalendarPerson> = {}): CalendarPerson {
+  return {
+    avatarUrl: null,
+    displayName: "Ava Nguyen",
+    firstName: "Ava",
+    id: ids.self,
+    jobTitle: "Support officer",
+    lastName: "Nguyen",
+    locationName: "Brisbane",
+    locationTimezone: TIMEZONE,
+    personType: "employee",
+    teamId: "team_1",
+    teamName: "Operations",
+    xeroSyncFailedCountInRange: 0,
+    ...overrides,
+  };
+}
+
+function buildEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+  return {
+    allDay: true,
+    approvalStatus: "approved",
+    avatarUrl: null,
+    contactabilityStatus: null,
+    displayName: "Ava Nguyen",
+    endsAt: zonedStartOfDay("2026-10-07", TIMEZONE),
+    id: "event_1",
+    isEditableByActor: false,
+    notesInternal: null,
+    personId: ids.self,
+    privacyMode: "named",
+    recordType: "annual_leave",
+    recordTypeCategory: "xero_leave",
+    renderTreatment: "solid",
+    sourceType: "xero_leave",
+    startsAt: zonedStartOfDay("2026-10-06", TIMEZONE),
+    xeroWriteError: null,
+    ...overrides,
+  };
+}
+
+function buildWeekRange(
+  input: { events?: CalendarEvent[]; people?: CalendarPerson[] } = {}
+): CalendarRange {
+  const events = input.events ?? [buildEvent()];
+  const people = input.people ?? [buildPerson()];
+  const days: CalendarDay[] = Array.from({ length: 7 }, (_, index) => {
+    const dateKey = addDaysToDateKey(WEEK_START, index);
+    const start = zonedStartOfDay(dateKey, TIMEZONE);
+    const end = zonedStartOfDay(addDaysToDateKey(dateKey, 1), TIMEZONE);
+    return {
+      date: new Date(`${dateKey}T00:00:00.000Z`),
+      dayOfWeek: index === 6 ? 0 : 1,
+      events: events.filter(
+        (event) => event.startsAt < end && event.endsAt > start
+      ),
+      isToday: index === 4,
+      publicHolidays: [],
+    };
+  });
+  return {
+    days,
+    people,
+    range: {
+      end: zonedStartOfDay(addDaysToDateKey(WEEK_START, 7), TIMEZONE),
+      start: zonedStartOfDay(WEEK_START, TIMEZONE),
+      timezone: TIMEZONE,
+    },
+    totalPeopleInScope: people.length,
+    truncated: false,
+    view: "week",
+    xeroConnectionState: "connected",
+    xeroSyncFailedCount: 0,
+  };
+}
+
+function buildMyRecord(
+  overrides: Partial<{
+    approvalStatus: string;
+    editableActions: string[];
+    endsAt: Date;
+    id: string;
+    recordType: string;
+    sourceType: string;
+    startsAt: Date;
+  }> = {}
+) {
+  return {
+    allDay: true,
+    approvalStatus: "submitted",
+    editableActions: ["view", "withdraw"],
+    endsAt: new Date("2026-10-13T23:59:59.999Z"),
+    id: "record_1",
+    person: { locationId: "location_1" },
+    recordType: "annual_leave",
+    sourceType: "team_calendar_leave",
+    startsAt: new Date("2026-10-12T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+function buildApprovalItem(
+  overrides: Partial<{
+    createdAt: Date;
+    id: string;
+    submittedAt: Date | null;
+  }> = {}
+) {
+  return {
+    approvalStatus: "submitted",
+    createdAt: new Date("2026-10-01T08:00:00.000Z"),
+    durationWorkingDays: 2,
+    endsAt: new Date("2026-10-20T23:59:59.999Z"),
+    failedAction: null,
+    id: "approval_1",
+    person: { firstName: "Luca", lastName: "Brown" },
+    recordType: "annual_leave",
+    sourceType: "team_calendar_leave",
+    startsAt: new Date("2026-10-19T00:00:00.000Z"),
+    submittedAt: new Date("2026-10-01T08:00:00.000Z"),
+    xeroWriteError: null,
+    ...overrides,
+  };
+}
+
+const coverageMap: CoverageMap = {
+  days: [],
+  firstIssue: null,
+  rows: [],
+};
+
+function calendarCalls() {
+  return mocks.getCalendarRange.mock.calls.map(([call]) => call);
+}
+
 describe("dashboard-service", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-20T00:00:00.000Z"));
+    vi.setSystemTime(NOW);
     vi.clearAllMocks();
     mocks.personFindFirst.mockResolvedValue({ id: baseInput.personId });
     mocks.personCount.mockResolvedValue(0);
-    mocks.organisationFindFirst.mockResolvedValue({
-      country_code: "AU",
-      name: "Acme Org",
-    });
+    mocks.organisationFindFirst.mockResolvedValue({ name: "Acme Org" });
     mocks.getPersonProfile.mockResolvedValue({
       ok: true,
       value: {
         balances: {
-          balancesLastFetchedAt: new Date("2026-04-18T09:00:00.000Z"),
+          balancesLastFetchedAt: new Date("2026-10-08T09:00:00.000Z"),
           rows: [
             {
               balanceUnits: 12,
@@ -122,23 +251,6 @@ describe("dashboard-service", () => {
           ],
           xeroLinked: true,
         },
-        currentStatus: {
-          activePublicHoliday: null,
-          activeRecord: {
-            approvalStatus: "approved",
-            endsAt: new Date("2026-04-19T23:59:59.999Z"),
-            id: "record_active",
-            recordType: "annual_leave",
-            sourceType: "team_calendar_leave",
-            startsAt: new Date("2026-04-19T00:00:00.000Z"),
-            title: null,
-          },
-          approvalStatus: "approved",
-          contactabilityStatus: "contactable",
-          label: "Annual leave",
-          recordType: "annual_leave",
-          statusKey: "annual_leave",
-        },
         header: {
           firstName: "Ava",
           lastName: "Nguyen",
@@ -147,10 +259,7 @@ describe("dashboard-service", () => {
             id: "location_1",
             name: "Brisbane",
             regionCode: "QLD",
-            timezone: "Australia/Brisbane",
-          },
-          team: {
-            id: "team_1",
+            timezone: TIMEZONE,
           },
         },
       },
@@ -159,67 +268,18 @@ describe("dashboard-service", () => {
       ok: true,
       value: { state: "connected" },
     });
-    mocks.listMyRecords.mockImplementation(({ filters }) => {
-      if (filters.approvalStatus?.includes("xero_sync_failed")) {
-        return {
-          ok: true,
-          value: [
-            {
-              approvedAt: null,
-              endsAt: new Date("2026-04-21T23:59:59.999Z"),
-              failedAction: "submit",
-              id: "record_failed",
-              recordType: "annual_leave",
-              startsAt: new Date("2026-04-20T00:00:00.000Z"),
-              xeroWriteError: "Balance mismatch",
-            },
-          ],
-        };
-      }
-      if (filters.approvalStatus?.includes("declined")) {
-        return {
-          ok: true,
-          value: [
-            {
-              approvalNote: "Need more notice",
-              approvedAt: new Date("2026-04-18T09:00:00.000Z"),
-              endsAt: new Date("2026-04-25T23:59:59.999Z"),
-              id: "record_declined",
-              recordType: "annual_leave",
-              startsAt: new Date("2026-04-24T00:00:00.000Z"),
-            },
-          ],
-        };
-      }
-      return {
-        ok: true,
-        value: [
-          {
-            allDay: true,
-            approvalStatus: "draft",
-            endsAt: new Date("2026-04-28T23:59:59.999Z"),
-            id: "record_upcoming",
-            recordType: "wfh",
-            startsAt: new Date("2026-04-28T00:00:00.000Z"),
-          },
-        ],
-      };
-    });
-    mocks.listUpcomingRecords.mockResolvedValue({
+    mocks.listMyRecords.mockResolvedValue({
       ok: true,
-      value: {
-        records: [
-          {
-            allDay: true,
-            approvalStatus: "approved",
-            endsAt: new Date("2026-04-29T23:59:59.999Z"),
-            id: "record_xero",
-            recordType: "annual_leave",
-            sourceType: "xero_leave",
-            startsAt: new Date("2026-04-29T00:00:00.000Z"),
-          },
-        ],
-      },
+      value: [buildMyRecord()],
+    });
+    mocks.loadWorkingDaysReferenceData.mockResolvedValue({
+      holidaysByYear: new Map(),
+      locationById: new Map(),
+      organisation: null,
+    });
+    mocks.computeWorkingDaysFromReferenceData.mockReturnValue({
+      ok: true,
+      value: 2,
     });
     mocks.listForUser.mockResolvedValue({
       ok: true,
@@ -228,7 +288,7 @@ describe("dashboard-service", () => {
           {
             actionUrl: "/notifications/1",
             body: "Please add more detail",
-            createdAt: new Date("2026-04-19T09:00:00.000Z"),
+            createdAt: new Date("2026-10-08T09:00:00.000Z"),
             id: "notification_1",
             title: "More information requested",
             type: "leave_info_requested",
@@ -236,289 +296,36 @@ describe("dashboard-service", () => {
         ],
       },
     });
-    mocks.resolvePublicHolidays.mockResolvedValue({
-      ok: true,
-      value: [resolvedHoliday({ date: "2026-04-25", name: "ANZAC Day" })],
-    });
+    mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: [] });
     mocks.getSettings.mockResolvedValue({
       ok: true,
-      value: {
-        managerVisibilityScope: "direct_reports_only",
-      },
+      value: { managerVisibilityScope: "direct_reports_only" },
     });
     mocks.managerScopePersonIds.mockResolvedValue([
       baseInput.personId,
-      "00000000-0000-4000-8000-000000000012",
+      ids.peer,
     ]);
-    mocks.personFindMany.mockResolvedValue([
-      {
-        first_name: "Ari",
-        id: "00000000-0000-4000-8000-000000000012",
-        last_name: "Report",
-        location_id: null,
-      },
-      {
-        first_name: "Sam",
-        id: "00000000-0000-4000-8000-000000000013",
-        last_name: "Home",
-        location_id: null,
-      },
-      {
-        first_name: "Lee",
-        id: "00000000-0000-4000-8000-000000000014",
-        last_name: "Ready",
-        location_id: null,
-      },
-    ]);
-    mocks.availabilityRecordGroupBy.mockResolvedValue([
-      {
-        _count: { _all: 1 },
-        person_id: "00000000-0000-4000-8000-000000000012",
-      },
-    ]);
-    mocks.computeCurrentStatusForPeople.mockResolvedValue(
-      new Map([
-        [
-          "00000000-0000-4000-8000-000000000012",
-          {
-            activePublicHoliday: null,
-            activeRecord: {
-              endsAt: new Date("2026-04-22T23:59:59.999Z"),
-              recordType: "annual_leave",
-              startsAt: new Date("2026-04-20T00:00:00.000Z"),
-            },
-            approvalStatus: "approved",
-            contactabilityStatus: "unavailable",
-            label: "On annual leave",
-            recordType: "annual_leave",
-            statusKey: "on_leave",
-          },
-        ],
-        [
-          "00000000-0000-4000-8000-000000000013",
-          {
-            activePublicHoliday: null,
-            activeRecord: {
-              endsAt: new Date("2026-04-20T23:59:59.999Z"),
-              recordType: "wfh",
-              startsAt: new Date("2026-04-20T00:00:00.000Z"),
-            },
-            approvalStatus: "approved",
-            contactabilityStatus: "contactable",
-            label: "Working from home",
-            recordType: "wfh",
-            statusKey: "wfh",
-          },
-        ],
-        [
-          "00000000-0000-4000-8000-000000000014",
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: null,
-            contactabilityStatus: null,
-            label: "Available",
-            recordType: null,
-            statusKey: "available",
-          },
-        ],
-      ])
-    );
     mocks.listPeople.mockResolvedValue({
       ok: true,
-      value: {
-        nextCursor: null,
-        people: [
-          {
-            currentStatus: {
-              activePublicHoliday: null,
-              activeRecord: {
-                endsAt: new Date("2026-04-22T23:59:59.999Z"),
-                recordType: "annual_leave",
-                startsAt: new Date("2026-04-20T00:00:00.000Z"),
-              },
-              approvalStatus: "approved",
-              contactabilityStatus: "unavailable",
-              label: "On annual leave",
-              recordType: "annual_leave",
-              statusKey: "on_leave",
-            },
-            firstName: "Ari",
-            id: "00000000-0000-4000-8000-000000000012",
-            lastName: "Report",
-            xeroSyncFailedCount: 1,
-          },
-          {
-            currentStatus: {
-              activePublicHoliday: null,
-              activeRecord: {
-                endsAt: new Date("2026-04-20T23:59:59.999Z"),
-                recordType: "wfh",
-                startsAt: new Date("2026-04-20T00:00:00.000Z"),
-              },
-              approvalStatus: "approved",
-              contactabilityStatus: "contactable",
-              label: "Working from home",
-              recordType: "wfh",
-              statusKey: "wfh",
-            },
-            firstName: "Sam",
-            id: "00000000-0000-4000-8000-000000000013",
-            lastName: "Home",
-            xeroSyncFailedCount: 0,
-          },
-          {
-            currentStatus: {
-              activePublicHoliday: null,
-              activeRecord: null,
-              approvalStatus: null,
-              contactabilityStatus: null,
-              label: "Available",
-              recordType: null,
-              statusKey: "available",
-            },
-            firstName: "Lee",
-            id: "00000000-0000-4000-8000-000000000014",
-            lastName: "Ready",
-            xeroSyncFailedCount: 0,
-          },
-        ],
-        totalCount: 3,
-      },
+      value: { nextCursor: null, people: [], totalCount: 48 },
     });
     mocks.listForApprover.mockResolvedValue({
       ok: true,
-      value: [
-        {
-          approvalStatus: "submitted",
-          createdAt: new Date("2026-04-19T08:00:00.000Z"),
-          endsAt: new Date("2026-04-26T23:59:59.999Z"),
-          failedAction: null,
-          id: "approval_1",
-          person: { firstName: "Luca", lastName: "Brown" },
-          recordType: "annual_leave",
-          startsAt: new Date("2026-04-26T00:00:00.000Z"),
-          submittedAt: new Date("2026-04-19T08:00:00.000Z"),
-          xeroWriteError: null,
-        },
-        {
-          approvalStatus: "xero_sync_failed",
-          createdAt: new Date("2026-04-19T07:00:00.000Z"),
-          endsAt: new Date("2026-04-27T23:59:59.999Z"),
-          failedAction: "approve",
-          id: "approval_2",
-          person: { firstName: "Mia", lastName: "Stone" },
-          recordType: "annual_leave",
-          startsAt: new Date("2026-04-27T00:00:00.000Z"),
-          submittedAt: new Date("2026-04-19T07:00:00.000Z"),
-          xeroWriteError: "Balance mismatch",
-        },
-      ],
+      value: [buildApprovalItem()],
     });
     mocks.getCalendarRange.mockResolvedValue({
       ok: true,
-      value: {
-        days: [
-          {
-            date: new Date("2026-04-21T00:00:00.000Z"),
-            events: [
-              {
-                approvalStatus: "approved",
-                endsAt: new Date("2026-04-21T23:59:59.999Z"),
-                id: "event_1",
-                person: { firstName: "Luca", lastName: "Brown" },
-                personId: "00000000-0000-4000-8000-000000000012",
-                recordType: "annual_leave",
-                renderTreatment: "solid",
-                startsAt: new Date("2026-04-21T00:00:00.000Z"),
-              },
-            ],
-          },
-        ],
-        people: [
-          {
-            firstName: "Luca",
-            id: "00000000-0000-4000-8000-000000000012",
-            lastName: "Brown",
-          },
-        ],
-        range: {
-          end: new Date("2026-04-27T23:59:59.999Z"),
-          start: new Date("2026-04-21T00:00:00.000Z"),
-        },
-        totalPeopleInScope: 3,
-      },
+      value: buildWeekRange(),
     });
-    mocks.listTenantSummaries.mockResolvedValue({
+    mocks.loadManagerCoverage.mockResolvedValue({
       ok: true,
-      value: [
-        {
-          connectionStatus: "active",
-          lastApprovalReconciliation: new Date("2026-04-19T08:30:00.000Z"),
-          lastLeaveBalancesSync: null,
-          lastLeaveRecordsSync: null,
-          lastPeopleSync: null,
-          pendingFailedRecords: 2,
-        },
-      ],
-    });
-    mocks.listRuns.mockResolvedValue({
-      ok: true,
-      value: {
-        runs: [{ status: "completed" }, { status: "failed" }],
-      },
-    });
-    mocks.getFeedSummaryForDashboard.mockResolvedValue({
-      ok: true,
-      value: {
-        activeCount: 2,
-        lastRenderedAt: new Date("2026-04-19T08:00:00.000Z"),
-        pausedCount: 1,
-      },
-    });
-    mocks.getBillingSummaryForDashboard.mockResolvedValue({
-      ok: true,
-      value: {
-        hasContactFlow: false,
-        hasUpgradeFlow: false,
-        isOverLimit: false,
-        plan: {
-          currentPeriodEnd: null,
-          key: "pro",
-          label: "Pro",
-          seatsPurchased: 10,
-          status: "active",
-        },
-        usage: [
-          {
-            currentValue: 12,
-            label: "People",
-            limit: 500,
-            metricKey: "people_count",
-            unit: "people",
-          },
-        ],
-        visibleToAdmin: false,
-      },
-    });
-    mocks.listEvents.mockResolvedValue({
-      ok: true,
-      value: {
-        events: [
-          {
-            action: "availability_records.submitted",
-            actorDisplay: "Ava Nguyen",
-            createdAt: new Date("2026-04-19T08:45:00.000Z"),
-            entityType: "availability_record",
-            id: "audit_1",
-          },
-        ],
-      },
+      value: coverageMap,
     });
   });
   afterEach(() => {
     vi.useRealTimers();
   });
+
   it.each([
     ["org:owner", 3, "owner"],
     ["org:admin", 3, "admin"],
@@ -541,462 +348,481 @@ describe("dashboard-service", () => {
       expect(result).toEqual({ ok: true, value: expectedRole });
     }
   );
-  it("preserves unavailable in the employee DTO rather than reporting disconnected", async () => {
-    mocks.getXeroConnectionStateForScope.mockResolvedValue({
-      error: { code: "state_unavailable" },
-      ok: false,
-    });
-    const result = await getEmployeeView(baseInput);
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.header.xeroConnectionState).toBe("unavailable");
-    if (result.value.balances.status === "ready") {
-      expect(result.value.balances.data.xeroConnectionState).toBe(
-        "unavailable"
-      );
-    }
-  });
-  it("builds the employee view and degrades balances when Xero is disconnected", async () => {
-    mocks.getXeroConnectionStateForScope.mockResolvedValue({
-      ok: true,
-      value: { state: "not_connected" },
-    });
-    const result = await getEmployeeView(baseInput);
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.header).toMatchObject({
-      firstName: "Ava",
-      roleLabel: "Employee",
-      xeroConnectionState: "not_connected",
-    });
-    expect(result.value.actionItems).toMatchObject({
-      data: {
-        xeroSyncFailedRecords: [
-          expect.objectContaining({
-            failedAction: "submit",
-            recordId: "record_failed",
-          }),
-        ],
-      },
-      status: "ready",
-    });
-    expect(result.value.upcoming).toMatchObject({
-      data: {
-        next14Days: expect.arrayContaining([
-          expect.objectContaining({ recordId: "record_failed" }),
-          expect.objectContaining({ recordId: "record_xero" }),
-        ]),
-      },
-      status: "ready",
-    });
-    expect(result.value.publicHolidays).toMatchObject({
-      data: {
-        next: expect.objectContaining({ name: "ANZAC Day" }),
-      },
-      status: "ready",
-    });
-    expect(mocks.getPersonProfile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        clerkOrgId: baseInput.clerkOrgId,
-        organisationId: baseInput.organisationId,
-      })
-    );
-  });
-  it("builds the manager view with team sections and all-team scope label", async () => {
-    mocks.getSettings.mockResolvedValue({
-      ok: true,
-      value: {
-        managerVisibilityScope: "all_team_leave",
-      },
-    });
-    const result = await getManagerView({
-      ...baseInput,
-      actingRole: "manager",
-    });
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.header).toMatchObject({
-      roleLabel: "Manager",
-      scopeLabel: "1 team members (direct + indirect)",
-    });
-    expect(result.value.approvalQueue).toMatchObject({
-      data: {
-        failedCount: 1,
-        pendingCount: 1,
-      },
-      status: "ready",
-    });
-    expect(result.value.teamToday).toMatchObject({
-      data: {
-        peopleAvailableCount: 1,
-        peopleNeedingAttention: [
-          expect.objectContaining({
-            personFirstName: "Ari",
-            statusLabel: "Xero sync failed",
-          }),
-          expect.objectContaining({
-            personFirstName: "Sam",
-            statusLabel: "Working from home",
-          }),
-        ],
-        peopleOnLeaveCount: 1,
-        peopleWorkingFromHomeCount: 1,
-      },
-      status: "ready",
-    });
-  });
-  it("builds the manager view with a direct-reports-only scope label and reuses the resolved scope for the team query", async () => {
-    mocks.personCount.mockResolvedValue(1);
-    const result = await getManagerView({
-      ...baseInput,
-      actingRole: "manager",
-    });
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.header).toMatchObject({
-      directReportCount: 1,
-      roleLabel: "Manager",
-      scopeLabel: "1 direct reports",
-    });
-    expect(mocks.managerScopePersonIds).toHaveBeenCalledTimes(1);
-    expect(mocks.listPeople).not.toHaveBeenCalled();
-    expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
-    expect(mocks.personFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: {
-            in: [baseInput.personId, "00000000-0000-4000-8000-000000000012"],
+
+  describe("employee view", () => {
+    it("loads a self-only timeline for the requested week", async () => {
+      const weekAnchor = new Date("2026-10-12T00:00:00.000Z");
+      const result = await getEmployeeView({ ...baseInput, weekAnchor });
+      expect(calendarCalls()).toEqual([
+        {
+          actingPersonId: ids.self,
+          actingUserId: baseInput.userId,
+          anchorDate: weekAnchor,
+          clerkOrgId: baseInput.clerkOrgId,
+          filters: {
+            approvalStatus: ["approved"],
+            includeDrafts: false,
+            recordTypeCategory: "all",
           },
-        }),
-      })
-    );
-  });
-  it("computes every current-status bucket and orders the attention list by severity", async () => {
-    const ids = {
-      leave: "00000000-0000-4000-8000-000000000101",
-      other: "00000000-0000-4000-8000-000000000106",
-      pending: "00000000-0000-4000-8000-000000000102",
-      syncFailedButAvailable: "00000000-0000-4000-8000-000000000107",
-      travel: "00000000-0000-4000-8000-000000000105",
-      wfh: "00000000-0000-4000-8000-000000000104",
-      whollyAvailable: "00000000-0000-4000-8000-000000000100",
-    };
-    mocks.managerScopePersonIds.mockResolvedValue([
-      baseInput.personId,
-      ...Object.values(ids),
-    ]);
-    mocks.personFindMany.mockResolvedValue([
-      {
-        first_name: "Ada",
-        id: ids.whollyAvailable,
-        last_name: "Free",
-        location_id: null,
-      },
-      {
-        first_name: "Bea",
-        id: ids.leave,
-        last_name: "Leave",
-        location_id: null,
-      },
-      {
-        first_name: "Cal",
-        id: ids.pending,
-        last_name: "Pending",
-        location_id: null,
-      },
-      {
-        first_name: "Dee",
-        id: ids.wfh,
-        last_name: "Wfh",
-        location_id: null,
-      },
-      {
-        first_name: "Eve",
-        id: ids.travel,
-        last_name: "Travel",
-        location_id: null,
-      },
-      {
-        first_name: "Fay",
-        id: ids.other,
-        last_name: "Client",
-        location_id: null,
-      },
-      {
-        first_name: "Gia",
-        id: ids.syncFailedButAvailable,
-        last_name: "Failed",
-        location_id: null,
-      },
-    ]);
-    mocks.availabilityRecordGroupBy.mockResolvedValue([
-      { _count: { _all: 2 }, person_id: ids.syncFailedButAvailable },
-    ]);
-    mocks.computeCurrentStatusForPeople.mockResolvedValue(
-      new Map([
-        [
-          ids.whollyAvailable,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: null,
-            contactabilityStatus: null,
-            label: "Available",
-            recordType: null,
-            statusKey: "available",
-          },
-        ],
-        [
-          ids.leave,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: "approved",
-            contactabilityStatus: "unavailable",
-            label: "On annual leave",
-            recordType: "annual_leave",
-            statusKey: "on_leave",
-          },
-        ],
-        [
-          ids.pending,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: "submitted",
-            contactabilityStatus: "unavailable",
-            label: "Leave pending approval",
-            recordType: "annual_leave",
-            statusKey: "pending_leave",
-          },
-        ],
-        [
-          ids.wfh,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: "approved",
-            contactabilityStatus: "contactable",
-            label: "Working from home",
-            recordType: "wfh",
-            statusKey: "wfh",
-          },
-        ],
-        [
-          ids.travel,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: "approved",
-            contactabilityStatus: "contactable",
-            label: "Travelling",
-            recordType: "travelling",
-            statusKey: "travelling",
-          },
-        ],
-        [
-          ids.other,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: "approved",
-            contactabilityStatus: "contactable",
-            label: "At client site",
-            recordType: "client_site",
-            statusKey: "client_site",
-          },
-        ],
-        [
-          ids.syncFailedButAvailable,
-          {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: null,
-            contactabilityStatus: null,
-            label: "Available",
-            recordType: null,
-            statusKey: "available",
-          },
-        ],
-      ])
-    );
-    const result = await getManagerView({
-      ...baseInput,
-      actingRole: "manager",
-    });
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.teamToday).toMatchObject({
-      data: {
-        peopleAvailableCount: 2,
-        peopleNeedingAttention: [
-          expect.objectContaining({
-            personId: ids.syncFailedButAvailable,
-            statusLabel: "Xero sync failed",
-            xeroSyncFailedCount: 2,
-          }),
-          expect.objectContaining({
-            personId: ids.leave,
-            statusLabel: "On annual leave",
-          }),
-          expect.objectContaining({
-            personId: ids.pending,
-            statusLabel: "Leave pending approval",
-          }),
-          expect.objectContaining({
-            personId: ids.wfh,
-            statusLabel: "Working from home",
-          }),
-          expect.objectContaining({
-            personId: ids.travel,
-            statusLabel: "Travelling",
-          }),
-          expect.objectContaining({
-            personId: ids.other,
-            statusLabel: "At client site",
-          }),
-        ],
-        peopleOnLeaveCount: 1,
-        peopleOtherOooCount: 2,
-        peopleTravellingCount: 1,
-        peopleWithXeroSyncFailedCount: 1,
-        peopleWorkingFromHomeCount: 1,
-      },
-      status: "ready",
-    });
-  });
-  it.each([1, 200, 201])(
-    "keeps a constant query count for %i visible people and never pages through listPeople",
-    async (scopeSize) => {
-      const ids = Array.from(
-        { length: scopeSize },
-        (_, index) =>
-          `00000000-0000-4000-9000-${String(index).padStart(12, "0")}`
-      );
-      mocks.managerScopePersonIds.mockResolvedValue([
-        baseInput.personId,
-        ...ids,
+          organisationId: baseInput.organisationId,
+          role: "viewer",
+          scope: { type: "my_self" },
+          view: "week",
+        },
       ]);
-      mocks.personFindMany.mockResolvedValue(
-        ids.map((id, index) => ({
-          first_name: `Person${index}`,
-          id,
-          last_name: "Test",
-          location_id: null,
-        }))
-      );
-      mocks.availabilityRecordGroupBy.mockResolvedValue([]);
-      mocks.computeCurrentStatusForPeople.mockResolvedValue(
-        new Map(
-          ids.map((id) => [
-            id,
-            {
-              activePublicHoliday: null,
-              activeRecord: null,
-              approvalStatus: null,
-              contactabilityStatus: null,
-              label: "Available",
-              recordType: null,
-              statusKey: "available",
-            },
-          ])
-        )
-      );
-      const result = await getManagerView({
-        ...baseInput,
-        actingRole: "manager",
-      });
       expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
+      if (!(result.ok && result.value.timeline.status === "ready")) {
+        throw new Error("Expected a ready timeline");
       }
-      expect(result.value.teamToday).toMatchObject({
-        data: { peopleAvailableCount: scopeSize },
+      expect(result.value.timeline.data.rows).toEqual([
+        expect.objectContaining({
+          entries: [
+            expect.objectContaining({ id: "event_1", provenance: "xero" }),
+          ],
+          isSelf: true,
+          personId: ids.self,
+        }),
+      ]);
+    });
+
+    it("defaults the timeline week to today", async () => {
+      await getEmployeeView(baseInput);
+      expect(calendarCalls()).toEqual([
+        expect.objectContaining({ anchorDate: NOW }),
+      ]);
+    });
+
+    it("keeps only the sections the employee dashboard renders", async () => {
+      const result = await getEmployeeView(baseInput);
+      if (!result.ok) {
+        throw new Error("Expected an employee view");
+      }
+      expect(Object.keys(result.value).sort()).toEqual([
+        "actionItems",
+        "balances",
+        "header",
+        "myRequests",
+        "publicHolidays",
+        "timeline",
+      ]);
+      expect(result.value.header).toEqual({
+        firstName: "Ava",
+        lastName: "Nguyen",
+        locationName: "Brisbane",
+        roleLabel: "Employee",
+        timezone: TIMEZONE,
+      });
+      expect(result.value.actionItems).toEqual({
+        data: {
+          infoRequestedNotifications: [
+            {
+              actionUrl: "/notifications/1",
+              body: "Please add more detail",
+              createdAt: new Date("2026-10-08T09:00:00.000Z"),
+              notificationId: "notification_1",
+              title: "More information requested",
+              type: "leave_info_requested",
+            },
+          ],
+        },
         status: "ready",
       });
-      expect(mocks.managerScopePersonIds).toHaveBeenCalledTimes(1);
-      expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
-      expect(mocks.availabilityRecordGroupBy).toHaveBeenCalledTimes(1);
-      expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledTimes(1);
-      expect(mocks.listPeople).not.toHaveBeenCalled();
-    }
-  );
-  it("builds the admin view and degrades only the billing card on failure", async () => {
-    mocks.getBillingSummaryForDashboard.mockResolvedValue({
-      error: {
-        code: "unknown_error",
-        message: "Billing unavailable",
-      },
-      ok: false,
     });
-    const result = await getAdminView({
-      ...baseInput,
-      actingRole: "admin",
+
+    it("preserves an unavailable Xero state on balances", async () => {
+      mocks.getXeroConnectionStateForScope.mockResolvedValue({
+        error: { code: "state_unavailable" },
+        ok: false,
+      });
+      const result = await getEmployeeView(baseInput);
+      expect(result.ok && result.value.balances).toMatchObject({
+        data: { xeroConnectionState: "unavailable" },
+        status: "ready",
+      });
     });
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.header).toMatchObject({
-      organisationName: "Acme Org",
-      roleLabel: "Admin",
-      totalActivePeopleCount: 3,
+
+    it("lists my requests ending today or later, soonest first, five at most", async () => {
+      mocks.listMyRecords.mockResolvedValue({
+        ok: true,
+        value: [
+          buildMyRecord({
+            approvalStatus: "approved",
+            editableActions: ["edit", "archive"],
+            id: "record_manual",
+            recordType: "wfh",
+            sourceType: "manual",
+            startsAt: new Date("2026-10-14T00:00:00.000Z"),
+          }),
+          buildMyRecord({
+            endsAt: new Date("2026-10-08T23:59:59.999Z"),
+            id: "record_ended",
+            startsAt: new Date("2026-10-08T00:00:00.000Z"),
+          }),
+          buildMyRecord({ id: "record_submitted" }),
+          buildMyRecord({
+            approvalStatus: "declined",
+            editableActions: ["view", "archive"],
+            id: "record_declined",
+            startsAt: new Date("2026-10-15T00:00:00.000Z"),
+          }),
+          buildMyRecord({
+            approvalStatus: "approved",
+            editableActions: ["view"],
+            id: "record_xero",
+            sourceType: "xero_leave",
+            startsAt: new Date("2026-10-16T00:00:00.000Z"),
+          }),
+          buildMyRecord({
+            id: "record_later_1",
+            startsAt: new Date("2026-10-20T00:00:00.000Z"),
+          }),
+          buildMyRecord({
+            id: "record_later_2",
+            startsAt: new Date("2026-10-21T00:00:00.000Z"),
+          }),
+        ],
+      });
+      mocks.computeWorkingDaysFromReferenceData.mockReturnValueOnce({
+        error: { code: "location_not_found", message: "Missing" },
+        ok: false,
+      });
+      const result = await getEmployeeView(baseInput);
+      expect(mocks.listMyRecords).toHaveBeenCalledWith({
+        clerkOrgId: baseInput.clerkOrgId,
+        filters: {
+          approvalStatus: ["submitted", "approved", "declined"],
+          dateRange: { from: new Date("2026-10-09T00:00:00.000Z") },
+          includeArchived: false,
+        },
+        organisationId: baseInput.organisationId,
+        userId: baseInput.userId,
+      });
+      if (!(result.ok && result.value.myRequests.status === "ready")) {
+        throw new Error("Expected ready requests");
+      }
+      expect(result.value.myRequests.data.records).toEqual([
+        expect.objectContaining({
+          canEdit: false,
+          canWithdraw: true,
+          dayCount: null,
+          recordId: "record_submitted",
+        }),
+        expect.objectContaining({
+          approvalStatus: "approved",
+          canEdit: true,
+          canWithdraw: false,
+          dayCount: 2,
+          recordId: "record_manual",
+          recordType: "wfh",
+          sourceType: "manual",
+        }),
+        expect.objectContaining({
+          canEdit: false,
+          canWithdraw: false,
+          recordId: "record_declined",
+        }),
+        expect.objectContaining({
+          canEdit: false,
+          canWithdraw: false,
+          recordId: "record_xero",
+        }),
+        expect.objectContaining({ recordId: "record_later_1" }),
+      ]);
     });
-    expect(result.value.activeFeeds).toMatchObject({
-      data: {
-        activeCount: 2,
-      },
-      status: "ready",
+
+    it("fails each section independently", async () => {
+      mocks.listMyRecords.mockResolvedValue({
+        error: { code: "unknown_error", message: "Records unavailable" },
+        ok: false,
+      });
+      mocks.getCalendarRange.mockResolvedValue({
+        error: { code: "unknown_error", message: "Calendar unavailable" },
+        ok: false,
+      });
+      mocks.listForUser.mockResolvedValue({
+        error: { code: "unknown_error", message: "Notifications unavailable" },
+        ok: false,
+      });
+      const result = await getEmployeeView(baseInput);
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          actionItems: {
+            message: "Notifications unavailable",
+            status: "error",
+          },
+          balances: { status: "ready" },
+          myRequests: { message: "Records unavailable", status: "error" },
+          publicHolidays: { status: "ready" },
+          timeline: { message: "Calendar unavailable", status: "error" },
+        },
+      });
     });
-    expect(result.value.usageVsLimits).toEqual({
-      message: "Billing unavailable",
-      status: "error",
+
+    it("caches views per week anchor", async () => {
+      const cache = createDashboardCache();
+      const first = new Date("2026-10-12T00:00:00.000Z");
+      const second = new Date("2026-10-19T00:00:00.000Z");
+      await getEmployeeView({ ...baseInput, weekAnchor: first }, cache);
+      await getEmployeeView({ ...baseInput, weekAnchor: first }, cache);
+      await getEmployeeView({ ...baseInput, weekAnchor: second }, cache);
+      expect(calendarCalls().map((call) => call.anchorDate)).toEqual([
+        first,
+        second,
+      ]);
     });
   });
-  it("builds the owner admin view with visible billing actions", async () => {
-    mocks.getBillingSummaryForDashboard.mockResolvedValue({
-      ok: true,
-      value: {
-        hasContactFlow: false,
-        hasUpgradeFlow: true,
-        isOverLimit: false,
-        plan: {
-          currentPeriodEnd: null,
-          key: "pro",
-          label: "Pro",
-          seatsPurchased: 10,
-          status: "active",
+
+  describe("manager view", () => {
+    const managerInput = { ...baseInput, actingRole: "manager" as const };
+
+    it("loads the team timeline, coverage weeks and approval rows", async () => {
+      const weekAnchor = new Date("2026-10-19T00:00:00.000Z");
+      const currentWeek = buildWeekRange();
+      mocks.getCalendarRange.mockImplementation(({ anchorDate }) =>
+        Promise.resolve({
+          ok: true,
+          value:
+            anchorDate.getTime() === NOW.getTime()
+              ? currentWeek
+              : buildWeekRange(),
+        })
+      );
+      mocks.listForApprover.mockResolvedValue({
+        ok: true,
+        value: [
+          buildApprovalItem({
+            id: "approval_new",
+            submittedAt: new Date("2026-10-08T08:00:00.000Z"),
+          }),
+          ...Array.from({ length: 5 }, (_, index) =>
+            buildApprovalItem({
+              id: `approval_old_${index}`,
+              submittedAt: new Date(`2026-10-0${index + 1}T08:00:00.000Z`),
+            })
+          ),
+        ],
+      });
+      const result = await getManagerView({ ...managerInput, weekAnchor });
+      expect(calendarCalls()).toHaveLength(3);
+      for (const call of calendarCalls()) {
+        expect(call).toMatchObject({
+          actingPersonId: ids.self,
+          filters: { approvalStatus: ["approved"] },
+          role: "manager",
+          scope: { type: "my_team" },
+          view: "week",
+        });
+      }
+      expect(calendarCalls().map((call) => call.anchorDate)).toEqual(
+        expect.arrayContaining([
+          NOW,
+          new Date("2026-10-16T02:00:00.000Z"),
+          weekAnchor,
+        ])
+      );
+      expect(mocks.loadManagerCoverage).toHaveBeenCalledWith({
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+        ranges: [currentWeek, expect.objectContaining({ view: "week" })],
+        today: NOW,
+      });
+      expect(mocks.listForApprover).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clerkOrgId: baseInput.clerkOrgId,
+          filters: { status: ["submitted"] },
+          organisationId: baseInput.organisationId,
+          role: "manager",
+        })
+      );
+      if (!result.ok) {
+        throw new Error("Expected a manager view");
+      }
+      expect(Object.keys(result.value).sort()).toEqual([
+        "actionItems",
+        "approvalQueue",
+        "balances",
+        "coverage",
+        "header",
+        "publicHolidays",
+        "timeline",
+      ]);
+      expect(result.value.coverage).toEqual({
+        data: coverageMap,
+        status: "ready",
+      });
+      expect(result.value.approvalQueue).toMatchObject({
+        data: {
+          count: 6,
+          rows: [
+            { recordId: "approval_old_0" },
+            { recordId: "approval_old_1" },
+            { recordId: "approval_old_2" },
+            { recordId: "approval_old_3" },
+            {
+              durationWorkingDays: 2,
+              personFirstName: "Luca",
+              personLastName: "Brown",
+              recordId: "approval_old_4",
+              recordType: "annual_leave",
+              sourceType: "team_calendar_leave",
+            },
+          ],
         },
-        usage: [],
-        visibleToAdmin: true,
-      },
+        status: "ready",
+      });
+      expect(result.value.header).toMatchObject({
+        directReportCount: 0,
+        roleLabel: "Manager",
+        scopeLabel: "0 direct reports",
+      });
     });
-    const result = await getAdminView({
-      ...baseInput,
-      actingRole: "owner",
+
+    it("reuses the current week for the timeline when no week is requested", async () => {
+      await getManagerView(managerInput);
+      expect(calendarCalls()).toHaveLength(2);
     });
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        header: { roleLabel: "Owner" },
-        usageVsLimits: {
-          data: { visibleToAdmin: true },
+
+    it("caps the timeline at twelve rows with self first", async () => {
+      const people = [
+        buildPerson(),
+        ...Array.from({ length: 14 }, (_, index) =>
+          buildPerson({
+            firstName: `Person${String(index).padStart(2, "0")}`,
+            id: `00000000-0000-4000-9000-${String(index).padStart(12, "0")}`,
+          })
+        ),
+      ];
+      mocks.getCalendarRange.mockResolvedValue({
+        ok: true,
+        value: buildWeekRange({ events: [], people: people.reverse() }),
+      });
+      const result = await getManagerView(managerInput);
+      if (!(result.ok && result.value.timeline.status === "ready")) {
+        throw new Error("Expected a ready timeline");
+      }
+      expect(result.value.timeline.data.rows).toHaveLength(12);
+      expect(result.value.timeline.data.rows[0]?.isSelf).toBe(true);
+      expect(result.value.timeline.data.totalPeopleInScope).toBe(15);
+    });
+
+    it("labels an all-team scope with direct and indirect reports", async () => {
+      mocks.getSettings.mockResolvedValue({
+        ok: true,
+        value: { managerVisibilityScope: "all_team_leave" },
+      });
+      const result = await getManagerView(managerInput);
+      expect(result.ok && result.value.header.scopeLabel).toBe(
+        "1 team members (direct + indirect)"
+      );
+    });
+
+    it("degrades coverage and approvals without failing the dashboard", async () => {
+      mocks.loadManagerCoverage.mockResolvedValue({
+        error: { code: "internal", message: "Coverage unavailable" },
+        ok: false,
+      });
+      mocks.listForApprover.mockResolvedValue({
+        error: { code: "unknown_error", message: "Approvals unavailable" },
+        ok: false,
+      });
+      const result = await getManagerView(managerInput);
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          approvalQueue: { message: "Approvals unavailable", status: "error" },
+          coverage: { message: "Coverage unavailable", status: "error" },
+          timeline: { status: "ready" },
+        },
+      });
+    });
+
+    it("reports coverage as an error when a coverage week fails", async () => {
+      mocks.getCalendarRange.mockResolvedValue({
+        error: { code: "unknown_error", message: "Calendar unavailable" },
+        ok: false,
+      });
+      const result = await getManagerView(managerInput);
+      expect(mocks.loadManagerCoverage).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          coverage: { message: "Calendar unavailable", status: "error" },
+          timeline: { message: "Calendar unavailable", status: "error" },
+        },
+      });
+    });
+  });
+
+  describe("admin view", () => {
+    it.each([
+      ["admin", "Admin"],
+      ["owner", "Owner"],
+    ] as const)(
+      "shows %s an organisation-wide timeline of people away",
+      async (actingRole, roleLabel) => {
+        mocks.getCalendarRange.mockResolvedValue({
+          ok: true,
+          value: buildWeekRange({
+            events: [buildEvent({ id: "event_peer", personId: ids.peer })],
+            people: [
+              buildPerson(),
+              buildPerson({ firstName: "Bo", id: ids.peer }),
+              buildPerson({ firstName: "Cy", id: ids.quiet }),
+            ],
+          }),
+        });
+        const result = await getAdminView({ ...baseInput, actingRole });
+        expect(calendarCalls()).toEqual([
+          expect.objectContaining({
+            anchorDate: NOW,
+            role: actingRole,
+            scope: { type: "all_teams" },
+            view: "week",
+          }),
+        ]);
+        expect(mocks.listForApprover).toHaveBeenCalledWith(
+          expect.objectContaining({
+            filters: { status: ["submitted"] },
+            role: actingRole,
+          })
+        );
+        if (!result.ok) {
+          throw new Error("Expected an admin view");
+        }
+        expect(Object.keys(result.value).sort()).toEqual([
+          "actionItems",
+          "approvalQueue",
+          "balances",
+          "header",
+          "publicHolidays",
+          "timeline",
+        ]);
+        expect(result.value.header).toMatchObject({
+          organisationName: "Acme Org",
+          roleLabel,
+          totalActivePeopleCount: 48,
+        });
+        if (result.value.timeline.status !== "ready") {
+          throw new Error("Expected a ready timeline");
+        }
+        expect(
+          result.value.timeline.data.rows.map((row) => row.personId)
+        ).toEqual([ids.peer]);
+        expect(result.value.timeline.data.totalPeopleInScope).toBe(1);
+        expect(result.value.approvalQueue).toMatchObject({
+          data: { count: 1, rows: [{ recordId: "approval_1" }] },
           status: "ready",
-        },
-      },
-    });
+        });
+      }
+    );
   });
+
   describe("next public holiday card", () => {
+    beforeEach(() => {
+      vi.setSystemTime(new Date("2026-04-20T00:00:00.000Z"));
+    });
+
     it("shows the next non-working or part-day holiday for the person's location", async () => {
       mocks.resolvePublicHolidays.mockResolvedValue({
         ok: true,
@@ -1044,14 +870,15 @@ describe("dashboard-service", () => {
         to: "2027-05-25",
       });
     });
+
     it("returns no holiday when none applies", async () => {
-      mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: [] });
       const result = await getEmployeeView(baseInput);
       expect(result.ok && result.value.publicHolidays).toEqual({
         data: { daysUntil: null, next: null },
         status: "ready",
       });
     });
+
     it("reports an error section when holidays cannot be resolved", async () => {
       mocks.resolvePublicHolidays.mockResolvedValue({
         error: {
