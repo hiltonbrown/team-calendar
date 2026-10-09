@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   ensureDefaultCalendarFeed: vi.fn(),
-  ensureDefaultPublicHolidaysForOrganisation: vi.fn(),
   organisationCreate: vi.fn(),
   organisationFindFirst: vi.fn(),
   organisationUpdate: vi.fn(),
@@ -41,10 +40,6 @@ vi.mock("@repo/database", () => ({
 }));
 vi.mock("@repo/feeds", () => ({
   ensureDefaultCalendarFeed: mocks.ensureDefaultCalendarFeed,
-}));
-vi.mock("../holidays/holiday-service", () => ({
-  ensureDefaultPublicHolidaysForOrganisation:
-    mocks.ensureDefaultPublicHolidaysForOrganisation,
 }));
 
 const { ensureCurrentUserPerson, ensureOrganisationForClerk } = await import(
@@ -90,15 +85,6 @@ describe("current-user-service organisation provisioning", () => {
       ok: true,
       value: { created: true, feedId: "feed_1" },
     });
-    mocks.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue({
-      ok: true,
-      value: {
-        importedCount: 0,
-        importedYears: [],
-        skippedCount: 0,
-        skippedYears: [],
-      },
-    });
   });
 
   it("creates an organisation once and provisions its defaults", async () => {
@@ -132,9 +118,6 @@ describe("current-user-service organisation provisioning", () => {
       clerkOrgId,
       organisationId,
     });
-    expect(
-      mocks.ensureDefaultPublicHolidaysForOrganisation
-    ).toHaveBeenCalledWith({ clerkOrgId, organisationId });
   });
 
   it("updates the oldest active organisation idempotently", async () => {
@@ -241,25 +224,6 @@ describe("current-user-service organisation provisioning", () => {
     expect(mocks.organisationCreate).toHaveBeenCalledTimes(1);
     expect(mocks.organisationUpdate).toHaveBeenCalledTimes(1);
     expect(mocks.ensureDefaultCalendarFeed).toHaveBeenCalledTimes(2);
-    expect(
-      mocks.ensureDefaultPublicHolidaysForOrganisation
-    ).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not fail organisation provisioning when holiday import reports an error", async () => {
-    mocks.organisationFindFirst.mockResolvedValue(organisation);
-    mocks.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue({
-      error: { code: "internal", message: "Holiday provider unavailable" },
-      ok: false,
-    });
-
-    await expect(
-      ensureOrganisationForClerk({
-        clerkOrgId,
-        countryCode: "AU",
-        name: "Current user test",
-      })
-    ).resolves.toEqual({ clerkOrgId, organisationId });
   });
 });
 

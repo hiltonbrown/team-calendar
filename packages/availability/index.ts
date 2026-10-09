@@ -95,17 +95,19 @@ export {
 } from "./src/dashboard/dashboard-service";
 export * from "./src/duration/working-days";
 export { computeWorkingDays } from "./src/duration/working-days";
+export * from "./src/holidays/holiday-preferences";
 export * from "./src/holidays/holiday-service";
+export type {
+  ReferenceHoliday,
+  ReferenceHolidayKind,
+} from "./src/holidays/reference/reference-holidays";
 export {
-  addCustomHoliday,
-  deleteCustomHoliday,
-  ensureDefaultPublicHolidaysForOrganisation,
-  importForJurisdiction,
-  listForOrganisation,
-  restoreHoliday,
-  suppressHoliday,
-} from "./src/holidays/holiday-service";
-export * from "./src/holidays/nager-client";
+  findReferenceHoliday,
+  listLocalReferenceHolidays,
+  listReferenceHolidays,
+  PUBLIC_HOLIDAY_DATA_VERSION,
+} from "./src/holidays/reference/reference-holidays";
+export * from "./src/holidays/resolve-public-holidays";
 export * from "./src/people/alternative-contact-service";
 export {
   type AlternativeContactServiceError,
