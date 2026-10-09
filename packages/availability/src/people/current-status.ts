@@ -520,7 +520,15 @@ async function resolveHolidaysForDates(input: {
     organisationId: input.organisationId,
     to,
   });
-  return result.ok ? result.value : [];
+  if (result.ok) {
+    return result.value;
+  }
+  // An unknown organisation has no holidays; any other failure must surface
+  // rather than reporting a public holiday as an ordinary day.
+  if (result.error.code === "not_found") {
+    return [];
+  }
+  throw new Error(result.error.message);
 }
 
 /** The non-working holiday on a local date for a location (null: organisation level). */

@@ -100,6 +100,28 @@ describe("current-status", () => {
     mocks.availabilityFindMany.mockResolvedValue([]);
   });
 
+  it("surfaces a holiday loading failure instead of reporting no holiday", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
+      error: { code: "internal", message: "Failed to resolve public holidays" },
+      ok: false,
+    });
+
+    await expect(computeCurrentStatus(baseInput)).rejects.toThrow(
+      "Failed to resolve public holidays"
+    );
+  });
+
+  it("treats an unknown organisation as having no holidays", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
+      error: { code: "not_found", message: "Organisation not found" },
+      ok: false,
+    });
+
+    await expect(computeCurrentStatus(baseInput)).resolves.toMatchObject({
+      activePublicHoliday: null,
+    });
+  });
+
   it("computes holiday applicability without querying invented people", async () => {
     const locationId = "00000000-0000-4000-8000-000000000101";
     mocks.locationFindMany.mockResolvedValue([
