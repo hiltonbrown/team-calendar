@@ -34,7 +34,7 @@ describe("SettingsNav", () => {
     );
 
     const links = screen.getAllByRole("link");
-    expect(links).toHaveLength(9);
+    expect(links).toHaveLength(10);
     for (const link of links) {
       expect(link.getAttribute("href")).toContain(
         "org=70000000-0000-4000-8000-000000000099"
@@ -45,6 +45,21 @@ describe("SettingsNav", () => {
     })) {
       expect(activeLink.getAttribute("aria-current")).toBe("page");
     }
+  });
+
+  it("lists Coverage in the Organisation group after Leave approval", () => {
+    render(
+      <SettingsNav orgQueryValue="70000000-0000-4000-8000-000000000001" />
+    );
+
+    const labels = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(labels.indexOf("Coverage")).toBe(
+      labels.indexOf("Leave approval") + 1
+    );
+    expect(labels.indexOf("Coverage")).toBeLessThan(labels.indexOf("Members"));
+    expect(
+      screen.getAllByRole("link", { name: "Coverage" })[0]?.getAttribute("href")
+    ).toBe("/settings/coverage?org=70000000-0000-4000-8000-000000000099");
   });
 
   it("uses the resolved fallback organisation when the URL has no org", () => {

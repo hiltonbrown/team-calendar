@@ -21,6 +21,7 @@ import {
   RssIcon,
   ScrollTextIcon,
   Settings2Icon,
+  UserCheckIcon,
   UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -47,6 +48,7 @@ const NAV_GROUPS: Array<{ items: NavItem[]; label: string }> = [
         icon: ClipboardListIcon,
         label: "Leave approval",
       },
+      { href: "/settings/coverage", icon: UserCheckIcon, label: "Coverage" },
       { href: "/settings/members", icon: UsersIcon, label: "Members" },
       { href: "/settings/billing", icon: CreditCardIcon, label: "Billing" },
     ],
