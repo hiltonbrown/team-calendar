@@ -19,6 +19,25 @@
 - NOT VERIFIED: visual rendering of the holiday screens (needs Clerk and other services); review the Vercel preview.
 - `bun.lock` synced to `next` 16.3.8 (matches `package.json`) in a separate chore commit.
 
+## Dashboard redesign (plan `docs/superpowers/plans/2026-10-09-dashboard-redesign.md`)
+
+- [x] Second pass on the spec and plan ("Second-pass corrections (binding)").
+- [x] Task 1 to 3: `Team.minimum_available_people`, team coverage queries, Settings > Coverage.
+- [x] Task 4 to 6: timeline week model, manager coverage map, design-system `TeamTimeline`.
+- [x] Task 7: dashboard service reshaped per role (employee self timeline and requests; manager team timeline, coverage and approvals; admin away-only timeline and approvals). Unused feed and billing dashboard summaries removed.
+- [x] Task 8: sentence-case record type labels in `@repo/core`, icon map, dashboard components; old cards removed.
+- [x] Task 9: role views composed around the timeline; `week` parameter validated; scaffold, layout and Xero banner removed.
+- [x] Task 10: verification (below).
+
+### Review
+
+- `bun run check`: passes. `bun run typecheck`: 19 of 19 tasks. `bun run test`: 18 of 18 tasks (app 808, availability 589, database 102, core 111, feeds 132, jobs 192).
+- `bun run test:integration` (local PostgreSQL, one task at a time, KV shim): database 57, availability 25, jobs 84, feeds 22 and app 10 pass. Xero fails 51, passes 39 and skips 12; `origin/main` gives exactly the same result on a fresh database, so these failures predate this work. Under parallel turbo the app shared-connection setup hook can time out (also seen on main in CI).
+- Fixed during verification: all-day records were matched against local day boundaries, so a one-day leave showed on two days in Brisbane in the calendar, the dashboard timeline and team coverage. A shared `recordFallsOnDay` in `@repo/core` now matches all-day records by their stored UTC dates (inclusive end, covering both the Xero midnight-to-midnight form and the 23:59:59.999Z form) and timed records by overlap.
+- Known effect: sentence-case labels change ICS titles for untitled records (for example "Jane Smith: Annual leave"), so the next publication run raises their SEQUENCE once.
+- Deviations: a client `dashboard-timeline.tsx` supplies Next.js links to `TeamTimeline`; `allDay` is carried on timeline entries and dashboard rows; "Leave request" is a third provenance; Withdraw and View link to `/plans?tab=my`, Edit to `/plans/<id>/edit`, Review to `/leave-approvals?status=submitted`; balances show only when Xero is connected.
+- NOT VERIFIED: rendering in a running app (no Clerk credentials here): desktop and mobile widths, light and dark themes, keyboard use. Review the Vercel preview.
+
 ## Design system sync (Claude Design System artifact, 9 October 2026)
 
 Bring code and docs in line with the reviewed Team Calendar design system. Brand mark unchanged.
