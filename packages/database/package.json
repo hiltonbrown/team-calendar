@@ -58,6 +58,10 @@
       "types": "./queries/sync-runs.ts",
       "default": "./queries/sync-runs.ts"
     },
+    "./queries/teams": {
+      "types": "./queries/teams.ts",
+      "default": "./queries/teams.ts"
+    },
     "./test-fixtures/slice-14-fixture": {
       "types": "./test-fixtures/slice-14-fixture.ts",
       "default": "./test-fixtures/slice-14-fixture.ts"

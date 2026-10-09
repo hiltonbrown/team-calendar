@@ -146,6 +146,7 @@ export const TeamScalarFieldEnum = {
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
   name: 'name',
+  minimum_available_people: 'minimum_available_people',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const

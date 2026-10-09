@@ -347,12 +347,14 @@ model OrganisationSettings {
 }
 
 model Team {
-  id              String   @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
-  organisation_id String   @db.Uuid
-  name            String
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                       String   @id @default(uuid()) @db.Uuid
+  clerk_org_id             String
+  organisation_id          String   @db.Uuid
+  name                     String
+  /// Minimum people needed available on a working day; null means no minimum.
+  minimum_available_people Int?
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
 
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   people       Person[]
