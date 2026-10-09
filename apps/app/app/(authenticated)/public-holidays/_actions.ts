@@ -180,7 +180,9 @@ export async function hideHolidayAction(
   revalidateHolidayPaths();
   return {
     ok: true,
-    value: { message: `${result.value.holidayName} hidden for all locations.` },
+    value: {
+      message: `${result.value.holidayName} hidden. Locations with their own working-day setting keep it.`,
+    },
   };
 }
 

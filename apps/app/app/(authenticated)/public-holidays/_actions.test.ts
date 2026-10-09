@@ -134,7 +134,10 @@ describe("public-holidays server actions", () => {
 
       expect(result).toEqual({
         ok: true,
-        value: { message: "Christmas Day hidden for all locations." },
+        value: {
+          message:
+            "Christmas Day hidden. Locations with their own working-day setting keep it.",
+        },
       });
       expect(mocks.hidePublicHoliday).toHaveBeenCalledWith({
         actingRole: "admin",
