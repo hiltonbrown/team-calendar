@@ -253,6 +253,8 @@ export {
   type TimelineEvent,
   type TimelinePage,
 } from "./src/sync/sync-monitor-service";
+export * from "./src/team-coverage/coverage-map";
+export * from "./src/team-coverage/load-manager-coverage";
 export * from "./src/team-coverage/team-coverage-minimums";
 export * from "./src/xero-connection-state";
 

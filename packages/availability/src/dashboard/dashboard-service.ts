@@ -52,6 +52,11 @@ import {
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { listRuns, listTenantSummaries } from "../sync/sync-monitor-service";
+import {
+  dedupeEventsByPerson,
+  isAwayEvent,
+  PEAK_AWAY_THRESHOLD_PERCENT,
+} from "../team-coverage/coverage-map";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import { createDashboardCache, type DashboardCache } from "./dashboard-cache";
 export type DashboardRole =
@@ -1345,7 +1350,7 @@ function buildUpcomingPeaksCard(input: CalendarRangeData) {
       continue;
     }
     const percentage = (awayEvents.length / input.totalPeopleInScope) * 100;
-    if (percentage <= 20) {
+    if (percentage <= PEAK_AWAY_THRESHOLD_PERCENT) {
       continue;
     }
     peaks.push({
@@ -1508,28 +1513,10 @@ function byDateDescending<TValue>(selector: (value: TValue) => Date | null) {
   return (left: TValue, right: TValue) =>
     (selector(right)?.getTime() ?? 0) - (selector(left)?.getTime() ?? 0);
 }
-function dedupeEventsByPerson(events: CalendarEvent[]) {
-  const byPerson = new Map<string, CalendarEvent>();
-  for (const event of events) {
-    if (!byPerson.has(event.personId)) {
-      byPerson.set(event.personId, event);
-    }
-  }
-  return [...byPerson.values()];
-}
 function uniqueRecordTypes(events: CalendarEvent[]) {
   return [...new Set(events.map((event) => event.recordType))].filter(
     (recordType): recordType is availability_record_type =>
       recordType !== "private"
-  );
-}
-function isAwayEvent(event: CalendarEvent) {
-  return (
-    event.approvalStatus === "approved" &&
-    event.recordType !== "private" &&
-    event.recordType !== "wfh" &&
-    event.recordType !== "alternative_contact" &&
-    event.recordType !== "limited_availability"
   );
 }
 function unwrapApprovalItems(
