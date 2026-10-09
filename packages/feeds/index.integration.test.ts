@@ -1207,6 +1207,19 @@ async function cleanTestData() {
   await database.location.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
+  // Audit rows reference the organisation; clear them by organisation just
+  // before it goes so a late write from the previous test cannot block cleanup.
+  const organisations = await database.organisation.findMany({
+    select: { id: true },
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.auditEvent.deleteMany({
+    where: {
+      organisation_id: {
+        in: organisations.map((organisation) => organisation.id),
+      },
+    },
+  });
   await database.organisation.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
