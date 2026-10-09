@@ -179,8 +179,9 @@ Tasks are sequential. Each has its own red/green cycle and a reviewable commit. 
 - Modify: dashboard employee/viewer view for the unlinked message if not already present (verify `viewer-view.tsx` first)
 
 **Interfaces:**
-- Consumes: `loadWelcomeEligibility`, person profile read, leave balance read used by `balances-card.tsx`, feed creation with scope `self` used by `/feeds/new`.
-- Produces: `completeWelcomeAction({ skipped: boolean })`, `createSelfFeedAction()` returning the full subscribe URL.
+- Consumes: `loadWelcomeEligibility`, person profile read, leave balance read used by `balances-card.tsx`, and the shipped calendar feeds self-service: `getOwnFeedEligibility` and `createOwnFeed` in `@repo/feeds` (via `createOwnFeedAction({ organisationId, kind: "personal" })` in `feeds/_actions.ts`), plus `YourCalendar` or `FeedProviderButtons` for the subscribe step.
+- Produces: `completeWelcomeAction({ skipped: boolean })`. Do not add a separate self-feed action; `createOwnFeed` is idempotent and returns the existing personal feed.
+- Constraint: personal feeds count toward the plan feed limit (Basic allows two feeds). When creation returns the plan-limit error, the step shows the organisation feed instead and offers Skip.
 
 - [ ] **Step 1:** Tests: ineligible users redirected to `/`; identity step shows name, email, team, manager; balances step shows explanatory copy and no zeros when no connection or no balances; calendar step shows full URL with copy and instructions, reuses an existing self feed rather than creating a duplicate; skip and finish both set `welcome_completed_at`; second visit redirects to `/`. Capture `Member Welcome Completed`.
 - [ ] **Step 2:** Confirm failure; implement; green.
