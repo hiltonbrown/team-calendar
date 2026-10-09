@@ -80,7 +80,7 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-20 | Settings: Xero detail | `/settings/integrations/xero` | Matches | One recommended sync is promoted; manual and connection controls are disclosed progressively; disconnect is confirmed and pause/resume is reachable. |
 | S-21 | Settings: Feeds | `/settings/feeds` | Matches | Feed defaults have visible labels, descriptions and scoped auto-save receipts. |
 | S-22 | Settings: Billing | `/settings/billing` | Drifted | Amber-to-token migration confirmed complete and consistent; role-blindness of `getBillingSummary` vs. role-aware dashboard widget re-confirmed. |
-| S-23 | Settings: Holidays | `/settings/holidays` | Matches | Truthful summary and launch page; all holiday operations live on S-11. |
+| S-23 | Settings: Holidays | `/settings/holidays` | Matches | Summary, per-location local day switches and launch into S-11. |
 | S-24 | Settings: Audit log | `/settings/audit-log` | Drifted | Pagination confirmed functional, contrary to the prior "non-functional" claim; no actor badges or field-level diff, unchanged. |
 | S-25 | Sync health | `/sync` | Drifted | All 4 sync dispatch buttons now wired (was 2/4); Records-failed count now colour-differentiated; failure/partial-success card logic more nuanced than previously described. |
 | S-26 | Sync run detail | `/sync/[runId]` | Drifted | "Re-run sync" enabled for every run type; Records-failed stat cell colour-differentiated; undocumented Cancel/Timeline controls found. |
@@ -466,21 +466,21 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 ### S-11: Public holidays
 
 **Route:** `/public-holidays` (list) and `/public-holidays/holidays/new` (+ intercepting modal).
-**Guard:** `requirePageRole("org:viewer")` on the list; no page-level guard on `holidays/new`. Every mutating action independently calls `requireRole("org:admin")`.
+**Guard:** `requirePageRole("org:viewer")` on the list; `requirePageRole("org:admin")` on `holidays/new`. Every mutating action independently checks for the owner or admin role.
 **Evidence:** `apps/app/app/(authenticated)/public-holidays/page.tsx:22-36,71-76`; `public-holidays-list.tsx`; `_actions.ts`.
 
 **Purpose:** Member-facing view of public holidays, with admin mutation controls.
 
-**User interactions, as-built:** This is the single operational holiday surface. `page.tsx` computes `canManage` server-side and passes it down; admins and owners can refresh every organisation/location jurisdiction for the selected year, add a custom holiday, suppress or restore an imported holiday, and permanently delete a manual holiday. Suppress and delete require consequence-aware confirmation. Viewers receive no action column or management chrome. The custom form supports organisation-wide scope or one active imported jurisdiction; its organisation and jurisdiction options are resolved server-side.
+**User interactions, as-built:** This is the single operational holiday surface. Official holidays come from the bundled AU, NZ and UK data files and are grouped by location, plus "People without a location". `page.tsx` computes `canManage` server-side and passes it down; admins and owners can hide a holiday for the whole organisation, restore it, mark it as a working or non-working day for one location, reset that override, add a custom holiday, and permanently delete a custom holiday. Hide and delete require consequence-aware confirmation. Viewers receive no action column or management chrome. The custom form applies to everyone, one country, or one state or region; its country and region options are built server-side from the region registry.
 
 **Role variations:** Admin/owner see mutating controls; everyone else sees a read-only equivalent. Server-side enforcement is unchanged and independently present on every action regardless of what the client hides.
 
-**Data displayed / States / Design requirements:** Date | Day | Name | Type | Source and, for managers, Actions; seven-value type badge map; jurisdiction shown with the source; suppressed rows have an explicit Suppressed badge in addition to dimming. Rows become labelled blocks below desktop width instead of requiring horizontal panning.
+**Data displayed / States / Design requirements:** Per-location tables of Date | Name | Type | Source (Official or Custom) | Day (Working day or Day off) and, for managers, Actions. Filters: year (last year to two years ahead), location, include hidden; hidden rows are dimmed and badged. When a year has no official data yet, the empty state explains that holidays are added each September. Rows become labelled blocks below desktop width instead of requiring horizontal panning.
 
 **`[v5 proposal]` interaction improvements:**
 - ~~Hide suppress/restore/delete/"Add custom holiday" from non-admin viewers client-side.~~ **Done.**
-- ~~Add a reachable source refresh action.~~ **Done.**
-- ~~Expose safe persisted scope in "Add custom holiday."~~ **Done for organisation-wide and imported-jurisdiction scope.** Location-specific assignments remain outside the current create-action contract.
+- ~~Add a reachable source refresh action.~~ **Superseded:** official holidays are bundled, so there is nothing to refresh.
+- ~~Expose safe persisted scope in "Add custom holiday."~~ **Done:** everyone, one country, or one state or region.
 
 **Note:** an unreferenced dead file, `public-holidays-client.tsx` (`return null`), exists in this directory: likely leftover scaffolding.
 
@@ -735,9 +735,9 @@ Automatic token refresh has no manual control. Normal disconnect completes synch
 **Evidence:** `apps/app/app/(authenticated)/settings/holidays/page.tsx:16-22`; `holidays-client.tsx`.
 **Country context:** Matches S-11.
 
-**Purpose:** Compact admin summary of public-holiday coverage and one launch into the operational S-11 surface.
+**Purpose:** Compact admin summary of public-holiday coverage, the per-location local day switches, and one launch into the operational S-11 surface.
 
-**User interactions, as-built:** One imported/custom count summary, an upcoming-holidays card and one "Manage public holidays" launch. Its code comment and visible copy both identify S-11 as the operational home.
+**User interactions, as-built:** One official/custom count summary to the end of the coverage horizon, a "Local holidays" card with one switch per local day for each location (off by default), an upcoming-holidays card and one "Manage public holidays" launch.
 
 **`[v5 proposal]` interaction improvements:**
 - ~~Choose one operational home and make this page a truthful summary-and-launch surface.~~ **Done.**

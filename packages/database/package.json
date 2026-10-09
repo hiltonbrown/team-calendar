@@ -50,10 +50,6 @@
       "types": "./queries/people.ts",
       "default": "./queries/people.ts"
     },
-    "./queries/public-holidays": {
-      "types": "./queries/public-holidays.ts",
-      "default": "./queries/public-holidays.ts"
-    },
     "./queries/support-submissions": {
       "types": "./queries/support-submissions.ts",
       "default": "./queries/support-submissions.ts"
@@ -61,6 +57,10 @@
     "./queries/sync-runs": {
       "types": "./queries/sync-runs.ts",
       "default": "./queries/sync-runs.ts"
+    },
+    "./queries/teams": {
+      "types": "./queries/teams.ts",
+      "default": "./queries/teams.ts"
     },
     "./test-fixtures/slice-14-fixture": {
       "types": "./test-fixtures/slice-14-fixture.ts",

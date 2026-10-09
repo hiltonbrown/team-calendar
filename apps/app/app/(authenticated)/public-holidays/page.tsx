@@ -1,5 +1,8 @@
 import { auth } from "@repo/auth/server";
-import { listForOrganisation } from "@repo/availability";
+import {
+  type ResolvedPublicHoliday,
+  resolvePublicHolidays,
+} from "@repo/availability";
 import { database, scopedQuery } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -8,10 +11,10 @@ import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-pag
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { PublicHolidayFilterSchema } from "./_schemas";
-import { PublicHolidaysList } from "./public-holidays-list";
+import { type HolidayGroup, PublicHolidaysList } from "./public-holidays-list";
 
 export const metadata: Metadata = {
-  description: "Manage public holidays for your organisation.",
+  description: "Review and manage public holidays for your organisation.",
   title: "Public Holidays - Team Calendar",
 };
 
@@ -20,8 +23,7 @@ interface PublicHolidaysPageProps {
 }
 
 // Public Holidays is the single operational list. Everyone may review it;
-// admins and owners receive the source refresh and mutation controls. Settings
-// Holidays remains a summary and launch surface only.
+// admins and owners also get the hide, restore and working-day controls.
 const PublicHolidaysPage = async ({
   searchParams,
 }: PublicHolidaysPageProps) => {
@@ -37,29 +39,18 @@ const PublicHolidaysPage = async ({
     parseFilterParams(filterParams, PublicHolidayFilterSchema) ??
     PublicHolidayFilterSchema.parse({});
 
-  const [holidaysResult, locations, organisation] = await Promise.all([
-    listForOrganisation(clerkOrgId, organisationId, {
-      includeSuppressed: filters.includeSuppressed,
-      locationId: filters.locationId,
-      year: filters.year,
+  const [holidaysResult, locations] = await Promise.all([
+    resolvePublicHolidays({
+      clerkOrgId,
+      from: `${filters.year}-01-01`,
+      includeHidden: true,
+      organisationId,
+      to: `${filters.year}-12-31`,
     }),
     database.location.findMany({
       orderBy: { name: "asc" },
-      select: {
-        country_code: true,
-        id: true,
-        name: true,
-        region_code: true,
-      },
+      select: { id: true, name: true },
       where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.organisation.findFirst({
-      select: { country_code: true, region_code: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
     }),
   ]);
 
@@ -81,10 +72,12 @@ const PublicHolidaysPage = async ({
         <PublicHolidaysList
           canManage={canManage}
           filters={filters}
-          holidays={holidaysResult.value}
-          locations={locations.map(({ id, name }) => ({ id, name }))}
+          groups={groupByLocation(holidaysResult.value, locations, filters)}
+          hasOfficialHolidays={holidaysResult.value.some(
+            (holiday) => holiday.origin === "official"
+          )}
+          locations={locations}
           organisationId={organisationId}
-          refreshTargets={buildRefreshTargets(organisation, locations)}
         />
       </div>
     </>
@@ -93,49 +86,27 @@ const PublicHolidaysPage = async ({
 
 export default PublicHolidaysPage;
 
-function buildRefreshTargets(
-  organisation: { country_code: string; region_code: string | null } | null,
-  locations: Array<{
-    country_code: string | null;
-    name: string;
-    region_code: string | null;
-  }>
-) {
-  if (!organisation) {
-    return [];
-  }
-  const targets = new Map<
-    string,
-    { countryCode: string; label: string; regionCode: string | null }
-  >();
-  const addTarget = (
-    countryCode: string,
-    regionCode: string | null,
-    label: string
-  ) => {
-    targets.set(`${countryCode}:${regionCode ?? "national"}`, {
-      countryCode,
-      label,
-      regionCode,
-    });
-  };
-  addTarget(
-    organisation.country_code,
-    organisation.region_code,
-    organisation.region_code
-      ? `${organisation.country_code}-${organisation.region_code}`
-      : `${organisation.country_code} national holidays`
+function groupByLocation(
+  holidays: readonly ResolvedPublicHoliday[],
+  locations: ReadonlyArray<{ id: string; name: string }>,
+  filters: { includeHidden: boolean; locationId?: string }
+): HolidayGroup[] {
+  const subjects = [
+    ...locations.map((location) => ({
+      id: location.id as string | null,
+      name: location.name,
+    })),
+    { id: null, name: "People without a location" },
+  ].filter(
+    (subject) => !filters.locationId || subject.id === filters.locationId
   );
-  for (const location of locations) {
-    if (location.country_code) {
-      addTarget(
-        location.country_code,
-        location.region_code,
-        location.region_code
-          ? `${location.name} (${location.country_code}-${location.region_code})`
-          : `${location.name} (${location.country_code})`
-      );
-    }
-  }
-  return [...targets.values()];
+  return subjects.map((subject) => ({
+    holidays: holidays.filter(
+      (holiday) =>
+        holiday.locationId === subject.id &&
+        (filters.includeHidden || !holiday.hidden)
+    ),
+    locationId: subject.id,
+    name: subject.name,
+  }));
 }

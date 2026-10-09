@@ -28,7 +28,6 @@ export type PublicHolidayMinAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
-  jurisdiction_id: string | null
   source: $Enums.public_holiday_source | null
   source_remote_id: string | null
   country_code: string | null
@@ -50,7 +49,6 @@ export type PublicHolidayMaxAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
-  jurisdiction_id: string | null
   source: $Enums.public_holiday_source | null
   source_remote_id: string | null
   country_code: string | null
@@ -72,7 +70,6 @@ export type PublicHolidayCountAggregateOutputType = {
   id: number
   clerk_org_id: number
   organisation_id: number
-  jurisdiction_id: number
   source: number
   source_remote_id: number
   country_code: number
@@ -83,7 +80,6 @@ export type PublicHolidayCountAggregateOutputType = {
   holiday_type: number
   default_classification: number
   notes_internal: number
-  source_payload_json: number
   created_by_user_id: number
   updated_by_user_id: number
   archived_at: number
@@ -97,7 +93,6 @@ export type PublicHolidayMinAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
-  jurisdiction_id?: true
   source?: true
   source_remote_id?: true
   country_code?: true
@@ -119,7 +114,6 @@ export type PublicHolidayMaxAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
-  jurisdiction_id?: true
   source?: true
   source_remote_id?: true
   country_code?: true
@@ -141,7 +135,6 @@ export type PublicHolidayCountAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
-  jurisdiction_id?: true
   source?: true
   source_remote_id?: true
   country_code?: true
@@ -152,7 +145,6 @@ export type PublicHolidayCountAggregateInputType = {
   holiday_type?: true
   default_classification?: true
   notes_internal?: true
-  source_payload_json?: true
   created_by_user_id?: true
   updated_by_user_id?: true
   archived_at?: true
@@ -237,7 +229,6 @@ export type PublicHolidayGroupByOutputType = {
   id: string
   clerk_org_id: string
   organisation_id: string
-  jurisdiction_id: string | null
   source: $Enums.public_holiday_source
   source_remote_id: string | null
   country_code: string
@@ -248,7 +239,6 @@ export type PublicHolidayGroupByOutputType = {
   holiday_type: $Enums.public_holiday_type
   default_classification: $Enums.public_holiday_day_classification
   notes_internal: string | null
-  source_payload_json: runtime.JsonValue | null
   created_by_user_id: string | null
   updated_by_user_id: string | null
   archived_at: Date | null
@@ -281,7 +271,6 @@ export type PublicHolidayWhereInput = {
   id?: Prisma.UuidFilter<"PublicHoliday"> | string
   clerk_org_id?: Prisma.StringFilter<"PublicHoliday"> | string
   organisation_id?: Prisma.UuidFilter<"PublicHoliday"> | string
-  jurisdiction_id?: Prisma.UuidNullableFilter<"PublicHoliday"> | string | null
   source?: Prisma.Enumpublic_holiday_sourceFilter<"PublicHoliday"> | $Enums.public_holiday_source
   source_remote_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   country_code?: Prisma.StringFilter<"PublicHoliday"> | string
@@ -292,22 +281,18 @@ export type PublicHolidayWhereInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFilter<"PublicHoliday"> | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFilter<"PublicHoliday"> | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
-  source_payload_json?: Prisma.JsonNullableFilter<"PublicHoliday">
   created_by_user_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   updated_by_user_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"PublicHoliday"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"PublicHoliday"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"PublicHoliday"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-  jurisdiction?: Prisma.XOR<Prisma.PublicHolidayJurisdictionNullableScalarRelationFilter, Prisma.PublicHolidayJurisdictionWhereInput> | null
-  assignments?: Prisma.PublicHolidayAssignmentListRelationFilter
 }
 
 export type PublicHolidayOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  jurisdiction_id?: Prisma.SortOrderInput | Prisma.SortOrder
   source?: Prisma.SortOrder
   source_remote_id?: Prisma.SortOrderInput | Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -318,15 +303,12 @@ export type PublicHolidayOrderByWithRelationInput = {
   holiday_type?: Prisma.SortOrder
   default_classification?: Prisma.SortOrder
   notes_internal?: Prisma.SortOrderInput | Prisma.SortOrder
-  source_payload_json?: Prisma.SortOrderInput | Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   updated_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
-  jurisdiction?: Prisma.PublicHolidayJurisdictionOrderByWithRelationInput
-  assignments?: Prisma.PublicHolidayAssignmentOrderByRelationAggregateInput
 }
 
 export type PublicHolidayWhereUniqueInput = Prisma.AtLeast<{
@@ -337,7 +319,6 @@ export type PublicHolidayWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.PublicHolidayWhereInput | Prisma.PublicHolidayWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"PublicHoliday"> | string
   organisation_id?: Prisma.UuidFilter<"PublicHoliday"> | string
-  jurisdiction_id?: Prisma.UuidNullableFilter<"PublicHoliday"> | string | null
   source?: Prisma.Enumpublic_holiday_sourceFilter<"PublicHoliday"> | $Enums.public_holiday_source
   source_remote_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   country_code?: Prisma.StringFilter<"PublicHoliday"> | string
@@ -348,22 +329,18 @@ export type PublicHolidayWhereUniqueInput = Prisma.AtLeast<{
   holiday_type?: Prisma.Enumpublic_holiday_typeFilter<"PublicHoliday"> | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFilter<"PublicHoliday"> | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
-  source_payload_json?: Prisma.JsonNullableFilter<"PublicHoliday">
   created_by_user_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   updated_by_user_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"PublicHoliday"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"PublicHoliday"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"PublicHoliday"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
-  jurisdiction?: Prisma.XOR<Prisma.PublicHolidayJurisdictionNullableScalarRelationFilter, Prisma.PublicHolidayJurisdictionWhereInput> | null
-  assignments?: Prisma.PublicHolidayAssignmentListRelationFilter
 }, "id" | "organisation_id_source_source_remote_id">
 
 export type PublicHolidayOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  jurisdiction_id?: Prisma.SortOrderInput | Prisma.SortOrder
   source?: Prisma.SortOrder
   source_remote_id?: Prisma.SortOrderInput | Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -374,7 +351,6 @@ export type PublicHolidayOrderByWithAggregationInput = {
   holiday_type?: Prisma.SortOrder
   default_classification?: Prisma.SortOrder
   notes_internal?: Prisma.SortOrderInput | Prisma.SortOrder
-  source_payload_json?: Prisma.SortOrderInput | Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   updated_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -392,7 +368,6 @@ export type PublicHolidayScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"PublicHoliday"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"PublicHoliday"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"PublicHoliday"> | string
-  jurisdiction_id?: Prisma.UuidNullableWithAggregatesFilter<"PublicHoliday"> | string | null
   source?: Prisma.Enumpublic_holiday_sourceWithAggregatesFilter<"PublicHoliday"> | $Enums.public_holiday_source
   source_remote_id?: Prisma.StringNullableWithAggregatesFilter<"PublicHoliday"> | string | null
   country_code?: Prisma.StringWithAggregatesFilter<"PublicHoliday"> | string
@@ -403,7 +378,6 @@ export type PublicHolidayScalarWhereWithAggregatesInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeWithAggregatesFilter<"PublicHoliday"> | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationWithAggregatesFilter<"PublicHoliday"> | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.StringNullableWithAggregatesFilter<"PublicHoliday"> | string | null
-  source_payload_json?: Prisma.JsonNullableWithAggregatesFilter<"PublicHoliday">
   created_by_user_id?: Prisma.StringNullableWithAggregatesFilter<"PublicHoliday"> | string | null
   updated_by_user_id?: Prisma.StringNullableWithAggregatesFilter<"PublicHoliday"> | string | null
   archived_at?: Prisma.DateTimeNullableWithAggregatesFilter<"PublicHoliday"> | Date | string | null
@@ -424,22 +398,18 @@ export type PublicHolidayCreateInput = {
   holiday_type: $Enums.public_holiday_type
   default_classification?: $Enums.public_holiday_day_classification
   notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: string | null
   updated_by_user_id?: string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPublic_holidaysInput
-  jurisdiction?: Prisma.PublicHolidayJurisdictionCreateNestedOneWithoutHolidaysInput
-  assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutPublic_holidayInput
 }
 
 export type PublicHolidayUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
-  jurisdiction_id?: string | null
   source: $Enums.public_holiday_source
   source_remote_id?: string | null
   country_code: string
@@ -450,13 +420,11 @@ export type PublicHolidayUncheckedCreateInput = {
   holiday_type: $Enums.public_holiday_type
   default_classification?: $Enums.public_holiday_day_classification
   notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: string | null
   updated_by_user_id?: string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutPublic_holidayInput
 }
 
 export type PublicHolidayUpdateInput = {
@@ -472,22 +440,18 @@ export type PublicHolidayUpdateInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPublic_holidaysNestedInput
-  jurisdiction?: Prisma.PublicHolidayJurisdictionUpdateOneWithoutHolidaysNestedInput
-  assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutPublic_holidayNestedInput
 }
 
 export type PublicHolidayUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  jurisdiction_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
   source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   country_code?: Prisma.StringFieldUpdateOperationsInput | string
@@ -498,20 +462,17 @@ export type PublicHolidayUncheckedUpdateInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutPublic_holidayNestedInput
 }
 
 export type PublicHolidayCreateManyInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
-  jurisdiction_id?: string | null
   source: $Enums.public_holiday_source
   source_remote_id?: string | null
   country_code: string
@@ -522,7 +483,6 @@ export type PublicHolidayCreateManyInput = {
   holiday_type: $Enums.public_holiday_type
   default_classification?: $Enums.public_holiday_day_classification
   notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: string | null
   updated_by_user_id?: string | null
   archived_at?: Date | string | null
@@ -543,7 +503,6 @@ export type PublicHolidayUpdateManyMutationInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -555,7 +514,6 @@ export type PublicHolidayUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  jurisdiction_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
   source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   country_code?: Prisma.StringFieldUpdateOperationsInput | string
@@ -566,7 +524,6 @@ export type PublicHolidayUncheckedUpdateManyInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -594,7 +551,6 @@ export type PublicHolidayCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  jurisdiction_id?: Prisma.SortOrder
   source?: Prisma.SortOrder
   source_remote_id?: Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -605,7 +561,6 @@ export type PublicHolidayCountOrderByAggregateInput = {
   holiday_type?: Prisma.SortOrder
   default_classification?: Prisma.SortOrder
   notes_internal?: Prisma.SortOrder
-  source_payload_json?: Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrder
   updated_by_user_id?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
@@ -617,7 +572,6 @@ export type PublicHolidayMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  jurisdiction_id?: Prisma.SortOrder
   source?: Prisma.SortOrder
   source_remote_id?: Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -639,7 +593,6 @@ export type PublicHolidayMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
-  jurisdiction_id?: Prisma.SortOrder
   source?: Prisma.SortOrder
   source_remote_id?: Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -655,11 +608,6 @@ export type PublicHolidayMinOrderByAggregateInput = {
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
-}
-
-export type PublicHolidayScalarRelationFilter = {
-  is?: Prisma.PublicHolidayWhereInput
-  isNot?: Prisma.PublicHolidayWhereInput
 }
 
 export type PublicHolidayCreateNestedManyWithoutOrganisationInput = {
@@ -704,46 +652,8 @@ export type PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput = {
   deleteMany?: Prisma.PublicHolidayScalarWhereInput | Prisma.PublicHolidayScalarWhereInput[]
 }
 
-export type PublicHolidayCreateNestedManyWithoutJurisdictionInput = {
-  create?: Prisma.XOR<Prisma.PublicHolidayCreateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput> | Prisma.PublicHolidayCreateWithoutJurisdictionInput[] | Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput[]
-  connectOrCreate?: Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput | Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput[]
-  createMany?: Prisma.PublicHolidayCreateManyJurisdictionInputEnvelope
-  connect?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-}
-
-export type PublicHolidayUncheckedCreateNestedManyWithoutJurisdictionInput = {
-  create?: Prisma.XOR<Prisma.PublicHolidayCreateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput> | Prisma.PublicHolidayCreateWithoutJurisdictionInput[] | Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput[]
-  connectOrCreate?: Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput | Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput[]
-  createMany?: Prisma.PublicHolidayCreateManyJurisdictionInputEnvelope
-  connect?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-}
-
-export type PublicHolidayUpdateManyWithoutJurisdictionNestedInput = {
-  create?: Prisma.XOR<Prisma.PublicHolidayCreateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput> | Prisma.PublicHolidayCreateWithoutJurisdictionInput[] | Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput[]
-  connectOrCreate?: Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput | Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput[]
-  upsert?: Prisma.PublicHolidayUpsertWithWhereUniqueWithoutJurisdictionInput | Prisma.PublicHolidayUpsertWithWhereUniqueWithoutJurisdictionInput[]
-  createMany?: Prisma.PublicHolidayCreateManyJurisdictionInputEnvelope
-  set?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  disconnect?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  delete?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  connect?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  update?: Prisma.PublicHolidayUpdateWithWhereUniqueWithoutJurisdictionInput | Prisma.PublicHolidayUpdateWithWhereUniqueWithoutJurisdictionInput[]
-  updateMany?: Prisma.PublicHolidayUpdateManyWithWhereWithoutJurisdictionInput | Prisma.PublicHolidayUpdateManyWithWhereWithoutJurisdictionInput[]
-  deleteMany?: Prisma.PublicHolidayScalarWhereInput | Prisma.PublicHolidayScalarWhereInput[]
-}
-
-export type PublicHolidayUncheckedUpdateManyWithoutJurisdictionNestedInput = {
-  create?: Prisma.XOR<Prisma.PublicHolidayCreateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput> | Prisma.PublicHolidayCreateWithoutJurisdictionInput[] | Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput[]
-  connectOrCreate?: Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput | Prisma.PublicHolidayCreateOrConnectWithoutJurisdictionInput[]
-  upsert?: Prisma.PublicHolidayUpsertWithWhereUniqueWithoutJurisdictionInput | Prisma.PublicHolidayUpsertWithWhereUniqueWithoutJurisdictionInput[]
-  createMany?: Prisma.PublicHolidayCreateManyJurisdictionInputEnvelope
-  set?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  disconnect?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  delete?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  connect?: Prisma.PublicHolidayWhereUniqueInput | Prisma.PublicHolidayWhereUniqueInput[]
-  update?: Prisma.PublicHolidayUpdateWithWhereUniqueWithoutJurisdictionInput | Prisma.PublicHolidayUpdateWithWhereUniqueWithoutJurisdictionInput[]
-  updateMany?: Prisma.PublicHolidayUpdateManyWithWhereWithoutJurisdictionInput | Prisma.PublicHolidayUpdateManyWithWhereWithoutJurisdictionInput[]
-  deleteMany?: Prisma.PublicHolidayScalarWhereInput | Prisma.PublicHolidayScalarWhereInput[]
+export type Enumpublic_holiday_sourceFieldUpdateOperationsInput = {
+  set?: $Enums.public_holiday_source
 }
 
 export type Enumpublic_holiday_typeFieldUpdateOperationsInput = {
@@ -752,20 +662,6 @@ export type Enumpublic_holiday_typeFieldUpdateOperationsInput = {
 
 export type Enumpublic_holiday_day_classificationFieldUpdateOperationsInput = {
   set?: $Enums.public_holiday_day_classification
-}
-
-export type PublicHolidayCreateNestedOneWithoutAssignmentsInput = {
-  create?: Prisma.XOR<Prisma.PublicHolidayCreateWithoutAssignmentsInput, Prisma.PublicHolidayUncheckedCreateWithoutAssignmentsInput>
-  connectOrCreate?: Prisma.PublicHolidayCreateOrConnectWithoutAssignmentsInput
-  connect?: Prisma.PublicHolidayWhereUniqueInput
-}
-
-export type PublicHolidayUpdateOneRequiredWithoutAssignmentsNestedInput = {
-  create?: Prisma.XOR<Prisma.PublicHolidayCreateWithoutAssignmentsInput, Prisma.PublicHolidayUncheckedCreateWithoutAssignmentsInput>
-  connectOrCreate?: Prisma.PublicHolidayCreateOrConnectWithoutAssignmentsInput
-  upsert?: Prisma.PublicHolidayUpsertWithoutAssignmentsInput
-  connect?: Prisma.PublicHolidayWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.PublicHolidayUpdateToOneWithWhereWithoutAssignmentsInput, Prisma.PublicHolidayUpdateWithoutAssignmentsInput>, Prisma.PublicHolidayUncheckedUpdateWithoutAssignmentsInput>
 }
 
 export type PublicHolidayCreateWithoutOrganisationInput = {
@@ -781,20 +677,16 @@ export type PublicHolidayCreateWithoutOrganisationInput = {
   holiday_type: $Enums.public_holiday_type
   default_classification?: $Enums.public_holiday_day_classification
   notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: string | null
   updated_by_user_id?: string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  jurisdiction?: Prisma.PublicHolidayJurisdictionCreateNestedOneWithoutHolidaysInput
-  assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutPublic_holidayInput
 }
 
 export type PublicHolidayUncheckedCreateWithoutOrganisationInput = {
   id?: string
   clerk_org_id: string
-  jurisdiction_id?: string | null
   source: $Enums.public_holiday_source
   source_remote_id?: string | null
   country_code: string
@@ -805,13 +697,11 @@ export type PublicHolidayUncheckedCreateWithoutOrganisationInput = {
   holiday_type: $Enums.public_holiday_type
   default_classification?: $Enums.public_holiday_day_classification
   notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: string | null
   updated_by_user_id?: string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutPublic_holidayInput
 }
 
 export type PublicHolidayCreateOrConnectWithoutOrganisationInput = {
@@ -847,7 +737,6 @@ export type PublicHolidayScalarWhereInput = {
   id?: Prisma.UuidFilter<"PublicHoliday"> | string
   clerk_org_id?: Prisma.StringFilter<"PublicHoliday"> | string
   organisation_id?: Prisma.UuidFilter<"PublicHoliday"> | string
-  jurisdiction_id?: Prisma.UuidNullableFilter<"PublicHoliday"> | string | null
   source?: Prisma.Enumpublic_holiday_sourceFilter<"PublicHoliday"> | $Enums.public_holiday_source
   source_remote_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   country_code?: Prisma.StringFilter<"PublicHoliday"> | string
@@ -858,7 +747,6 @@ export type PublicHolidayScalarWhereInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFilter<"PublicHoliday"> | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFilter<"PublicHoliday"> | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
-  source_payload_json?: Prisma.JsonNullableFilter<"PublicHoliday">
   created_by_user_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   updated_by_user_id?: Prisma.StringNullableFilter<"PublicHoliday"> | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"PublicHoliday"> | Date | string | null
@@ -866,190 +754,9 @@ export type PublicHolidayScalarWhereInput = {
   updated_at?: Prisma.DateTimeFilter<"PublicHoliday"> | Date | string
 }
 
-export type PublicHolidayCreateWithoutJurisdictionInput = {
-  id?: string
-  clerk_org_id: string
-  source: $Enums.public_holiday_source
-  source_remote_id?: string | null
-  country_code: string
-  region_code?: string | null
-  holiday_date: Date | string
-  name: string
-  local_name?: string | null
-  holiday_type: $Enums.public_holiday_type
-  default_classification?: $Enums.public_holiday_day_classification
-  notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: string | null
-  updated_by_user_id?: string | null
-  archived_at?: Date | string | null
-  created_at?: Date | string
-  updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutPublic_holidaysInput
-  assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutPublic_holidayInput
-}
-
-export type PublicHolidayUncheckedCreateWithoutJurisdictionInput = {
-  id?: string
-  clerk_org_id: string
-  organisation_id: string
-  source: $Enums.public_holiday_source
-  source_remote_id?: string | null
-  country_code: string
-  region_code?: string | null
-  holiday_date: Date | string
-  name: string
-  local_name?: string | null
-  holiday_type: $Enums.public_holiday_type
-  default_classification?: $Enums.public_holiday_day_classification
-  notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: string | null
-  updated_by_user_id?: string | null
-  archived_at?: Date | string | null
-  created_at?: Date | string
-  updated_at?: Date | string
-  assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutPublic_holidayInput
-}
-
-export type PublicHolidayCreateOrConnectWithoutJurisdictionInput = {
-  where: Prisma.PublicHolidayWhereUniqueInput
-  create: Prisma.XOR<Prisma.PublicHolidayCreateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput>
-}
-
-export type PublicHolidayCreateManyJurisdictionInputEnvelope = {
-  data: Prisma.PublicHolidayCreateManyJurisdictionInput | Prisma.PublicHolidayCreateManyJurisdictionInput[]
-  skipDuplicates?: boolean
-}
-
-export type PublicHolidayUpsertWithWhereUniqueWithoutJurisdictionInput = {
-  where: Prisma.PublicHolidayWhereUniqueInput
-  update: Prisma.XOR<Prisma.PublicHolidayUpdateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedUpdateWithoutJurisdictionInput>
-  create: Prisma.XOR<Prisma.PublicHolidayCreateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedCreateWithoutJurisdictionInput>
-}
-
-export type PublicHolidayUpdateWithWhereUniqueWithoutJurisdictionInput = {
-  where: Prisma.PublicHolidayWhereUniqueInput
-  data: Prisma.XOR<Prisma.PublicHolidayUpdateWithoutJurisdictionInput, Prisma.PublicHolidayUncheckedUpdateWithoutJurisdictionInput>
-}
-
-export type PublicHolidayUpdateManyWithWhereWithoutJurisdictionInput = {
-  where: Prisma.PublicHolidayScalarWhereInput
-  data: Prisma.XOR<Prisma.PublicHolidayUpdateManyMutationInput, Prisma.PublicHolidayUncheckedUpdateManyWithoutJurisdictionInput>
-}
-
-export type PublicHolidayCreateWithoutAssignmentsInput = {
-  id?: string
-  clerk_org_id: string
-  source: $Enums.public_holiday_source
-  source_remote_id?: string | null
-  country_code: string
-  region_code?: string | null
-  holiday_date: Date | string
-  name: string
-  local_name?: string | null
-  holiday_type: $Enums.public_holiday_type
-  default_classification?: $Enums.public_holiday_day_classification
-  notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: string | null
-  updated_by_user_id?: string | null
-  archived_at?: Date | string | null
-  created_at?: Date | string
-  updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutPublic_holidaysInput
-  jurisdiction?: Prisma.PublicHolidayJurisdictionCreateNestedOneWithoutHolidaysInput
-}
-
-export type PublicHolidayUncheckedCreateWithoutAssignmentsInput = {
-  id?: string
-  clerk_org_id: string
-  organisation_id: string
-  jurisdiction_id?: string | null
-  source: $Enums.public_holiday_source
-  source_remote_id?: string | null
-  country_code: string
-  region_code?: string | null
-  holiday_date: Date | string
-  name: string
-  local_name?: string | null
-  holiday_type: $Enums.public_holiday_type
-  default_classification?: $Enums.public_holiday_day_classification
-  notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: string | null
-  updated_by_user_id?: string | null
-  archived_at?: Date | string | null
-  created_at?: Date | string
-  updated_at?: Date | string
-}
-
-export type PublicHolidayCreateOrConnectWithoutAssignmentsInput = {
-  where: Prisma.PublicHolidayWhereUniqueInput
-  create: Prisma.XOR<Prisma.PublicHolidayCreateWithoutAssignmentsInput, Prisma.PublicHolidayUncheckedCreateWithoutAssignmentsInput>
-}
-
-export type PublicHolidayUpsertWithoutAssignmentsInput = {
-  update: Prisma.XOR<Prisma.PublicHolidayUpdateWithoutAssignmentsInput, Prisma.PublicHolidayUncheckedUpdateWithoutAssignmentsInput>
-  create: Prisma.XOR<Prisma.PublicHolidayCreateWithoutAssignmentsInput, Prisma.PublicHolidayUncheckedCreateWithoutAssignmentsInput>
-  where?: Prisma.PublicHolidayWhereInput
-}
-
-export type PublicHolidayUpdateToOneWithWhereWithoutAssignmentsInput = {
-  where?: Prisma.PublicHolidayWhereInput
-  data: Prisma.XOR<Prisma.PublicHolidayUpdateWithoutAssignmentsInput, Prisma.PublicHolidayUncheckedUpdateWithoutAssignmentsInput>
-}
-
-export type PublicHolidayUpdateWithoutAssignmentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
-  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  country_code?: Prisma.StringFieldUpdateOperationsInput | string
-  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  local_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
-  default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
-  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPublic_holidaysNestedInput
-  jurisdiction?: Prisma.PublicHolidayJurisdictionUpdateOneWithoutHolidaysNestedInput
-}
-
-export type PublicHolidayUncheckedUpdateWithoutAssignmentsInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  jurisdiction_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
-  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  country_code?: Prisma.StringFieldUpdateOperationsInput | string
-  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  local_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
-  default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
-  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
 export type PublicHolidayCreateManyOrganisationInput = {
   id?: string
   clerk_org_id: string
-  jurisdiction_id?: string | null
   source: $Enums.public_holiday_source
   source_remote_id?: string | null
   country_code: string
@@ -1060,7 +767,6 @@ export type PublicHolidayCreateManyOrganisationInput = {
   holiday_type: $Enums.public_holiday_type
   default_classification?: $Enums.public_holiday_day_classification
   notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: string | null
   updated_by_user_id?: string | null
   archived_at?: Date | string | null
@@ -1081,20 +787,16 @@ export type PublicHolidayUpdateWithoutOrganisationInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  jurisdiction?: Prisma.PublicHolidayJurisdictionUpdateOneWithoutHolidaysNestedInput
-  assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutPublic_holidayNestedInput
 }
 
 export type PublicHolidayUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  jurisdiction_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
   source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   country_code?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1105,19 +807,16 @@ export type PublicHolidayUncheckedUpdateWithoutOrganisationInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutPublic_holidayNestedInput
 }
 
 export type PublicHolidayUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  jurisdiction_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
   source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   country_code?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1128,7 +827,6 @@ export type PublicHolidayUncheckedUpdateManyWithoutOrganisationInput = {
   holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
   default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
   notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1136,132 +834,12 @@ export type PublicHolidayUncheckedUpdateManyWithoutOrganisationInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type PublicHolidayCreateManyJurisdictionInput = {
-  id?: string
-  clerk_org_id: string
-  organisation_id: string
-  source: $Enums.public_holiday_source
-  source_remote_id?: string | null
-  country_code: string
-  region_code?: string | null
-  holiday_date: Date | string
-  name: string
-  local_name?: string | null
-  holiday_type: $Enums.public_holiday_type
-  default_classification?: $Enums.public_holiday_day_classification
-  notes_internal?: string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: string | null
-  updated_by_user_id?: string | null
-  archived_at?: Date | string | null
-  created_at?: Date | string
-  updated_at?: Date | string
-}
-
-export type PublicHolidayUpdateWithoutJurisdictionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
-  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  country_code?: Prisma.StringFieldUpdateOperationsInput | string
-  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  local_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
-  default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
-  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPublic_holidaysNestedInput
-  assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutPublic_holidayNestedInput
-}
-
-export type PublicHolidayUncheckedUpdateWithoutJurisdictionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
-  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  country_code?: Prisma.StringFieldUpdateOperationsInput | string
-  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  local_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
-  default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
-  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutPublic_holidayNestedInput
-}
-
-export type PublicHolidayUncheckedUpdateManyWithoutJurisdictionInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  source?: Prisma.Enumpublic_holiday_sourceFieldUpdateOperationsInput | $Enums.public_holiday_source
-  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  country_code?: Prisma.StringFieldUpdateOperationsInput | string
-  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_date?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  name?: Prisma.StringFieldUpdateOperationsInput | string
-  local_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  holiday_type?: Prisma.Enumpublic_holiday_typeFieldUpdateOperationsInput | $Enums.public_holiday_type
-  default_classification?: Prisma.Enumpublic_holiday_day_classificationFieldUpdateOperationsInput | $Enums.public_holiday_day_classification
-  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-}
-
-
-/**
- * Count Type PublicHolidayCountOutputType
- */
-
-export type PublicHolidayCountOutputType = {
-  assignments: number
-}
-
-export type PublicHolidayCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  assignments?: boolean | PublicHolidayCountOutputTypeCountAssignmentsArgs
-}
-
-/**
- * PublicHolidayCountOutputType without action
- */
-export type PublicHolidayCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PublicHolidayCountOutputType
-   */
-  select?: Prisma.PublicHolidayCountOutputTypeSelect<ExtArgs> | null
-}
-
-/**
- * PublicHolidayCountOutputType without action
- */
-export type PublicHolidayCountOutputTypeCountAssignmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.PublicHolidayAssignmentWhereInput
-}
 
 
 export type PublicHolidaySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  jurisdiction_id?: boolean
   source?: boolean
   source_remote_id?: boolean
   country_code?: boolean
@@ -1272,23 +850,18 @@ export type PublicHolidaySelect<ExtArgs extends runtime.Types.Extensions.Interna
   holiday_type?: boolean
   default_classification?: boolean
   notes_internal?: boolean
-  source_payload_json?: boolean
   created_by_user_id?: boolean
   updated_by_user_id?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  jurisdiction?: boolean | Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>
-  assignments?: boolean | Prisma.PublicHoliday$assignmentsArgs<ExtArgs>
-  _count?: boolean | Prisma.PublicHolidayCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["publicHoliday"]>
 
 export type PublicHolidaySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  jurisdiction_id?: boolean
   source?: boolean
   source_remote_id?: boolean
   country_code?: boolean
@@ -1299,21 +872,18 @@ export type PublicHolidaySelectCreateManyAndReturn<ExtArgs extends runtime.Types
   holiday_type?: boolean
   default_classification?: boolean
   notes_internal?: boolean
-  source_payload_json?: boolean
   created_by_user_id?: boolean
   updated_by_user_id?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  jurisdiction?: boolean | Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>
 }, ExtArgs["result"]["publicHoliday"]>
 
 export type PublicHolidaySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  jurisdiction_id?: boolean
   source?: boolean
   source_remote_id?: boolean
   country_code?: boolean
@@ -1324,21 +894,18 @@ export type PublicHolidaySelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   holiday_type?: boolean
   default_classification?: boolean
   notes_internal?: boolean
-  source_payload_json?: boolean
   created_by_user_id?: boolean
   updated_by_user_id?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  jurisdiction?: boolean | Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>
 }, ExtArgs["result"]["publicHoliday"]>
 
 export type PublicHolidaySelectScalar = {
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
-  jurisdiction_id?: boolean
   source?: boolean
   source_remote_id?: boolean
   country_code?: boolean
@@ -1349,7 +916,6 @@ export type PublicHolidaySelectScalar = {
   holiday_type?: boolean
   default_classification?: boolean
   notes_internal?: boolean
-  source_payload_json?: boolean
   created_by_user_id?: boolean
   updated_by_user_id?: boolean
   archived_at?: boolean
@@ -1357,34 +923,26 @@ export type PublicHolidaySelectScalar = {
   updated_at?: boolean
 }
 
-export type PublicHolidayOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "jurisdiction_id" | "source" | "source_remote_id" | "country_code" | "region_code" | "holiday_date" | "name" | "local_name" | "holiday_type" | "default_classification" | "notes_internal" | "source_payload_json" | "created_by_user_id" | "updated_by_user_id" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["publicHoliday"]>
+export type PublicHolidayOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "source" | "source_remote_id" | "country_code" | "region_code" | "holiday_date" | "name" | "local_name" | "holiday_type" | "default_classification" | "notes_internal" | "created_by_user_id" | "updated_by_user_id" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["publicHoliday"]>
 export type PublicHolidayInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  jurisdiction?: boolean | Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>
-  assignments?: boolean | Prisma.PublicHoliday$assignmentsArgs<ExtArgs>
-  _count?: boolean | Prisma.PublicHolidayCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PublicHolidayIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  jurisdiction?: boolean | Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>
 }
 export type PublicHolidayIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
-  jurisdiction?: boolean | Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>
 }
 
 export type $PublicHolidayPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PublicHoliday"
   objects: {
     organisation: Prisma.$OrganisationPayload<ExtArgs>
-    jurisdiction: Prisma.$PublicHolidayJurisdictionPayload<ExtArgs> | null
-    assignments: Prisma.$PublicHolidayAssignmentPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
     organisation_id: string
-    jurisdiction_id: string | null
     source: $Enums.public_holiday_source
     source_remote_id: string | null
     country_code: string
@@ -1395,7 +953,6 @@ export type $PublicHolidayPayload<ExtArgs extends runtime.Types.Extensions.Inter
     holiday_type: $Enums.public_holiday_type
     default_classification: $Enums.public_holiday_day_classification
     notes_internal: string | null
-    source_payload_json: runtime.JsonValue | null
     created_by_user_id: string | null
     updated_by_user_id: string | null
     archived_at: Date | null
@@ -1796,8 +1353,6 @@ readonly fields: PublicHolidayFieldRefs;
 export interface Prisma__PublicHolidayClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  jurisdiction<T extends Prisma.PublicHoliday$jurisdictionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PublicHoliday$jurisdictionArgs<ExtArgs>>): Prisma.Prisma__PublicHolidayJurisdictionClient<runtime.Types.Result.GetResult<Prisma.$PublicHolidayJurisdictionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-  assignments<T extends Prisma.PublicHoliday$assignmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PublicHoliday$assignmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublicHolidayAssignmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1830,7 +1385,6 @@ export interface PublicHolidayFieldRefs {
   readonly id: Prisma.FieldRef<"PublicHoliday", 'String'>
   readonly clerk_org_id: Prisma.FieldRef<"PublicHoliday", 'String'>
   readonly organisation_id: Prisma.FieldRef<"PublicHoliday", 'String'>
-  readonly jurisdiction_id: Prisma.FieldRef<"PublicHoliday", 'String'>
   readonly source: Prisma.FieldRef<"PublicHoliday", 'public_holiday_source'>
   readonly source_remote_id: Prisma.FieldRef<"PublicHoliday", 'String'>
   readonly country_code: Prisma.FieldRef<"PublicHoliday", 'String'>
@@ -1841,7 +1395,6 @@ export interface PublicHolidayFieldRefs {
   readonly holiday_type: Prisma.FieldRef<"PublicHoliday", 'public_holiday_type'>
   readonly default_classification: Prisma.FieldRef<"PublicHoliday", 'public_holiday_day_classification'>
   readonly notes_internal: Prisma.FieldRef<"PublicHoliday", 'String'>
-  readonly source_payload_json: Prisma.FieldRef<"PublicHoliday", 'Json'>
   readonly created_by_user_id: Prisma.FieldRef<"PublicHoliday", 'String'>
   readonly updated_by_user_id: Prisma.FieldRef<"PublicHoliday", 'String'>
   readonly archived_at: Prisma.FieldRef<"PublicHoliday", 'DateTime'>
@@ -2245,49 +1798,6 @@ export type PublicHolidayDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many PublicHolidays to delete.
    */
   limit?: number
-}
-
-/**
- * PublicHoliday.jurisdiction
- */
-export type PublicHoliday$jurisdictionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PublicHolidayJurisdiction
-   */
-  select?: Prisma.PublicHolidayJurisdictionSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the PublicHolidayJurisdiction
-   */
-  omit?: Prisma.PublicHolidayJurisdictionOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.PublicHolidayJurisdictionInclude<ExtArgs> | null
-  where?: Prisma.PublicHolidayJurisdictionWhereInput
-}
-
-/**
- * PublicHoliday.assignments
- */
-export type PublicHoliday$assignmentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the PublicHolidayAssignment
-   */
-  select?: Prisma.PublicHolidayAssignmentSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the PublicHolidayAssignment
-   */
-  omit?: Prisma.PublicHolidayAssignmentOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.PublicHolidayAssignmentInclude<ExtArgs> | null
-  where?: Prisma.PublicHolidayAssignmentWhereInput
-  orderBy?: Prisma.PublicHolidayAssignmentOrderByWithRelationInput | Prisma.PublicHolidayAssignmentOrderByWithRelationInput[]
-  cursor?: Prisma.PublicHolidayAssignmentWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.PublicHolidayAssignmentScalarFieldEnum | Prisma.PublicHolidayAssignmentScalarFieldEnum[]
 }
 
 /**

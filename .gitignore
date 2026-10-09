@@ -18,6 +18,8 @@ out/
 .nyc_output/
 blob-report/
 coverage/
+# The coverage minimum settings route, not test coverage output.
+!apps/app/app/(authenticated)/settings/coverage/
 playwright-report/
 playwright/.cache/
 storybook-static/

@@ -30,10 +30,6 @@ export interface BillingSummary {
   }>;
 }
 
-export interface DashboardBillingSummary extends BillingSummary {
-  visibleToAdmin: boolean;
-}
-
 interface BillingSummaryCore {
   isOverLimit: boolean;
   plan: BillingSummary["plan"];
@@ -83,42 +79,6 @@ export async function getBillingSummary(
       ...summaryResult.value,
       hasContactFlow: true,
       hasUpgradeFlow: true,
-    },
-  };
-}
-
-export async function getBillingSummaryForDashboard(
-  input: z.input<typeof SummarySchema>
-): Promise<Result<DashboardBillingSummary, BillingServiceError>> {
-  const parsed = SummarySchema.safeParse(input);
-  if (!parsed.success) {
-    return unknownError("Failed to load billing summary.");
-  }
-  if (
-    parsed.data.actingRole !== "owner" &&
-    parsed.data.actingRole !== "admin"
-  ) {
-    return {
-      error: {
-        code: "not_authorised",
-        message: "Billing is managed by the account owner.",
-      },
-      ok: false,
-    };
-  }
-
-  const summaryResult = await loadBillingSummary(parsed.data);
-  if (!summaryResult.ok) {
-    return summaryResult;
-  }
-
-  return {
-    ok: true,
-    value: {
-      ...summaryResult.value,
-      hasContactFlow: false,
-      hasUpgradeFlow: parsed.data.actingRole === "owner",
-      visibleToAdmin: parsed.data.actingRole === "owner",
     },
   };
 }

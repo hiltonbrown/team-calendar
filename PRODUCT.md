@@ -130,7 +130,7 @@ Slack notifications, Teams integration, HTML calendar views, and additional prov
 | Testing | Vitest | Co-located test files |
 | Linting | Biome 2 + Ultracite | |
 | Real-time notifications | SSE via Vercel streaming | No WebSocket infrastructure required |
-| Public holiday data | Nager.Date API | Auto-sourced per country and region; manual overrides in database |
+| Public holiday data | Bundled data files (AU, NZ, UK) | One file per country in `packages/core`, updated by hand each September; per-organisation preferences and custom holidays in database. See `docs/public-holidays.md` |
 
 ---
 
@@ -353,6 +353,7 @@ AvailabilityRecord
 AvailabilityPublication
 LeaveBalance
 PublicHoliday
+PublicHolidayPreference
 Feed
 FeedScope
 FeedToken
@@ -435,13 +436,19 @@ Fetched from Xero per person per leave type during normal operation, or managed 
 
 **Balance unit and currency:** `balance_unit` is `hours | days | currency`. `currency_code` is nullable and holds an ISO 4217 code (e.g. `NZD`) for NZ Payroll balances such as Holiday Pay that Xero exposes in dollars rather than hours or days. The unit/code pairing is enforced at the application layer, not by a database constraint: a `currency` balance requires a code from `SupportedCurrencyCodeSchema` (`packages/xero/src/read/leave-balances.ts`, currently `["NZD"]`, extended only alongside a documented provider mapping); an `hours` or `days` balance must never carry a code. Manual balances are always hours or days and always carry a null `currency_code`. `source_payload_json` retains the raw Xero balance payload for admin audit only, validated as Prisma-safe JSON via `LeaveBalanceRawPayloadSchema` in the same file; it is always null for manual balances, which have no Xero-provided payload. Team Calendar stores and displays these provider values as given; it never calculates accruals, converts currency, or subtracts a duration from a monetary balance.
 
+### Official public holidays (bundled reference data)
+
+Official AU, NZ and UK holidays are not stored per organisation. They ship as one JSON file per country in `packages/core/src/public-holidays/reference/data/`, validated when the module loads, covering the current year plus two and updated by hand each September (`docs/public-holidays.md`). Each entry has a stable `id` (`<country>-<region|national>-<date>-<slug>`), `date`, `name`, `region` (registry code or null), `kind` (`public` | `part_day` | `local`), plus `startsAt` for part days and `area` for local days.
+
+Resolution (`resolvePublicHolidaysFromData` in `packages/core`, loaded through `loadHolidayResolutionData` in `packages/database`): a location uses its own region; without one it uses the organisation's region when in the same country, else national only. The organisation level covers people without a location. `public` holidays default to non-working, `part_day` to working, and `local` days apply only after a location opts in. Holiday keys are the reference `id`, or `custom:<public_holidays.id>` for custom holidays.
+
 ### `public_holidays`
 
-Sourced from Nager.Date API or entered manually. Carries `country_code`, optional `region_code`, and `default_classification` (`non_working` | `working`). `country_code = "CUSTOM"` bypasses country matching and applies across all jurisdictions unless restricted by a region. Unique on `(organisation_id, source, source_remote_id)`.
+Custom holidays an organisation adds itself (`source = "manual"`). Carries `country_code`, optional `region_code`, and `default_classification` (`non_working` | `working`). `country_code = "CUSTOM"` bypasses country matching and applies everywhere unless restricted by a region. Unique on `(organisation_id, source, source_remote_id)`.
 
-### `public_holiday_assignments`
+### `public_holiday_preferences`
 
-Explicit holiday classification overrides scoped by location (`scope_type = "location"`, `scope_value = location_id`). A matching active location assignment overrides the holiday's `default_classification` (e.g. marking a working day non-working for a specific office or vice versa), even when the holiday jurisdiction differs from the location. Unique on `(public_holiday_id, scope_type, scope_value)`. Other schema scopes (`organisation`, `team`, `person`, `feed`) and `include_in_feeds` remain dormant and inert until a supported writer and UI productise them.
+Per-organisation choices about any holiday key: `setting` is `hidden`, `working` or `non_working`. `location_id = null` is organisation-wide and only ever `hidden`; a location row sets a working or non-working classification, or switches on a local day. A location preference beats an organisation preference. Unique on `(organisation_id, holiday_key, location_id)`; rows cascade when their location is deleted. Owner/admin only, audited.
 
 ### `notifications`
 
@@ -503,6 +510,7 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 | `availability_publications` | `availability_record_id` |
 | `leave_balances` | `(person_id, xero_connection_id, leave_type_xero_id)` for Xero-sourced rows; partial unique on `(person_id, leave_type_xero_id) WHERE xero_connection_id IS NULL` for manual balances |
 | `public_holidays` | `(organisation_id, source, source_remote_id)` |
+| `public_holiday_preferences` | `(organisation_id, holiday_key, location_id)` |
 | `notification_preferences` | `(user_id, organisation_id, notification_type)` |
 | `feeds` | `(clerk_org_id, slug)` |
 | `plans` | `key` |
@@ -761,7 +769,7 @@ Revoked or expired tokens return `410 Gone`.
 6. Leave submission workflow: draft, submit, Xero write-back, approval state machine
 7. Leave approval workflow: manager approve/decline, Xero write-back
 8. Manual availability CRUD (WFH, travel, etc.)
-9. Public holiday data: API sourcing, manual overrides, per-location configuration
+9. Public holiday data: bundled reference files, custom holidays, per-location preferences
 10. SSE notification infrastructure and in-app notification delivery
 11. Feed model and token model
 12. ICS renderer with stable UID and privacy modes

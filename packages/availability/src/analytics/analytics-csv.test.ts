@@ -38,7 +38,7 @@ describe("exportAnalyticsToCsv", () => {
     const lines = csv.split("\r\n");
     expect(lines[0]).toBe(expectedHeaders);
     expect(lines[1]).toBe(
-      "John,Doe,Engineering,Sydney,Annual Leave,xero,2026-05-10T09:00:00.000Z,2026-05-12T17:00:00.000Z,3,2026-05-01T09:00:00.000Z,2026-05-02T10:00:00.000Z,Jane Smith"
+      "John,Doe,Engineering,Sydney,Annual leave,xero,2026-05-10T09:00:00.000Z,2026-05-12T17:00:00.000Z,3,2026-05-01T09:00:00.000Z,2026-05-02T10:00:00.000Z,Jane Smith"
     );
     expect(lines[2]).toBe(""); // ends with trailing newline
   });
@@ -68,7 +68,7 @@ describe("exportAnalyticsToCsv", () => {
     const csv = exportAnalyticsToCsv([record]);
     const lines = csv.split("\r\n");
     expect(lines[1]).toBe(
-      "John,Doe,,,Annual Leave,xero,2026-05-10T09:00:00.000Z,2026-05-12T17:00:00.000Z,3,,,"
+      "John,Doe,,,Annual leave,xero,2026-05-10T09:00:00.000Z,2026-05-12T17:00:00.000Z,3,,,"
     );
   });
 });

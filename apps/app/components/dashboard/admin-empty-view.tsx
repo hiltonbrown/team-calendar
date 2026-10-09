@@ -1,35 +1,24 @@
 import { DashboardCardShell } from "./dashboard-card-shell";
+import { formatFullDate } from "./dashboard-format";
 import { DashboardHeader } from "./dashboard-header";
-import { DashboardLayout } from "./dashboard-layout";
-import { XeroDisconnectedBanner } from "./xero-disconnected-banner";
+import { DEFAULT_DASHBOARD_TIMEZONE } from "./dashboard-view-state";
 
 interface AdminEmptyViewProps {
+  now: Date;
   orgQueryValue: string | null;
-  roleLabel: "Admin" | "Owner";
-  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
-export function AdminEmptyView({
-  xeroConnectionState,
-  orgQueryValue,
-  roleLabel,
-}: AdminEmptyViewProps) {
+
+/** Owners and admins without a person profile in this organisation. */
+export function AdminEmptyView({ now, orgQueryValue }: AdminEmptyViewProps) {
   return (
     <div className="space-y-6">
       <DashboardHeader
-        name="Welcome"
-        roleLabel={roleLabel}
-        subtitle="Your dashboard is ready. Add people manually, connect Xero, or create calendar feeds when you need them."
+        dateLabel={formatFullDate(now, DEFAULT_DASHBOARD_TIMEZONE)}
+        locationLabel={null}
+        orgQueryValue={orgQueryValue}
+        scopeLine="Your dashboard is ready. Add people manually, connect Xero, or create calendar feeds when you need them."
       />
-
-      {xeroConnectionState === "connected" ? null : (
-        <XeroDisconnectedBanner
-          connectHref="/settings/integrations/xero"
-          orgQueryValue={orgQueryValue}
-          xeroConnectionState={xeroConnectionState}
-        />
-      )}
-
-      <DashboardLayout>
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <DashboardCardShell
           ctaHref="/people"
           ctaLabel="Manage people"
@@ -66,7 +55,7 @@ export function AdminEmptyView({
             Calendar, Outlook, or Apple Calendar.
           </p>
         </DashboardCardShell>
-      </DashboardLayout>
+      </div>
     </div>
   );
 }

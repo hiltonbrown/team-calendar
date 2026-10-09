@@ -16,9 +16,6 @@ vi.mock("@repo/feeds", () => ({
   ensureDefaultCalendarFeed: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 vi.mock("@repo/availability", () => ({
-  ensureDefaultPublicHolidaysForOrganisation: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: {} }),
   XERO_WRITE_CLAIM_LEASE_MS: 5 * 60 * 1000,
 }));
 const identity = vi.hoisted(() => ({ verify: vi.fn() }));

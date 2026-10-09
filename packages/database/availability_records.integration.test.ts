@@ -143,9 +143,8 @@ const cleanTestData = async () => {
   await database.xeroAuthorisation.deleteMany({
     where: { id: approvalAuthorisationId },
   });
-  await database.publicHolidayAssignment.deleteMany({ where: scope });
+  await database.publicHolidayPreference.deleteMany({ where: scope });
   await database.publicHoliday.deleteMany({ where: scope });
-  await database.publicHolidayJurisdiction.deleteMany({ where: scope });
   await database.feedToken.deleteMany({ where: scope });
   await database.feedScope.deleteMany({ where: scope });
   await database.feed.deleteMany({ where: scope });

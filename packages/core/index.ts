@@ -80,14 +80,16 @@ export {
   formatAvailabilityRecordType,
   getAvailabilityRecordLabel,
 } from "./src/availability-record-label";
-
-export type {
-  HolidayApplicabilityHoliday,
-  HolidayApplicabilityInput,
-  HolidayApplicabilityLocationAssignment,
-  HolidayApplicabilitySubject,
-} from "./src/holiday-applicability";
-export { holidayIsNonWorking } from "./src/holiday-applicability";
+export {
+  addDaysToDateKey,
+  dateKeyInTimeZone,
+  dateKeyOfUtcDate,
+  dateKeysBetween,
+  dayOfWeekOfDateKey,
+  recordFallsOnDay,
+  recordQueryWindow,
+  zonedStartOfDay,
+} from "./src/date-keys";
 export type {
   ApproveLeaveInput,
   DeclineLeaveInput,
@@ -102,12 +104,46 @@ export type {
   XeroMutationIdentity,
 } from "./src/ports/external-write-port";
 export type {
+  ListReferenceHolidays,
+  ListReferenceHolidaysInput,
+  ReferenceHoliday,
+  ReferenceHolidayKind,
+} from "./src/public-holidays/reference/reference-holidays";
+export {
+  findReferenceHoliday,
+  listReferenceHolidays,
+  PUBLIC_HOLIDAY_DATA_VERSION,
+} from "./src/public-holidays/reference/reference-holidays";
+export type {
+  HolidayClassification,
+  HolidayPreferenceSetting,
+  LocalHolidayOption,
+  ResolvedPublicHoliday,
+  ResolveHolidayData,
+} from "./src/public-holidays/resolve";
+export {
+  CUSTOM_HOLIDAY_KEY_PREFIX,
+  customHolidayKey,
+  localHolidayOptions,
+  nonWorkingHolidayDates,
+  resolvePublicHolidaysFromData,
+} from "./src/public-holidays/resolve";
+export type {
   ExecuteRedisRestCommandInput,
   RedisRestEnvelope,
   RedisRestTransportError,
   RedisRestTransportErrorCode,
 } from "./src/redis-rest-transport";
 export { executeRedisRestCommand } from "./src/redis-rest-transport";
+export type { CountryCode, RegionDefinition } from "./src/regions";
+export {
+  COUNTRIES,
+  isCountryCode,
+  isRegionCode,
+  normaliseRegionCode,
+  REGIONS,
+  regionLabel,
+} from "./src/regions";
 export type {
   SupportIssuePayload,
   SupportSubmissionCategory,

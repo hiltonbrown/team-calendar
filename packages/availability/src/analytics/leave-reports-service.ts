@@ -3,9 +3,10 @@ import "server-only";
 import {
   type ClerkOrgId,
   getAvailabilityRecordLabel,
-  holidayIsNonWorking,
   type OrganisationId,
   type Result,
+  startOfUtcDay,
+  toDateOnly,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
@@ -14,7 +15,11 @@ import type {
   availability_source_type,
 } from "@repo/database/generated/enums";
 import { z } from "zod";
-import { listForOrganisation } from "../holidays/holiday-service";
+import {
+  nonWorkingHolidayDates,
+  type ResolvedPublicHoliday,
+  resolvePublicHolidays,
+} from "../holidays/resolve-public-holidays";
 import {
   isXeroLeaveType,
   XERO_LEAVE_TYPES,
@@ -171,13 +176,6 @@ type PersonRow = Prisma.PersonGetPayload<{
 type RecordRow = Prisma.AvailabilityRecordGetPayload<{
   select: typeof analyticsRecordSelect;
 }>;
-
-type HolidayRow =
-  Awaited<ReturnType<typeof listForOrganisation>> extends Result<infer TValue>
-    ? TValue extends readonly (infer THoliday)[]
-      ? THoliday
-      : never
-    : never;
 
 interface Dataset {
   entries: ExpandedRecordDay[];
@@ -461,43 +459,21 @@ function recordWhere(
   };
 }
 
-async function loadHolidays(input: AggregateInput) {
-  const years = yearsBetween(
-    input.dateRange.start.getUTCFullYear(),
-    input.dateRange.end.getUTCFullYear()
-  );
-  const results = await Promise.all(
-    years.map((year) =>
-      listForOrganisation(
-        input.clerkOrgId as ClerkOrgId,
-        input.organisationId as OrganisationId,
-        { year }
-      )
-    )
-  );
-  const holidays: HolidayRow[] = [];
-  for (const result of results) {
-    if (!result.ok) {
-      return result;
-    }
-    holidays.push(...result.value);
-  }
-  return { ok: true as const, value: holidays };
+function loadHolidays(input: AggregateInput) {
+  return resolvePublicHolidays({
+    clerkOrgId: input.clerkOrgId as ClerkOrgId,
+    from: toDateOnly(input.dateRange.start),
+    organisationId: input.organisationId as OrganisationId,
+    to: toDateOnly(input.dateRange.end),
+  });
 }
 
-type LocationForHolidayMatch = {
-  country_code?: string | null;
-  id?: string;
-  region_code?: string | null;
-} | null;
-
 interface PersonForHolidayMap {
-  location?: LocationForHolidayMatch;
   location_id?: string | null;
 }
 
 function buildHolidayMap(
-  holidays: readonly HolidayRow[],
+  holidays: readonly ResolvedPublicHoliday[],
   people: readonly PersonForHolidayMap[]
 ): Map<string, AnalyticsHoliday[]> {
   const map = new Map<string, AnalyticsHoliday[]>();
@@ -508,35 +484,9 @@ function buildHolidayMap(
     }
     map.set(
       locationKey,
-      holidays
-        .filter((holiday) => {
-          const locationAssignments = holiday.assignments
-            .filter((assignment) => assignment.scope_type === "location")
-            .map((assignment) => ({
-              archivedAt: assignment.archived_at,
-              classification: assignment.day_classification,
-              locationId: assignment.scope_value,
-            }));
-
-          return holidayIsNonWorking({
-            holiday: {
-              archivedAt: holiday.archived_at,
-              countryCode: holiday.country_code,
-              defaultClassification: holiday.default_classification,
-              locationAssignments,
-              regionCode: holiday.region_code,
-            },
-            subject: {
-              countryCode: person.location?.country_code ?? null,
-              locationId: person.location?.id ?? null,
-              regionCode: person.location?.region_code ?? null,
-            },
-          });
-        })
-        .map((holiday) => ({
-          date: holiday.holiday_date,
-          isSuppressed: false,
-        }))
+      [...nonWorkingHolidayDates(holidays, person.location_id ?? null)].map(
+        (dateOnly) => ({ date: startOfUtcDay(dateOnly), isSuppressed: false })
+      )
     );
   }
   return map;
@@ -758,14 +708,6 @@ function monthKeys(start: Date, end: Date): string[] {
     );
   }
   return months;
-}
-
-function yearsBetween(startYear: number, endYear: number): number[] {
-  const years: number[] = [];
-  for (let year = startYear; year <= endYear; year += 1) {
-    years.push(year);
-  }
-  return years;
 }
 
 function sum(values: readonly number[]): number {

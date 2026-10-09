@@ -7,6 +7,7 @@ import type { CalendarFilterInput } from "../../app/(authenticated)/calendar/_sc
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
 import { calendarDayHref } from "./calendar-url-state";
+import { publicHolidayLabel } from "./public-holiday-label";
 
 interface CalendarMonthViewProps {
   actingPersonId: string | null;
@@ -161,7 +162,7 @@ export function CalendarMonthView({
                   className={`mt-2 rounded-xl px-2.5 py-1.5 text-body-sm ${statusToneClasses.holiday}`}
                   key={holiday.name}
                 >
-                  {holiday.name}
+                  {publicHolidayLabel(holiday)}
                 </p>
               ))}
               <div className="mt-2 space-y-2">

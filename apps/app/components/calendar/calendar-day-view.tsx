@@ -3,6 +3,7 @@ import { statusToneClasses } from "@/components/availability/availability-status
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
 import { hourInTimeZone } from "./calendar-local-time";
+import { publicHolidayLabel } from "./public-holiday-label";
 
 interface CalendarDayViewProps {
   actingPersonId: string | null;
@@ -53,7 +54,7 @@ export function CalendarDayView({
               className={`rounded-2xl px-4 py-3 text-label-lg ${statusToneClasses.holiday}`}
               key={holiday.name}
             >
-              <p className="font-medium">{holiday.name}</p>
+              <p className="font-medium">{publicHolidayLabel(holiday)}</p>
               <p className="text-label-md opacity-75">
                 {holiday.appliesToAllLocationsInView
                   ? "All locations"

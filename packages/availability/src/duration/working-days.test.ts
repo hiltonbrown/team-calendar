@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findLocation: vi.fn(),
   findOrganisation: vi.fn(),
-  listForOrganisation: vi.fn(),
+  resolvePublicHolidays: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
@@ -18,8 +18,11 @@ vi.mock("@repo/database", () => ({
   },
   scopedQuery: mocks.scopedQuery,
 }));
-vi.mock("../holidays/holiday-service", () => ({
-  listForOrganisation: mocks.listForOrganisation,
+vi.mock("../holidays/resolve-public-holidays", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../holidays/resolve-public-holidays")
+  >()),
+  resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
 
 const { computeWorkingDays } = await import("./working-days");
@@ -38,13 +41,25 @@ const timezones = [
   "Europe/London",
 ] as const;
 
-const holiday = (date: string, archived = false) => ({
-  archived_at: archived ? new Date("2026-01-01T00:00:00.000Z") : null,
-  assignments: [],
-  country_code: "AU",
-  default_classification: "non_working",
-  holiday_date: new Date(`${date}T00:00:00.000Z`),
-  region_code: "QLD",
+const holiday = (
+  date: string,
+  overrides: Partial<{
+    classification: "non_working" | "working";
+    hidden: boolean;
+    locationId: string | null;
+  }> = {}
+) => ({
+  area: null,
+  classification: "non_working" as const,
+  date,
+  hidden: false,
+  key: `au-qld-${date}-holiday`,
+  kind: "public" as const,
+  locationId: "loc_1",
+  name: "Holiday",
+  origin: "official" as const,
+  startsAt: null,
+  ...overrides,
 });
 
 describe("computeWorkingDays", () => {
@@ -52,7 +67,7 @@ describe("computeWorkingDays", () => {
     vi.clearAllMocks();
     mocks.findLocation.mockResolvedValue(location);
     mocks.findOrganisation.mockResolvedValue(location);
-    mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
+    mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: [] });
   });
 
   it.each(timezones)(
@@ -131,7 +146,7 @@ describe("computeWorkingDays", () => {
     "excludes the stored public holiday date in %s",
     async (timezone) => {
       mocks.findLocation.mockResolvedValue({ ...location, timezone });
-      mocks.listForOrganisation.mockResolvedValue({
+      mocks.resolvePublicHolidays.mockResolvedValue({
         ok: true,
         value: [holiday("2026-01-06")],
       });
@@ -176,7 +191,7 @@ describe("computeWorkingDays", () => {
   });
 
   it("excludes active public holidays", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
       value: [holiday("2026-05-05")],
     });
@@ -193,10 +208,10 @@ describe("computeWorkingDays", () => {
     expect(result).toEqual({ ok: true, value: 4 });
   });
 
-  it("does not exclude suppressed holidays", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
+  it("does not exclude holidays resolved as working days", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
-      value: [holiday("2026-05-05", true)],
+      value: [holiday("2026-05-05", { classification: "working" })],
     });
 
     const result = await computeWorkingDays({
@@ -211,56 +226,10 @@ describe("computeWorkingDays", () => {
     expect(result).toEqual({ ok: true, value: 5 });
   });
 
-  it("applies location override non_working to exclude holiday", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
+  it("ignores holidays resolved for another location", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
-      value: [
-        {
-          ...holiday("2026-05-05"),
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "non_working",
-              scope_type: "location",
-              scope_value: "loc_1",
-            },
-          ],
-          default_classification: "working",
-          region_code: "NSW", // Mismatched jurisdiction overridden by location
-        },
-      ],
-    });
-
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
-
-    expect(result).toEqual({ ok: true, value: 4 });
-  });
-
-  it("applies location override working to include day as working day", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
-      ok: true,
-      value: [
-        {
-          ...holiday("2026-05-05"),
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "working",
-              scope_type: "location",
-              scope_value: "loc_1",
-            },
-          ],
-          default_classification: "non_working",
-          region_code: "QLD",
-        },
-      ],
+      value: [holiday("2026-05-05", { locationId: "loc_2" })],
     });
 
     const result = await computeWorkingDays({
@@ -275,15 +244,12 @@ describe("computeWorkingDays", () => {
     expect(result).toEqual({ ok: true, value: 5 });
   });
 
-  it("applies CUSTOM holiday to exclude working day", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
+  it("uses organisation-level holidays for people without a location", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
       value: [
-        {
-          ...holiday("2026-05-06"),
-          country_code: "CUSTOM",
-          region_code: null,
-        },
+        holiday("2026-05-05", { locationId: null }),
+        holiday("2026-05-06", { locationId: "loc_1" }),
       ],
     });
 
@@ -291,12 +257,53 @@ describe("computeWorkingDays", () => {
       allDay: true,
       clerkOrgId: "org_1",
       endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: "loc_1",
+      locationId: null,
       organisationId: "00000000-0000-4000-8000-000000000001",
       startsAt: new Date("2026-05-04T00:00:00.000Z"),
     });
 
     expect(result).toEqual({ ok: true, value: 4 });
+  });
+
+  it("resolves holidays for every year in the range from one load", async () => {
+    await computeWorkingDays({
+      allDay: true,
+      clerkOrgId: "org_1",
+      endsAt: new Date("2027-01-05T00:00:00.000Z"),
+      locationId: "loc_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      startsAt: new Date("2026-12-30T00:00:00.000Z"),
+    });
+
+    expect(
+      mocks.resolvePublicHolidays.mock.calls.map(([input]) => input)
+    ).toEqual([
+      {
+        clerkOrgId: "org_1",
+        from: "2026-01-01",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        to: "2027-12-31",
+      },
+    ]);
+  });
+
+  it("excludes holidays in both years of a range that crosses New Year", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
+      ok: true,
+      value: [holiday("2026-12-31"), holiday("2027-01-01")],
+    });
+
+    const result = await computeWorkingDays({
+      allDay: true,
+      clerkOrgId: "org_1",
+      endsAt: new Date("2027-01-04T00:00:00.000Z"),
+      locationId: "loc_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      startsAt: new Date("2026-12-30T00:00:00.000Z"),
+    });
+
+    // Wed 30 Dec to Mon 4 Jan: four weekdays, two of them holidays.
+    expect(result).toEqual({ ok: true, value: 2 });
   });
 
   it("rounds part-day ranges half-up to the nearest quarter", async () => {

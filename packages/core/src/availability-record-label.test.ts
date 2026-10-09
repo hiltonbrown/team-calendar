@@ -9,26 +9,26 @@ import {
 
 describe("availability record label mappings", () => {
   const expectedLabels: Record<AvailabilityRecordType, string> = {
-    alternative_contact: "Alternative Contact",
-    annual_leave: "Annual Leave",
-    another_office: "Another Office",
-    client_site: "Client Site",
-    contractor_unavailable: "Contractor Unavailable",
+    alternative_contact: "Alternative contact",
+    annual_leave: "Annual leave",
+    another_office: "Another office",
+    client_site: "Client site",
+    contractor_unavailable: "Contractor unavailable",
     holiday: "Holiday",
     leave: "Leave",
-    leave_request: "Leave Request",
-    limited_availability: "Limited Availability",
-    long_service_leave: "Long Service Leave",
-    offsite_meeting: "Offsite Meeting",
+    leave_request: "Leave request",
+    limited_availability: "Limited availability",
+    long_service_leave: "Long service leave",
+    offsite_meeting: "Offsite meeting",
     other: "Other",
-    personal_leave: "Personal Leave",
-    public_holiday: "Public Holiday",
-    sick_leave: "Sick Leave",
+    personal_leave: "Personal leave",
+    public_holiday: "Public holiday",
+    sick_leave: "Sick leave",
     training: "Training",
     travel: "Travel",
     travelling: "Travelling",
-    unpaid_leave: "Unpaid Leave",
-    wfh: "Work From Home",
+    unpaid_leave: "Unpaid leave",
+    wfh: "Working from home",
   };
 
   it("includes all 20 canonical record types in the enum definition", () => {
@@ -65,10 +65,10 @@ describe("availability record label mappings", () => {
     expect(isExhaustive).toBe(true);
   });
 
-  it("falls back to capitalised words for unclassified custom strings", () => {
+  it("falls back to sentence case for unclassified custom strings", () => {
     expect(getAvailabilityRecordLabel("custom_record_type")).toBe(
-      "Custom Record Type"
+      "Custom record type"
     );
-    expect(getAvailabilityRecordLabel("jury_duty")).toBe("Jury Duty");
+    expect(getAvailabilityRecordLabel("jury_duty")).toBe("Jury duty");
   });
 });

@@ -1,0 +1,400 @@
+{
+  "country": "NZ",
+  "entries": [
+    {
+      "id": "nz-national-2026-01-01-new-years-day",
+      "date": "2026-01-01",
+      "name": "New Year's Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-01-02-day-after-new-years-day",
+      "date": "2026-01-02",
+      "name": "Day after New Year's Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-01-19-wellington-anniversary-day",
+      "date": "2026-01-19",
+      "name": "Wellington Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Wellington province"
+    },
+    {
+      "id": "nz-national-2026-01-26-auckland-anniversary-day",
+      "date": "2026-01-26",
+      "name": "Auckland Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Auckland province"
+    },
+    {
+      "id": "nz-national-2026-02-02-nelson-anniversary-day",
+      "date": "2026-02-02",
+      "name": "Nelson Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Nelson province"
+    },
+    {
+      "id": "nz-national-2026-02-06-waitangi-day",
+      "date": "2026-02-06",
+      "name": "Waitangi Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-03-09-taranaki-anniversary-day",
+      "date": "2026-03-09",
+      "name": "Taranaki Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Taranaki province"
+    },
+    {
+      "id": "nz-national-2026-03-23-otago-anniversary-day",
+      "date": "2026-03-23",
+      "name": "Otago Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Otago province"
+    },
+    {
+      "id": "nz-national-2026-04-03-good-friday",
+      "date": "2026-04-03",
+      "name": "Good Friday",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-04-06-easter-monday",
+      "date": "2026-04-06",
+      "name": "Easter Monday",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-04-07-southland-anniversary-day",
+      "date": "2026-04-07",
+      "name": "Southland Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Southland province"
+    },
+    {
+      "id": "nz-national-2026-04-25-anzac-day",
+      "date": "2026-04-25",
+      "name": "Anzac Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-04-27-anzac-day-observed",
+      "date": "2026-04-27",
+      "name": "Anzac Day (observed)",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-06-01-kings-birthday",
+      "date": "2026-06-01",
+      "name": "King's Birthday",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-07-10-matariki",
+      "date": "2026-07-10",
+      "name": "Matariki",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-09-28-south-canterbury-anniversary-day",
+      "date": "2026-09-28",
+      "name": "South Canterbury Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "South Canterbury"
+    },
+    {
+      "id": "nz-national-2026-10-23-hawkes-bay-anniversary-day",
+      "date": "2026-10-23",
+      "name": "Hawke's Bay Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Hawke's Bay province"
+    },
+    {
+      "id": "nz-national-2026-10-26-labour-day",
+      "date": "2026-10-26",
+      "name": "Labour Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-11-02-marlborough-anniversary-day",
+      "date": "2026-11-02",
+      "name": "Marlborough Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Marlborough province"
+    },
+    {
+      "id": "nz-national-2026-11-13-canterbury-anniversary-day",
+      "date": "2026-11-13",
+      "name": "Canterbury Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "North and Central Canterbury"
+    },
+    {
+      "id": "nz-national-2026-11-30-chatham-islands-anniversary-day",
+      "date": "2026-11-30",
+      "name": "Chatham Islands Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Chatham Islands"
+    },
+    {
+      "id": "nz-national-2026-11-30-westland-anniversary-day",
+      "date": "2026-11-30",
+      "name": "Westland Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Westland province"
+    },
+    {
+      "id": "nz-national-2026-12-25-christmas-day",
+      "date": "2026-12-25",
+      "name": "Christmas Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-12-26-boxing-day",
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2026-12-28-boxing-day-observed",
+      "date": "2026-12-28",
+      "name": "Boxing Day (observed)",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-01-01-new-years-day",
+      "date": "2027-01-01",
+      "name": "New Year's Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-01-02-day-after-new-years-day",
+      "date": "2027-01-02",
+      "name": "Day after New Year's Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-01-04-day-after-new-years-day-observed",
+      "date": "2027-01-04",
+      "name": "Day after New Year's Day (observed)",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-01-25-wellington-anniversary-day",
+      "date": "2027-01-25",
+      "name": "Wellington Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Wellington province"
+    },
+    {
+      "id": "nz-national-2027-02-01-auckland-anniversary-day",
+      "date": "2027-02-01",
+      "name": "Auckland Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Auckland province"
+    },
+    {
+      "id": "nz-national-2027-02-01-nelson-anniversary-day",
+      "date": "2027-02-01",
+      "name": "Nelson Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Nelson province"
+    },
+    {
+      "id": "nz-national-2027-02-06-waitangi-day",
+      "date": "2027-02-06",
+      "name": "Waitangi Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-02-08-waitangi-day-observed",
+      "date": "2027-02-08",
+      "name": "Waitangi Day (observed)",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-03-08-taranaki-anniversary-day",
+      "date": "2027-03-08",
+      "name": "Taranaki Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Taranaki province"
+    },
+    {
+      "id": "nz-national-2027-03-22-otago-anniversary-day",
+      "date": "2027-03-22",
+      "name": "Otago Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Otago province"
+    },
+    {
+      "id": "nz-national-2027-03-26-good-friday",
+      "date": "2027-03-26",
+      "name": "Good Friday",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-03-29-easter-monday",
+      "date": "2027-03-29",
+      "name": "Easter Monday",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-03-30-southland-anniversary-day",
+      "date": "2027-03-30",
+      "name": "Southland Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Southland province"
+    },
+    {
+      "id": "nz-national-2027-04-25-anzac-day",
+      "date": "2027-04-25",
+      "name": "Anzac Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-04-26-anzac-day-observed",
+      "date": "2027-04-26",
+      "name": "Anzac Day (observed)",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-06-07-kings-birthday",
+      "date": "2027-06-07",
+      "name": "King's Birthday",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-06-25-matariki",
+      "date": "2027-06-25",
+      "name": "Matariki",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-09-27-south-canterbury-anniversary-day",
+      "date": "2027-09-27",
+      "name": "South Canterbury Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "South Canterbury"
+    },
+    {
+      "id": "nz-national-2027-10-22-hawkes-bay-anniversary-day",
+      "date": "2027-10-22",
+      "name": "Hawke's Bay Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Hawke's Bay province"
+    },
+    {
+      "id": "nz-national-2027-10-25-labour-day",
+      "date": "2027-10-25",
+      "name": "Labour Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-11-01-marlborough-anniversary-day",
+      "date": "2027-11-01",
+      "name": "Marlborough Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Marlborough province"
+    },
+    {
+      "id": "nz-national-2027-11-12-canterbury-anniversary-day",
+      "date": "2027-11-12",
+      "name": "Canterbury Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "North and Central Canterbury"
+    },
+    {
+      "id": "nz-national-2027-11-29-chatham-islands-anniversary-day",
+      "date": "2027-11-29",
+      "name": "Chatham Islands Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Chatham Islands"
+    },
+    {
+      "id": "nz-national-2027-11-29-westland-anniversary-day",
+      "date": "2027-11-29",
+      "name": "Westland Anniversary Day",
+      "region": null,
+      "kind": "local",
+      "area": "Westland province"
+    },
+    {
+      "id": "nz-national-2027-12-25-christmas-day",
+      "date": "2027-12-25",
+      "name": "Christmas Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-12-26-boxing-day",
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-12-27-christmas-day-observed",
+      "date": "2027-12-27",
+      "name": "Christmas Day (observed)",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "nz-national-2027-12-28-boxing-day-observed",
+      "date": "2027-12-28",
+      "name": "Boxing Day (observed)",
+      "region": null,
+      "kind": "public"
+    }
+  ]
+}

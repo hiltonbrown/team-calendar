@@ -31,11 +31,11 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: { plan_id: 1, plan_key: 1 },
     tenants: 0,
   },
-  "packages/database/public-holidays.integration.test.ts": { tenants: 2 },
   "packages/database/src/seed/seed.integration.test.ts": {
     globalKeys: { plan_id: 3, plan_key: 3 },
     tenants: 2,
   },
+  "packages/database/teams.integration.test.ts": { tenants: 2 },
   "packages/database/xero-authorisation-locks.integration.test.ts": {
     tenants: 0,
   },

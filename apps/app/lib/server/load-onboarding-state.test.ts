@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   organisationFindFirst: vi.fn(),
   pendingMatchesCount: vi.fn(),
   peopleCount: vi.fn(),
-  publicHolidayJurisdictionCount: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/availability", () => ({
@@ -24,9 +23,6 @@ vi.mock("@repo/database", () => ({
     person: {
       count: mocks.peopleCount,
       findFirst: mocks.currentUserPersonFindFirst,
-    },
-    publicHolidayJurisdiction: {
-      count: mocks.publicHolidayJurisdictionCount,
     },
     xeroConnection: {
       findFirst: mocks.getXeroConnectionStateForScope,
@@ -51,7 +47,6 @@ describe("loadOnboardingState", () => {
     mocks.peopleCount.mockResolvedValue(2);
     mocks.currentUserPersonFindFirst.mockResolvedValue({ id: "person_1" });
     mocks.pendingMatchesCount.mockResolvedValue(0);
-    mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
     mocks.feedCount.mockResolvedValue(1);
   });
   it.each([
@@ -110,8 +105,7 @@ describe("loadOnboardingState", () => {
       title: "Review calendar feed",
     });
   });
-  it("provisions complete holidays step when jurisdiction exists", async () => {
-    mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
+  it("completes the holidays step for a supported country", async () => {
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
@@ -121,13 +115,16 @@ describe("loadOnboardingState", () => {
     expect(holidayStep).toMatchObject({
       ctaLabel: "Review holidays",
       description:
-        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
+        "Official public holidays apply automatically for your country and each location's state or region. Review them and add local or company days.",
       status: "complete",
       title: "Review public holidays",
     });
   });
-  it("provisions incomplete holidays step when no jurisdiction exists", async () => {
-    mocks.publicHolidayJurisdictionCount.mockResolvedValue(0);
+  it("leaves the holidays step next for an unsupported country", async () => {
+    mocks.organisationFindFirst.mockResolvedValue({
+      country_code: "US",
+      name: "Acme",
+    });
     const state = await loadOnboardingState({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
@@ -137,7 +134,7 @@ describe("loadOnboardingState", () => {
     expect(holidayStep).toMatchObject({
       ctaLabel: "Review setup",
       description:
-        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
+        "Official public holidays apply automatically for your country and each location's state or region. Review them and add local or company days.",
       status: "next",
       title: "Review public holidays",
     });

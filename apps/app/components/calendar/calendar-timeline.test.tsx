@@ -12,7 +12,7 @@ describe("CalendarTimeline", () => {
     expect(screen.getByText("Manual availability")).toBeDefined();
     expect(screen.getAllByText("Ari Report").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mika Planner").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Annual Leave").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Annual leave").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Training").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", {
@@ -164,7 +164,7 @@ describe("CalendarTimeline", () => {
     );
     expect(
       screen.getAllByRole("button", {
-        name: "Ari Report: Annual Leave, Team Calendar leave",
+        name: "Ari Report: Annual leave, Team Calendar leave",
       })
     ).toHaveLength(2);
   });
@@ -206,6 +206,7 @@ function calendarRange(
               isSuppressed: false,
               locationNames: ["Brisbane"],
               name: "Queensland Day",
+              startsAt: null,
             },
           ]
         : [],
@@ -231,10 +232,12 @@ function person(overrides: { displayName: string; id: string }) {
     displayName: overrides.displayName,
     firstName: overrides.displayName.split(" ")[0] ?? overrides.displayName,
     id: overrides.id,
+    jobTitle: null,
     lastName: overrides.displayName.split(" ")[1] ?? "",
     locationName: "Brisbane",
     locationTimezone: "Australia/Brisbane",
     personType: "employee",
+    teamId: null,
     teamName: "Operations",
     xeroSyncFailedCountInRange: 0,
   } as const;

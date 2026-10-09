@@ -1,8 +1,7 @@
 "use server";
 
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
-import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { normaliseRegionCode, type Result } from "@repo/core";
 import { database } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -145,11 +144,24 @@ export async function updateOrganisationAction(input: {
       return validationError("Confirm the country change before saving.");
     }
 
+    const countryCode = parsed.data.countryCode ?? organisation.country_code;
+    let regionCode = organisation.region_code
+      ? normaliseRegionCode(countryCode, organisation.region_code)
+      : null;
+    if (parsed.data.regionCode !== undefined) {
+      regionCode = parsed.data.regionCode
+        ? normaliseRegionCode(countryCode, parsed.data.regionCode)
+        : null;
+      if (parsed.data.regionCode && !regionCode) {
+        return validationError("Choose a state or region in that country.");
+      }
+    }
+
     const updated = await database.organisation.update({
       data: {
-        country_code: parsed.data.countryCode ?? organisation.country_code,
+        country_code: countryCode,
         name: parsed.data.name ?? organisation.name,
-        region_code: parsed.data.regionCode ?? organisation.region_code,
+        region_code: regionCode,
         timezone: parsed.data.timezone ?? organisation.timezone,
       },
       select: {
@@ -189,18 +201,6 @@ export async function updateOrganisationAction(input: {
         user_agent: context.value.userAgent,
       },
     });
-
-    const holidayJurisdictionChanged =
-      updated.country_code !== organisation.country_code ||
-      updated.region_code !== organisation.region_code;
-
-    if (holidayJurisdictionChanged) {
-      await ensureDefaultPublicHolidaysForOrganisation({
-        clerkOrgId: context.value.clerkOrgId as ClerkOrgId,
-        organisationId: context.value.organisationId as OrganisationId,
-        userId: context.value.actingUserId,
-      });
-    }
 
     revalidatePath("/settings/general");
     revalidatePath("/");

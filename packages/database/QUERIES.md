@@ -169,6 +169,25 @@ countUnreadNotifications(
 
 ---
 
+### `teams.ts`
+
+Team coverage minimums and counts-only coverage reads.
+
+```typescript
+// Teams with their coverage minimum and active headcount
+listTeamsWithCoverageMinimum(input: { clerkOrgId; organisationId }): Promise<Result<TeamCoverageMinimumRow[]>>
+
+// Set or clear (null) one team's minimum; pass a transaction client to join a caller's transaction
+setTeamCoverageMinimum(input: { clerkOrgId; organisationId; teamId; minimum }, client?): Promise<Result<TeamCoverageMinimumChange>>
+
+// People away per team and day (approved, non-archived records of active people); numbers only
+countAwayPeopleByTeamAndDay(input: { clerkOrgId; organisationId; teamIds; from; to; timezone; awayRecordTypes }): Promise<Result<Map<teamId, Map<dateKey, number>>>>
+```
+
+**Tenant scoping**: Filtered by `clerkOrgId` and `organisationId`, on records and on the people they belong to. A team from another tenant is `not_found`.
+
+---
+
 ## Using These Services
 
 ### From apps/app

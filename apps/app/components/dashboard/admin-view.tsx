@@ -1,100 +1,79 @@
 import type { AdminDashboardView } from "@repo/availability";
-import { ActionItemsCard } from "./action-items-card";
-import { ActiveFeedsCard } from "./active-feeds-card";
-import { buildPersonalCalendarTimeline } from "./ambient-calendar-data";
-import { AmbientCalendarField } from "./ambient-calendar-field";
+import { ApprovalRows } from "./approval-rows";
 import { BalancesCard } from "./balances-card";
+import { formatFullDate } from "./dashboard-format";
+import { DashboardGrid } from "./dashboard-grid";
+import { approvalHeaderActions, DashboardHeader } from "./dashboard-header";
 import {
-  DashboardScaffold,
-  toDashboardHeaderProps,
-} from "./dashboard-scaffold";
+  DEFAULT_DASHBOARD_TIMEZONE,
+  showBalances,
+} from "./dashboard-view-state";
+import { NeedsReply } from "./needs-reply";
 import { NextPublicHolidayCard } from "./next-public-holiday-card";
-import { OrgPendingApprovalsCard } from "./org-pending-approvals-card";
-import { OrgXeroSyncFailedCard } from "./org-xero-sync-failed-card";
-import { QuickActionsCard } from "./quick-actions-card";
-import { RecentAuditEventsCard } from "./recent-audit-events-card";
-import { SyncHealthCard } from "./sync-health-card";
-import { UsageVsLimitsCard } from "./usage-vs-limits-card";
-import { XeroDisconnectedBanner } from "./xero-disconnected-banner";
+import { TimelineSection } from "./timeline-section";
 
 interface AdminViewProps {
+  now: Date;
   orgQueryValue: string | null;
   personId: string;
   view: AdminDashboardView;
 }
-export function AdminView({ view, orgQueryValue, personId }: AdminViewProps) {
-  const xero = view.header.xeroConnectionState === "connected";
-  const timeline = buildPersonalCalendarTimeline(view, {
-    now: new Date(),
-    timezone: view.header.timezone ?? "Australia/Brisbane",
-  });
+
+export function AdminView({
+  now,
+  orgQueryValue,
+  personId,
+  view,
+}: AdminViewProps) {
+  const timezone = view.header.timezone ?? DEFAULT_DASHBOARD_TIMEZONE;
+  const peopleCount = view.header.totalActivePeopleCount;
   return (
-    <DashboardScaffold
-      banner={
-        xero ? null : (
-          <XeroDisconnectedBanner
-            connectHref="/settings/integrations/xero"
-            orgQueryValue={orgQueryValue}
-            xeroConnectionState={view.header.xeroConnectionState}
-          />
-        )
-      }
-      feature={
-        <AmbientCalendarField model={timeline} orgQueryValue={orgQueryValue} />
-      }
-      header={toDashboardHeaderProps(view.header)}
-      lead={
-        <>
-          {xero ? (
-            <SyncHealthCard
+    <div className="space-y-6">
+      <DashboardHeader
+        dateLabel={formatFullDate(now, timezone)}
+        locationLabel={view.header.locationName}
+        orgQueryValue={orgQueryValue}
+        scopeLine={`${view.header.organisationName} · ${peopleCount} ${peopleCount === 1 ? "person" : "people"}`}
+        {...approvalHeaderActions(view.approvalQueue)}
+      />
+      <TimelineSection
+        now={now}
+        orgQueryValue={orgQueryValue}
+        state={view.timeline}
+        viewerRole="admin"
+      />
+      <DashboardGrid
+        lead={
+          <>
+            <NeedsReply
               orgQueryValue={orgQueryValue}
-              state={view.syncHealth}
+              state={view.actionItems}
             />
-          ) : null}
-          {xero ? (
-            <OrgPendingApprovalsCard
+            <ApprovalRows
+              now={now}
               orgQueryValue={orgQueryValue}
-              state={view.orgWidePendingApprovals}
+              state={view.approvalQueue}
+              timezone={timezone}
+              title="Waiting for approval"
             />
-          ) : null}
-          <ActionItemsCard
-            orgQueryValue={orgQueryValue}
-            state={view.actionItems}
-          />
-        </>
-      }
-      rail={
-        <>
-          <OrgXeroSyncFailedCard
-            orgQueryValue={orgQueryValue}
-            state={view.orgWideXeroSyncFailed}
-          />
-          <ActiveFeedsCard
-            orgQueryValue={orgQueryValue}
-            state={view.activeFeeds}
-          />
-          <UsageVsLimitsCard
-            orgQueryValue={orgQueryValue}
-            state={view.usageVsLimits}
-          />
-          <RecentAuditEventsCard
-            orgQueryValue={orgQueryValue}
-            state={view.recentAuditEvents}
-          />
-          <NextPublicHolidayCard
-            orgQueryValue={orgQueryValue}
-            state={view.publicHolidays}
-          />
-          <QuickActionsCard orgQueryValue={orgQueryValue} />
-          {xero ? (
-            <BalancesCard
+          </>
+        }
+        rail={
+          <>
+            {showBalances(view.balances) ? (
+              <BalancesCard
+                orgQueryValue={orgQueryValue}
+                personId={personId}
+                state={view.balances}
+              />
+            ) : null}
+            <NextPublicHolidayCard
               orgQueryValue={orgQueryValue}
-              personId={personId}
-              state={view.balances}
+              state={view.publicHolidays}
             />
-          ) : null}
-        </>
-      }
-    />
+          </>
+        }
+      />
+    </div>
   );
 }

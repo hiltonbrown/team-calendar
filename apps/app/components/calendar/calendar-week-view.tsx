@@ -3,6 +3,7 @@ import { cn } from "@repo/design-system/lib/utils";
 import { statusToneClasses } from "@/components/availability/availability-status";
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
+import { publicHolidayLabel } from "./public-holiday-label";
 
 interface CalendarWeekViewProps {
   actingPersonId: string | null;
@@ -71,7 +72,7 @@ export function CalendarWeekView({
                 >
                   {day.publicHolidays.map((holiday) => (
                     <li className="truncate font-medium" key={holiday.name}>
-                      {holiday.name}
+                      {publicHolidayLabel(holiday)}
                     </li>
                   ))}
                 </ul>

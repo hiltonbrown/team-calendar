@@ -78,6 +78,7 @@ function weekRange() {
                 isSuppressed: false,
                 locationNames: ["Brisbane"],
                 name: "Queensland Day",
+                startsAt: null,
               },
             ]
           : [],

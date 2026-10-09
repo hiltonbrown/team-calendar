@@ -1,11 +1,7 @@
 import { log } from "@repo/observability/log";
 import "server-only";
-import {
-  type ClerkOrgId,
-  holidayIsNonWorking,
-  type OrganisationId,
-  type Result,
-} from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { recordFallsOnDay, recordQueryWindow } from "@repo/core";
 import { database, scopedTo } from "@repo/database";
 import type {
   availability_approval_status,
@@ -16,7 +12,7 @@ import type {
   person_type,
 } from "@repo/database/generated/enums";
 import { z } from "zod";
-import { listForOrganisation } from "../holidays/holiday-service";
+import { resolvePublicHolidays } from "../holidays/resolve-public-holidays";
 import {
   type RecordTypeCategory,
   sourceTypesForCategory,
@@ -71,10 +67,12 @@ export interface CalendarPerson {
   displayName: string;
   firstName: string;
   id: string;
+  jobTitle: string | null;
   lastName: string;
   locationName: string | null;
   locationTimezone: string | null;
   personType: person_type | "contractor" | "employee";
+  teamId: string | null;
   teamName: string | null;
   xeroSyncFailedCountInRange: number;
 }
@@ -83,6 +81,8 @@ export interface PublicHolidayCell {
   isSuppressed: boolean;
   locationNames: readonly string[];
   name: string;
+  /** "HH:mm" for part-day holidays, otherwise null. */
+  startsAt: string | null;
 }
 export interface CalendarEvent {
   allDay: boolean;
@@ -190,6 +190,7 @@ interface ScopedPerson {
   employment_type: string;
   first_name: string;
   id: string;
+  job_title: string | null;
   last_name: string;
   location: {
     country_code: string | null;
@@ -283,7 +284,11 @@ export async function getCalendarRange(
     const visiblePersonIds = new Set(visiblePeople.map((person) => person.id));
     const records = await loadRecords(
       parsed.data,
-      range,
+      recordQueryWindow(
+        localRange.startDateOnly,
+        addDays(localRange.endDateOnly, -1),
+        timezone
+      ),
       [...visiblePersonIds],
       {
         showPendingOnCalendar: settingsResult.ok
@@ -309,23 +314,25 @@ export async function getCalendarRange(
       range,
       timezone,
     });
-    const failedCounts = countFailedByPerson(events);
     const dayBoundaries = dayDateOnly.map((dateOnly) => ({
+      dateKey: dateOnly,
       dateOnly,
       end: zonedStartOfDayToUtc(addDays(dateOnly, 1), timezone),
       start: zonedStartOfDayToUtc(dateOnly, timezone),
     }));
+    const eventsInView = events.filter((event) =>
+      dayBoundaries.some((day) => recordFallsOnDay(event, day))
+    );
+    const failedCounts = countFailedByPerson(eventsInView);
     const today = dateOnlyInTimeZone(new Date(), timezone);
-    const days = dayBoundaries.map(({ dateOnly, end, start }) => ({
-      date: dateOnlyToUtcDate(dateOnly),
+    const days = dayBoundaries.map((day) => ({
+      date: dateOnlyToUtcDate(day.dateOnly),
       dayOfWeek: dateOnlyToUtcDate(
-        dateOnly
+        day.dateOnly
       ).getUTCDay() as CalendarDay["dayOfWeek"],
-      events: events.filter(
-        (event) => event.startsAt < end && event.endsAt > start
-      ),
-      isToday: dateOnly === today,
-      publicHolidays: holidays.get(dateOnly) ?? [],
+      events: eventsInView.filter((event) => recordFallsOnDay(event, day)),
+      isToday: day.dateOnly === today,
+      publicHolidays: holidays.get(day.dateOnly) ?? [],
     }));
     const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
@@ -346,7 +353,7 @@ export async function getCalendarRange(
         truncated: totalPeopleInScope > MAX_VISIBLE_PEOPLE,
         view: parsed.data.view,
         xeroConnectionState,
-        xeroSyncFailedCount: events.filter(
+        xeroSyncFailedCount: eventsInView.filter(
           (event) => event.approvalStatus === "xero_sync_failed"
         ).length,
       },
@@ -557,7 +564,7 @@ function applyPeopleFilters(
 }
 async function loadRecords(
   input: ParsedRangeInput,
-  range: CalendarRange["range"],
+  range: { end: Date; start: Date },
   personIds: string[],
   options: {
     showPendingOnCalendar: boolean;
@@ -591,7 +598,7 @@ async function loadRecords(
         organisationId: input.organisationId,
       }),
       archived_at: null,
-      ends_at: { gt: range.start },
+      ends_at: { gte: range.start },
       OR: approvalOr,
       person_id: { in: personIds },
       record_type: input.filters.recordType?.length
@@ -631,87 +638,56 @@ async function loadPublicHolidayCells(input: {
   range: CalendarRange["range"];
   timezone: string;
 }): Promise<Map<string, PublicHolidayCell[]>> {
-  const years = new Set(
-    input.dateOnlyValues.map((dateOnly) => Number(dateOnly.slice(0, 4)))
-  );
-  const holidayResults = await Promise.all(
-    [...years].map((year) =>
-      listForOrganisation(
-        input.clerkOrgId as ClerkOrgId,
-        input.organisationId as OrganisationId,
-        { year }
-      )
-    )
-  );
+  const sortedDates = [...input.dateOnlyValues].sort();
+  const [from] = sortedDates;
+  const to = sortedDates.at(-1);
+  const cells = new Map<string, PublicHolidayCell[]>();
+  if (!(from && to)) {
+    return cells;
+  }
   const locations = new Map(
     input.people
       .filter((person) => person.location)
       .map((person) => [person.location?.id ?? "", person.location])
   );
-  const cells = new Map<string, PublicHolidayCell[]>();
-  for (const result of holidayResults) {
-    if (!result.ok) {
+  const result = await resolvePublicHolidays({
+    clerkOrgId: input.clerkOrgId as ClerkOrgId,
+    from,
+    organisationId: input.organisationId as OrganisationId,
+    to,
+  });
+  if (!result.ok) {
+    return cells;
+  }
+  for (const holiday of result.value) {
+    const location = holiday.locationId
+      ? locations.get(holiday.locationId)
+      : null;
+    // Part days stay working days but still show, with their start time.
+    const visible =
+      holiday.classification === "non_working" || holiday.kind === "part_day";
+    if (!(location && visible)) {
       continue;
     }
-    for (const holiday of result.value) {
-      if (holiday.archived_at) {
-        continue;
-      }
-      const dateOnly = dateOnlyInTimeZone(holiday.holiday_date, input.timezone);
-      if (!input.dateOnlyValues.includes(dateOnly)) {
-        continue;
-      }
-      const locationAssignments = holiday.assignments
-        .filter((assignment) => assignment.scope_type === "location")
-        .map((assignment) => ({
-          archivedAt: assignment.archived_at,
-          classification: assignment.day_classification,
-          locationId: assignment.scope_value,
-        }));
-      const locationNames = [...locations.values()]
-        .filter((location): location is NonNullable<typeof location> =>
-          Boolean(location)
-        )
-        .filter((location) =>
-          holidayIsNonWorking({
-            holiday: {
-              archivedAt: holiday.archived_at,
-              countryCode: holiday.country_code,
-              defaultClassification: holiday.default_classification,
-              locationAssignments,
-              regionCode: holiday.region_code,
-            },
-            subject: {
-              countryCode: location.country_code,
-              locationId: location.id,
-              regionCode: location.region_code,
-            },
-          })
-        )
-        .map((location) => location.name)
-        .sort((first, second) => first.localeCompare(second));
-      if (locationNames.length === 0) {
-        continue;
-      }
-      const dateCells = cells.get(dateOnly) ?? [];
-      const existing = dateCells.find((cell) => cell.name === holiday.name);
-      if (existing) {
-        existing.locationNames = uniqueSorted([
-          ...existing.locationNames,
-          ...locationNames,
-        ]);
-        existing.appliesToAllLocationsInView =
-          existing.locationNames.length === locations.size;
-      } else {
-        dateCells.push({
-          appliesToAllLocationsInView: locationNames.length === locations.size,
-          isSuppressed: false,
-          locationNames,
-          name: holiday.name,
-        });
-      }
-      cells.set(dateOnly, dateCells);
+    const dateCells = cells.get(holiday.date) ?? [];
+    const existing = dateCells.find((cell) => cell.name === holiday.name);
+    if (existing) {
+      existing.locationNames = uniqueSorted([
+        ...existing.locationNames,
+        location.name,
+      ]);
+      existing.appliesToAllLocationsInView =
+        existing.locationNames.length === locations.size;
+    } else {
+      dateCells.push({
+        appliesToAllLocationsInView: locations.size === 1,
+        isSuppressed: false,
+        locationNames: [location.name],
+        name: holiday.name,
+        startsAt: holiday.startsAt,
+      });
     }
+    cells.set(holiday.date, dateCells);
   }
   return cells;
 }
@@ -774,10 +750,12 @@ function toCalendarPerson(
     displayName: `${person.first_name} ${person.last_name}`,
     firstName: person.first_name,
     id: person.id,
+    jobTitle: person.job_title,
     lastName: person.last_name,
     locationName: person.location?.name ?? null,
     locationTimezone: person.location?.timezone ?? null,
     personType: effectivePersonType(person),
+    teamId: person.team?.id ?? null,
     teamName: person.team?.name ?? null,
     xeroSyncFailedCountInRange,
   };
@@ -1093,6 +1071,7 @@ const personSelect = {
   employment_type: true,
   first_name: true,
   id: true,
+  job_title: true,
   last_name: true,
   location: {
     select: {

@@ -28,34 +28,6 @@ const COUNTRY_LABELS = {
   UK: "United Kingdom",
 } as const;
 
-const REGION_OPTIONS: Record<
-  string,
-  Array<{ label: string; value: string }>
-> = {
-  AU: [
-    { label: "Australian Capital Territory", value: "ACT" },
-    { label: "New South Wales", value: "NSW" },
-    { label: "Northern Territory", value: "NT" },
-    { label: "Queensland", value: "QLD" },
-    { label: "South Australia", value: "SA" },
-    { label: "Tasmania", value: "TAS" },
-    { label: "Victoria", value: "VIC" },
-    { label: "Western Australia", value: "WA" },
-  ],
-  NZ: [
-    { label: "Auckland", value: "AUK" },
-    { label: "Canterbury", value: "CAN" },
-    { label: "Otago", value: "OTA" },
-    { label: "Wellington", value: "WGN" },
-  ],
-  UK: [
-    { label: "England", value: "ENG" },
-    { label: "Northern Ireland", value: "NIR" },
-    { label: "Scotland", value: "SCT" },
-    { label: "Wales", value: "WLS" },
-  ],
-};
-
 const TIMEZONE_OPTIONS = [
   "Australia/Brisbane",
   "Australia/Sydney",
@@ -77,11 +49,14 @@ interface GeneralClientProps {
     regionCode: null | string;
     timezone: string;
   };
+  /** States or regions in the organisation's country, from the region registry. */
+  regionOptions: Array<{ label: string; value: string }>;
 }
 
 export const GeneralClient = ({
   organisation,
   account,
+  regionOptions,
 }: GeneralClientProps) => {
   const [accountName, setAccountName] = useState(account.name);
   const [organisationName, setOrganisationName] = useState(organisation.name);
@@ -89,8 +64,6 @@ export const GeneralClient = ({
   const [timezone, setTimezone] = useState(organisation.timezone);
   const [savingAccount, startAccountTransition] = useTransition();
   const [savingOrganisation, startOrganisationTransition] = useTransition();
-
-  const regionOptions = REGION_OPTIONS[organisation.countryCode] ?? [];
 
   const saveAccount = () => {
     startAccountTransition(async () => {
