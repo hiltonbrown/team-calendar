@@ -753,3 +753,34 @@ Verification (local disposable PostgreSQL 16 and a local Redis REST adapter in t
 - `bun run test:integration`: database 52, availability 25, app 10, feeds 31 and jobs 84 (run directly after Turbo interrupted it) all passed. `@repo/xero` failed 51 of 102 with identical results on the base commit `970906b`, which this branch does not change; the failures are mostly `network_error` where provider responses are expected, so they are environmental, not caused by this work.
 - A mutation check (disabling the owner guard) failed the escalation integration test, confirming coverage.
 - Browser rendering NOT VERIFIED: this environment has no Clerk keys, so authenticated pages cannot load. Walk through `/feeds`, a feed detail page and `/settings/feeds` at desktop and mobile widths, light and dark, before release.
+
+## 2026-10-09 New user onboarding (plan `docs/superpowers/plans/2026-10-09-onboarding.md`)
+
+Commits `c13ffbe` to `c29a3fc` on `ccr-dc842a52-ry65ln` implement Tasks 1 to 10.
+
+- [x] Task 1: `onboarding_step` enum, organisation onboarding columns, person `welcome_completed_at`, scoped queries, new registered integration suite.
+- [x] Task 2: wizard rules, state loader and service; welcome service.
+- [x] Task 3: `x-pathname` from the proxy and the first-run gate in the authenticated layout.
+- [x] Task 4: shared brand components, `(setup)` layout, `StepIndicator`.
+- [x] Task 5: details and Xero steps; failed Xero callbacks return to the signed path with a safe `xero_error` code.
+- [x] Task 6: people and invite steps; manual person creation extracted to a shared helper.
+- [x] Task 7: wizard page and finish step.
+- [x] Task 8: member welcome.
+- [x] Task 9: post-wizard checklist; dashboard panel removed.
+- [x] Task 10: catalogue, verification. Browser walkthrough NOT VERIFIED (see below).
+
+Deviations from the plan and spec:
+
+- `xero_setup_skipped_at` is not cleared inside the Xero OAuth transaction. Instead an active Xero connection always overrides the skip flag when the wizard and checklist derive mode, which gives the same behaviour without touching the hardened OAuth code.
+- A failed people import does not block the People step (the plan only allowed a complete import), so a failure never traps the admin.
+- The timezone control is a plain select of nine Australian zones rather than a searchable select.
+- Analytics are captured server-side only (`Onboarding Step Completed`, `Onboarding Completed`, `Member Welcome Completed`).
+- The dashboard's unlinked-member view already explains that the account is not linked, so its copy was left unchanged.
+- The organisation used by the gate and wizard is the Clerk organisation's first Organisation, matching existing layout behaviour; multi-entity selection is still an open gap.
+
+Verification (local disposable PostgreSQL 16 with the new migration applied, and the local Redis REST adapter):
+
+- `bun run check` passed (1,217 files); `bun run typecheck` passed.
+- `bun run test`: 17 of 18 tasks passed in the Turbo run; `app#test` failed one existing test (`xero-client.test.tsx`, "keeps connection history and a retry available after destructive disconnect fails") that could not find a dialog button under parallel load. It passed three isolated reruns and a full `apps/app` rerun (139 files, 835 tests). This branch does not change that component; treat it as an intermittent, load-sensitive test to stabilise separately.
+- `bun run test:integration --continue`: database 58, app 10, availability 26, feeds 31, jobs 84 passed. `@repo/xero` failed 51 of 102, identical to the base commit `970906b` (environmental, mostly `network_error`).
+- Browser rendering NOT VERIFIED: no Clerk keys in this environment. Before release, walk the owner wizard with Xero (single and multiple payroll files), without Xero, an OAuth cancel, and the member welcome for linked and unlinked members, at desktop and mobile widths in light and dark.
