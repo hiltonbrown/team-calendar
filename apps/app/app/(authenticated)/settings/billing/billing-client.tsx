@@ -141,7 +141,10 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
         </CardContent>
       </Card>
       {earlyAccess ? (
-        <Card className="rounded-xl border-warning/20 bg-warning-container/50">
+        <Card
+          className="rounded-xl border border-warning/20 bg-warning-container/50"
+          variant="plain"
+        >
           <CardHeader>
             <CardTitle>Closed Early Access</CardTitle>
             <CardDescription>

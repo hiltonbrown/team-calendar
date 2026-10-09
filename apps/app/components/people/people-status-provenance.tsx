@@ -1,5 +1,5 @@
 import { Badge } from "@repo/design-system/components/ui/badge";
-import { LeafIcon, PencilIcon } from "lucide-react";
+import { PencilIcon, RefreshCwIcon } from "lucide-react";
 import {
   statusToneClasses,
   toneForStatusKey,
@@ -28,13 +28,13 @@ export function PeopleProvenanceBadge({ xeroLinked }: { xeroLinked: boolean }) {
     <Badge
       className={
         xeroLinked
-          ? "gap-1 border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary/60"
-          : "gap-1 border-transparent bg-accent-container text-on-accent-container ring-1 ring-accent-container/60"
+          ? "gap-1 border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary-foreground/30"
+          : "gap-1 border-transparent bg-accent-container text-on-accent-container ring-1 ring-on-accent-container/30"
       }
       variant="secondary"
     >
       {xeroLinked ? (
-        <LeafIcon aria-hidden="true" className="size-3" />
+        <RefreshCwIcon aria-hidden="true" className="size-3" />
       ) : (
         <PencilIcon aria-hidden="true" className="size-3" />
       )}

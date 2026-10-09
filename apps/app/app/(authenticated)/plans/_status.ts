@@ -23,44 +23,44 @@ const planStatusStyles: Record<
 > = {
   approved: {
     badgeClassName:
-      "border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary/60",
+      "border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary-foreground/30",
     dotClassName: "bg-primary",
     rowClassName: "hover:bg-secondary/30",
   },
   archived: {
     badgeClassName:
-      "border-transparent bg-surface-container-high text-on-surface-variant ring-1 ring-outline/20",
+      "border-transparent bg-surface-container-high text-on-surface-variant ring-1 ring-on-surface-variant/30",
     dotClassName: "bg-outline",
     rowClassName: "opacity-80 hover:bg-surface-container-high/60",
   },
   declined: {
     badgeClassName:
-      "border-transparent bg-error-container text-on-error-container ring-1 ring-destructive/25",
+      "border-transparent bg-error-container text-on-error-container ring-1 ring-on-error-container/30",
     dotClassName: "bg-destructive",
     rowClassName: "bg-error-container/35 hover:bg-error-container/55",
   },
   draft: {
     badgeClassName:
-      "border-transparent bg-muted text-muted-foreground ring-1 ring-muted-foreground/15",
+      "border-transparent bg-muted text-muted-foreground ring-1 ring-muted-foreground/30",
     dotClassName: "bg-muted-foreground",
     rowClassName: "hover:bg-muted/70",
   },
   pending: {
     badgeClassName:
-      "border border-dashed bg-secondary/15 text-secondary-foreground ring-1 ring-secondary/30",
+      "border border-dashed bg-secondary/15 text-secondary-foreground ring-1 ring-secondary-foreground/30",
     dotClassName: "bg-secondary",
     rowClassName:
       "border border-dashed border-secondary/20 bg-secondary/10 hover:bg-secondary/20",
   },
   withdrawn: {
     badgeClassName:
-      "border-transparent bg-surface-container-high text-on-surface-variant ring-1 ring-outline/20",
+      "border-transparent bg-surface-container-high text-on-surface-variant ring-1 ring-on-surface-variant/30",
     dotClassName: "bg-outline",
     rowClassName: "hover:bg-surface-container-high/60",
   },
   xero_sync_failed: {
     badgeClassName:
-      "border-transparent bg-error-container text-on-error-container ring-1 ring-destructive/30",
+      "border-transparent bg-error-container text-on-error-container ring-1 ring-on-error-container/30",
     dotClassName: "bg-destructive",
     rowClassName: "bg-error-container/45 hover:bg-error-container/65",
   },

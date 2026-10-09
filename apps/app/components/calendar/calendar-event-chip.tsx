@@ -1,7 +1,7 @@
 import type { CalendarEvent } from "@repo/availability";
 import { getAvailabilityRecordLabel } from "@repo/core";
 import { cn } from "@repo/design-system/lib/utils";
-import { AlertTriangleIcon, LeafIcon, PencilIcon } from "lucide-react";
+import { AlertTriangleIcon, PencilIcon, RefreshCwIcon } from "lucide-react";
 import {
   statusToneClasses,
   toneForCalendarEvent,
@@ -26,7 +26,7 @@ export function CalendarEventChip({
   const style = statusToneClasses[toneForCalendarEvent(event)];
   const microLabel = treatmentLabel(event.renderTreatment);
   const isManual = isManualCalendarEvent(event);
-  const ProvenanceIcon = isManual ? PencilIcon : LeafIcon;
+  const ProvenanceIcon = isManual ? PencilIcon : RefreshCwIcon;
   const accessibleLabel = calendarEventAccessibleLabel(event);
 
   return (

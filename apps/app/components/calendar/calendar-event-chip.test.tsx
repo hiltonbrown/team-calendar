@@ -80,7 +80,7 @@ describe("CalendarEventChip", () => {
       name: MANUAL_EVENT_NAME,
     });
 
-    expect(leave.querySelector(".lucide-leaf")).not.toBeNull();
+    expect(leave.querySelector(".lucide-refresh-cw")).not.toBeNull();
     expect(manual.querySelector(".lucide-pencil")).not.toBeNull();
   });
 
