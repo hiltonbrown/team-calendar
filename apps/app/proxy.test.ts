@@ -109,6 +109,15 @@ describe("Proxy nonce and CSP generation", () => {
     expect(csp).toContain("report-to csp-endpoint");
   });
 
+  it("forwards the request pathname for server layouts", () => {
+    const response = handleProxyWithNonce(
+      new NextRequest("http://localhost:3000/settings/general?org=abc")
+    );
+    expect(response.headers.get("x-middleware-request-x-pathname")).toBe(
+      "/settings/general"
+    );
+  });
+
   it("sets consistent nonce and enforcing CSP on request and response headers", () => {
     const request = new NextRequest("http://localhost:3000/calendar");
     const response = handleProxyWithNonce(request);
