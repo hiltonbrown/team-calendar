@@ -216,6 +216,7 @@ export type LocationWhereInput = {
   updated_at?: Prisma.DateTimeFilter<"Location"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   people?: Prisma.PersonListRelationFilter
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceListRelationFilter
 }
 
 export type LocationOrderByWithRelationInput = {
@@ -230,6 +231,7 @@ export type LocationOrderByWithRelationInput = {
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
   people?: Prisma.PersonOrderByRelationAggregateInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceOrderByRelationAggregateInput
 }
 
 export type LocationWhereUniqueInput = Prisma.AtLeast<{
@@ -247,6 +249,7 @@ export type LocationWhereUniqueInput = Prisma.AtLeast<{
   updated_at?: Prisma.DateTimeFilter<"Location"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   people?: Prisma.PersonListRelationFilter
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceListRelationFilter
 }, "id">
 
 export type LocationOrderByWithAggregationInput = {
@@ -290,6 +293,7 @@ export type LocationCreateInput = {
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutLocationsInput
   people?: Prisma.PersonCreateNestedManyWithoutLocationInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceCreateNestedManyWithoutLocationInput
 }
 
 export type LocationUncheckedCreateInput = {
@@ -303,6 +307,7 @@ export type LocationUncheckedCreateInput = {
   created_at?: Date | string
   updated_at?: Date | string
   people?: Prisma.PersonUncheckedCreateNestedManyWithoutLocationInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUncheckedCreateNestedManyWithoutLocationInput
 }
 
 export type LocationUpdateInput = {
@@ -316,6 +321,7 @@ export type LocationUpdateInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutLocationsNestedInput
   people?: Prisma.PersonUpdateManyWithoutLocationNestedInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUpdateManyWithoutLocationNestedInput
 }
 
 export type LocationUncheckedUpdateInput = {
@@ -329,6 +335,7 @@ export type LocationUncheckedUpdateInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   people?: Prisma.PersonUncheckedUpdateManyWithoutLocationNestedInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUncheckedUpdateManyWithoutLocationNestedInput
 }
 
 export type LocationCreateManyInput = {
@@ -475,6 +482,22 @@ export type LocationUpdateOneWithoutPeopleNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.LocationUpdateToOneWithWhereWithoutPeopleInput, Prisma.LocationUpdateWithoutPeopleInput>, Prisma.LocationUncheckedUpdateWithoutPeopleInput>
 }
 
+export type LocationCreateNestedOneWithoutPublic_holiday_preferencesInput = {
+  create?: Prisma.XOR<Prisma.LocationCreateWithoutPublic_holiday_preferencesInput, Prisma.LocationUncheckedCreateWithoutPublic_holiday_preferencesInput>
+  connectOrCreate?: Prisma.LocationCreateOrConnectWithoutPublic_holiday_preferencesInput
+  connect?: Prisma.LocationWhereUniqueInput
+}
+
+export type LocationUpdateOneWithoutPublic_holiday_preferencesNestedInput = {
+  create?: Prisma.XOR<Prisma.LocationCreateWithoutPublic_holiday_preferencesInput, Prisma.LocationUncheckedCreateWithoutPublic_holiday_preferencesInput>
+  connectOrCreate?: Prisma.LocationCreateOrConnectWithoutPublic_holiday_preferencesInput
+  upsert?: Prisma.LocationUpsertWithoutPublic_holiday_preferencesInput
+  disconnect?: Prisma.LocationWhereInput | boolean
+  delete?: Prisma.LocationWhereInput | boolean
+  connect?: Prisma.LocationWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.LocationUpdateToOneWithWhereWithoutPublic_holiday_preferencesInput, Prisma.LocationUpdateWithoutPublic_holiday_preferencesInput>, Prisma.LocationUncheckedUpdateWithoutPublic_holiday_preferencesInput>
+}
+
 export type LocationCreateWithoutOrganisationInput = {
   id?: string
   clerk_org_id: string
@@ -485,6 +508,7 @@ export type LocationCreateWithoutOrganisationInput = {
   created_at?: Date | string
   updated_at?: Date | string
   people?: Prisma.PersonCreateNestedManyWithoutLocationInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceCreateNestedManyWithoutLocationInput
 }
 
 export type LocationUncheckedCreateWithoutOrganisationInput = {
@@ -497,6 +521,7 @@ export type LocationUncheckedCreateWithoutOrganisationInput = {
   created_at?: Date | string
   updated_at?: Date | string
   people?: Prisma.PersonUncheckedCreateNestedManyWithoutLocationInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUncheckedCreateNestedManyWithoutLocationInput
 }
 
 export type LocationCreateOrConnectWithoutOrganisationInput = {
@@ -550,6 +575,7 @@ export type LocationCreateWithoutPeopleInput = {
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutLocationsInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceCreateNestedManyWithoutLocationInput
 }
 
 export type LocationUncheckedCreateWithoutPeopleInput = {
@@ -562,6 +588,7 @@ export type LocationUncheckedCreateWithoutPeopleInput = {
   timezone?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUncheckedCreateNestedManyWithoutLocationInput
 }
 
 export type LocationCreateOrConnectWithoutPeopleInput = {
@@ -590,6 +617,7 @@ export type LocationUpdateWithoutPeopleInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutLocationsNestedInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUpdateManyWithoutLocationNestedInput
 }
 
 export type LocationUncheckedUpdateWithoutPeopleInput = {
@@ -602,6 +630,75 @@ export type LocationUncheckedUpdateWithoutPeopleInput = {
   timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUncheckedUpdateManyWithoutLocationNestedInput
+}
+
+export type LocationCreateWithoutPublic_holiday_preferencesInput = {
+  id?: string
+  clerk_org_id: string
+  name: string
+  country_code?: string | null
+  region_code?: string | null
+  timezone?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutLocationsInput
+  people?: Prisma.PersonCreateNestedManyWithoutLocationInput
+}
+
+export type LocationUncheckedCreateWithoutPublic_holiday_preferencesInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  name: string
+  country_code?: string | null
+  region_code?: string | null
+  timezone?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  people?: Prisma.PersonUncheckedCreateNestedManyWithoutLocationInput
+}
+
+export type LocationCreateOrConnectWithoutPublic_holiday_preferencesInput = {
+  where: Prisma.LocationWhereUniqueInput
+  create: Prisma.XOR<Prisma.LocationCreateWithoutPublic_holiday_preferencesInput, Prisma.LocationUncheckedCreateWithoutPublic_holiday_preferencesInput>
+}
+
+export type LocationUpsertWithoutPublic_holiday_preferencesInput = {
+  update: Prisma.XOR<Prisma.LocationUpdateWithoutPublic_holiday_preferencesInput, Prisma.LocationUncheckedUpdateWithoutPublic_holiday_preferencesInput>
+  create: Prisma.XOR<Prisma.LocationCreateWithoutPublic_holiday_preferencesInput, Prisma.LocationUncheckedCreateWithoutPublic_holiday_preferencesInput>
+  where?: Prisma.LocationWhereInput
+}
+
+export type LocationUpdateToOneWithWhereWithoutPublic_holiday_preferencesInput = {
+  where?: Prisma.LocationWhereInput
+  data: Prisma.XOR<Prisma.LocationUpdateWithoutPublic_holiday_preferencesInput, Prisma.LocationUncheckedUpdateWithoutPublic_holiday_preferencesInput>
+}
+
+export type LocationUpdateWithoutPublic_holiday_preferencesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutLocationsNestedInput
+  people?: Prisma.PersonUpdateManyWithoutLocationNestedInput
+}
+
+export type LocationUncheckedUpdateWithoutPublic_holiday_preferencesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  people?: Prisma.PersonUncheckedUpdateManyWithoutLocationNestedInput
 }
 
 export type LocationCreateManyOrganisationInput = {
@@ -625,6 +722,7 @@ export type LocationUpdateWithoutOrganisationInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   people?: Prisma.PersonUpdateManyWithoutLocationNestedInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUpdateManyWithoutLocationNestedInput
 }
 
 export type LocationUncheckedUpdateWithoutOrganisationInput = {
@@ -637,6 +735,7 @@ export type LocationUncheckedUpdateWithoutOrganisationInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   people?: Prisma.PersonUncheckedUpdateManyWithoutLocationNestedInput
+  public_holiday_preferences?: Prisma.PublicHolidayPreferenceUncheckedUpdateManyWithoutLocationNestedInput
 }
 
 export type LocationUncheckedUpdateManyWithoutOrganisationInput = {
@@ -657,10 +756,12 @@ export type LocationUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type LocationCountOutputType = {
   people: number
+  public_holiday_preferences: number
 }
 
 export type LocationCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   people?: boolean | LocationCountOutputTypeCountPeopleArgs
+  public_holiday_preferences?: boolean | LocationCountOutputTypeCountPublic_holiday_preferencesArgs
 }
 
 /**
@@ -680,6 +781,13 @@ export type LocationCountOutputTypeCountPeopleArgs<ExtArgs extends runtime.Types
   where?: Prisma.PersonWhereInput
 }
 
+/**
+ * LocationCountOutputType without action
+ */
+export type LocationCountOutputTypeCountPublic_holiday_preferencesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PublicHolidayPreferenceWhereInput
+}
+
 
 export type LocationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -693,6 +801,7 @@ export type LocationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   people?: boolean | Prisma.Location$peopleArgs<ExtArgs>
+  public_holiday_preferences?: boolean | Prisma.Location$public_holiday_preferencesArgs<ExtArgs>
   _count?: boolean | Prisma.LocationCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["location"]>
 
@@ -738,6 +847,7 @@ export type LocationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs =
 export type LocationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   people?: boolean | Prisma.Location$peopleArgs<ExtArgs>
+  public_holiday_preferences?: boolean | Prisma.Location$public_holiday_preferencesArgs<ExtArgs>
   _count?: boolean | Prisma.LocationCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type LocationIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -752,6 +862,7 @@ export type $LocationPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   objects: {
     organisation: Prisma.$OrganisationPayload<ExtArgs>
     people: Prisma.$PersonPayload<ExtArgs>[]
+    public_holiday_preferences: Prisma.$PublicHolidayPreferencePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1159,6 +1270,7 @@ export interface Prisma__LocationClient<T, Null = never, ExtArgs extends runtime
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   people<T extends Prisma.Location$peopleArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Location$peopleArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PersonPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  public_holiday_preferences<T extends Prisma.Location$public_holiday_preferencesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Location$public_holiday_preferencesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublicHolidayPreferencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1619,6 +1731,30 @@ export type Location$peopleArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   distinct?: Prisma.PersonScalarFieldEnum | Prisma.PersonScalarFieldEnum[]
+}
+
+/**
+ * Location.public_holiday_preferences
+ */
+export type Location$public_holiday_preferencesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PublicHolidayPreference
+   */
+  select?: Prisma.PublicHolidayPreferenceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PublicHolidayPreference
+   */
+  omit?: Prisma.PublicHolidayPreferenceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PublicHolidayPreferenceInclude<ExtArgs> | null
+  where?: Prisma.PublicHolidayPreferenceWhereInput
+  orderBy?: Prisma.PublicHolidayPreferenceOrderByWithRelationInput | Prisma.PublicHolidayPreferenceOrderByWithRelationInput[]
+  cursor?: Prisma.PublicHolidayPreferenceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PublicHolidayPreferenceScalarFieldEnum | Prisma.PublicHolidayPreferenceScalarFieldEnum[]
 }
 
 /**

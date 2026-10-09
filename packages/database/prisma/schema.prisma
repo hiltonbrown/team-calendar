@@ -239,7 +239,6 @@ enum notification_email_status {
 }
 
 enum public_holiday_source {
-  nager
   manual
 }
 
@@ -254,17 +253,15 @@ enum public_holiday_type {
   custom
 }
 
-enum public_holiday_assignment_scope_type {
-  organisation
-  location
-  team
-  person
-  feed
-}
-
 enum public_holiday_day_classification {
   non_working
   working
+}
+
+enum public_holiday_setting {
+  hidden
+  working
+  non_working
 }
 
 enum plan_limit_type {
@@ -298,30 +295,29 @@ model Organisation {
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
 
-  teams                        Team[]
-  locations                    Location[]
-  people                       Person[]
-  leave_balances               LeaveBalance[]
-  alternative_contacts         AlternativeContact[]
-  availability_records         AvailabilityRecord[]
-  availability_publications    AvailabilityPublication[]
-  feeds                        Feed[]
-  feed_tokens                  FeedToken[]
-  public_holiday_jurisdictions PublicHolidayJurisdiction[]
-  public_holidays              PublicHoliday[]
-  public_holiday_assignments   PublicHolidayAssignment[]
-  xero_connection              XeroConnection?
-  xero_oauth_sessions          XeroOAuthSession[]
-  xero_person_matches          XeroPersonMatch[]
-  xero_sync_cursors            XeroSyncCursor[]
-  sync_runs                    SyncRun[]
-  failed_records               FailedRecord[]
-  audit_events                 AuditEvent[]
-  notifications                Notification[]
-  notification_preferences     NotificationPreference[]
-  notification_email_queue     NotificationEmailQueue[]
-  outbound_operations          OutboundOperation[]
-  organisation_settings        OrganisationSettings?
+  teams                      Team[]
+  locations                  Location[]
+  people                     Person[]
+  leave_balances             LeaveBalance[]
+  alternative_contacts       AlternativeContact[]
+  availability_records       AvailabilityRecord[]
+  availability_publications  AvailabilityPublication[]
+  feeds                      Feed[]
+  feed_tokens                FeedToken[]
+  public_holidays            PublicHoliday[]
+  public_holiday_preferences PublicHolidayPreference[]
+  xero_connection            XeroConnection?
+  xero_oauth_sessions        XeroOAuthSession[]
+  xero_person_matches        XeroPersonMatch[]
+  xero_sync_cursors          XeroSyncCursor[]
+  sync_runs                  SyncRun[]
+  failed_records             FailedRecord[]
+  audit_events               AuditEvent[]
+  notifications              Notification[]
+  notification_preferences   NotificationPreference[]
+  notification_email_queue   NotificationEmailQueue[]
+  outbound_operations        OutboundOperation[]
+  organisation_settings      OrganisationSettings?
 
   @@unique([id, clerk_org_id])
   @@index([clerk_org_id])
@@ -377,8 +373,9 @@ model Location {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  people       Person[]
+  organisation               Organisation              @relation(fields: [organisation_id], references: [id])
+  people                     Person[]
+  public_holiday_preferences PublicHolidayPreference[]
 
   @@index([clerk_org_id])
   @@index([organisation_id])
@@ -806,34 +803,10 @@ model XeroPersonMatch {
   @@map("xero_person_matches")
 }
 
-model PublicHolidayJurisdiction {
-  id                 String                @id @default(uuid()) @db.Uuid
-  clerk_org_id       String
-  organisation_id    String                @db.Uuid
-  country_code       String
-  region_code        String?
-  source             public_holiday_source @default(nager)
-  is_enabled         Boolean               @default(true)
-  created_by_user_id String?
-  updated_by_user_id String?
-  archived_at        DateTime?
-  created_at         DateTime              @default(now())
-  updated_at         DateTime              @updatedAt
-
-  organisation Organisation    @relation(fields: [organisation_id], references: [id])
-  holidays     PublicHoliday[]
-
-  @@unique([organisation_id, country_code, region_code])
-  @@index([clerk_org_id])
-  @@index([organisation_id])
-  @@map("public_holiday_jurisdictions")
-}
-
 model PublicHoliday {
   id                     String                            @id @default(uuid()) @db.Uuid
   clerk_org_id           String
   organisation_id        String                            @db.Uuid
-  jurisdiction_id        String?                           @db.Uuid
   source                 public_holiday_source
   source_remote_id       String?
   country_code           String
@@ -844,49 +817,42 @@ model PublicHoliday {
   holiday_type           public_holiday_type
   default_classification public_holiday_day_classification @default(non_working)
   notes_internal         String?
-  source_payload_json    Json?
   created_by_user_id     String?
   updated_by_user_id     String?
   archived_at            DateTime?
   created_at             DateTime                          @default(now())
   updated_at             DateTime                          @updatedAt
 
-  organisation Organisation               @relation(fields: [organisation_id], references: [id])
-  jurisdiction PublicHolidayJurisdiction? @relation(fields: [jurisdiction_id], references: [id])
-  assignments  PublicHolidayAssignment[]
+  organisation Organisation @relation(fields: [organisation_id], references: [id])
 
   @@unique([organisation_id, source, source_remote_id])
   @@index([clerk_org_id])
   @@index([organisation_id, holiday_date])
-  @@index([jurisdiction_id])
   @@map("public_holidays")
 }
 
-model PublicHolidayAssignment {
-  id                 String                               @id @default(uuid()) @db.Uuid
+/// Organisation changes to bundled or custom public holidays. holiday_key is a
+/// bundled reference id or "custom:<public_holidays.id>". A null location_id
+/// applies organisation-wide and is only ever "hidden".
+model PublicHolidayPreference {
+  id                 String                 @id @default(uuid()) @db.Uuid
   clerk_org_id       String
-  organisation_id    String                               @db.Uuid
-  public_holiday_id  String                               @db.Uuid
-  scope_type         public_holiday_assignment_scope_type
-  scope_value        String
-  day_classification public_holiday_day_classification    @default(non_working)
-  include_in_feeds   Boolean                              @default(true)
-  notes_internal     String?
+  organisation_id    String                 @db.Uuid
+  holiday_key        String
+  location_id        String?                @db.Uuid
+  setting            public_holiday_setting
   created_by_user_id String?
   updated_by_user_id String?
-  archived_at        DateTime?
-  created_at         DateTime                             @default(now())
-  updated_at         DateTime                             @updatedAt
+  created_at         DateTime               @default(now())
+  updated_at         DateTime               @updatedAt
 
-  organisation   Organisation  @relation(fields: [organisation_id], references: [id])
-  public_holiday PublicHoliday @relation(fields: [public_holiday_id], references: [id])
+  organisation Organisation @relation(fields: [organisation_id], references: [id])
+  location     Location?    @relation(fields: [location_id], references: [id], onDelete: Cascade)
 
-  @@unique([public_holiday_id, scope_type, scope_value])
+  @@unique([organisation_id, holiday_key, location_id])
   @@index([clerk_org_id])
   @@index([organisation_id])
-  @@index([public_holiday_id])
-  @@index([scope_type, scope_value])
-  @@map("public_holiday_assignments")
+  @@map("public_holiday_preferences")
 }
 
 model Feed {

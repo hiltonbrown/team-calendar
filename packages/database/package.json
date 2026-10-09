@@ -50,10 +50,6 @@
       "types": "./queries/people.ts",
       "default": "./queries/people.ts"
     },
-    "./queries/public-holidays": {
-      "types": "./queries/public-holidays.ts",
-      "default": "./queries/public-holidays.ts"
-    },
     "./queries/support-submissions": {
       "types": "./queries/support-submissions.ts",
       "default": "./queries/support-submissions.ts"

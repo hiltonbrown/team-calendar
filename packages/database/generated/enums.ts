@@ -324,7 +324,6 @@ export type notification_email_status = (typeof notification_email_status)[keyof
 
 
 export const public_holiday_source = {
-  nager: 'nager',
   manual: 'manual'
 } as const
 
@@ -345,23 +344,21 @@ export const public_holiday_type = {
 export type public_holiday_type = (typeof public_holiday_type)[keyof typeof public_holiday_type]
 
 
-export const public_holiday_assignment_scope_type = {
-  organisation: 'organisation',
-  location: 'location',
-  team: 'team',
-  person: 'person',
-  feed: 'feed'
-} as const
-
-export type public_holiday_assignment_scope_type = (typeof public_holiday_assignment_scope_type)[keyof typeof public_holiday_assignment_scope_type]
-
-
 export const public_holiday_day_classification = {
   non_working: 'non_working',
   working: 'working'
 } as const
 
 export type public_holiday_day_classification = (typeof public_holiday_day_classification)[keyof typeof public_holiday_day_classification]
+
+
+export const public_holiday_setting = {
+  hidden: 'hidden',
+  working: 'working',
+  non_working: 'non_working'
+} as const
+
+export type public_holiday_setting = (typeof public_holiday_setting)[keyof typeof public_holiday_setting]
 
 
 export const plan_limit_type = {

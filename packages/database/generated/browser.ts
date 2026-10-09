@@ -93,20 +93,17 @@ export type LeaveBalance = Prisma.LeaveBalanceModel
  */
 export type XeroPersonMatch = Prisma.XeroPersonMatchModel
 /**
- * Model PublicHolidayJurisdiction
- * 
- */
-export type PublicHolidayJurisdiction = Prisma.PublicHolidayJurisdictionModel
-/**
  * Model PublicHoliday
  * 
  */
 export type PublicHoliday = Prisma.PublicHolidayModel
 /**
- * Model PublicHolidayAssignment
- * 
+ * Model PublicHolidayPreference
+ * Organisation changes to bundled or custom public holidays. holiday_key is a
+ * bundled reference id or "custom:<public_holidays.id>". A null location_id
+ * applies organisation-wide and is only ever "hidden".
  */
-export type PublicHolidayAssignment = Prisma.PublicHolidayAssignmentModel
+export type PublicHolidayPreference = Prisma.PublicHolidayPreferenceModel
 /**
  * Model Feed
  * 

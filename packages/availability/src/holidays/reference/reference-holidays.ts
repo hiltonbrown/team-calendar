@@ -130,6 +130,8 @@ export function listLocalReferenceHolidays(input: {
       holiday.kind === "local" &&
       holiday.date >= input.from &&
       holiday.date <= input.to &&
-      (input.region === null || holiday.region === input.region)
+      (holiday.region === null ||
+        input.region === null ||
+        holiday.region === input.region)
   );
 }

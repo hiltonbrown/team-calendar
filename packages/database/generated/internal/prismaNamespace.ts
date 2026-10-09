@@ -412,9 +412,8 @@ export const ModelName = {
   AvailabilityPublication: 'AvailabilityPublication',
   LeaveBalance: 'LeaveBalance',
   XeroPersonMatch: 'XeroPersonMatch',
-  PublicHolidayJurisdiction: 'PublicHolidayJurisdiction',
   PublicHoliday: 'PublicHoliday',
-  PublicHolidayAssignment: 'PublicHolidayAssignment',
+  PublicHolidayPreference: 'PublicHolidayPreference',
   Feed: 'Feed',
   FeedEventPublication: 'FeedEventPublication',
   FeedScope: 'FeedScope',
@@ -445,7 +444,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroAuthorisation" | "xeroConnection" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedEventPublication" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroAuthorisation" | "xeroConnection" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHoliday" | "publicHolidayPreference" | "feed" | "feedEventPublication" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1559,80 +1558,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    PublicHolidayJurisdiction: {
-      payload: Prisma.$PublicHolidayJurisdictionPayload<ExtArgs>
-      fields: Prisma.PublicHolidayJurisdictionFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.PublicHolidayJurisdictionFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.PublicHolidayJurisdictionFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>
-        }
-        findFirst: {
-          args: Prisma.PublicHolidayJurisdictionFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.PublicHolidayJurisdictionFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>
-        }
-        findMany: {
-          args: Prisma.PublicHolidayJurisdictionFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>[]
-        }
-        create: {
-          args: Prisma.PublicHolidayJurisdictionCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>
-        }
-        createMany: {
-          args: Prisma.PublicHolidayJurisdictionCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.PublicHolidayJurisdictionCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>[]
-        }
-        delete: {
-          args: Prisma.PublicHolidayJurisdictionDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>
-        }
-        update: {
-          args: Prisma.PublicHolidayJurisdictionUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>
-        }
-        deleteMany: {
-          args: Prisma.PublicHolidayJurisdictionDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.PublicHolidayJurisdictionUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.PublicHolidayJurisdictionUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>[]
-        }
-        upsert: {
-          args: Prisma.PublicHolidayJurisdictionUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayJurisdictionPayload>
-        }
-        aggregate: {
-          args: Prisma.PublicHolidayJurisdictionAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregatePublicHolidayJurisdiction>
-        }
-        groupBy: {
-          args: Prisma.PublicHolidayJurisdictionGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.PublicHolidayJurisdictionGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.PublicHolidayJurisdictionCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.PublicHolidayJurisdictionCountAggregateOutputType> | number
-        }
-      }
-    }
     PublicHoliday: {
       payload: Prisma.$PublicHolidayPayload<ExtArgs>
       fields: Prisma.PublicHolidayFieldRefs
@@ -1707,77 +1632,77 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    PublicHolidayAssignment: {
-      payload: Prisma.$PublicHolidayAssignmentPayload<ExtArgs>
-      fields: Prisma.PublicHolidayAssignmentFieldRefs
+    PublicHolidayPreference: {
+      payload: Prisma.$PublicHolidayPreferencePayload<ExtArgs>
+      fields: Prisma.PublicHolidayPreferenceFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.PublicHolidayAssignmentFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload> | null
+          args: Prisma.PublicHolidayPreferenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.PublicHolidayAssignmentFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>
+          args: Prisma.PublicHolidayPreferenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>
         }
         findFirst: {
-          args: Prisma.PublicHolidayAssignmentFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload> | null
+          args: Prisma.PublicHolidayPreferenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.PublicHolidayAssignmentFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>
+          args: Prisma.PublicHolidayPreferenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>
         }
         findMany: {
-          args: Prisma.PublicHolidayAssignmentFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>[]
+          args: Prisma.PublicHolidayPreferenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>[]
         }
         create: {
-          args: Prisma.PublicHolidayAssignmentCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>
+          args: Prisma.PublicHolidayPreferenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>
         }
         createMany: {
-          args: Prisma.PublicHolidayAssignmentCreateManyArgs<ExtArgs>
+          args: Prisma.PublicHolidayPreferenceCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.PublicHolidayAssignmentCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>[]
+          args: Prisma.PublicHolidayPreferenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>[]
         }
         delete: {
-          args: Prisma.PublicHolidayAssignmentDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>
+          args: Prisma.PublicHolidayPreferenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>
         }
         update: {
-          args: Prisma.PublicHolidayAssignmentUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>
+          args: Prisma.PublicHolidayPreferenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>
         }
         deleteMany: {
-          args: Prisma.PublicHolidayAssignmentDeleteManyArgs<ExtArgs>
+          args: Prisma.PublicHolidayPreferenceDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.PublicHolidayAssignmentUpdateManyArgs<ExtArgs>
+          args: Prisma.PublicHolidayPreferenceUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.PublicHolidayAssignmentUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>[]
+          args: Prisma.PublicHolidayPreferenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>[]
         }
         upsert: {
-          args: Prisma.PublicHolidayAssignmentUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayAssignmentPayload>
+          args: Prisma.PublicHolidayPreferenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PublicHolidayPreferencePayload>
         }
         aggregate: {
-          args: Prisma.PublicHolidayAssignmentAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregatePublicHolidayAssignment>
+          args: Prisma.PublicHolidayPreferenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePublicHolidayPreference>
         }
         groupBy: {
-          args: Prisma.PublicHolidayAssignmentGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.PublicHolidayAssignmentGroupByOutputType>[]
+          args: Prisma.PublicHolidayPreferenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PublicHolidayPreferenceGroupByOutputType>[]
         }
         count: {
-          args: Prisma.PublicHolidayAssignmentCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.PublicHolidayAssignmentCountAggregateOutputType> | number
+          args: Prisma.PublicHolidayPreferenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PublicHolidayPreferenceCountAggregateOutputType> | number
         }
       }
     }
@@ -3303,29 +3228,10 @@ export const XeroPersonMatchScalarFieldEnum = {
 export type XeroPersonMatchScalarFieldEnum = (typeof XeroPersonMatchScalarFieldEnum)[keyof typeof XeroPersonMatchScalarFieldEnum]
 
 
-export const PublicHolidayJurisdictionScalarFieldEnum = {
-  id: 'id',
-  clerk_org_id: 'clerk_org_id',
-  organisation_id: 'organisation_id',
-  country_code: 'country_code',
-  region_code: 'region_code',
-  source: 'source',
-  is_enabled: 'is_enabled',
-  created_by_user_id: 'created_by_user_id',
-  updated_by_user_id: 'updated_by_user_id',
-  archived_at: 'archived_at',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type PublicHolidayJurisdictionScalarFieldEnum = (typeof PublicHolidayJurisdictionScalarFieldEnum)[keyof typeof PublicHolidayJurisdictionScalarFieldEnum]
-
-
 export const PublicHolidayScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
-  jurisdiction_id: 'jurisdiction_id',
   source: 'source',
   source_remote_id: 'source_remote_id',
   country_code: 'country_code',
@@ -3336,7 +3242,6 @@ export const PublicHolidayScalarFieldEnum = {
   holiday_type: 'holiday_type',
   default_classification: 'default_classification',
   notes_internal: 'notes_internal',
-  source_payload_json: 'source_payload_json',
   created_by_user_id: 'created_by_user_id',
   updated_by_user_id: 'updated_by_user_id',
   archived_at: 'archived_at',
@@ -3347,24 +3252,20 @@ export const PublicHolidayScalarFieldEnum = {
 export type PublicHolidayScalarFieldEnum = (typeof PublicHolidayScalarFieldEnum)[keyof typeof PublicHolidayScalarFieldEnum]
 
 
-export const PublicHolidayAssignmentScalarFieldEnum = {
+export const PublicHolidayPreferenceScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
-  public_holiday_id: 'public_holiday_id',
-  scope_type: 'scope_type',
-  scope_value: 'scope_value',
-  day_classification: 'day_classification',
-  include_in_feeds: 'include_in_feeds',
-  notes_internal: 'notes_internal',
+  holiday_key: 'holiday_key',
+  location_id: 'location_id',
+  setting: 'setting',
   created_by_user_id: 'created_by_user_id',
   updated_by_user_id: 'updated_by_user_id',
-  archived_at: 'archived_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
 
-export type PublicHolidayAssignmentScalarFieldEnum = (typeof PublicHolidayAssignmentScalarFieldEnum)[keyof typeof PublicHolidayAssignmentScalarFieldEnum]
+export type PublicHolidayPreferenceScalarFieldEnum = (typeof PublicHolidayPreferenceScalarFieldEnum)[keyof typeof PublicHolidayPreferenceScalarFieldEnum]
 
 
 export const FeedScalarFieldEnum = {
@@ -4085,16 +3986,16 @@ export type ListEnumpublic_holiday_day_classificationFieldRefInput<$PrismaModel>
 
 
 /**
- * Reference to a field of type 'public_holiday_assignment_scope_type'
+ * Reference to a field of type 'public_holiday_setting'
  */
-export type Enumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'public_holiday_assignment_scope_type'>
+export type Enumpublic_holiday_settingFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'public_holiday_setting'>
     
 
 
 /**
- * Reference to a field of type 'public_holiday_assignment_scope_type[]'
+ * Reference to a field of type 'public_holiday_setting[]'
  */
-export type ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'public_holiday_assignment_scope_type[]'>
+export type ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'public_holiday_setting[]'>
     
 
 
@@ -4445,9 +4346,8 @@ export type GlobalOmitConfig = {
   availabilityPublication?: Prisma.AvailabilityPublicationOmit
   leaveBalance?: Prisma.LeaveBalanceOmit
   xeroPersonMatch?: Prisma.XeroPersonMatchOmit
-  publicHolidayJurisdiction?: Prisma.PublicHolidayJurisdictionOmit
   publicHoliday?: Prisma.PublicHolidayOmit
-  publicHolidayAssignment?: Prisma.PublicHolidayAssignmentOmit
+  publicHolidayPreference?: Prisma.PublicHolidayPreferenceOmit
   feed?: Prisma.FeedOmit
   feedEventPublication?: Prisma.FeedEventPublicationOmit
   feedScope?: Prisma.FeedScopeOmit
