@@ -6,8 +6,16 @@ export type {
   ExternalWritePort,
   ProviderResolutionError,
   ProviderWriteError,
+  ReferenceHoliday,
+  ReferenceHolidayKind,
   SubmitLeaveInput,
   WithdrawLeaveInput,
+} from "@repo/core";
+export {
+  findReferenceHoliday,
+  listLocalReferenceHolidays,
+  listReferenceHolidays,
+  PUBLIC_HOLIDAY_DATA_VERSION,
 } from "@repo/core";
 export { materialiseAvailabilityPublication } from "@repo/feeds";
 export { exportAnalyticsToCsv } from "./src/analytics/analytics-csv";
@@ -97,16 +105,6 @@ export * from "./src/duration/working-days";
 export { computeWorkingDays } from "./src/duration/working-days";
 export * from "./src/holidays/holiday-preferences";
 export * from "./src/holidays/holiday-service";
-export type {
-  ReferenceHoliday,
-  ReferenceHolidayKind,
-} from "./src/holidays/reference/reference-holidays";
-export {
-  findReferenceHoliday,
-  listLocalReferenceHolidays,
-  listReferenceHolidays,
-  PUBLIC_HOLIDAY_DATA_VERSION,
-} from "./src/holidays/reference/reference-holidays";
 export * from "./src/holidays/resolve-public-holidays";
 export * from "./src/people/alternative-contact-service";
 export {

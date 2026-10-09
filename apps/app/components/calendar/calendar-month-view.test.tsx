@@ -145,6 +145,7 @@ function calendarRange({ eventCount }: { eventCount: number }) {
             isSuppressed: false,
             locationNames: ["Brisbane"],
             name: "Queensland Day",
+            startsAt: null,
           },
         ],
       },

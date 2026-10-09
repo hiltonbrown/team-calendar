@@ -32,10 +32,10 @@ import { createAggregationCache } from "../analytics/request-cache";
 import {
   computeWorkingDays,
   computeWorkingDaysFromReferenceData,
+  loadHolidaysForYear,
   type WorkingDaysReferenceData,
   workingDayYearsForInput,
 } from "../duration/working-days";
-import { listForOrganisation } from "../holidays/holiday-service";
 import {
   createLeaveOnApproval,
   type SubmitServiceError,
@@ -1662,10 +1662,10 @@ async function loadApprovalListContext(
         [
           year,
           await cache.getOrLoad(`approval-list:holidays:${year}`, () =>
-            listForOrganisation(
+            loadHolidaysForYear(
               clerkOrgId as ClerkOrgId,
               organisationId as OrganisationId,
-              { year }
+              year
             )
           ),
         ] as const

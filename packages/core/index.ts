@@ -82,13 +82,6 @@ export {
 } from "./src/availability-record-label";
 
 export type {
-  HolidayApplicabilityHoliday,
-  HolidayApplicabilityInput,
-  HolidayApplicabilityLocationAssignment,
-  HolidayApplicabilitySubject,
-} from "./src/holiday-applicability";
-export { holidayIsNonWorking } from "./src/holiday-applicability";
-export type {
   ApproveLeaveInput,
   DeclineLeaveInput,
   ExternalWritePort,
@@ -101,6 +94,30 @@ export type {
   WithdrawLeaveInput,
   XeroMutationIdentity,
 } from "./src/ports/external-write-port";
+export type {
+  ListReferenceHolidays,
+  ListReferenceHolidaysInput,
+  ReferenceHoliday,
+  ReferenceHolidayKind,
+} from "./src/public-holidays/reference/reference-holidays";
+export {
+  findReferenceHoliday,
+  listLocalReferenceHolidays,
+  listReferenceHolidays,
+  PUBLIC_HOLIDAY_DATA_VERSION,
+} from "./src/public-holidays/reference/reference-holidays";
+export type {
+  HolidayClassification,
+  HolidayPreferenceSetting,
+  ResolvedPublicHoliday,
+  ResolveHolidayData,
+} from "./src/public-holidays/resolve";
+export {
+  CUSTOM_HOLIDAY_KEY_PREFIX,
+  customHolidayKey,
+  nonWorkingHolidayDates,
+  resolvePublicHolidaysFromData,
+} from "./src/public-holidays/resolve";
 export type {
   ExecuteRedisRestCommandInput,
   RedisRestEnvelope,

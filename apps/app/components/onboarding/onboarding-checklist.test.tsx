@@ -72,7 +72,6 @@ const incompleteState: OnboardingState = {
   isComplete: false,
   pendingPersonMatchesCount: 0,
   peopleCount: 0,
-  publicHolidayJurisdictionCount: 0,
   requiredCount: 4,
   steps: [
     {
@@ -125,7 +124,6 @@ const completeState: OnboardingState = {
   currentUserPersonLinked: true,
   isComplete: true,
   peopleCount: 2,
-  publicHolidayJurisdictionCount: 1,
   steps: incompleteState.steps.map((step) =>
     step.id === "xero" ? step : { ...step, status: "complete" }
   ),

@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   getXeroConnectionStateForScope: vi.fn(),
   listEvents: vi.fn(),
   listForApprover: vi.fn(),
-  listForOrganisation: vi.fn(),
   listForUser: vi.fn(),
   listMyRecords: vi.fn(),
   listPeople: vi.fn(),
@@ -23,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   personCount: vi.fn(),
   personFindFirst: vi.fn(),
   personFindMany: vi.fn(),
+  resolvePublicHolidays: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
@@ -53,8 +53,8 @@ vi.mock("../approvals/approval-service", () => ({
 vi.mock("../calendar/calendar-service", () => ({
   getCalendarRange: mocks.getCalendarRange,
 }));
-vi.mock("../holidays/holiday-service", () => ({
-  listForOrganisation: mocks.listForOrganisation,
+vi.mock("../holidays/resolve-public-holidays", () => ({
+  resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
 vi.mock("../people/current-status", () => ({
   computeCurrentStatusForPeople: mocks.computeCurrentStatusForPeople,
@@ -236,22 +236,9 @@ describe("dashboard-service", () => {
         ],
       },
     });
-    mocks.listForOrganisation.mockResolvedValue({
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
-      value: [
-        {
-          archived_at: null,
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working",
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          id: "holiday_1",
-          name: "ANZAC Day",
-          region_code: null,
-          source: "nager",
-          type: "public",
-        },
-      ],
+      value: [resolvedHoliday({ date: "2026-04-25", name: "ANZAC Day" })],
     });
     mocks.getSettings.mockResolvedValue({
       ok: true,
@@ -1009,283 +996,29 @@ describe("dashboard-service", () => {
       },
     });
   });
-  describe("public holiday card applicability aligns with canonical rules", () => {
-    const holidayDate = new Date("2026-04-25T00:00:00.000Z");
-    it("matches regional holiday for a person with matching location region", async () => {
-      mocks.listForOrganisation.mockResolvedValue({
+  describe("next public holiday card", () => {
+    it("shows the next non-working or part-day holiday for the person's location", async () => {
+      mocks.resolvePublicHolidays.mockResolvedValue({
         ok: true,
         value: [
-          {
-            archived_at: null,
-            assignments: [],
-            country_code: "AU",
-            default_classification: "non_working",
-            holiday_date: holidayDate,
-            id: "holiday_qld",
-            name: "QLD Day",
-            region_code: "QLD",
-            source: "nager",
-            type: "public",
-          },
-        ],
-      });
-      const result = await getEmployeeView(baseInput);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-      expect(result.value.publicHolidays).toMatchObject({
-        data: {
-          daysUntil: 5,
-          next: expect.objectContaining({ id: "holiday_qld", name: "QLD Day" }),
-        },
-        status: "ready",
-      });
-    });
-    it("skips regional holiday when person is in a different region", async () => {
-      mocks.listForOrganisation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            archived_at: null,
-            assignments: [],
-            country_code: "AU",
-            default_classification: "non_working",
-            holiday_date: holidayDate,
-            id: "holiday_nsw",
-            name: "NSW Day",
-            region_code: "NSW",
-            source: "nager",
-            type: "public",
-          },
-        ],
-      });
-      const result = await getEmployeeView(baseInput);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-      expect(result.value.publicHolidays).toMatchObject({
-        data: {
-          daysUntil: null,
-          next: null,
-        },
-        status: "ready",
-      });
-    });
-    it("applies custom holiday to actor regardless of country code", async () => {
-      mocks.listForOrganisation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            archived_at: null,
-            assignments: [],
-            country_code: "CUSTOM",
-            default_classification: "non_working",
-            holiday_date: holidayDate,
-            id: "holiday_custom",
-            name: "Company Wide Day",
-            region_code: null,
-            source: "manual",
-            type: "custom",
-          },
-        ],
-      });
-      const result = await getEmployeeView(baseInput);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-      expect(result.value.publicHolidays).toMatchObject({
-        data: {
-          daysUntil: 5,
-          next: expect.objectContaining({
-            id: "holiday_custom",
-            name: "Company Wide Day",
+          resolvedHoliday({
+            date: "2026-04-22",
+            locationId: "location_other",
+            name: "Other Office Day",
           }),
-        },
-        status: "ready",
-      });
-    });
-    it("applies location override from working to non_working", async () => {
-      mocks.listForOrganisation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            archived_at: null,
-            assignments: [
-              {
-                archived_at: null,
-                day_classification: "non_working",
-                scope_type: "location",
-                scope_value: "location_1",
-              },
-            ],
-            country_code: "AU",
-            default_classification: "working",
-            holiday_date: holidayDate,
-            id: "holiday_override_non_working",
-            name: "Overridden Working Day",
-            region_code: null,
-            source: "nager",
-            type: "observance",
-          },
-        ],
-      });
-      const result = await getEmployeeView(baseInput);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-      expect(result.value.publicHolidays).toMatchObject({
-        data: {
-          daysUntil: 5,
-          next: expect.objectContaining({
-            id: "holiday_override_non_working",
-            name: "Overridden Working Day",
+          resolvedHoliday({
+            classification: "working",
+            date: "2026-04-23",
+            name: "Working Day",
           }),
-        },
-        status: "ready",
-      });
-    });
-    it("skips non_working holiday when overridden to working for person location", async () => {
-      mocks.listForOrganisation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            archived_at: null,
-            assignments: [
-              {
-                archived_at: null,
-                day_classification: "working",
-                scope_type: "location",
-                scope_value: "location_1",
-              },
-            ],
-            country_code: "AU",
-            default_classification: "non_working",
-            holiday_date: holidayDate,
-            id: "holiday_override_working",
-            name: "Working In Brisbane",
-            region_code: null,
-            source: "nager",
-            type: "public",
-          },
-        ],
-      });
-      const result = await getEmployeeView(baseInput);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-      expect(result.value.publicHolidays).toMatchObject({
-        data: {
-          daysUntil: null,
-          next: null,
-        },
-        status: "ready",
-      });
-    });
-    it("uses organisation country fallback for a person without location", async () => {
-      mocks.getPersonProfile.mockResolvedValue({
-        ok: true,
-        value: {
-          balances: {
-            balancesLastFetchedAt: null,
-            rows: [],
-            xeroLinked: false,
-          },
-          currentStatus: {
-            activePublicHoliday: null,
-            activeRecord: null,
-            approvalStatus: null,
-            contactabilityStatus: null,
-            label: "Available",
-            recordType: null,
-            statusKey: "available",
-          },
-          header: {
-            firstName: "Sam",
-            lastName: "Unassigned",
-            location: null,
-            team: null,
-          },
-        },
-      });
-      mocks.listForOrganisation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            archived_at: null,
-            assignments: [],
-            country_code: "AU",
-            default_classification: "non_working",
-            holiday_date: holidayDate,
-            id: "holiday_national",
-            name: "National Day",
-            region_code: null,
-            source: "nager",
-            type: "public",
-          },
-        ],
-      });
-      const result = await getEmployeeView(baseInput);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-      expect(result.value.publicHolidays).toMatchObject({
-        data: {
-          daysUntil: 5,
-          next: expect.objectContaining({
-            id: "holiday_national",
-            name: "National Day",
+          resolvedHoliday({
+            classification: "working",
+            date: "2026-04-24",
+            kind: "part_day",
+            name: "Part Day",
+            startsAt: "18:00",
           }),
-        },
-        status: "ready",
-      });
-    });
-    it("treats organisation, team, person, and feed assignments as inert", async () => {
-      mocks.listForOrganisation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            archived_at: null,
-            assignments: [
-              {
-                archived_at: null,
-                day_classification: "working",
-                scope_type: "organisation",
-                scope_value: baseInput.organisationId,
-              },
-              {
-                archived_at: null,
-                day_classification: "working",
-                scope_type: "team",
-                scope_value: "team_1",
-              },
-              {
-                archived_at: null,
-                day_classification: "working",
-                scope_type: "person",
-                scope_value: baseInput.personId,
-              },
-              {
-                archived_at: null,
-                day_classification: "working",
-                scope_type: "feed",
-                scope_value: "feed_1",
-              },
-            ],
-            country_code: "AU",
-            default_classification: "non_working",
-            holiday_date: holidayDate,
-            id: "holiday_inert_scopes",
-            name: "Inert Scopes National Day",
-            region_code: null,
-            source: "nager",
-            type: "public",
-          },
+          resolvedHoliday({ date: "2026-04-25", name: "ANZAC Day" }),
         ],
       });
       const result = await getEmployeeView(baseInput);
@@ -1293,16 +1026,70 @@ describe("dashboard-service", () => {
       if (!result.ok) {
         return;
       }
-      expect(result.value.publicHolidays).toMatchObject({
+      expect(result.value.publicHolidays).toEqual({
         data: {
-          daysUntil: 5,
-          next: expect.objectContaining({
-            id: "holiday_inert_scopes",
-            name: "Inert Scopes National Day",
-          }),
+          daysUntil: 4,
+          next: {
+            holidayDate: new Date("2026-04-24T00:00:00.000Z"),
+            name: "Part Day",
+            startsAt: "18:00",
+          },
         },
         status: "ready",
+      });
+      expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
+        clerkOrgId: baseInput.clerkOrgId,
+        from: "2026-04-20",
+        organisationId: baseInput.organisationId,
+        to: "2027-05-25",
+      });
+    });
+    it("returns no holiday when none applies", async () => {
+      mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: [] });
+      const result = await getEmployeeView(baseInput);
+      expect(result.ok && result.value.publicHolidays).toEqual({
+        data: { daysUntil: null, next: null },
+        status: "ready",
+      });
+    });
+    it("reports an error section when holidays cannot be resolved", async () => {
+      mocks.resolvePublicHolidays.mockResolvedValue({
+        error: {
+          code: "internal",
+          message: "Failed to resolve public holidays",
+        },
+        ok: false,
+      });
+      const result = await getEmployeeView(baseInput);
+      expect(result.ok && result.value.publicHolidays).toEqual({
+        message: "Failed to resolve public holidays",
+        status: "error",
       });
     });
   });
 });
+
+function resolvedHoliday(
+  overrides: Partial<{
+    classification: "non_working" | "working";
+    date: string;
+    kind: "custom" | "local" | "part_day" | "public";
+    locationId: string | null;
+    name: string;
+    startsAt: string | null;
+  }>
+) {
+  return {
+    area: null,
+    classification: "non_working",
+    date: "2026-04-25",
+    hidden: false,
+    key: "au-national-2026-04-25-holiday",
+    kind: "public",
+    locationId: "location_1",
+    name: "Holiday",
+    origin: "official",
+    startsAt: null,
+    ...overrides,
+  };
+}

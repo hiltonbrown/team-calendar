@@ -15,9 +15,9 @@ const mocks = vi.hoisted(() => ({
   availabilityFindMany: vi.fn(),
   getSettings: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
-  listForOrganisation: vi.fn(),
   organisationFindFirst: vi.fn(),
   personFindMany: vi.fn(),
+  resolvePublicHolidays: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
@@ -40,8 +40,8 @@ vi.mock("@repo/database", () => ({
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
 }));
-vi.mock("../holidays/holiday-service", () => ({
-  listForOrganisation: mocks.listForOrganisation,
+vi.mock("../holidays/resolve-public-holidays", () => ({
+  resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
 vi.mock("../settings/organisation-settings-service", () => ({
   getSettings: mocks.getSettings,
@@ -102,19 +102,9 @@ describe("calendar-service", () => {
       ok: true,
       value: { state: "not_connected" },
     });
-    mocks.listForOrganisation.mockResolvedValue({
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
-      value: [
-        {
-          archived_at: null,
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working",
-          holiday_date: new Date("2026-04-15T00:00:00.000Z"),
-          name: "Queensland Day",
-          region_code: "QLD",
-        },
-      ],
+      value: [resolvedHoliday({ date: "2026-04-15", name: "Queensland Day" })],
     });
   });
   it("returns direct reports plus self for my_team and uses Monday week range", async () => {
@@ -472,69 +462,33 @@ describe("calendar-service", () => {
     const result = await getEventDetail(detailInput());
     expect(result.ok).toBe(true);
   });
-  it("applies centralised holiday applicability rules to calendar holiday cells", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
+  it("builds holiday cells from resolved holidays for locations in view", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
       ok: true,
       value: [
-        {
-          archived_at: null,
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "non_working",
-              scope_type: "location",
-              scope_value: "00000000-0000-4000-8000-000000000200",
-            },
-          ],
-          country_code: "AU",
-          default_classification: "working",
-          holiday_date: new Date("2026-04-14T00:00:00.000Z"),
-          name: "Location Override Picnic Day",
-          region_code: "NSW",
-        },
-        {
-          archived_at: null,
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "working",
-              scope_type: "location",
-              scope_value: "00000000-0000-4000-8000-000000000200",
-            },
-          ],
-          country_code: "AU",
-          default_classification: "non_working",
-          holiday_date: new Date("2026-04-15T00:00:00.000Z"),
-          name: "Excluded by Override",
-          region_code: "QLD",
-        },
-        {
-          archived_at: null,
-          assignments: [],
-          country_code: "CUSTOM",
-          default_classification: "non_working",
-          holiday_date: new Date("2026-04-16T00:00:00.000Z"),
-          name: "Custom Org Day",
-          region_code: null,
-        },
-        {
-          archived_at: null,
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working",
-          holiday_date: new Date("2026-04-17T00:00:00.000Z"),
-          name: "Mismatched Region Holiday",
-          region_code: "WA",
-        },
-        {
-          archived_at: new Date("2026-01-01T00:00:00.000Z"),
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working",
-          holiday_date: new Date("2026-04-18T00:00:00.000Z"),
-          name: "Archived Holiday",
-          region_code: "QLD",
-        },
+        resolvedHoliday({ date: "2026-04-14", name: "Location Holiday" }),
+        resolvedHoliday({
+          classification: "working",
+          date: "2026-04-15",
+          name: "Working Day",
+        }),
+        resolvedHoliday({
+          date: "2026-04-16",
+          locationId: "00000000-0000-4000-8000-000000000999",
+          name: "Other Location",
+        }),
+        resolvedHoliday({
+          date: "2026-04-17",
+          locationId: null,
+          name: "Organisation Level",
+        }),
+        resolvedHoliday({
+          classification: "working",
+          date: "2026-04-18",
+          kind: "part_day",
+          name: "Part Day",
+          startsAt: "18:00",
+        }),
       ],
     });
     const result = await getCalendarRange(baseInput);
@@ -542,14 +496,23 @@ describe("calendar-service", () => {
     if (!result.ok) {
       return;
     }
-    const holidayNames = result.value.days.flatMap((day) =>
-      day.publicHolidays.map((h) => h.name)
-    );
-    expect(holidayNames).toContain("Location Override Picnic Day");
-    expect(holidayNames).toContain("Custom Org Day");
-    expect(holidayNames).not.toContain("Excluded by Override");
-    expect(holidayNames).not.toContain("Mismatched Region Holiday");
-    expect(holidayNames).not.toContain("Archived Holiday");
+    const cells = result.value.days.flatMap((day) => day.publicHolidays);
+    expect(cells.map((cell) => cell.name)).toEqual([
+      "Location Holiday",
+      "Part Day",
+    ]);
+    expect(cells[0]).toMatchObject({
+      appliesToAllLocationsInView: true,
+      locationNames: ["Brisbane"],
+      startsAt: null,
+    });
+    expect(cells[1]).toMatchObject({ startsAt: "18:00" });
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
+      clerkOrgId: ids.clerkOrg,
+      from: "2026-04-13",
+      organisationId: ids.org,
+      to: "2026-04-19",
+    });
   });
 });
 function detailInput() {
@@ -625,5 +588,29 @@ function record(id: string, personId: string) {
     submitted_at: null,
     title: null,
     xero_write_error: null,
+  };
+}
+function resolvedHoliday(
+  overrides: Partial<{
+    classification: "non_working" | "working";
+    date: string;
+    kind: "custom" | "local" | "part_day" | "public";
+    locationId: string | null;
+    name: string;
+    startsAt: string | null;
+  }>
+) {
+  return {
+    area: null,
+    classification: "non_working",
+    date: "2026-04-15",
+    hidden: false,
+    key: "au-qld-2026-04-15-holiday",
+    kind: "public",
+    locationId: "00000000-0000-4000-8000-000000000200",
+    name: "Holiday",
+    origin: "official",
+    startsAt: null,
+    ...overrides,
   };
 }

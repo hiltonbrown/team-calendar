@@ -9,6 +9,7 @@ import {
 import { withOrg } from "@/lib/navigation/org-url";
 import type { CalendarFilterInput } from "../../app/(authenticated)/calendar/_schemas";
 import { calendarDayHref } from "./calendar-url-state";
+import { publicHolidayLabel } from "./public-holiday-label";
 
 interface CalendarScanPanelProps {
   data: CalendarRange;
@@ -145,7 +146,7 @@ function scanItemsForDay(
     (holiday) => ({
       endsAt: day.date,
       id: `holiday-${holiday.name}`,
-      name: holiday.name,
+      name: publicHolidayLabel(holiday),
       startsAt: day.date,
       statusLabel: "Public holiday",
       subtitle: holiday.appliesToAllLocationsInView

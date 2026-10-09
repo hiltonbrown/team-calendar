@@ -1,4 +1,4 @@
-import type { CountryCode } from "@repo/core";
+import type { CountryCode } from "../../regions";
 import auData from "./data/au.json";
 import nzData from "./data/nz.json";
 import ukData from "./data/uk.json";

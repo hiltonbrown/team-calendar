@@ -1,11 +1,16 @@
 import "server-only";
 
 import {
+  type ClerkOrgId,
   getAvailabilityRecordLabel,
-  holidayIsNonWorking,
+  type OrganisationId,
+  PUBLIC_HOLIDAY_DATA_VERSION,
   type Result,
+  resolvePublicHolidaysFromData,
+  startOfUtcDay,
+  toDateOnly,
 } from "@repo/core";
-import { database } from "@repo/database";
+import { database, loadHolidayResolutionData } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_contactability,
@@ -264,108 +269,84 @@ async function projectPublicHolidays(input: {
   horizonEnd: Date;
   horizonStart: Date;
   organisationId: string;
-  personLocations: Map<
-    string,
-    {
-      countryCode: string | null;
-      id: string;
-      name: string;
-      regionCode: string | null;
-      timezone: string | null;
-    } | null
-  >;
+  personLocations: Map<string, { id: string } | null>;
   privacyMode: availability_privacy_mode;
 }): Promise<PreviewEvent[]> {
-  const holidays = await (input.client ?? database).publicHoliday.findMany({
-    orderBy: { holiday_date: "asc" },
-    select: holidaySelect,
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-      holiday_date: {
-        gte: input.horizonStart,
-        lte: input.horizonEnd,
-      },
-      organisation_id: input.organisationId,
+  const data = await loadHolidayResolutionData(
+    {
+      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      from: toDateOnly(input.horizonStart),
+      organisationId: input.organisationId as OrganisationId,
+      to: toDateOnly(input.horizonEnd),
     },
-  });
-  const locations = [...input.personLocations.values()].filter(
-    (
-      location
-    ): location is {
-      countryCode: string | null;
-      id: string;
-      name: string;
-      regionCode: string | null;
-      timezone: string | null;
-    } => Boolean(location)
+    input.client ?? database
   );
+  if (!data) {
+    return [];
+  }
+  // The feed covers its people's locations, plus the organisation level for
+  // people without a location.
+  const subjects = new Set<string | null>(
+    [...input.personLocations.values()].map((location) => location?.id ?? null)
+  );
+  const customUpdatedAt = new Map(
+    data.customHolidays.map((holiday) => [
+      `custom:${holiday.id}`,
+      holiday.updatedAt,
+    ])
+  );
+  const dataVersionAt = startOfUtcDay(PUBLIC_HOLIDAY_DATA_VERSION);
   const events: PreviewEvent[] = [];
   const seen = new Set<string>();
-  for (const holiday of holidays) {
-    const locationAssignments = holiday.assignments
-      .filter((assignment) => assignment.scope_type === "location")
-      .map((assignment) => ({
-        archivedAt: assignment.archived_at,
-        classification: assignment.day_classification,
-        locationId: assignment.scope_value,
-      }));
-
+  for (const holiday of resolvePublicHolidaysFromData(data)) {
+    const visible =
+      holiday.classification === "non_working" || holiday.kind === "part_day";
     if (
-      !locations.some((location) =>
-        holidayIsNonWorking({
-          holiday: {
-            archivedAt: null,
-            countryCode: holiday.country_code,
-            defaultClassification: holiday.default_classification,
-            locationAssignments,
-            regionCode: holiday.region_code,
-          },
-          subject: {
-            countryCode: location.countryCode,
-            locationId: location.id,
-            regionCode: location.regionCode,
-          },
-        })
-      )
+      !(visible && subjects.has(holiday.locationId)) ||
+      seen.has(holiday.key)
     ) {
       continue;
     }
-    const key = `${holiday.id}:${holiday.holiday_date.toISOString()}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
+    seen.add(holiday.key);
     const summary = projectSummaryLine({
       displayName: "Public holiday",
       isPublicHoliday: true,
       privacyMode: input.privacyMode,
       recordTypeLabel: holiday.name,
     });
-    const endsAt = new Date(holiday.holiday_date);
+    // Part days keep the start time in front of the usual holiday summary.
+    const title = holiday.startsAt
+      ? summary.replace(
+          "Public holiday",
+          `Public holiday from ${holiday.startsAt}`
+        )
+      : summary;
+    const startsAt = startOfUtcDay(holiday.date);
+    const endsAt = new Date(startsAt);
     endsAt.setUTCDate(endsAt.getUTCDate() + 1);
+    const publishedAt =
+      holiday.origin === "custom"
+        ? (customUpdatedAt.get(holiday.key) ?? dataVersionAt)
+        : dataVersionAt;
     events.push({
       allDay: true,
       contactabilityStatus: null,
       description: null,
-      displayName:
-        input.privacyMode === "private"
-          ? "Public holiday"
-          : `Public holiday: ${holiday.name}`,
+      displayName: title,
       endsAt,
       eventClass: input.privacyMode === "named" ? "PUBLIC" : "PRIVATE",
       hasPublication: Boolean(
-        input.lastRenderedAt && holiday.created_at <= input.lastRenderedAt
+        input.lastRenderedAt && publishedAt <= input.lastRenderedAt
       ),
       isPublicHoliday: true,
       location: null,
-      publishedAt: holiday.updated_at,
+      publishedAt,
       publishedSequence: 0,
-      publishedUid: `${holiday.id}${icsUidSuffix}`,
+      publishedUid: `${input.organisationId}-${holiday.key}${icsUidSuffix}`,
       recordType: "public_holiday",
-      sourceRecordId: holiday.id,
-      startsAt: holiday.holiday_date,
-      summary,
+      sourceRecordId: holiday.key,
+      startsAt,
+      summary: title,
     });
   }
   return events;
@@ -444,22 +425,3 @@ const recordSelect = {
 type RecordRow = Prisma.AvailabilityRecordGetPayload<{
   select: typeof recordSelect;
 }>;
-
-const holidaySelect = {
-  assignments: {
-    select: {
-      archived_at: true,
-      day_classification: true,
-      scope_type: true,
-      scope_value: true,
-    },
-  },
-  country_code: true,
-  created_at: true,
-  default_classification: true,
-  holiday_date: true,
-  id: true,
-  name: true,
-  region_code: true,
-  updated_at: true,
-} satisfies Prisma.PublicHolidaySelect;

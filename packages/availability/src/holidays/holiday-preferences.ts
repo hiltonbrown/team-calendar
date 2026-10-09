@@ -1,11 +1,13 @@
-import type { Result } from "@repo/core";
+import {
+  type ClerkOrgId,
+  CUSTOM_HOLIDAY_KEY_PREFIX,
+  findReferenceHoliday,
+  type HolidayPreferenceSetting,
+  type OrganisationId,
+  type Result,
+} from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { z } from "zod";
-import { findReferenceHoliday } from "./reference/reference-holidays";
-import {
-  CUSTOM_HOLIDAY_KEY_PREFIX,
-  type HolidayPreferenceSetting,
-} from "./resolve-public-holidays";
 
 export type HolidayPreferenceError =
   | { code: "not_authorised"; message: string }
@@ -35,6 +37,13 @@ const ClassificationSchema = LocationSchema.extend({
 const LocalDaySchema = LocationSchema.extend({ enabled: z.boolean() });
 
 type Base = z.infer<typeof BaseSchema>;
+
+// Both ids were validated by BaseSchema; branding them scopes every query.
+const scopeOf = (input: Base) =>
+  scopedQuery(
+    input.clerkOrgId as ClerkOrgId,
+    input.organisationId as OrganisationId
+  );
 type Transaction = Parameters<Parameters<typeof database.$transaction>[0]>[0];
 
 const failure = (
@@ -56,7 +65,7 @@ async function resolveHoliday(
     const custom = await database.publicHoliday.findFirst({
       select: { name: true },
       where: {
-        ...scopedQuery(input.clerkOrgId, input.organisationId),
+        ...scopeOf(input),
         id,
         source: "manual",
       },
@@ -77,7 +86,7 @@ async function resolveLocationName(
   const location = await database.location.findFirst({
     select: { id: true, name: true },
     where: {
-      ...scopedQuery(input.clerkOrgId, input.organisationId),
+      ...scopeOf(input),
       id: locationId,
     },
   });
@@ -149,7 +158,7 @@ async function applyPreference(
     }
 
     const where = {
-      ...scopedQuery(input.clerkOrgId, input.organisationId),
+      ...scopeOf(input),
       holiday_key: input.holidayKey,
       location_id: input.locationId,
     };

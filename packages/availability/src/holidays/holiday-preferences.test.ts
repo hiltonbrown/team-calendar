@@ -30,7 +30,8 @@ vi.mock("@repo/database", () => ({
   })),
 }));
 
-vi.mock("./reference/reference-holidays", () => ({
+vi.mock("@repo/core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@repo/core")>()),
   findReferenceHoliday: vi.fn((id: string) => {
     if (id === "au-qld-2026-08-12-royal-queensland-show") {
       return { id, kind: "local", name: "Royal Queensland Show" };

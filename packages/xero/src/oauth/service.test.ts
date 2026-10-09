@@ -33,9 +33,7 @@ const loggerMock = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 const feedMock = vi.hoisted(() => ({ ensureDefaultCalendarFeed: vi.fn() }));
-const availabilityMock = vi.hoisted(() => ({
-  ensureDefaultPublicHolidaysForOrganisation: vi.fn(),
-}));
+const availabilityMock = vi.hoisted(() => ({}));
 const lockMock = vi.hoisted(() => ({ grant: vi.fn() }));
 const identityMock = vi.hoisted(() => ({ verify: vi.fn() }));
 vi.mock("@repo/database", () => ({
@@ -173,17 +171,6 @@ beforeEach(() => {
     ok: true,
     value: { created: true, feedId: "feed_1" },
   });
-  availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue(
-    {
-      ok: true,
-      value: {
-        importedCount: 2,
-        importedYears: [2026, 2027],
-        skippedCount: 0,
-        skippedYears: [],
-      },
-    }
-  );
 });
 afterEach(() => {
   process.env = { ...ORIGINAL_ENV };

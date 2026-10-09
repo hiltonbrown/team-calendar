@@ -35,6 +35,7 @@ import {
 } from "./calendar-event-provenance";
 import { formatCalendarEventDateRange } from "./calendar-local-time";
 import { calendarDayHref } from "./calendar-url-state";
+import { publicHolidayLabel } from "./public-holiday-label";
 
 interface CalendarTimelineProps {
   data: CalendarRange;
@@ -735,7 +736,7 @@ function MobileRunway({
             </span>
             {day.publicHolidays.length > 0 ? (
               <p className="mt-3 rounded-xl bg-warning-container px-3 py-2 text-body-sm text-on-warning-container">
-                {day.publicHolidays.map(({ name }) => name).join(", ")}
+                {day.publicHolidays.map(publicHolidayLabel).join(", ")}
               </p>
             ) : null}
             {day.events.length > 0 ? (

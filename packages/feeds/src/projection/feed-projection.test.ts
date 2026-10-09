@@ -35,8 +35,9 @@ const mocks = vi.hoisted(() => {
         scopes: [{ scope_type: "org", scope_value: null }],
       })
     ),
-    publicHolidayFindMany: vi.fn(() => Promise.resolve([])),
+    loadHolidayResolutionData: vi.fn(() => Promise.resolve(null)),
     record,
+    referenceHolidays: vi.fn(() => [] as unknown[]),
     resolvePeopleForFeed: vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -63,9 +64,53 @@ vi.mock("@repo/database", () => ({
   database: {
     availabilityRecord: { findMany: mocks.availabilityRecordFindMany },
     feed: { findFirst: mocks.feedFindFirst },
-    publicHoliday: { findMany: mocks.publicHolidayFindMany },
   },
+  loadHolidayResolutionData: mocks.loadHolidayResolutionData,
 }));
+vi.mock(
+  "../../../core/src/public-holidays/reference/reference-holidays",
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    listReferenceHolidays: (input: { region: string | null }) =>
+      (mocks.referenceHolidays() as Array<{ region: string | null }>).filter(
+        (holiday) => holiday.region === null || holiday.region === input.region
+      ),
+  })
+);
+
+const { PUBLIC_HOLIDAY_DATA_VERSION } = await import("@repo/core");
+
+function referenceHoliday(
+  overrides: {
+    date: string;
+    id: string;
+    name: string;
+    region: string | null;
+  } & Partial<{
+    kind: "local" | "part_day" | "public";
+    startsAt: string;
+  }>
+) {
+  return {
+    area: null,
+    country: "AU",
+    kind: "public",
+    startsAt: null,
+    ...overrides,
+  };
+}
+
+function holidayData(overrides: Record<string, unknown>) {
+  return {
+    customHolidays: [],
+    from: "2026-01-01",
+    locations: [],
+    organisation: { countryCode: "AU", regionCode: "QLD" },
+    preferences: [],
+    to: "2026-12-31",
+    ...overrides,
+  };
+}
 vi.mock("../scope/feed-scope", () => ({
   resolvePeopleForFeed: mocks.resolvePeopleForFeed,
 }));
@@ -170,10 +215,9 @@ describe("projectFeedEvents", () => {
     }
   );
 
-  it("projects public holidays for matching locations and deduplicates by id and date", async () => {
+  it("projects resolved holidays for the feed's locations once per holiday", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-20T09:00:00.000Z"));
-
     mocks.feedFindFirst.mockResolvedValueOnce({
       created_by_user_id: "user_1",
       includes_public_holidays: true,
@@ -210,7 +254,7 @@ describe("projectFeedEvents", () => {
             id: "50000000-0000-4000-8000-000000000002",
             name: "Auckland",
             regionCode: "AUK",
-            timezone: "Pacific/Auckland",
+            timezone: "Australia/Brisbane",
           },
           locationId: "50000000-0000-4000-8000-000000000002",
           managerPersonId: null,
@@ -219,72 +263,62 @@ describe("projectFeedEvents", () => {
         },
       ],
     });
-    mocks.publicHolidayFindMany.mockResolvedValueOnce([
-      {
-        archived_at: null,
-        assignments: [
-          {
-            archived_at: null,
-            day_classification: "non_working",
-            scope_type: "location",
-            scope_value: "50000000-0000-4000-8000-000000000001",
-          },
-        ],
-        country_code: "AU",
-        default_classification: "working",
-        holiday_date: new Date("2026-06-22T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000001",
-        name: "Assigned Picnic Day",
-        region_code: "NSW",
-      },
-      {
-        archived_at: null,
-        assignments: [
-          {
-            archived_at: null,
-            day_classification: "working",
-            scope_type: "location",
-            scope_value: "50000000-0000-4000-8000-000000000001",
-          },
-        ],
-        country_code: "AU",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-06-23T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000002",
-        name: "Local Trading Day",
-        region_code: "QLD",
-      },
-      {
-        archived_at: null,
-        assignments: [],
-        country_code: "CUSTOM",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-06-24T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000003",
-        name: "Company Holiday",
-        region_code: null,
-      },
-      {
-        archived_at: null,
-        assignments: [],
-        country_code: "CUSTOM",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-06-24T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000003",
-        name: "Company Holiday Duplicate",
-        region_code: null,
-      },
-      {
-        archived_at: null,
-        assignments: [],
-        country_code: "AU",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-06-25T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000004",
-        name: "State Holiday",
-        region_code: "NSW",
-      },
+    mocks.referenceHolidays.mockReturnValue([
+      referenceHoliday({
+        date: "2026-06-22",
+        id: "au-qld-2026-06-22-state-day",
+        name: "State Day",
+        region: "QLD",
+      }),
+      referenceHoliday({
+        date: "2026-06-23",
+        id: "au-qld-2026-06-23-eve",
+        kind: "part_day",
+        name: "Eve",
+        region: "QLD",
+        startsAt: "18:00",
+      }),
+      referenceHoliday({
+        date: "2026-06-26",
+        id: "au-nsw-2026-06-26-nsw-day",
+        name: "NSW Day",
+        region: "NSW",
+      }),
     ]);
+    mocks.loadHolidayResolutionData.mockResolvedValueOnce(
+      holidayData({
+        customHolidays: [
+          {
+            countryCode: "CUSTOM",
+            date: "2026-06-24",
+            defaultClassification: "non_working",
+            id: "c-1",
+            name: "Company Holiday",
+            regionCode: null,
+            updatedAt: new Date("2026-06-01T00:00:00.000Z"),
+          },
+        ],
+        locations: [
+          {
+            countryCode: "AU",
+            id: "50000000-0000-4000-8000-000000000001",
+            regionCode: "QLD",
+          },
+          {
+            countryCode: "NZ",
+            id: "50000000-0000-4000-8000-000000000002",
+            regionCode: "AUK",
+          },
+        ],
+        preferences: [
+          {
+            holidayKey: "au-qld-2026-06-22-state-day",
+            locationId: "50000000-0000-4000-8000-000000000001",
+            setting: "working",
+          },
+        ],
+      })
+    );
 
     const result = await projectFeedEvents({
       ...baseInput,
@@ -295,41 +329,23 @@ describe("projectFeedEvents", () => {
     if (!result.ok) {
       return;
     }
-
-    const publicHolidays = result.value.filter(
-      (event) => event.isPublicHoliday
-    );
-
-    expect(publicHolidays).toHaveLength(2);
-    expect(publicHolidays).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          allDay: true,
-          displayName: "Public holiday: Assigned Picnic Day",
-          endsAt: new Date("2026-06-23T00:00:00.000Z"),
-          publishedUid:
-            "60000000-0000-4000-8000-000000000001@ical.teamcalendar.online",
-          sourceRecordId: "60000000-0000-4000-8000-000000000001",
-          startsAt: new Date("2026-06-22T00:00:00.000Z"),
-          summary: "Public holiday: Assigned Picnic Day",
-        }),
-        expect.objectContaining({
-          displayName: "Public holiday: Company Holiday",
-          endsAt: new Date("2026-06-25T00:00:00.000Z"),
-          publishedUid:
-            "60000000-0000-4000-8000-000000000003@ical.teamcalendar.online",
-          sourceRecordId: "60000000-0000-4000-8000-000000000003",
-          startsAt: new Date("2026-06-24T00:00:00.000Z"),
-          summary: "Public holiday: Company Holiday",
-        }),
-      ])
-    );
-    expect(publicHolidays.map((event) => event.summary)).not.toContain(
-      "Public holiday: Local Trading Day"
-    );
-    expect(publicHolidays.map((event) => event.summary)).not.toContain(
-      "Public holiday: State Holiday"
-    );
+    const holidays = result.value.filter((event) => event.isPublicHoliday);
+    expect(holidays.map((event) => event.sourceRecordId)).toEqual([
+      "au-qld-2026-06-23-eve",
+      "custom:c-1",
+    ]);
+    expect(holidays[0]).toMatchObject({
+      allDay: true,
+      endsAt: new Date("2026-06-24T00:00:00.000Z"),
+      publishedUid: `${"40000000-0000-4000-8000-000000000001"}-au-qld-2026-06-23-eve@ical.teamcalendar.online`,
+      startsAt: new Date("2026-06-23T00:00:00.000Z"),
+      summary: "Public holiday from 18:00: Eve",
+    });
+    expect(holidays[1]).toMatchObject({
+      displayName: "Public holiday: Company Holiday",
+      publishedAt: new Date("2026-06-01T00:00:00.000Z"),
+      publishedUid: `${"40000000-0000-4000-8000-000000000001"}-custom:c-1@ical.teamcalendar.online`,
+    });
   });
 
   it("converts a one-day all-day record inclusive end at 23:59:59.999 to the next midnight exclusive", async () => {
@@ -645,7 +661,6 @@ describe("projectFeedEvents", () => {
   it("does not double-extend public holiday exclusive ends", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-20T09:00:00.000Z"));
-
     mocks.feedFindFirst.mockResolvedValueOnce({
       created_by_user_id: "user_1",
       includes_public_holidays: true,
@@ -675,18 +690,27 @@ describe("projectFeedEvents", () => {
         },
       ],
     });
-    mocks.publicHolidayFindMany.mockResolvedValueOnce([
-      {
-        archived_at: null,
-        assignments: [],
-        country_code: "CUSTOM",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-06-22T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000005",
-        name: "Holiday Day",
-        region_code: null,
-      },
-    ]);
+    mocks.loadHolidayResolutionData.mockResolvedValueOnce(
+      holidayData({
+        customHolidays: [
+          {
+            countryCode: "CUSTOM",
+            date: "2026-06-22",
+            defaultClassification: "non_working",
+            id: "c-2",
+            name: "Holiday Day",
+            regionCode: null,
+          },
+        ],
+        locations: [
+          {
+            countryCode: "AU",
+            id: "50000000-0000-4000-8000-000000000001",
+            regionCode: "QLD",
+          },
+        ],
+      })
+    );
 
     const result = await projectFeedEvents({
       ...baseInput,
@@ -702,10 +726,9 @@ describe("projectFeedEvents", () => {
     expect(holiday?.endsAt.toISOString()).toBe("2026-06-23T00:00:00.000Z");
   });
 
-  it("queries public holidays in a single query bounded by the horizon window and excluding archived holidays", async () => {
+  it("loads holiday data once for the horizon window within the tenant", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-20T09:00:00.000Z"));
-
     mocks.feedFindFirst.mockResolvedValueOnce({
       created_by_user_id: "user_1",
       includes_public_holidays: true,
@@ -734,7 +757,6 @@ describe("projectFeedEvents", () => {
         },
       ],
     });
-    mocks.publicHolidayFindMany.mockResolvedValueOnce([]);
 
     await projectFeedEvents({
       ...baseInput,
@@ -742,36 +764,12 @@ describe("projectFeedEvents", () => {
       privacyMode: "named",
     });
 
-    expect(mocks.publicHolidayFindMany).toHaveBeenCalledTimes(1);
-    expect(mocks.publicHolidayFindMany).toHaveBeenCalledWith({
-      orderBy: { holiday_date: "asc" },
-      select: {
-        assignments: {
-          select: {
-            archived_at: true,
-            day_classification: true,
-            scope_type: true,
-            scope_value: true,
-          },
-        },
-        country_code: true,
-        created_at: true,
-        default_classification: true,
-        holiday_date: true,
-        id: true,
-        name: true,
-        region_code: true,
-        updated_at: true,
-      },
-      where: {
-        archived_at: null,
-        clerk_org_id: baseInput.clerkOrgId,
-        holiday_date: {
-          gte: new Date("2026-06-20T00:00:00.000Z"),
-          lte: new Date("2026-07-20T00:00:00.000Z"),
-        },
-        organisation_id: baseInput.organisationId,
-      },
+    expect(mocks.loadHolidayResolutionData).toHaveBeenCalledTimes(1);
+    expect(mocks.loadHolidayResolutionData.mock.calls[0]?.[0]).toEqual({
+      clerkOrgId: baseInput.clerkOrgId,
+      from: "2026-06-20",
+      organisationId: baseInput.organisationId,
+      to: "2026-07-20",
     });
   });
 
@@ -831,18 +829,25 @@ describe("projectFeedEvents", () => {
         },
       ],
     });
-    mocks.publicHolidayFindMany.mockResolvedValueOnce([
-      {
-        archived_at: null,
-        assignments: [],
-        country_code: "AU",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-05-04T00:00:00.000Z"),
-        id: "60000000-0000-4000-8000-000000000020",
+    mocks.referenceHolidays.mockReturnValue([
+      referenceHoliday({
+        date: "2026-05-04",
+        id: "au-qld-2026-05-04-labour-day",
         name: "Labour Day",
-        region_code: "QLD",
-      },
+        region: "QLD",
+      }),
     ]);
+    mocks.loadHolidayResolutionData.mockResolvedValueOnce(
+      holidayData({
+        locations: [
+          {
+            countryCode: "AU",
+            id: "50000000-0000-4000-8000-000000000001",
+            regionCode: "QLD",
+          },
+        ],
+      })
+    );
 
     const result = await projectFeedEvents({
       ...baseInput,
@@ -883,12 +888,11 @@ describe("projectFeedEvents", () => {
         hasPublication: false,
         isPublicHoliday: true,
         location: null,
-        publishedAt: undefined,
+        publishedAt: new Date(`${PUBLIC_HOLIDAY_DATA_VERSION}T00:00:00.000Z`),
         publishedSequence: 0,
-        publishedUid:
-          "60000000-0000-4000-8000-000000000020@ical.teamcalendar.online",
+        publishedUid: `${"40000000-0000-4000-8000-000000000001"}-au-qld-2026-05-04-labour-day@ical.teamcalendar.online`,
         recordType: "public_holiday",
-        sourceRecordId: "60000000-0000-4000-8000-000000000020",
+        sourceRecordId: "au-qld-2026-05-04-labour-day",
         startsAt: new Date("2026-05-04T00:00:00.000Z"),
         summary: "Public holiday: Labour Day",
       },

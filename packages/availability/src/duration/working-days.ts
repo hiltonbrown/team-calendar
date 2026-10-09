@@ -1,13 +1,12 @@
 import "server-only";
 
-import {
-  type ClerkOrgId,
-  holidayIsNonWorking,
-  type OrganisationId,
-  type Result,
-} from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
-import { listForOrganisation } from "../holidays/holiday-service";
+import {
+  nonWorkingHolidayDates,
+  type ResolvedPublicHoliday,
+  resolvePublicHolidays,
+} from "../holidays/resolve-public-holidays";
 
 export type DurationError =
   | { code: "invalid_range"; message: string }
@@ -32,20 +31,6 @@ interface LocalDateParts {
   year: number;
 }
 
-interface HolidayForDuration {
-  archived_at: Date | null;
-  assignments: Array<{
-    archived_at: Date | null;
-    day_classification: "non_working" | "working";
-    scope_type: string;
-    scope_value: string;
-  }>;
-  country_code: string;
-  default_classification: "non_working" | "working";
-  holiday_date: Date;
-  region_code: string | null;
-}
-
 interface DurationLocation {
   country_code: string | null;
   region_code: string | null;
@@ -57,7 +42,10 @@ interface HolidayLoadError {
 }
 
 export interface WorkingDaysReferenceData {
-  holidaysByYear: Map<number, Result<HolidayForDuration[], HolidayLoadError>>;
+  holidaysByYear: Map<
+    number,
+    Result<ResolvedPublicHoliday[], HolidayLoadError>
+  >;
   locationById: Map<string, DurationLocation>;
   organisation: DurationLocation | null;
 }
@@ -131,10 +119,10 @@ export async function loadWorkingDaysReferenceData(
       async (year) =>
         [
           year,
-          await listForOrganisation(
+          await loadHolidaysForYear(
             first.clerkOrgId as ClerkOrgId,
             first.organisationId as OrganisationId,
-            { year }
+            year
           ),
         ] as const
     )
@@ -144,6 +132,19 @@ export async function loadWorkingDaysReferenceData(
     locationById,
     organisation: organisationLocation,
   };
+}
+
+export function loadHolidaysForYear(
+  clerkOrgId: ClerkOrgId,
+  organisationId: OrganisationId,
+  year: number
+): Promise<Result<ResolvedPublicHoliday[], HolidayLoadError>> {
+  return resolvePublicHolidays({
+    clerkOrgId,
+    from: `${year}-01-01`,
+    organisationId,
+    to: `${year}-12-31`,
+  });
 }
 
 const WORKING_DAY_START_MINUTES = 9 * 60;
@@ -180,10 +181,10 @@ export async function computeWorkingDays(
     const holidayDates = loadHolidayDatesFromResults({
       holidayResults: await Promise.all(
         yearsBetween(startParts.year, endParts.year).map((year) =>
-          listForOrganisation(
+          loadHolidaysForYear(
             input.clerkOrgId as ClerkOrgId,
             input.organisationId as OrganisationId,
-            { year }
+            year
           )
         )
       ),
@@ -375,7 +376,7 @@ function loadHolidayDatesFromResults({
   location,
   locationId,
 }: {
-  holidayResults: Result<HolidayForDuration[], HolidayLoadError>[];
+  holidayResults: Result<ResolvedPublicHoliday[], HolidayLoadError>[];
   location: DurationLocation | null;
   locationId: string | null;
 }): Result<Set<string>, DurationError> {
@@ -390,57 +391,12 @@ function loadHolidayDatesFromResults({
         ok: false,
       };
     }
-
-    for (const holiday of result.value) {
-      addExcludedHolidayDate({
-        holiday,
-        holidayDates,
-        location,
-        locationId,
-      });
+    for (const dateOnly of nonWorkingHolidayDates(result.value, locationId)) {
+      holidayDates.add(dateOnly);
     }
   }
 
   return { ok: true, value: holidayDates };
-}
-
-function addExcludedHolidayDate({
-  holiday,
-  holidayDates,
-  location,
-  locationId,
-}: {
-  holiday: HolidayForDuration;
-  holidayDates: Set<string>;
-  location: DurationLocation;
-  locationId: string | null;
-}) {
-  const locationAssignments = holiday.assignments
-    .filter((assignment) => assignment.scope_type === "location")
-    .map((assignment) => ({
-      archivedAt: assignment.archived_at,
-      classification: assignment.day_classification,
-      locationId: assignment.scope_value,
-    }));
-
-  if (
-    holidayIsNonWorking({
-      holiday: {
-        archivedAt: holiday.archived_at,
-        countryCode: holiday.country_code,
-        defaultClassification: holiday.default_classification,
-        locationAssignments,
-        regionCode: holiday.region_code,
-      },
-      subject: {
-        countryCode: location.country_code,
-        locationId,
-        regionCode: location.region_code,
-      },
-    })
-  ) {
-    holidayDates.add(getStoredWallClockParts(holiday.holiday_date).dateOnly);
-  }
 }
 
 function fractionalWorkingDay(

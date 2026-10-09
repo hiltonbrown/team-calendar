@@ -2,7 +2,6 @@ import "server-only";
 
 import {
   type ClerkOrgId,
-  holidayIsNonWorking,
   type OrganisationId,
   startOfUtcDay,
 } from "@repo/core";
@@ -12,11 +11,11 @@ import type {
   availability_contactability,
   availability_record_type,
   availability_source_type,
-  public_holiday_assignment_scope_type,
-  public_holiday_day_classification,
-  public_holiday_source,
-  public_holiday_type,
 } from "@repo/database/generated/enums";
+import {
+  type ResolvedPublicHoliday,
+  resolvePublicHolidays,
+} from "../holidays/resolve-public-holidays";
 import {
   isXeroLeaveType,
   type RecordType,
@@ -51,10 +50,11 @@ export interface CurrentStatusRecord {
 
 export interface CurrentStatusPublicHoliday {
   date: Date;
+  /** Bundled reference id or "custom:<id>". */
   id: string;
   name: string;
-  source: public_holiday_source;
-  type: public_holiday_type;
+  source: ResolvedPublicHoliday["origin"];
+  type: ResolvedPublicHoliday["kind"];
 }
 
 export interface CurrentStatus {
@@ -75,24 +75,6 @@ export interface CurrentStatusPersonInput {
 export interface PublicHolidayApplicability {
   locationIds: Set<string>;
   unassigned: boolean;
-}
-
-interface CurrentStatusHolidayRow {
-  archived_at?: Date | null;
-  assignments?: Array<{
-    archived_at: Date | null;
-    day_classification: public_holiday_day_classification;
-    scope_type: public_holiday_assignment_scope_type;
-    scope_value: string;
-  }>;
-  country_code: string;
-  default_classification?: public_holiday_day_classification;
-  holiday_date: Date;
-  holiday_type: public_holiday_type;
-  id: string;
-  name: string;
-  region_code: string | null;
-  source: public_holiday_source;
 }
 
 const LOCAL_PRIORITY: Array<{
@@ -228,23 +210,18 @@ export async function computeCurrentStatusForPeople(input: {
     recordsByPersonId.set(record.person_id, records);
   }
 
-  const holidayLookupInputs = input.people.map((person) => {
+  const localDates = input.people.map((person) => {
     const location = person.locationId
       ? (locationsById.get(person.locationId) ?? null)
       : null;
-    return {
-      countryCode: location?.country_code ?? organisation?.country_code ?? null,
-      localDate: dateOnlyInTimeZone(
-        input.at,
-        location?.timezone ?? organisation?.timezone ?? "UTC"
-      ),
-      locationId: person.locationId,
-      regionCode: location?.region_code ?? null,
-    };
+    return dateOnlyInTimeZone(
+      input.at,
+      location?.timezone ?? organisation?.timezone ?? "UTC"
+    );
   });
-  const holidays = await findPublicHolidays({
+  const holidays = await resolveHolidaysForDates({
     clerkOrgId,
-    holidayLookupInputs,
+    localDates,
     organisationId,
   });
 
@@ -262,13 +239,7 @@ export async function computeCurrentStatusForPeople(input: {
       : null;
     const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
     const localDate = dateOnlyInTimeZone(input.at, timezone);
-    const holiday = findPublicHolidayInRows({
-      countryCode: location?.country_code ?? organisation?.country_code ?? null,
-      holidays,
-      localDate,
-      locationId: person.locationId,
-      regionCode: location?.region_code ?? null,
-    });
+    const holiday = holidayOn(holidays, localDate, person.locationId);
     statuses.set(person.personId, statusFromHolidayOrLocal(records, holiday));
   }
 
@@ -309,33 +280,26 @@ export async function computePublicHolidayApplicability(input: {
   ]);
   const subjects = [
     ...locations.map((location) => ({
-      countryCode: location.country_code ?? organisation?.country_code ?? null,
       localDate: dateOnlyInTimeZone(
         input.at,
         location.timezone ?? organisation?.timezone ?? "UTC"
       ),
-      locationId: location.id,
-      regionCode: location.region_code ?? null,
+      locationId: location.id as string | null,
     })),
     {
-      countryCode: organisation?.country_code ?? null,
       localDate: dateOnlyInTimeZone(input.at, organisation?.timezone ?? "UTC"),
       locationId: null,
-      regionCode: null,
     },
   ];
-  const holidays = await findPublicHolidays({
+  const holidays = await resolveHolidaysForDates({
     clerkOrgId,
-    holidayLookupInputs: subjects,
+    localDates: subjects.map((subject) => subject.localDate),
     organisationId,
   });
   const applicable = new Set<string>();
   let unassigned = false;
   for (const subject of subjects) {
-    const holiday = findPublicHolidayInRows({
-      ...subject,
-      holidays,
-    });
+    const holiday = holidayOn(holidays, subject.localDate, subject.locationId);
     if (!holiday) {
       continue;
     }
@@ -413,15 +377,15 @@ export async function computeCurrentStatus(input: {
 
   const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
   const localDate = dateOnlyInTimeZone(input.at, timezone);
-  const holiday = await findPublicHoliday({
+  const holidays = await resolveHolidaysForDates({
     clerkOrgId,
-    countryCode: location?.country_code ?? organisation?.country_code ?? null,
-    localDate,
-    locationId: input.locationId,
+    localDates: [localDate],
     organisationId,
-    regionCode: location?.region_code ?? null,
   });
-  return statusFromHolidayOrLocal(mappedRecords, holiday);
+  return statusFromHolidayOrLocal(
+    mappedRecords,
+    holidayOn(holidays, localDate, input.locationId)
+  );
 }
 
 function toStatusRecord(record: {
@@ -498,16 +462,16 @@ function statusFromApprovedOrPendingLeave(
 
 function statusFromHolidayOrLocal(
   records: CurrentStatusRecord[],
-  holiday: CurrentStatusHolidayRow | null
+  holiday: ResolvedPublicHoliday | null
 ): CurrentStatus {
   if (holiday) {
     return {
       activePublicHoliday: {
-        date: holiday.holiday_date,
-        id: holiday.id,
+        date: startOfUtcDay(holiday.date),
+        id: holiday.key,
         name: holiday.name,
-        source: holiday.source,
-        type: holiday.holiday_type,
+        source: holiday.origin,
+        type: holiday.kind,
       },
       activeRecord: null,
       approvalStatus: null,
@@ -538,222 +502,41 @@ function statusFromHolidayOrLocal(
   };
 }
 
-async function findPublicHoliday(input: {
+/** Resolves holidays covering every local date the lookups need, in one call. */
+async function resolveHolidaysForDates(input: {
   clerkOrgId: ClerkOrgId;
-  countryCode: string | null;
-  localDate: string;
-  locationId: string | null;
+  localDates: string[];
   organisationId: OrganisationId;
-  regionCode: string | null;
-}): Promise<CurrentStatusHolidayRow | null> {
-  const holidayStart = startOfUtcDay(input.localDate);
-  const holidayEnd = new Date(holidayStart);
-  holidayEnd.setUTCDate(holidayEnd.getUTCDate() + 1);
-
-  const holiday = await database.publicHoliday.findFirst({
-    orderBy: [{ region_code: "desc" }, { name: "asc" }],
-    select: {
-      assignments: {
-        select: {
-          archived_at: true,
-          day_classification: true,
-          scope_type: true,
-          scope_value: true,
-        },
-        where: {
-          archived_at: null,
-          scope_type: "location",
-        },
-      },
-      country_code: true,
-      default_classification: true,
-      holiday_date: true,
-      holiday_type: true,
-      id: true,
-      name: true,
-      region_code: true,
-      source: true,
-    },
-    where: {
-      ...scopedQuery(input.clerkOrgId, input.organisationId),
-      archived_at: null,
-      country_code: input.countryCode
-        ? { in: [input.countryCode, "CUSTOM"] }
-        : "CUSTOM",
-      holiday_date: {
-        gte: holidayStart,
-        lt: holidayEnd,
-      },
-      OR: [
-        { region_code: null },
-        ...(input.regionCode ? [{ region_code: input.regionCode }] : []),
-      ],
-    },
-  });
-
-  if (!holiday) {
-    return null;
+}): Promise<ResolvedPublicHoliday[]> {
+  const sorted = [...input.localDates].sort();
+  const [from] = sorted;
+  const to = sorted.at(-1);
+  if (!(from && to)) {
+    return [];
   }
-
-  const locationAssignments = (holiday.assignments ?? [])
-    .filter((assignment) => assignment.scope_type === "location")
-    .map((assignment) => ({
-      archivedAt: assignment.archived_at ?? null,
-      classification: assignment.day_classification,
-      locationId: assignment.scope_value,
-    }));
-
-  const applies = holidayIsNonWorking({
-    holiday: {
-      archivedAt: null,
-      countryCode: holiday.country_code,
-      defaultClassification: holiday.default_classification ?? "non_working",
-      locationAssignments,
-      regionCode: holiday.region_code ?? null,
-    },
-    subject: {
-      countryCode: input.countryCode,
-      locationId: input.locationId,
-      regionCode: input.regionCode,
-    },
+  const result = await resolvePublicHolidays({
+    clerkOrgId: input.clerkOrgId,
+    from,
+    organisationId: input.organisationId,
+    to,
   });
-
-  return applies ? holiday : null;
+  return result.ok ? result.value : [];
 }
 
-function findPublicHolidays(input: {
-  clerkOrgId: ClerkOrgId;
-  holidayLookupInputs: Array<{
-    countryCode: string | null;
-    localDate: string;
-    locationId?: string | null;
-    regionCode: string | null;
-  }>;
-  organisationId: OrganisationId;
-}): Promise<CurrentStatusHolidayRow[]> {
-  const countries = [
-    ...new Set([
-      ...input.holidayLookupInputs
-        .map((lookup) => lookup.countryCode)
-        .filter((countryCode): countryCode is string => countryCode !== null),
-      "CUSTOM",
-    ]),
-  ];
-  if (countries.length === 0) {
-    return Promise.resolve([]);
-  }
-
-  const regions = [
-    ...new Set(
-      input.holidayLookupInputs
-        .map((lookup) => lookup.regionCode)
-        .filter((regionCode): regionCode is string => regionCode !== null)
-    ),
-  ];
-  const starts = input.holidayLookupInputs.map((lookup) =>
-    startOfUtcDay(lookup.localDate)
+/** The non-working holiday on a local date for a location (null: organisation level). */
+function holidayOn(
+  holidays: readonly ResolvedPublicHoliday[],
+  localDate: string,
+  locationId: string | null
+): ResolvedPublicHoliday | null {
+  return (
+    holidays.find(
+      (holiday) =>
+        holiday.date === localDate &&
+        holiday.locationId === locationId &&
+        holiday.classification === "non_working"
+    ) ?? null
   );
-  const earliest = new Date(Math.min(...starts.map((date) => date.getTime())));
-  const latest = new Date(Math.max(...starts.map((date) => date.getTime())));
-  latest.setUTCDate(latest.getUTCDate() + 1);
-
-  return database.publicHoliday.findMany({
-    orderBy: [{ region_code: "desc" }, { name: "asc" }],
-    select: {
-      assignments: {
-        select: {
-          archived_at: true,
-          day_classification: true,
-          scope_type: true,
-          scope_value: true,
-        },
-        where: {
-          archived_at: null,
-          scope_type: "location",
-        },
-      },
-      country_code: true,
-      default_classification: true,
-      holiday_date: true,
-      holiday_type: true,
-      id: true,
-      name: true,
-      region_code: true,
-      source: true,
-    },
-    where: {
-      ...scopedQuery(input.clerkOrgId, input.organisationId),
-      archived_at: null,
-      country_code: { in: countries },
-      holiday_date: {
-        gte: earliest,
-        lt: latest,
-      },
-      OR: [
-        { region_code: null },
-        ...(regions.length ? [{ region_code: { in: regions } }] : []),
-      ],
-    },
-  });
-}
-
-function findPublicHolidayInRows(input: {
-  countryCode: string | null;
-  holidays: CurrentStatusHolidayRow[];
-  localDate: string;
-  locationId: string | null;
-  regionCode: string | null;
-}): CurrentStatusHolidayRow | null {
-  const holidayStart = startOfUtcDay(input.localDate);
-  const holidayEnd = new Date(holidayStart);
-  holidayEnd.setUTCDate(holidayEnd.getUTCDate() + 1);
-  const matches = input.holidays
-    .filter((holiday) => {
-      if (
-        holiday.holiday_date < holidayStart ||
-        holiday.holiday_date >= holidayEnd
-      ) {
-        return false;
-      }
-      const locationAssignments = (holiday.assignments ?? [])
-        .filter((assignment) => assignment.scope_type === "location")
-        .map((assignment) => ({
-          archivedAt: assignment.archived_at ?? null,
-          classification: assignment.day_classification,
-          locationId: assignment.scope_value,
-        }));
-
-      return holidayIsNonWorking({
-        holiday: {
-          archivedAt: holiday.archived_at ?? null,
-          countryCode: holiday.country_code,
-          defaultClassification:
-            holiday.default_classification ?? "non_working",
-          locationAssignments,
-          regionCode: holiday.region_code ?? null,
-        },
-        subject: {
-          countryCode: input.countryCode,
-          locationId: input.locationId,
-          regionCode: input.regionCode,
-        },
-      });
-    })
-    .sort(compareHolidayPriority);
-
-  return matches[0] ?? null;
-}
-
-function compareHolidayPriority(
-  left: CurrentStatusHolidayRow,
-  right: CurrentStatusHolidayRow
-): number {
-  const regionPriority =
-    Number(Boolean(right.region_code)) - Number(Boolean(left.region_code));
-  if (regionPriority !== 0) {
-    return regionPriority;
-  }
-  return left.name.localeCompare(right.name);
 }
 
 export function dateOnlyInTimeZone(date: Date, timeZone: string): string {

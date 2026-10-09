@@ -57,7 +57,6 @@ const incompleteState: OnboardingState = {
   isComplete: false,
   pendingPersonMatchesCount: 0,
   peopleCount: 0,
-  publicHolidayJurisdictionCount: 0,
   requiredCount: 4,
   steps: [
     {

@@ -5,8 +5,7 @@ const mocks = vi.hoisted(() => ({
   locationFindFirst: vi.fn(),
   locationFindMany: vi.fn(),
   organisationFindFirst: vi.fn(),
-  publicHolidayFindFirst: vi.fn(),
-  publicHolidayFindMany: vi.fn(),
+  resolvePublicHolidays: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
@@ -22,13 +21,38 @@ vi.mock("@repo/database", () => ({
       findMany: mocks.locationFindMany,
     },
     organisation: { findFirst: mocks.organisationFindFirst },
-    publicHoliday: {
-      findFirst: mocks.publicHolidayFindFirst,
-      findMany: mocks.publicHolidayFindMany,
-    },
   },
   scopedQuery: mocks.scopedQuery,
 }));
+vi.mock("../holidays/resolve-public-holidays", () => ({
+  resolvePublicHolidays: mocks.resolvePublicHolidays,
+}));
+
+const LOCATION_ID = "00000000-0000-4000-8000-000000000101";
+const resolvedHoliday = (
+  overrides: Partial<{
+    classification: "non_working" | "working";
+    key: string;
+    kind: "custom" | "local" | "part_day" | "public";
+    locationId: string | null;
+    name: string;
+    origin: "custom" | "official";
+  }> = {}
+) => ({
+  area: null,
+  classification: "non_working",
+  date: "2026-04-25",
+  hidden: false,
+  key: "au-national-2026-04-25-anzac-day",
+  kind: "public",
+  locationId: LOCATION_ID,
+  name: "ANZAC Day",
+  origin: "official",
+  startsAt: null,
+  ...overrides,
+});
+const resolved = (...holidays: ReturnType<typeof resolvedHoliday>[]) =>
+  mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: holidays });
 
 const {
   computeCurrentStatus,
@@ -72,8 +96,7 @@ describe("current-status", () => {
       country_code: "AU",
       timezone: "Australia/Brisbane",
     });
-    mocks.publicHolidayFindFirst.mockResolvedValue(null);
-    mocks.publicHolidayFindMany.mockResolvedValue([]);
+    resolved();
     mocks.availabilityFindMany.mockResolvedValue([]);
   });
 
@@ -87,20 +110,7 @@ describe("current-status", () => {
         timezone: "Australia/Brisbane",
       },
     ]);
-    mocks.publicHolidayFindMany.mockResolvedValue([
-      {
-        archived_at: null,
-        assignments: [],
-        country_code: "AU",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-        holiday_type: "public",
-        id: "holiday-1",
-        name: "ANZAC Day",
-        region_code: null,
-        source: "australian_government",
-      },
-    ]);
+    resolved(resolvedHoliday(), resolvedHoliday({ locationId: null }));
 
     const result = await computePublicHolidayApplicability({
       at: baseInput.at,
@@ -131,17 +141,7 @@ describe("current-status", () => {
     mocks.availabilityFindMany.mockResolvedValue([
       activeRecord("sick_leave", "submitted"),
     ]);
-    mocks.publicHolidayFindFirst.mockResolvedValue({
-      assignments: [],
-      country_code: "AU",
-      default_classification: "non_working",
-      holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-      holiday_type: "public",
-      id: "holiday-1",
-      name: "ANZAC Day",
-      region_code: null,
-      source: "nager",
-    });
+    resolved(resolvedHoliday());
 
     const status = await computeCurrentStatus(baseInput);
 
@@ -161,27 +161,18 @@ describe("current-status", () => {
     expect(status.label).toBe("In training");
   });
 
-  it("uses archived_at null when checking public holidays", async () => {
-    mocks.publicHolidayFindFirst.mockResolvedValue({
-      assignments: [],
-      country_code: "AU",
-      default_classification: "non_working",
-      holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-      holiday_type: "public",
-      id: "holiday-1",
-      name: "ANZAC Day",
-      region_code: null,
-      source: "nager",
-    });
+  it("returns the public holiday resolved for the person's location and local date", async () => {
+    resolved(resolvedHoliday());
 
     const status = await computeCurrentStatus(baseInput);
 
     expect(status.statusKey).toBe("public_holiday");
-    expect(mocks.publicHolidayFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ archived_at: null }),
-      })
-    );
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
+      clerkOrgId: baseInput.clerkOrgId,
+      from: "2026-04-25",
+      organisationId: baseInput.organisationId,
+      to: "2026-04-25",
+    });
   });
 
   it("returns available when no active record or holiday applies", async () => {
@@ -246,19 +237,7 @@ describe("current-status", () => {
         person_id: people[3].personId,
       },
     ]);
-    mocks.publicHolidayFindMany.mockResolvedValue([
-      {
-        assignments: [],
-        country_code: "AU",
-        default_classification: "non_working",
-        holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-        holiday_type: "public",
-        id: "holiday-1",
-        name: "ANZAC Day",
-        region_code: "QLD",
-        source: "nager",
-      },
-    ]);
+    resolved(resolvedHoliday());
 
     const statuses = await computeCurrentStatusForPeople({
       at: baseInput.at,
@@ -274,322 +253,77 @@ describe("current-status", () => {
     expect(mocks.organisationFindFirst).toHaveBeenCalledOnce();
     expect(mocks.locationFindMany).toHaveBeenCalledOnce();
     expect(mocks.availabilityFindMany).toHaveBeenCalledOnce();
-    expect(mocks.publicHolidayFindMany).toHaveBeenCalledOnce();
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledOnce();
   });
 
-  it("selects the exact Plan 095 helper fields in both single and batch queries", async () => {
-    mocks.publicHolidayFindFirst.mockResolvedValue(null);
-    mocks.publicHolidayFindMany.mockResolvedValue([]);
-
-    await computeCurrentStatus(baseInput);
-    await computeCurrentStatusForPeople({
-      at: baseInput.at,
-      clerkOrgId: baseInput.clerkOrgId,
-      organisationId: baseInput.organisationId,
-      people: [
-        { locationId: baseInput.locationId, personId: baseInput.personId },
-      ],
-    });
-
-    const expectedSelect = {
-      assignments: {
-        select: {
-          archived_at: true,
-          day_classification: true,
-          scope_type: true,
-          scope_value: true,
-        },
-        where: {
-          archived_at: null,
-          scope_type: "location",
-        },
-      },
-      country_code: true,
-      default_classification: true,
-      holiday_date: true,
-      holiday_type: true,
-      id: true,
-      name: true,
-      region_code: true,
-      source: true,
-    };
-
-    expect(mocks.publicHolidayFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        select: expectedSelect,
-        where: expect.objectContaining({
-          clerk_org_id: baseInput.clerkOrgId,
-          organisation_id: baseInput.organisationId,
-        }),
-      })
-    );
-
-    expect(mocks.publicHolidayFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        select: expectedSelect,
-        where: expect.objectContaining({
-          clerk_org_id: baseInput.clerkOrgId,
-          organisation_id: baseInput.organisationId,
-        }),
-      })
-    );
-  });
-
-  it("never exposes helper-only or internal fields on the public activePublicHoliday object", async () => {
-    mocks.publicHolidayFindFirst.mockResolvedValue({
-      assignments: [
-        {
-          archived_at: null,
-          day_classification: "non_working",
-          scope_type: "location",
-          scope_value: baseInput.locationId,
-        },
-      ],
-      country_code: "AU",
-      default_classification: "non_working",
-      holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-      holiday_type: "public",
-      id: "holiday-1",
-      name: "ANZAC Day",
-      region_code: "QLD",
-      source: "nager",
-    });
+  it("exposes only the public holiday summary on activePublicHoliday", async () => {
+    resolved(resolvedHoliday());
 
     const status = await computeCurrentStatus(baseInput);
 
-    expect(status.statusKey).toBe("public_holiday");
     expect(status.activePublicHoliday).toEqual({
       date: new Date("2026-04-25T00:00:00.000Z"),
-      id: "holiday-1",
+      id: "au-national-2026-04-25-anzac-day",
       name: "ANZAC Day",
-      source: "nager",
+      source: "official",
       type: "public",
     });
-    expect(status.activePublicHoliday).not.toHaveProperty("assignments");
-    expect(status.activePublicHoliday).not.toHaveProperty(
-      "default_classification"
-    );
-    expect(status.activePublicHoliday).not.toHaveProperty("country_code");
-    expect(status.activePublicHoliday).not.toHaveProperty("region_code");
   });
 
   describe("single and batched status parity across holiday scenarios", () => {
     const scenarios = [
       {
-        description: "regional holiday matching subject location",
+        description: "holiday resolved for the person's location",
         expectedStatus: "public_holiday",
-        holiday: {
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-regional-match",
-          name: "QLD Day",
-          region_code: "QLD",
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
+        holidays: [resolvedHoliday()],
+        personLocationId: LOCATION_ID,
       },
       {
-        description: "regional holiday mismatched with subject location",
+        description: "holiday resolved for another location only",
         expectedStatus: "available",
-        holiday: {
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-regional-mismatch",
-          name: "NSW Day",
-          region_code: "NSW",
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
+        holidays: [
+          resolvedHoliday({
+            locationId: "00000000-0000-4000-8000-000000000999",
+          }),
+        ],
+        personLocationId: LOCATION_ID,
       },
       {
-        description: "custom holiday applying to all jurisdictions",
-        expectedStatus: "public_holiday",
-        holiday: {
-          assignments: [],
-          country_code: "CUSTOM",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "custom" as const,
-          id: "holiday-custom",
-          name: "Company Day",
-          region_code: null,
-          source: "manual" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
-      },
-      {
-        description: "default working holiday without override",
+        description: "holiday resolved as a working day",
         expectedStatus: "available",
-        holiday: {
-          assignments: [],
-          country_code: "AU",
-          default_classification: "working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "observance" as const,
-          id: "holiday-working-default",
-          name: "Working Observance",
-          region_code: null,
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
+        holidays: [resolvedHoliday({ classification: "working" })],
+        personLocationId: LOCATION_ID,
       },
       {
-        description:
-          "default working holiday with non_working location override",
+        description: "custom holiday for the location",
         expectedStatus: "public_holiday",
-        holiday: {
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "non_working" as const,
-              scope_type: "location" as const,
-              scope_value: "00000000-0000-4000-8000-000000000101",
-            },
-          ],
-          country_code: "AU",
-          default_classification: "working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "observance" as const,
-          id: "holiday-working-overridden-non-working",
-          name: "Overridden Observance",
-          region_code: null,
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
+        holidays: [
+          resolvedHoliday({
+            key: "custom:1",
+            kind: "custom",
+            name: "Company Day",
+            origin: "custom",
+          }),
+        ],
+        personLocationId: LOCATION_ID,
       },
       {
-        description:
-          "default non_working holiday with working location override",
-        expectedStatus: "available",
-        holiday: {
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "working" as const,
-              scope_type: "location" as const,
-              scope_value: "00000000-0000-4000-8000-000000000101",
-            },
-          ],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-non-working-overridden-working",
-          name: "Working Override",
-          region_code: null,
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
-      },
-      {
-        description: "archived location override is ignored",
+        description: "person without location uses the organisation level",
         expectedStatus: "public_holiday",
-        holiday: {
-          assignments: [
-            {
-              archived_at: new Date("2026-01-01T00:00:00.000Z"),
-              day_classification: "working" as const,
-              scope_type: "location" as const,
-              scope_value: "00000000-0000-4000-8000-000000000101",
-            },
-          ],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-archived-override",
-          name: "ANZAC Day",
-          region_code: null,
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
-      },
-      {
-        description:
-          "person without location matches national organisation holiday",
-        expectedStatus: "public_holiday",
-        holiday: {
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-national-for-unassigned-person",
-          name: "National Day",
-          region_code: null,
-          source: "nager" as const,
-        },
+        holidays: [resolvedHoliday({ locationId: null, name: "National Day" })],
         personLocationId: null,
       },
       {
-        description: "person without location ignores regional holiday",
+        description: "person without location ignores location holidays",
         expectedStatus: "available",
-        holiday: {
-          assignments: [],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-regional-for-unassigned-person",
-          name: "QLD Day",
-          region_code: "QLD",
-          source: "nager" as const,
-        },
+        holidays: [resolvedHoliday()],
         personLocationId: null,
-      },
-      {
-        description: "organisation/team/person/feed assignments remain inert",
-        expectedStatus: "public_holiday",
-        holiday: {
-          assignments: [
-            {
-              archived_at: null,
-              day_classification: "working" as const,
-              scope_type: "person" as const,
-              scope_value: baseInput.personId,
-            },
-            {
-              archived_at: null,
-              day_classification: "working" as const,
-              scope_type: "team" as const,
-              scope_value: "team-1",
-            },
-            {
-              archived_at: null,
-              day_classification: "working" as const,
-              scope_type: "organisation" as const,
-              scope_value: baseInput.organisationId,
-            },
-            {
-              archived_at: null,
-              day_classification: "working" as const,
-              scope_type: "feed" as const,
-              scope_value: "feed-1",
-            },
-          ],
-          country_code: "AU",
-          default_classification: "non_working" as const,
-          holiday_date: new Date("2026-04-25T00:00:00.000Z"),
-          holiday_type: "public" as const,
-          id: "holiday-inert-scopes",
-          name: "Inert Scope Holiday",
-          region_code: null,
-          source: "nager" as const,
-        },
-        personLocationId: "00000000-0000-4000-8000-000000000101",
       },
     ];
 
     for (const scenario of scenarios) {
       it(`evaluates single and batch identically for: ${scenario.description}`, async () => {
-        mocks.publicHolidayFindFirst.mockResolvedValue(scenario.holiday);
-        mocks.publicHolidayFindMany.mockResolvedValue([scenario.holiday]);
+        resolved(...scenario.holidays);
 
         const singleStatus = await computeCurrentStatus({
           ...baseInput,

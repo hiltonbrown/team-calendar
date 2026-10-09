@@ -1,9 +1,10 @@
 import "server-only";
 import {
   type ClerkOrgId,
-  holidayIsNonWorking,
   type OrganisationId,
   type Result,
+  startOfUtcDay,
+  toDateOnly,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import type {
@@ -29,7 +30,7 @@ import {
   type CalendarEvent,
   getCalendarRange,
 } from "../calendar/calendar-service";
-import { listForOrganisation } from "../holidays/holiday-service";
+import { resolvePublicHolidays } from "../holidays/resolve-public-holidays";
 import {
   type CurrentStatus,
   computeCurrentStatusForPeople,
@@ -128,7 +129,7 @@ export interface EmployeeDashboardView {
   };
   publicHolidays: DashboardSection<{
     daysUntil: number | null;
-    next: HolidayRow | null;
+    next: DashboardHoliday | null;
   }>;
   quickActions: {
     canCreatePlan: true;
@@ -323,13 +324,13 @@ const ViewSchema = z.object({
   personId: z.string().uuid(),
   userId: z.string().min(1),
 });
-type HolidayListResult = Awaited<ReturnType<typeof listForOrganisation>>;
-type HolidayRow = Extract<
-  HolidayListResult,
-  {
-    ok: true;
-  }
->["value"][number];
+export interface DashboardHoliday {
+  /** UTC midnight of the holiday's calendar date. */
+  holidayDate: Date;
+  name: string;
+  /** "HH:mm" for part-day holidays, otherwise null. */
+  startsAt: string | null;
+}
 type CalendarRangeData =
   Awaited<ReturnType<typeof getCalendarRange>> extends Result<
     infer TValue,
@@ -742,12 +743,8 @@ async function buildEmployeeView(
         async () =>
           await loadPublicHolidayCard({
             clerkOrgId: input.clerkOrgId,
-            locationCountryCode: profile.header.location?.countryCode ?? null,
             locationId: profile.header.location?.id ?? null,
-            locationRegionCode: profile.header.location?.regionCode ?? null,
             organisationId: input.organisationId,
-            personId: input.personId,
-            teamId: profile.header.team?.id ?? null,
           })
       ),
     ]);
@@ -954,68 +951,33 @@ async function loadUpcomingCard(
 }
 async function loadPublicHolidayCard(input: {
   clerkOrgId: string;
-  locationCountryCode?: string | null;
   locationId: string | null;
-  locationRegionCode?: string | null;
   organisationId: string;
-  personId: string;
-  teamId: string | null;
 }): Promise<EmployeeDashboardView["publicHolidays"]> {
-  const holidayResult = await listForOrganisation(
-    input.clerkOrgId as ClerkOrgId,
-    input.organisationId as OrganisationId
-  );
+  const today = startOfDay(new Date());
+  const holidayResult = await resolvePublicHolidays({
+    clerkOrgId: input.clerkOrgId as ClerkOrgId,
+    from: toDateOnly(today),
+    organisationId: input.organisationId as OrganisationId,
+    to: toDateOnly(addDays(today, 400)),
+  });
   if (!holidayResult.ok) {
     return errorSection(holidayResult.error.message);
   }
-  let countryCode = input.locationCountryCode ?? null;
-  let regionCode = input.locationRegionCode ?? null;
-  if (!countryCode) {
-    const org = await database.organisation.findFirst({
-      select: { country_code: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: input.clerkOrgId,
-        id: input.organisationId,
-      },
-    });
-    countryCode = org?.country_code ?? null;
-    regionCode = null;
-  }
-  const today = startOfDay(new Date());
-  const next =
-    holidayResult.value.find((holiday) => {
-      if (holiday.archived_at !== null) {
-        return false;
+  const match = holidayResult.value.find(
+    (holiday) =>
+      holiday.locationId === input.locationId &&
+      (holiday.classification === "non_working" || holiday.kind === "part_day")
+  );
+  const next: DashboardHoliday | null = match
+    ? {
+        holidayDate: startOfUtcDay(match.date),
+        name: match.name,
+        startsAt: match.startsAt,
       }
-      if (startOfDay(holiday.holiday_date) < today) {
-        return false;
-      }
-      const locationAssignments = (holiday.assignments ?? [])
-        .filter((assignment) => assignment.scope_type === "location")
-        .map((assignment) => ({
-          archivedAt: assignment.archived_at ?? null,
-          classification: assignment.day_classification,
-          locationId: assignment.scope_value,
-        }));
-      return holidayIsNonWorking({
-        holiday: {
-          archivedAt: holiday.archived_at,
-          countryCode: holiday.country_code,
-          defaultClassification:
-            holiday.default_classification ?? "non_working",
-          locationAssignments,
-          regionCode: holiday.region_code ?? null,
-        },
-        subject: {
-          countryCode,
-          locationId: input.locationId,
-          regionCode,
-        },
-      });
-    }) ?? null;
+    : null;
   return readySection({
-    daysUntil: next ? dayDiff(startOfDay(next.holiday_date), today) : null,
+    daysUntil: next ? dayDiff(next.holidayDate, today) : null,
     next,
   });
 }

@@ -1,11 +1,6 @@
 import { log } from "@repo/observability/log";
 import "server-only";
-import {
-  type ClerkOrgId,
-  holidayIsNonWorking,
-  type OrganisationId,
-  type Result,
-} from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedTo } from "@repo/database";
 import type {
   availability_approval_status,
@@ -16,7 +11,7 @@ import type {
   person_type,
 } from "@repo/database/generated/enums";
 import { z } from "zod";
-import { listForOrganisation } from "../holidays/holiday-service";
+import { resolvePublicHolidays } from "../holidays/resolve-public-holidays";
 import {
   type RecordTypeCategory,
   sourceTypesForCategory,
@@ -83,6 +78,8 @@ export interface PublicHolidayCell {
   isSuppressed: boolean;
   locationNames: readonly string[];
   name: string;
+  /** "HH:mm" for part-day holidays, otherwise null. */
+  startsAt: string | null;
 }
 export interface CalendarEvent {
   allDay: boolean;
@@ -631,87 +628,56 @@ async function loadPublicHolidayCells(input: {
   range: CalendarRange["range"];
   timezone: string;
 }): Promise<Map<string, PublicHolidayCell[]>> {
-  const years = new Set(
-    input.dateOnlyValues.map((dateOnly) => Number(dateOnly.slice(0, 4)))
-  );
-  const holidayResults = await Promise.all(
-    [...years].map((year) =>
-      listForOrganisation(
-        input.clerkOrgId as ClerkOrgId,
-        input.organisationId as OrganisationId,
-        { year }
-      )
-    )
-  );
+  const sortedDates = [...input.dateOnlyValues].sort();
+  const [from] = sortedDates;
+  const to = sortedDates.at(-1);
+  const cells = new Map<string, PublicHolidayCell[]>();
+  if (!(from && to)) {
+    return cells;
+  }
   const locations = new Map(
     input.people
       .filter((person) => person.location)
       .map((person) => [person.location?.id ?? "", person.location])
   );
-  const cells = new Map<string, PublicHolidayCell[]>();
-  for (const result of holidayResults) {
-    if (!result.ok) {
+  const result = await resolvePublicHolidays({
+    clerkOrgId: input.clerkOrgId as ClerkOrgId,
+    from,
+    organisationId: input.organisationId as OrganisationId,
+    to,
+  });
+  if (!result.ok) {
+    return cells;
+  }
+  for (const holiday of result.value) {
+    const location = holiday.locationId
+      ? locations.get(holiday.locationId)
+      : null;
+    // Part days stay working days but still show, with their start time.
+    const visible =
+      holiday.classification === "non_working" || holiday.kind === "part_day";
+    if (!(location && visible)) {
       continue;
     }
-    for (const holiday of result.value) {
-      if (holiday.archived_at) {
-        continue;
-      }
-      const dateOnly = dateOnlyInTimeZone(holiday.holiday_date, input.timezone);
-      if (!input.dateOnlyValues.includes(dateOnly)) {
-        continue;
-      }
-      const locationAssignments = holiday.assignments
-        .filter((assignment) => assignment.scope_type === "location")
-        .map((assignment) => ({
-          archivedAt: assignment.archived_at,
-          classification: assignment.day_classification,
-          locationId: assignment.scope_value,
-        }));
-      const locationNames = [...locations.values()]
-        .filter((location): location is NonNullable<typeof location> =>
-          Boolean(location)
-        )
-        .filter((location) =>
-          holidayIsNonWorking({
-            holiday: {
-              archivedAt: holiday.archived_at,
-              countryCode: holiday.country_code,
-              defaultClassification: holiday.default_classification,
-              locationAssignments,
-              regionCode: holiday.region_code,
-            },
-            subject: {
-              countryCode: location.country_code,
-              locationId: location.id,
-              regionCode: location.region_code,
-            },
-          })
-        )
-        .map((location) => location.name)
-        .sort((first, second) => first.localeCompare(second));
-      if (locationNames.length === 0) {
-        continue;
-      }
-      const dateCells = cells.get(dateOnly) ?? [];
-      const existing = dateCells.find((cell) => cell.name === holiday.name);
-      if (existing) {
-        existing.locationNames = uniqueSorted([
-          ...existing.locationNames,
-          ...locationNames,
-        ]);
-        existing.appliesToAllLocationsInView =
-          existing.locationNames.length === locations.size;
-      } else {
-        dateCells.push({
-          appliesToAllLocationsInView: locationNames.length === locations.size,
-          isSuppressed: false,
-          locationNames,
-          name: holiday.name,
-        });
-      }
-      cells.set(dateOnly, dateCells);
+    const dateCells = cells.get(holiday.date) ?? [];
+    const existing = dateCells.find((cell) => cell.name === holiday.name);
+    if (existing) {
+      existing.locationNames = uniqueSorted([
+        ...existing.locationNames,
+        location.name,
+      ]);
+      existing.appliesToAllLocationsInView =
+        existing.locationNames.length === locations.size;
+    } else {
+      dateCells.push({
+        appliesToAllLocationsInView: locations.size === 1,
+        isSuppressed: false,
+        locationNames: [location.name],
+        name: holiday.name,
+        startsAt: holiday.startsAt,
+      });
     }
+    cells.set(holiday.date, dateCells);
   }
   return cells;
 }
