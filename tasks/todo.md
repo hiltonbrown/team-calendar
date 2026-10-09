@@ -1,5 +1,27 @@
 # Current work
 
+## Design system sync (Claude Design System artifact, 9 October 2026)
+
+Bring code and docs in line with the reviewed Team Calendar design system. Brand mark unchanged.
+Auth brand panel rebuild (solid primary with week-view pattern) is out of scope: rule documented only.
+
+- [x] Tokens in `packages/design-system/styles/globals.css`: near-grey neutrals, primary `#46734a`, warmer error set, success aliases primary, lightness-stepped chart ramp, frost lifted in dark, restepped `--elev-*`, new `--elev-card`.
+- [x] `button.tsx`: offset focus outline, opaque disabled, hover moves away from label colour, `outline` border, link underlined at rest.
+- [x] `input.tsx`: `outline` border, offset focus outline, opaque disabled, 1rem text on coarse pointers.
+- [x] `card.tsx`: `elev-card` hairline by default (no border); `variant="plain"` for cards on darker parents. Changed from the original "no edge by default" plan after review: 33 call sites sit on the near-white page and would have lost their edge.
+- [x] App: `RefreshCwIcon` replaces `LeafIcon` for every Xero provenance cue; holiday tone uses warning; chip and plan status rings in own text colour at 30%.
+- [x] Hard-coded brand colours in the email template, blog OG image and marketing CSS updated.
+- [x] Docs: DESIGN.md, AGENTS.md, `.impeccable.md` updated for the above.
+- [x] Gates: `bun run check`, `bun run typecheck`, `bun run test`, `bun run test:integration` (see review for sandbox limits).
+
+### Review
+
+- `bun run check`: passes after `bun run fix` reformatted long `--elev-*` lines.
+- `bun run typecheck`: 18 of 18 tasks pass. Run with `turbo run typecheck --only` because `prisma generate` cannot download the schema engine in the sandbox; the committed generated client matches the schema.
+- `bun run test`: 18 of 18 packages pass, 3,121 tests.
+- `bun run test:integration` (local PostgreSQL 16, migrations applied with psql): availability 25, database 52 and app 10 tests pass. The Xero OAuth suite fails identically on `main` (17 failures) in this sandbox. The feeds and Xero shared-store suites need the serverless Redis HTTP proxy, which only runs under Docker. CI provides both; neither package is touched by this change.
+- Not verified: visual rendering of the changed screens. The app needs Clerk and other services to render; review the Vercel preview.
+
 ## Prompt 7 renewed HTTP and obsolete-infrastructure check
 
 - [x] Recheck the existing `e5fe001f` implementation at baseline `47c75872` against current provider limits and all Prompt 7 requirements.
