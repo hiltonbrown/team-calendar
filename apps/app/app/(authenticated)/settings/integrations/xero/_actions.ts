@@ -14,6 +14,11 @@ import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ConnectSchema = z.object({
   organisationId: z.string().uuid(),
+  // Only known in-app destinations; the OAuth service also rejects
+  // non-local paths.
+  returnTo: z
+    .enum(["/settings/integrations/xero", "/onboarding"])
+    .default("/settings/integrations/xero"),
 });
 const ConnectionSchema = z.object({
   connectionId: z.string().uuid(),
@@ -43,6 +48,7 @@ type ActionError =
 type ActionResult<T> = Result<T, ActionError>;
 export async function connectXeroAction(input: {
   organisationId: string;
+  returnTo?: "/onboarding" | "/settings/integrations/xero";
 }): Promise<
   ActionResult<{
     redirectUrl: string;
@@ -61,7 +67,7 @@ export async function connectXeroAction(input: {
   const redirectUrl = new URL("/api/xero/oauth/start", baseUrl);
   redirectUrl.searchParams.set("clerkOrgId", context.value.clerkOrgId);
   redirectUrl.searchParams.set("organisationId", context.value.organisationId);
-  redirectUrl.searchParams.set("returnTo", "/settings/integrations/xero");
+  redirectUrl.searchParams.set("returnTo", parsed.data.returnTo);
   redirectUrl.searchParams.set("userId", context.value.actingUserId);
   return { ok: true, value: { redirectUrl: redirectUrl.toString() } };
 }
