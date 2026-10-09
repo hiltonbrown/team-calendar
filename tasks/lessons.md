@@ -177,9 +177,9 @@ Keep one-off task evidence in that task's review, not here.
 
 - Dashboards hold frequently checked, up-to-the-minute information only. Do not
   put Xero sync failures, sync health metrics, Xero connection banners or other
-  rare exception or setup states on
-  a dashboard; they belong in the action receipt, notifications and the Sync
-  page.
+  rare exception or setup states on a dashboard. Failures belong in the action
+  receipt, notifications and the Sync page; connection state belongs in
+  onboarding and Settings.
 - The marketing homepage team timeline (`DemoTeamCalendar`, `.tl-*` in
   `apps/web/app/styles/home.css`) is the reference pattern for availability on
   every role dashboard. Reuse it rather than inventing a new day strip.
