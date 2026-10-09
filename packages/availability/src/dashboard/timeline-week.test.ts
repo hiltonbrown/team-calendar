@@ -225,6 +225,7 @@ describe("buildTimelineWeek", () => {
     );
     expect(week.rows[0]?.entries).toHaveLength(1);
     expect(week.rows[0]?.entries[0]).toMatchObject({
+      allDay: true,
       dayCount: 3,
       endIndex: 2,
       note: "Dentist",

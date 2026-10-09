@@ -180,7 +180,7 @@ describe("projectFeedEvents", () => {
       publishedSequence: 3,
       publishedUid: "published@ical.teamcalendar.online",
       sourceRecordId: "10000000-0000-4000-8000-000000000001",
-      summary: "Jane Smith: Annual Leave",
+      summary: "Jane Smith: Annual leave",
     });
     expect(masked.ok && masked.value[0]).toMatchObject({
       description: null,
@@ -876,7 +876,7 @@ describe("projectFeedEvents", () => {
         recordType: "annual_leave",
         sourceRecordId: "10000000-0000-4000-8000-000000000010",
         startsAt: new Date("2026-05-02T00:00:00.000Z"),
-        summary: "Alice Walker: Annual Leave",
+        summary: "Alice Walker: Annual leave",
       },
       {
         allDay: true,
@@ -908,11 +908,11 @@ describe("projectFeedEvents", () => {
     });
 
     it("falls back to centralised canonical label when title is null or whitespace", () => {
-      expect(labelForRecordType("annual_leave", null)).toBe("Annual Leave");
-      expect(labelForRecordType("annual_leave", "   ")).toBe("Annual Leave");
-      expect(labelForRecordType("wfh", null)).toBe("Work From Home");
+      expect(labelForRecordType("annual_leave", null)).toBe("Annual leave");
+      expect(labelForRecordType("annual_leave", "   ")).toBe("Annual leave");
+      expect(labelForRecordType("wfh", null)).toBe("Working from home");
       expect(labelForRecordType("long_service_leave", null)).toBe(
-        "Long Service Leave"
+        "Long service leave"
       );
       expect(labelForRecordType("travelling", null)).toBe("Travelling");
     });

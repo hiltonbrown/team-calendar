@@ -87,6 +87,7 @@ export interface DashboardInfoRequest {
   type: notification_type;
 }
 export interface DashboardMyRequest {
+  allDay: boolean;
   approvalStatus: availability_approval_status;
   canEdit: boolean;
   canWithdraw: boolean;
@@ -99,6 +100,7 @@ export interface DashboardMyRequest {
   startsAt: Date;
 }
 export interface DashboardApprovalRow {
+  allDay: boolean;
   durationWorkingDays: number | null;
   endsAt: Date;
   personFirstName: string;
@@ -621,6 +623,7 @@ function toMyRequest(
   dayCount: number | null
 ): DashboardMyRequest {
   return {
+    allDay: record.allDay,
     approvalStatus: record.approvalStatus,
     canEdit:
       record.sourceType === "manual" &&
@@ -666,6 +669,7 @@ async function loadApprovalQueue(
       )
       .slice(0, LIST_ROW_LIMIT)
       .map((record) => ({
+        allDay: record.allDay,
         durationWorkingDays: record.durationWorkingDays,
         endsAt: record.endsAt,
         personFirstName: record.person.firstName,

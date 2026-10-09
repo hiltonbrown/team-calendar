@@ -25,6 +25,8 @@ export interface TimelineWeekDay {
 }
 
 export interface TimelineWeekEntry {
+  /** All-day records carry UTC calendar dates; timed records are instants. */
+  allDay: boolean;
   /** Days visible inside this week (1 to 7). */
   dayCount: number;
   endIndex: number;
@@ -169,6 +171,7 @@ function toEntry(
 ): TimelineWeekEntry {
   const isPrivate = isPrivateToViewer(event);
   return {
+    allDay: event.allDay,
     dayCount: endIndex - startIndex + 1,
     endIndex,
     endsAt: event.endsAt,

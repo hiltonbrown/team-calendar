@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
     published_ends_at: new Date("2026-05-01T17:00:00.000Z"),
     published_sequence: 0,
     published_starts_at: new Date("2026-05-01T09:00:00.000Z"),
-    published_summary: "Jane Smith: Annual Leave",
+    published_summary: "Jane Smith: Annual leave",
     published_uid: "stable@ical.teamcalendar.online",
   };
   const record = {
@@ -162,7 +162,7 @@ describe("materialiseAvailabilityPublication", () => {
       value: {
         publishedDescription: null,
         publishedSequence: 0,
-        publishedSummary: "Jane Smith: Annual Leave",
+        publishedSummary: "Jane Smith: Annual leave",
         publishedUid: "stable@ical.teamcalendar.online",
       },
     });

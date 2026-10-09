@@ -118,7 +118,7 @@ describe("leave reports service", () => {
         expect(result.value.leaveTypeDonut).toEqual([
           {
             days: 5,
-            label: "Annual Leave",
+            label: "Annual leave",
             percentage: 100,
             recordType: "annual_leave",
           },

@@ -12,7 +12,7 @@ describe("CalendarTimeline", () => {
     expect(screen.getByText("Manual availability")).toBeDefined();
     expect(screen.getAllByText("Ari Report").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mika Planner").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Annual Leave").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Annual leave").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Training").length).toBeGreaterThan(0);
     expect(
       screen.getByRole("link", {
@@ -164,7 +164,7 @@ describe("CalendarTimeline", () => {
     );
     expect(
       screen.getAllByRole("button", {
-        name: "Ari Report: Annual Leave, Team Calendar leave",
+        name: "Ari Report: Annual leave, Team Calendar leave",
       })
     ).toHaveLength(2);
   });

@@ -201,6 +201,7 @@ function buildApprovalItem(
   }> = {}
 ) {
   return {
+    allDay: true,
     approvalStatus: "submitted",
     createdAt: new Date("2026-10-01T08:00:00.000Z"),
     durationWorkingDays: 2,
@@ -508,6 +509,7 @@ describe("dashboard-service", () => {
           recordId: "record_submitted",
         }),
         expect.objectContaining({
+          allDay: true,
           approvalStatus: "approved",
           canEdit: true,
           canWithdraw: false,
@@ -660,6 +662,7 @@ describe("dashboard-service", () => {
             { recordId: "approval_old_2" },
             { recordId: "approval_old_3" },
             {
+              allDay: true,
               durationWorkingDays: 2,
               personFirstName: "Luca",
               personLastName: "Brown",
