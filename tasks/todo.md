@@ -14,7 +14,7 @@
 
 - `bun run check`: passes. `bun run typecheck`: 19 of 19 tasks. `bun run test`: 18 of 18 tasks.
 - `bun run test:integration` (local PostgreSQL): database 54, availability 25, app 10 and jobs 84 pass. Feeds passes 22 of 22 when run in its package with `TC_TEST_KV_*` set to a local Redis HTTP shim; under turbo those variables are filtered, so it fails to load. The Xero OAuth suite has the same 17 failures as before this work.
-- Data gaps: ACT, NT, SA, TAS and VIC have no entries (official sites blocked in the sandbox); NSW, WA and NZ cover 2026 to 2027 only (2028 not yet published). QLD and UK cover 2026 to 2028.
+- Data gaps: AU now has national plus all eight states and territories for 2026 to 2028, except WA 2028 (only the national days; WA has not published 2028) and the VIC AFL Grand Final Friday for 2027 and 2028 (set by the AFL fixture). SA dates came from search excerpts of SafeWork SA because every SA government site was blocked: re-check first. NSW 2028 follows the Public Holidays Act rules, not a published list. NZ covers 2026 to 2027 only. UK covers 2026 to 2028.
 - Deviations from the plan: resolver and reference data live in `@repo/core` and the loader in `@repo/database` (feeds cannot depend on availability); the jurisdiction removal migration is split in two; NZ anniversary days are national `local` entries with the province as the area; QLD Christmas Eve starts at 18:00; WA regional King's Birthday is not modelled; `recursAnnually` was a no-op and is removed; there is no location editing UI, so no location region picker.
 - NOT VERIFIED: visual rendering of the holiday screens (needs Clerk and other services); review the Vercel preview.
 - `bun.lock` synced to `next` 16.3.8 (matches `package.json`) in a separate chore commit.

@@ -2,46 +2,26 @@
   "country": "AU",
   "entries": [
     {
-      "id": "au-nsw-2026-01-01-new-years-day",
+      "id": "au-national-2026-01-01-new-years-day",
       "date": "2026-01-01",
       "name": "New Year's Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2026-01-01-new-years-day",
-      "date": "2026-01-01",
-      "name": "New Year's Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2026-01-01-new-years-day",
-      "date": "2026-01-01",
-      "name": "New Year's Day",
-      "region": "WA",
-      "kind": "public"
-    },
-    {
-      "id": "au-nsw-2026-01-26-australia-day",
+      "id": "au-national-2026-01-26-australia-day",
       "date": "2026-01-26",
       "name": "Australia Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2026-01-26-australia-day",
-      "date": "2026-01-26",
-      "name": "Australia Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2026-01-26-australia-day",
-      "date": "2026-01-26",
-      "name": "Australia Day",
-      "region": "WA",
-      "kind": "public"
+      "id": "au-tas-2026-02-09-royal-hobart-regatta",
+      "date": "2026-02-09",
+      "name": "Royal Hobart Regatta",
+      "region": "TAS",
+      "kind": "local",
+      "area": "Southern Tasmania"
     },
     {
       "id": "au-wa-2026-03-02-labour-day",
@@ -51,24 +31,45 @@
       "kind": "public"
     },
     {
-      "id": "au-nsw-2026-04-03-good-friday",
-      "date": "2026-04-03",
-      "name": "Good Friday",
-      "region": "NSW",
+      "id": "au-act-2026-03-09-canberra-day",
+      "date": "2026-03-09",
+      "name": "Canberra Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
-      "id": "au-qld-2026-04-03-good-friday",
-      "date": "2026-04-03",
-      "name": "Good Friday",
-      "region": "QLD",
+      "id": "au-sa-2026-03-09-adelaide-cup-day",
+      "date": "2026-03-09",
+      "name": "Adelaide Cup Day",
+      "region": "SA",
       "kind": "public"
     },
     {
-      "id": "au-wa-2026-04-03-good-friday",
+      "id": "au-tas-2026-03-09-eight-hours-day",
+      "date": "2026-03-09",
+      "name": "Eight Hours Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2026-03-09-labour-day",
+      "date": "2026-03-09",
+      "name": "Labour Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-national-2026-04-03-good-friday",
       "date": "2026-04-03",
       "name": "Good Friday",
-      "region": "WA",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2026-04-04-easter-saturday",
+      "date": "2026-04-04",
+      "name": "Easter Saturday",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -79,10 +80,38 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2026-04-04-easter-saturday",
+      "date": "2026-04-04",
+      "name": "Easter Saturday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2026-04-04-the-day-after-good-friday",
       "date": "2026-04-04",
       "name": "The day after Good Friday",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2026-04-04-easter-saturday",
+      "date": "2026-04-04",
+      "name": "Easter Saturday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2026-04-04-saturday-before-easter-sunday",
+      "date": "2026-04-04",
+      "name": "Saturday before Easter Sunday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2026-04-05-easter-sunday",
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -93,10 +122,31 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2026-04-05-easter-sunday",
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2026-04-05-easter-sunday",
       "date": "2026-04-05",
       "name": "Easter Sunday",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2026-04-05-easter-sunday",
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2026-04-05-easter-sunday",
+      "date": "2026-04-05",
+      "name": "Easter Sunday",
+      "region": "VIC",
       "kind": "public"
     },
     {
@@ -107,45 +157,24 @@
       "kind": "public"
     },
     {
-      "id": "au-nsw-2026-04-06-easter-monday",
+      "id": "au-national-2026-04-06-easter-monday",
       "date": "2026-04-06",
       "name": "Easter Monday",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2026-04-06-easter-monday",
-      "date": "2026-04-06",
-      "name": "Easter Monday",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2026-04-06-easter-monday",
-      "date": "2026-04-06",
-      "name": "Easter Monday",
-      "region": "WA",
-      "kind": "public"
-    },
-    {
-      "id": "au-nsw-2026-04-25-anzac-day",
+      "id": "au-national-2026-04-25-anzac-day",
       "date": "2026-04-25",
       "name": "Anzac Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2026-04-25-anzac-day",
-      "date": "2026-04-25",
-      "name": "Anzac Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2026-04-25-anzac-day",
-      "date": "2026-04-25",
-      "name": "Anzac Day",
-      "region": "WA",
+      "id": "au-act-2026-04-27-anzac-day-additional-day",
+      "date": "2026-04-27",
+      "name": "Anzac Day (additional day)",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -163,10 +192,24 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2026-05-04-may-day",
+      "date": "2026-05-04",
+      "name": "May Day",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2026-05-04-labour-day",
       "date": "2026-05-04",
       "name": "Labour Day",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2026-06-01-reconciliation-day",
+      "date": "2026-06-01",
+      "name": "Reconciliation Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -177,10 +220,52 @@
       "kind": "public"
     },
     {
+      "id": "au-act-2026-06-08-kings-birthday",
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
       "id": "au-nsw-2026-06-08-kings-birthday",
       "date": "2026-06-08",
       "name": "King's Birthday",
       "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2026-06-08-kings-birthday",
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2026-06-08-kings-birthday",
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2026-06-08-kings-birthday",
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2026-06-08-kings-birthday",
+      "date": "2026-06-08",
+      "name": "King's Birthday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2026-08-03-picnic-day",
+      "date": "2026-08-03",
+      "name": "Picnic Day",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -192,10 +277,24 @@
       "area": "Brisbane"
     },
     {
+      "id": "au-vic-2026-09-25-friday-before-the-afl-grand-final",
+      "date": "2026-09-25",
+      "name": "Friday before the AFL Grand Final",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
       "id": "au-wa-2026-09-28-kings-birthday",
       "date": "2026-09-28",
       "name": "King's Birthday",
       "region": "WA",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2026-10-05-labour-day",
+      "date": "2026-10-05",
+      "name": "Labour Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -213,6 +312,36 @@
       "kind": "public"
     },
     {
+      "id": "au-sa-2026-10-05-labour-day",
+      "date": "2026-10-05",
+      "name": "Labour Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2026-11-02-recreation-day",
+      "date": "2026-11-02",
+      "name": "Recreation Day",
+      "region": "TAS",
+      "kind": "local",
+      "area": "Northern Tasmania"
+    },
+    {
+      "id": "au-vic-2026-11-03-melbourne-cup-day",
+      "date": "2026-11-03",
+      "name": "Melbourne Cup Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2026-12-24-christmas-eve",
+      "date": "2026-12-24",
+      "name": "Christmas Eve",
+      "region": "NT",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
       "id": "au-qld-2026-12-24-christmas-eve",
       "date": "2026-12-24",
       "name": "Christmas Eve",
@@ -221,24 +350,25 @@
       "startsAt": "18:00"
     },
     {
-      "id": "au-nsw-2026-12-25-christmas-day",
+      "id": "au-sa-2026-12-24-christmas-eve",
+      "date": "2026-12-24",
+      "name": "Christmas Eve",
+      "region": "SA",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-national-2026-12-25-christmas-day",
       "date": "2026-12-25",
       "name": "Christmas Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2026-12-25-christmas-day",
-      "date": "2026-12-25",
-      "name": "Christmas Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2026-12-25-christmas-day",
-      "date": "2026-12-25",
-      "name": "Christmas Day",
-      "region": "WA",
+      "id": "au-act-2026-12-26-boxing-day",
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -249,10 +379,31 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2026-12-26-boxing-day",
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2026-12-26-boxing-day",
       "date": "2026-12-26",
       "name": "Boxing Day",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2026-12-26-proclamation-day",
+      "date": "2026-12-26",
+      "name": "Proclamation Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2026-12-26-boxing-day",
+      "date": "2026-12-26",
+      "name": "Boxing Day",
+      "region": "VIC",
       "kind": "public"
     },
     {
@@ -263,10 +414,24 @@
       "kind": "public"
     },
     {
+      "id": "au-act-2026-12-28-boxing-day-additional-day",
+      "date": "2026-12-28",
+      "name": "Boxing Day (additional day)",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
       "id": "au-nsw-2026-12-28-boxing-day-additional-day",
       "date": "2026-12-28",
       "name": "Boxing Day (additional day)",
       "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2026-12-28-boxing-day-additional-day",
+      "date": "2026-12-28",
+      "name": "Boxing Day (additional day)",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -277,6 +442,27 @@
       "kind": "public"
     },
     {
+      "id": "au-sa-2026-12-28-proclamation-day-additional-day",
+      "date": "2026-12-28",
+      "name": "Proclamation Day (additional day)",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2026-12-28-boxing-day",
+      "date": "2026-12-28",
+      "name": "Boxing Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2026-12-28-boxing-day-additional-day",
+      "date": "2026-12-28",
+      "name": "Boxing Day (additional day)",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
       "id": "au-wa-2026-12-28-boxing-day-additional-day",
       "date": "2026-12-28",
       "name": "Boxing Day (additional day)",
@@ -284,46 +470,42 @@
       "kind": "public"
     },
     {
-      "id": "au-nsw-2027-01-01-new-years-day",
+      "id": "au-nt-2026-12-31-new-years-eve",
+      "date": "2026-12-31",
+      "name": "New Year's Eve",
+      "region": "NT",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-sa-2026-12-31-new-years-eve",
+      "date": "2026-12-31",
+      "name": "New Year's Eve",
+      "region": "SA",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-national-2027-01-01-new-years-day",
       "date": "2027-01-01",
       "name": "New Year's Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2027-01-01-new-years-day",
-      "date": "2027-01-01",
-      "name": "New Year's Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2027-01-01-new-years-day",
-      "date": "2027-01-01",
-      "name": "New Year's Day",
-      "region": "WA",
-      "kind": "public"
-    },
-    {
-      "id": "au-nsw-2027-01-26-australia-day",
+      "id": "au-national-2027-01-26-australia-day",
       "date": "2027-01-26",
       "name": "Australia Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2027-01-26-australia-day",
-      "date": "2027-01-26",
-      "name": "Australia Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2027-01-26-australia-day",
-      "date": "2027-01-26",
-      "name": "Australia Day",
-      "region": "WA",
-      "kind": "public"
+      "id": "au-tas-2027-02-08-royal-hobart-regatta",
+      "date": "2027-02-08",
+      "name": "Royal Hobart Regatta",
+      "region": "TAS",
+      "kind": "local",
+      "area": "Southern Tasmania"
     },
     {
       "id": "au-wa-2027-03-01-labour-day",
@@ -333,24 +515,45 @@
       "kind": "public"
     },
     {
-      "id": "au-nsw-2027-03-26-good-friday",
-      "date": "2027-03-26",
-      "name": "Good Friday",
-      "region": "NSW",
+      "id": "au-act-2027-03-08-canberra-day",
+      "date": "2027-03-08",
+      "name": "Canberra Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
-      "id": "au-qld-2027-03-26-good-friday",
-      "date": "2027-03-26",
-      "name": "Good Friday",
-      "region": "QLD",
+      "id": "au-sa-2027-03-08-adelaide-cup-day",
+      "date": "2027-03-08",
+      "name": "Adelaide Cup Day",
+      "region": "SA",
       "kind": "public"
     },
     {
-      "id": "au-wa-2027-03-26-good-friday",
+      "id": "au-tas-2027-03-08-eight-hours-day",
+      "date": "2027-03-08",
+      "name": "Eight Hours Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-03-08-labour-day",
+      "date": "2027-03-08",
+      "name": "Labour Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-national-2027-03-26-good-friday",
       "date": "2027-03-26",
       "name": "Good Friday",
-      "region": "WA",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2027-03-27-easter-saturday",
+      "date": "2027-03-27",
+      "name": "Easter Saturday",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -361,6 +564,13 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2027-03-27-easter-saturday",
+      "date": "2027-03-27",
+      "name": "Easter Saturday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2027-03-27-the-day-after-good-friday",
       "date": "2027-03-27",
       "name": "The day after Good Friday",
@@ -368,45 +578,38 @@
       "kind": "public"
     },
     {
-      "id": "au-nsw-2027-03-28-easter-sunday",
+      "id": "au-sa-2027-03-27-easter-saturday",
+      "date": "2027-03-27",
+      "name": "Easter Saturday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-03-27-saturday-before-easter-sunday",
+      "date": "2027-03-27",
+      "name": "Saturday before Easter Sunday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-national-2027-03-28-easter-sunday",
       "date": "2027-03-28",
       "name": "Easter Sunday",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2027-03-28-easter-sunday",
-      "date": "2027-03-28",
-      "name": "Easter Sunday",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2027-03-28-easter-sunday",
-      "date": "2027-03-28",
-      "name": "Easter Sunday",
-      "region": "WA",
-      "kind": "public"
-    },
-    {
-      "id": "au-nsw-2027-03-29-easter-monday",
+      "id": "au-national-2027-03-29-easter-monday",
       "date": "2027-03-29",
       "name": "Easter Monday",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2027-03-29-easter-monday",
-      "date": "2027-03-29",
-      "name": "Easter Monday",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2027-03-29-easter-monday",
-      "date": "2027-03-29",
-      "name": "Easter Monday",
-      "region": "WA",
+      "id": "au-act-2027-04-25-anzac-day",
+      "date": "2027-04-25",
+      "name": "Anzac Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -417,6 +620,27 @@
       "kind": "public"
     },
     {
+      "id": "au-sa-2027-04-25-anzac-day",
+      "date": "2027-04-25",
+      "name": "Anzac Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2027-04-25-anzac-day",
+      "date": "2027-04-25",
+      "name": "Anzac Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-04-25-anzac-day",
+      "date": "2027-04-25",
+      "name": "Anzac Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
       "id": "au-wa-2027-04-25-anzac-day",
       "date": "2027-04-25",
       "name": "Anzac Day",
@@ -424,10 +648,24 @@
       "kind": "public"
     },
     {
+      "id": "au-act-2027-04-26-anzac-day-additional-day",
+      "date": "2027-04-26",
+      "name": "Anzac Day (additional day)",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
       "id": "au-nsw-2027-04-26-anzac-day-additional-day",
       "date": "2027-04-26",
       "name": "Anzac Day (additional day)",
       "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2027-04-26-anzac-day",
+      "date": "2027-04-26",
+      "name": "Anzac Day",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -445,10 +683,24 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2027-05-03-may-day",
+      "date": "2027-05-03",
+      "name": "May Day",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2027-05-03-labour-day",
       "date": "2027-05-03",
       "name": "Labour Day",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2027-05-31-reconciliation-day",
+      "date": "2027-05-31",
+      "name": "Reconciliation Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -459,10 +711,52 @@
       "kind": "public"
     },
     {
+      "id": "au-act-2027-06-14-kings-birthday",
+      "date": "2027-06-14",
+      "name": "King's Birthday",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
       "id": "au-nsw-2027-06-14-kings-birthday",
       "date": "2027-06-14",
       "name": "King's Birthday",
       "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2027-06-14-kings-birthday",
+      "date": "2027-06-14",
+      "name": "King's Birthday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2027-06-14-kings-birthday",
+      "date": "2027-06-14",
+      "name": "King's Birthday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2027-06-14-kings-birthday",
+      "date": "2027-06-14",
+      "name": "King's Birthday",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-06-14-kings-birthday",
+      "date": "2027-06-14",
+      "name": "King's Birthday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2027-08-02-picnic-day",
+      "date": "2027-08-02",
+      "name": "Picnic Day",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -481,6 +775,13 @@
       "kind": "public"
     },
     {
+      "id": "au-act-2027-10-04-labour-day",
+      "date": "2027-10-04",
+      "name": "Labour Day",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
       "id": "au-nsw-2027-10-04-labour-day",
       "date": "2027-10-04",
       "name": "Labour Day",
@@ -495,6 +796,36 @@
       "kind": "public"
     },
     {
+      "id": "au-sa-2027-10-04-labour-day",
+      "date": "2027-10-04",
+      "name": "Labour Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2027-11-01-recreation-day",
+      "date": "2027-11-01",
+      "name": "Recreation Day",
+      "region": "TAS",
+      "kind": "local",
+      "area": "Northern Tasmania"
+    },
+    {
+      "id": "au-vic-2027-11-02-melbourne-cup-day",
+      "date": "2027-11-02",
+      "name": "Melbourne Cup Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2027-12-24-christmas-eve",
+      "date": "2027-12-24",
+      "name": "Christmas Eve",
+      "region": "NT",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
       "id": "au-qld-2027-12-24-christmas-eve",
       "date": "2027-12-24",
       "name": "Christmas Eve",
@@ -503,24 +834,25 @@
       "startsAt": "18:00"
     },
     {
-      "id": "au-nsw-2027-12-25-christmas-day",
+      "id": "au-sa-2027-12-24-christmas-eve",
+      "date": "2027-12-24",
+      "name": "Christmas Eve",
+      "region": "SA",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-national-2027-12-25-christmas-day",
       "date": "2027-12-25",
       "name": "Christmas Day",
-      "region": "NSW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2027-12-25-christmas-day",
-      "date": "2027-12-25",
-      "name": "Christmas Day",
-      "region": "QLD",
-      "kind": "public"
-    },
-    {
-      "id": "au-wa-2027-12-25-christmas-day",
-      "date": "2027-12-25",
-      "name": "Christmas Day",
-      "region": "WA",
+      "id": "au-act-2027-12-26-boxing-day",
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -531,10 +863,31 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2027-12-26-boxing-day",
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2027-12-26-boxing-day",
       "date": "2027-12-26",
       "name": "Boxing Day",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2027-12-26-proclamation-day",
+      "date": "2027-12-26",
+      "name": "Proclamation Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-12-26-boxing-day",
+      "date": "2027-12-26",
+      "name": "Boxing Day",
+      "region": "VIC",
       "kind": "public"
     },
     {
@@ -545,10 +898,24 @@
       "kind": "public"
     },
     {
+      "id": "au-act-2027-12-27-christmas-day-additional-day",
+      "date": "2027-12-27",
+      "name": "Christmas Day (additional day)",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
       "id": "au-nsw-2027-12-27-christmas-day-additional-day",
       "date": "2027-12-27",
       "name": "Christmas Day (additional day)",
       "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2027-12-27-christmas-day-additional-day",
+      "date": "2027-12-27",
+      "name": "Christmas Day (additional day)",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -559,10 +926,38 @@
       "kind": "public"
     },
     {
+      "id": "au-sa-2027-12-27-christmas-day-additional-day",
+      "date": "2027-12-27",
+      "name": "Christmas Day (additional day)",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2027-12-27-christmas-day-additional-day",
+      "date": "2027-12-27",
+      "name": "Christmas Day (additional day)",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-12-27-christmas-day-additional-day",
+      "date": "2027-12-27",
+      "name": "Christmas Day (additional day)",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
       "id": "au-wa-2027-12-27-christmas-day-additional-day",
       "date": "2027-12-27",
       "name": "Christmas Day (additional day)",
       "region": "WA",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2027-12-28-boxing-day-additional-day",
+      "date": "2027-12-28",
+      "name": "Boxing Day (additional day)",
+      "region": "ACT",
       "kind": "public"
     },
     {
@@ -573,10 +968,38 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2027-12-28-boxing-day-additional-day",
+      "date": "2027-12-28",
+      "name": "Boxing Day (additional day)",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2027-12-28-boxing-day-additional-day",
       "date": "2027-12-28",
       "name": "Boxing Day (additional day)",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2027-12-28-proclamation-day-additional-day",
+      "date": "2027-12-28",
+      "name": "Proclamation Day (additional day)",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2027-12-28-boxing-day",
+      "date": "2027-12-28",
+      "name": "Boxing Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-12-28-boxing-day-additional-day",
+      "date": "2027-12-28",
+      "name": "Boxing Day (additional day)",
+      "region": "VIC",
       "kind": "public"
     },
     {
@@ -587,10 +1010,82 @@
       "kind": "public"
     },
     {
+      "id": "au-nt-2027-12-31-new-years-eve",
+      "date": "2027-12-31",
+      "name": "New Year's Eve",
+      "region": "NT",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-sa-2027-12-31-new-years-eve",
+      "date": "2027-12-31",
+      "name": "New Year's Eve",
+      "region": "SA",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-act-2028-01-01-new-years-day",
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-01-01-new-years-day",
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-01-01-new-years-day",
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2028-01-01-new-years-day",
       "date": "2028-01-01",
       "name": "New Year's Day",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2028-01-01-new-years-day",
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-01-01-new-years-day",
+      "date": "2028-01-01",
+      "name": "New Year's Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2028-01-03-new-years-day-additional-day",
+      "date": "2028-01-03",
+      "name": "New Year's Day (additional day)",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-01-03-new-years-day-additional-day",
+      "date": "2028-01-03",
+      "name": "New Year's Day (additional day)",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-01-03-new-years-day-additional-day",
+      "date": "2028-01-03",
+      "name": "New Year's Day (additional day)",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -601,17 +1096,95 @@
       "kind": "public"
     },
     {
-      "id": "au-qld-2028-01-26-australia-day",
-      "date": "2028-01-26",
-      "name": "Australia Day",
-      "region": "QLD",
+      "id": "au-sa-2028-01-03-new-years-day-additional-day",
+      "date": "2028-01-03",
+      "name": "New Year's Day (additional day)",
+      "region": "SA",
       "kind": "public"
     },
     {
-      "id": "au-qld-2028-04-14-good-friday",
+      "id": "au-tas-2028-01-03-new-years-day",
+      "date": "2028-01-03",
+      "name": "New Year's Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-01-03-new-years-day-additional-day",
+      "date": "2028-01-03",
+      "name": "New Year's Day (additional day)",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-national-2028-01-26-australia-day",
+      "date": "2028-01-26",
+      "name": "Australia Day",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2028-02-14-royal-hobart-regatta",
+      "date": "2028-02-14",
+      "name": "Royal Hobart Regatta",
+      "region": "TAS",
+      "kind": "local",
+      "area": "Southern Tasmania"
+    },
+    {
+      "id": "au-act-2028-03-13-canberra-day",
+      "date": "2028-03-13",
+      "name": "Canberra Day",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2028-03-13-adelaide-cup-day",
+      "date": "2028-03-13",
+      "name": "Adelaide Cup Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2028-03-13-eight-hours-day",
+      "date": "2028-03-13",
+      "name": "Eight Hours Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-03-13-labour-day",
+      "date": "2028-03-13",
+      "name": "Labour Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-national-2028-04-14-good-friday",
       "date": "2028-04-14",
       "name": "Good Friday",
-      "region": "QLD",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2028-04-15-easter-saturday",
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-04-15-easter-saturday",
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-04-15-easter-saturday",
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -622,24 +1195,45 @@
       "kind": "public"
     },
     {
-      "id": "au-qld-2028-04-16-easter-sunday",
+      "id": "au-sa-2028-04-15-easter-saturday",
+      "date": "2028-04-15",
+      "name": "Easter Saturday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-04-15-saturday-before-easter-sunday",
+      "date": "2028-04-15",
+      "name": "Saturday before Easter Sunday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-national-2028-04-16-easter-sunday",
       "date": "2028-04-16",
       "name": "Easter Sunday",
-      "region": "QLD",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2028-04-17-easter-monday",
+      "id": "au-national-2028-04-17-easter-monday",
       "date": "2028-04-17",
       "name": "Easter Monday",
-      "region": "QLD",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "au-qld-2028-04-25-anzac-day",
+      "id": "au-national-2028-04-25-anzac-day",
       "date": "2028-04-25",
       "name": "Anzac Day",
-      "region": "QLD",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-05-01-may-day",
+      "date": "2028-05-01",
+      "name": "May Day",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -647,6 +1241,62 @@
       "date": "2028-05-01",
       "name": "Labour Day",
       "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2028-05-29-reconciliation-day",
+      "date": "2028-05-29",
+      "name": "Reconciliation Day",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2028-06-12-kings-birthday",
+      "date": "2028-06-12",
+      "name": "King's Birthday",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-06-12-kings-birthday",
+      "date": "2028-06-12",
+      "name": "King's Birthday",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-06-12-kings-birthday",
+      "date": "2028-06-12",
+      "name": "King's Birthday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2028-06-12-kings-birthday",
+      "date": "2028-06-12",
+      "name": "King's Birthday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2028-06-12-kings-birthday",
+      "date": "2028-06-12",
+      "name": "King's Birthday",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-06-12-kings-birthday",
+      "date": "2028-06-12",
+      "name": "King's Birthday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-08-07-picnic-day",
+      "date": "2028-08-07",
+      "name": "Picnic Day",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -658,11 +1308,55 @@
       "area": "Brisbane"
     },
     {
+      "id": "au-act-2028-10-02-labour-day",
+      "date": "2028-10-02",
+      "name": "Labour Day",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-10-02-labour-day",
+      "date": "2028-10-02",
+      "name": "Labour Day",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
       "id": "au-qld-2028-10-02-kings-birthday",
       "date": "2028-10-02",
       "name": "King's Birthday",
       "region": "QLD",
       "kind": "public"
+    },
+    {
+      "id": "au-sa-2028-10-02-labour-day",
+      "date": "2028-10-02",
+      "name": "Labour Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2028-11-06-recreation-day",
+      "date": "2028-11-06",
+      "name": "Recreation Day",
+      "region": "TAS",
+      "kind": "local",
+      "area": "Northern Tasmania"
+    },
+    {
+      "id": "au-vic-2028-11-07-melbourne-cup-day",
+      "date": "2028-11-07",
+      "name": "Melbourne Cup Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-12-24-christmas-eve",
+      "date": "2028-12-24",
+      "name": "Christmas Eve",
+      "region": "NT",
+      "kind": "part_day",
+      "startsAt": "19:00"
     },
     {
       "id": "au-qld-2028-12-24-christmas-eve",
@@ -673,10 +1367,39 @@
       "startsAt": "18:00"
     },
     {
-      "id": "au-qld-2028-12-25-christmas-day",
+      "id": "au-sa-2028-12-24-christmas-eve",
+      "date": "2028-12-24",
+      "name": "Christmas Eve",
+      "region": "SA",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-national-2028-12-25-christmas-day",
       "date": "2028-12-25",
       "name": "Christmas Day",
-      "region": "QLD",
+      "region": null,
+      "kind": "public"
+    },
+    {
+      "id": "au-act-2028-12-26-boxing-day",
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-12-26-boxing-day",
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-12-26-boxing-day",
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "region": "NT",
       "kind": "public"
     },
     {
@@ -685,6 +1408,43 @@
       "name": "Boxing Day",
       "region": "QLD",
       "kind": "public"
+    },
+    {
+      "id": "au-sa-2028-12-26-proclamation-day",
+      "date": "2028-12-26",
+      "name": "Proclamation Day",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-tas-2028-12-26-boxing-day",
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "region": "TAS",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-12-26-boxing-day",
+      "date": "2028-12-26",
+      "name": "Boxing Day",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-12-31-new-years-eve",
+      "date": "2028-12-31",
+      "name": "New Year's Eve",
+      "region": "NT",
+      "kind": "part_day",
+      "startsAt": "19:00"
+    },
+    {
+      "id": "au-sa-2028-12-31-new-years-eve",
+      "date": "2028-12-31",
+      "name": "New Year's Eve",
+      "region": "SA",
+      "kind": "part_day",
+      "startsAt": "19:00"
     }
   ]
 }

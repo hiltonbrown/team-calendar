@@ -61,6 +61,10 @@ Never change the `id` of an existing entry. Organisation preferences (hidden hol
 - New Zealand: Employment New Zealand, public holidays and anniversary dates. Regional anniversary days are entered as `local` national entries with the province as the `area`.
 - United Kingdom: GOV.UK, UK bank holidays, which lists England and Wales, Scotland, and Northern Ireland separately.
 
+## National and regional entries
+
+A location sees national entries (`region: null`) plus its own region's entries, so the same holiday must never appear in both. Make an entry national only when every state and territory (or every nation, for the UK) observes it on the same date under the same name. Everything else, including additional or substitute days, Easter Saturday and Sunday where not universal, and differently named days such as SA's Proclamation Day, is regional.
+
 ## How holidays apply
 
 - A location uses its own state or region. A location without one uses the organisation's region when it is in the same country, otherwise national holidays only.
