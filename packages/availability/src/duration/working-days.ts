@@ -114,37 +114,51 @@ export async function loadWorkingDaysReferenceData(
       }
     }
   }
-  const entries = await Promise.all(
-    [...years].map(
-      async (year) =>
-        [
-          year,
-          await loadHolidaysForYear(
-            first.clerkOrgId as ClerkOrgId,
-            first.organisationId as OrganisationId,
-            year
-          ),
-        ] as const
-    )
-  );
   return {
-    holidaysByYear: new Map(entries),
+    holidaysByYear: await loadHolidaysForYears(
+      first.clerkOrgId as ClerkOrgId,
+      first.organisationId as OrganisationId,
+      years
+    ),
     locationById,
     organisation: organisationLocation,
   };
 }
 
-export function loadHolidaysForYear(
+/**
+ * Resolves holidays for every requested year from one tenant load, keyed by
+ * year. A failure applies to every year.
+ */
+export async function loadHolidaysForYears(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  year: number
-): Promise<Result<ResolvedPublicHoliday[], HolidayLoadError>> {
-  return resolvePublicHolidays({
+  years: Iterable<number>
+): Promise<Map<number, Result<ResolvedPublicHoliday[], HolidayLoadError>>> {
+  const sorted = [...new Set(years)].sort((left, right) => left - right);
+  const [first] = sorted;
+  const last = sorted.at(-1);
+  if (first === undefined || last === undefined) {
+    return new Map();
+  }
+  const result = await resolvePublicHolidays({
     clerkOrgId,
-    from: `${year}-01-01`,
+    from: `${first}-01-01`,
     organisationId,
-    to: `${year}-12-31`,
+    to: `${last}-12-31`,
   });
+  return new Map(
+    sorted.map((year) => [
+      year,
+      result.ok
+        ? {
+            ok: true,
+            value: result.value.filter((holiday) =>
+              holiday.date.startsWith(`${year}-`)
+            ),
+          }
+        : result,
+    ])
+  );
 }
 
 const WORKING_DAY_START_MINUTES = 9 * 60;
@@ -179,15 +193,15 @@ export async function computeWorkingDays(
     const startParts = getStoredWallClockParts(input.startsAt);
     const endParts = getStoredWallClockParts(input.endsAt);
     const holidayDates = loadHolidayDatesFromResults({
-      holidayResults: await Promise.all(
-        yearsBetween(startParts.year, endParts.year).map((year) =>
-          loadHolidaysForYear(
+      holidayResults: [
+        ...(
+          await loadHolidaysForYears(
             input.clerkOrgId as ClerkOrgId,
             input.organisationId as OrganisationId,
-            year
+            yearsBetween(startParts.year, endParts.year)
           )
-        )
-      ),
+        ).values(),
+      ],
       location,
       locationId: input.locationId,
     });

@@ -32,7 +32,7 @@ import { createAggregationCache } from "../analytics/request-cache";
 import {
   computeWorkingDays,
   computeWorkingDaysFromReferenceData,
-  loadHolidaysForYear,
+  loadHolidaysForYears,
   type WorkingDaysReferenceData,
   workingDayYearsForInput,
 } from "../duration/working-days";
@@ -1656,22 +1656,16 @@ async function loadApprovalListContext(
       }
     }
   }
-  const holidayEntries = await Promise.all(
-    [...years].map(
-      async (year) =>
-        [
-          year,
-          await cache.getOrLoad(`approval-list:holidays:${year}`, () =>
-            loadHolidaysForYear(
-              clerkOrgId as ClerkOrgId,
-              organisationId as OrganisationId,
-              year
-            )
-          ),
-        ] as const
-    )
+  const yearList = [...years].sort((left, right) => left - right);
+  workingDaysReferenceData.holidaysByYear = await cache.getOrLoad(
+    `approval-list:holidays:${yearList.join(",")}`,
+    () =>
+      loadHolidaysForYears(
+        clerkOrgId as ClerkOrgId,
+        organisationId as OrganisationId,
+        yearList
+      )
   );
-  workingDaysReferenceData.holidaysByYear = new Map(holidayEntries);
   const personIds = [...new Set(records.map((record) => record.person_id))];
   const recordTypes = [
     ...new Set(

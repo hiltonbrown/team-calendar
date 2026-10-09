@@ -265,7 +265,7 @@ describe("computeWorkingDays", () => {
     expect(result).toEqual({ ok: true, value: 4 });
   });
 
-  it("resolves holidays per calendar year within the organisation", async () => {
+  it("resolves holidays for every year in the range from one load", async () => {
     await computeWorkingDays({
       allDay: true,
       clerkOrgId: "org_1",
@@ -282,15 +282,28 @@ describe("computeWorkingDays", () => {
         clerkOrgId: "org_1",
         from: "2026-01-01",
         organisationId: "00000000-0000-4000-8000-000000000001",
-        to: "2026-12-31",
-      },
-      {
-        clerkOrgId: "org_1",
-        from: "2027-01-01",
-        organisationId: "00000000-0000-4000-8000-000000000001",
         to: "2027-12-31",
       },
     ]);
+  });
+
+  it("excludes holidays in both years of a range that crosses New Year", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
+      ok: true,
+      value: [holiday("2026-12-31"), holiday("2027-01-01")],
+    });
+
+    const result = await computeWorkingDays({
+      allDay: true,
+      clerkOrgId: "org_1",
+      endsAt: new Date("2027-01-04T00:00:00.000Z"),
+      locationId: "loc_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      startsAt: new Date("2026-12-30T00:00:00.000Z"),
+    });
+
+    // Wed 30 Dec to Mon 4 Jan: four weekdays, two of them holidays.
+    expect(result).toEqual({ ok: true, value: 2 });
   });
 
   it("rounds part-day ranges half-up to the nearest quarter", async () => {
