@@ -120,7 +120,7 @@
   place-items: center;
   width: 16px;
   height: 16px;
-  /* Legend marker geometry, not a surface radius. See DESIGN.md Corner Rule. */
+  /* Legend marker geometry, not a surface radius. See DESIGN.md Shapes. */
   border-radius: 4px;
 }
 .tl-swatch--sage {

@@ -30,8 +30,8 @@
     var(--marketing-outline-variant) 15%,
     transparent
   );
-  /* The Hairline Ceiling Rule: this is the strongest shadow a persistent
-     marketing surface may carry. Anything heavier is transient elevation. */
+  /* The strongest shadow a persistent marketing surface may carry (DESIGN.md
+     Elevation & Depth). Anything heavier belongs to a floating surface. */
   --marketing-shadow-hairline: 0 1px 2px
     color-mix(in srgb, var(--marketing-inverse-surface) 10%, transparent);
   --marketing-font:
