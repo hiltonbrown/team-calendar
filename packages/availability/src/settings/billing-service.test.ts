@@ -17,9 +17,7 @@ vi.mock("@repo/database", () => ({
   limitTypes: ["payroll_entities", "seats", "feeds"],
 }));
 
-const { getBillingSummary, getBillingSummaryForDashboard } = await import(
-  "./billing-service"
-);
+const { getBillingSummary } = await import("./billing-service");
 
 const baseInput = {
   actingRole: "owner" as const,
@@ -164,32 +162,5 @@ describe("billing-service", () => {
     const result = await getBillingSummary(baseInput);
 
     expect(result).toMatchObject({ ok: true, value: { isOverLimit: false } });
-  });
-
-  it("returns dashboard summary for admins with locked visibility", async () => {
-    const result = await getBillingSummaryForDashboard({
-      ...baseInput,
-      actingRole: "admin",
-    });
-
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        hasUpgradeFlow: false,
-        visibleToAdmin: false,
-      },
-    });
-  });
-
-  it("returns dashboard summary for owners with billing visibility", async () => {
-    const result = await getBillingSummaryForDashboard(baseInput);
-
-    expect(result).toMatchObject({
-      ok: true,
-      value: {
-        hasUpgradeFlow: true,
-        visibleToAdmin: true,
-      },
-    });
   });
 });

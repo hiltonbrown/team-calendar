@@ -67,7 +67,6 @@ const incompleteState: OnboardingState = {
   activeFeedCount: 0,
   completedRequiredCount: 1,
   isComplete: false,
-  publicHolidayJurisdictionCount: 1,
   requiredCount: 2,
   steps: [
     {

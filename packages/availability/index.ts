@@ -6,8 +6,15 @@ export type {
   ExternalWritePort,
   ProviderResolutionError,
   ProviderWriteError,
+  ReferenceHoliday,
+  ReferenceHolidayKind,
   SubmitLeaveInput,
   WithdrawLeaveInput,
+} from "@repo/core";
+export {
+  findReferenceHoliday,
+  listReferenceHolidays,
+  PUBLIC_HOLIDAY_DATA_VERSION,
 } from "@repo/core";
 export { materialiseAvailabilityPublication } from "@repo/feeds";
 export { exportAnalyticsToCsv } from "./src/analytics/analytics-csv";
@@ -83,6 +90,10 @@ export {
 } from "./src/dashboard/dashboard-cache";
 export {
   type AdminDashboardView,
+  type DashboardApprovalQueue,
+  type DashboardApprovalRow,
+  type DashboardInfoRequest,
+  type DashboardMyRequest,
   type DashboardRole,
   type DashboardSection,
   type DashboardServiceError,
@@ -93,19 +104,12 @@ export {
   type ManagerDashboardView,
   resolveDashboardRole,
 } from "./src/dashboard/dashboard-service";
+export * from "./src/dashboard/timeline-week";
 export * from "./src/duration/working-days";
 export { computeWorkingDays } from "./src/duration/working-days";
+export * from "./src/holidays/holiday-preferences";
 export * from "./src/holidays/holiday-service";
-export {
-  addCustomHoliday,
-  deleteCustomHoliday,
-  ensureDefaultPublicHolidaysForOrganisation,
-  importForJurisdiction,
-  listForOrganisation,
-  restoreHoliday,
-  suppressHoliday,
-} from "./src/holidays/holiday-service";
-export * from "./src/holidays/nager-client";
+export * from "./src/holidays/resolve-public-holidays";
 export {
   completeMemberWelcome,
   loadWelcomeEligibility,
@@ -226,9 +230,7 @@ export {
 export {
   type BillingServiceError,
   type BillingSummary,
-  type DashboardBillingSummary,
   getBillingSummary,
-  getBillingSummaryForDashboard,
 } from "./src/settings/billing-service";
 export {
   defaultOrganisationSettingsPatch,
@@ -271,6 +273,9 @@ export {
   type TimelineEvent,
   type TimelinePage,
 } from "./src/sync/sync-monitor-service";
+export * from "./src/team-coverage/coverage-map";
+export * from "./src/team-coverage/load-manager-coverage";
+export * from "./src/team-coverage/team-coverage-minimums";
 export * from "./src/xero-connection-state";
 export {
   acquireXeroWriteClaim,

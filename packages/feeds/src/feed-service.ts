@@ -90,12 +90,6 @@ export interface FeedDetail {
   updatedAt: Date;
 }
 
-export interface DashboardFeedSummary {
-  activeCount: number;
-  lastRenderedAt: Date | null;
-  pausedCount: number;
-}
-
 const PrivacyModeSchema = z.enum(["named", "masked", "private"]);
 const RoleSchema = z.string().min(1).transform(normaliseRole);
 
@@ -203,7 +197,7 @@ export interface OwnFeedEligibility {
   teamFeedId: string | null;
 }
 
-const DashboardSummarySchema = z.object({
+const FeedCountsSchema = z.object({
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
   clerkOrgId: z.string().min(1),
@@ -926,7 +920,7 @@ export async function createOwnFeed(
 export async function getFeedOversightCounts(
   input: unknown
 ): Promise<Result<{ personal: number; total: number }, FeedServiceError>> {
-  const parsed = DashboardSummarySchema.safeParse(input);
+  const parsed = FeedCountsSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
@@ -952,50 +946,6 @@ export async function getFeedOversightCounts(
     return { ok: true, value: { personal, total } };
   } catch {
     return unknownError("Failed to count feeds.");
-  }
-}
-
-export async function getFeedSummaryForDashboard(
-  input: unknown
-): Promise<Result<DashboardFeedSummary, FeedServiceError>> {
-  const parsed = DashboardSummarySchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
-  }
-
-  try {
-    const [activeFeeds, pausedCount] = await Promise.all([
-      database.feed.findMany({
-        orderBy: [{ last_rendered_at: "desc" }, { id: "asc" }],
-        select: { id: true, last_rendered_at: true },
-        where: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          organisation_id: parsed.data.organisationId,
-          status: "active",
-        },
-      }),
-      database.feed.count({
-        where: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          organisation_id: parsed.data.organisationId,
-          status: "paused",
-        },
-      }),
-    ]);
-
-    return {
-      ok: true,
-      value: {
-        activeCount: activeFeeds.length,
-        lastRenderedAt: activeFeeds[0]?.last_rendered_at ?? null,
-        pausedCount,
-      },
-    };
-  } catch {
-    return unknownError("Failed to load feed dashboard summary.");
   }
 }
 

@@ -1,5 +1,43 @@
 # Current work
 
+## Bundled public holidays (plan `docs/superpowers/plans/2026-10-09-bundled-public-holidays.md`)
+
+- [x] Region registry, reference schema and loader; one data file each for AU, NZ and UK.
+- [x] Starter data (basics only; the user will add the full range by hand).
+- [x] `public_holiday_preferences`; Nager rows, jurisdictions and assignments removed; custom holidays kept.
+- [x] Resolver in `@repo/core`, tenant loader in `@repo/database`, preference service in `@repo/availability`.
+- [x] Working days, approvals, calendar, dashboard, reports, current status and feeds read through the resolver.
+- [x] Public Holidays page, custom holiday modal, Settings > Holidays local day switches, registry regions in General settings.
+- [x] `docs/public-holidays.md`; PRODUCT.md, AGENTS.md and ScreenCatalogue.md updated; no runtime Nager references remain.
+
+### Review
+
+- `bun run check`: passes. `bun run typecheck`: 19 of 19 tasks. `bun run test`: 18 of 18 tasks.
+- `bun run test:integration` (local PostgreSQL): database 54, availability 25, app 10 and jobs 84 pass. Feeds passes 22 of 22 when run in its package with `TC_TEST_KV_*` set to a local Redis HTTP shim; under turbo those variables are filtered, so it fails to load. The Xero OAuth suite has the same 17 failures as before this work.
+- Data gaps: AU now has national plus all eight states and territories for 2026 to 2028, except WA 2028 (only the national days; WA has not published 2028) and the VIC AFL Grand Final Friday for 2027 and 2028 (set by the AFL fixture). SA dates came from search excerpts of SafeWork SA because every SA government site was blocked: re-check first. NSW 2028 follows the Public Holidays Act rules, not a published list. NZ covers 2026 to 2027 only. UK covers 2026 to 2028.
+- Deviations from the plan: resolver and reference data live in `@repo/core` and the loader in `@repo/database` (feeds cannot depend on availability); the jurisdiction removal migration is split in two; NZ anniversary days are national `local` entries with the province as the area; QLD Christmas Eve starts at 18:00; WA regional King's Birthday is not modelled; `recursAnnually` was a no-op and is removed; there is no location editing UI, so no location region picker.
+- NOT VERIFIED: visual rendering of the holiday screens (needs Clerk and other services); review the Vercel preview.
+- `bun.lock` synced to `next` 16.3.8 (matches `package.json`) in a separate chore commit.
+
+## Dashboard redesign (plan `docs/superpowers/plans/2026-10-09-dashboard-redesign.md`)
+
+- [x] Second pass on the spec and plan ("Second-pass corrections (binding)").
+- [x] Task 1 to 3: `Team.minimum_available_people`, team coverage queries, Settings > Coverage.
+- [x] Task 4 to 6: timeline week model, manager coverage map, design-system `TeamTimeline`.
+- [x] Task 7: dashboard service reshaped per role (employee self timeline and requests; manager team timeline, coverage and approvals; admin away-only timeline and approvals). Unused feed and billing dashboard summaries removed.
+- [x] Task 8: sentence-case record type labels in `@repo/core`, icon map, dashboard components; old cards removed.
+- [x] Task 9: role views composed around the timeline; `week` parameter validated; scaffold, layout and Xero banner removed.
+- [x] Task 10: verification (below).
+
+### Review
+
+- `bun run check`: passes. `bun run typecheck`: 19 of 19 tasks. `bun run test`: 18 of 18 tasks (app 808, availability 589, database 102, core 111, feeds 132, jobs 192).
+- `bun run test:integration` (local PostgreSQL, one task at a time, KV shim): database 57, availability 25, jobs 84, feeds 22 and app 10 pass. Xero fails 51, passes 39 and skips 12; `origin/main` gives exactly the same result on a fresh database, so these failures predate this work. Under parallel turbo the app shared-connection setup hook can time out (also seen on main in CI).
+- Fixed during verification: all-day records were matched against local day boundaries, so a one-day leave showed on two days in Brisbane in the calendar, the dashboard timeline and team coverage. A shared `recordFallsOnDay` in `@repo/core` now matches all-day records by their stored UTC dates (inclusive end, covering both the Xero midnight-to-midnight form and the 23:59:59.999Z form) and timed records by overlap.
+- Known effect: sentence-case labels change ICS titles for untitled records (for example "Jane Smith: Annual leave"), so the next publication run raises their SEQUENCE once.
+- Deviations: a client `dashboard-timeline.tsx` supplies Next.js links to `TeamTimeline`; `allDay` is carried on timeline entries and dashboard rows; "Leave request" is a third provenance; Withdraw and View link to `/plans?tab=my`, Edit to `/plans/<id>/edit`, Review to `/leave-approvals?status=submitted`; balances show only when Xero is connected.
+- NOT VERIFIED: rendering in a running app (no Clerk credentials here): desktop and mobile widths, light and dark themes, keyboard use. Review the Vercel preview.
+
 ## Design system sync (Claude Design System artifact, 9 October 2026)
 
 Bring code and docs in line with the reviewed Team Calendar design system. Brand mark unchanged.

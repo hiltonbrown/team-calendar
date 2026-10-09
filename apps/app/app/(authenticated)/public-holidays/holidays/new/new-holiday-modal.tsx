@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@repo/design-system/components/ui/button";
-import { Checkbox } from "@repo/design-system/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -34,57 +33,63 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { addCustomHolidayAction } from "../../_actions";
+import type { HolidayCountryOption } from "./form-data";
+
+const NATIONWIDE = "__all__";
 
 const formSchema = z
   .object({
+    countryCode: z.string().optional(),
     date: z.string().min(1, "Date is required"),
-    jurisdictionId: z.string().uuid().optional(),
     name: z.string().min(1, "Name is required").max(100),
-    recursAnnually: z.boolean(),
-    scope: z.enum(["jurisdiction", "organisation"]),
+    regionCode: z.string(),
+    scope: z.enum(["everywhere", "country"]),
   })
   .superRefine((value, context) => {
-    if (value.scope === "jurisdiction" && !value.jurisdictionId) {
+    if (value.scope === "country" && !value.countryCode) {
       context.addIssue({
         code: "custom",
-        message: "Choose a jurisdiction",
-        path: ["jurisdictionId"],
+        message: "Choose a country",
+        path: ["countryCode"],
       });
     }
   });
 
+type FormValues = z.infer<typeof formSchema>;
+
 interface NewHolidayModalProps {
-  jurisdictions: Array<{
-    country_code: string;
-    id: string;
-    region_code: string | null;
-  }>;
+  countries: HolidayCountryOption[];
+  defaultCountryCode: string | null;
   organisationId: string;
 }
 
 export function NewHolidayModal({
-  jurisdictions,
+  countries,
+  defaultCountryCode,
   organisationId,
 }: NewHolidayModalProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     defaultValues: {
+      countryCode:
+        countries.find((country) => country.code === defaultCountryCode)
+          ?.code ?? undefined,
       date: "",
-      jurisdictionId: undefined,
       name: "",
-      recursAnnually: false,
-      scope: "organisation",
+      regionCode: NATIONWIDE,
+      scope: "everywhere",
     },
     resolver: zodResolver(formSchema),
   });
   const scope = form.watch("scope");
-  const jurisdictionId = form.watch("jurisdictionId");
-  const selectedJurisdiction = jurisdictions.find(
-    (jurisdiction) => jurisdiction.id === jurisdictionId
+  const countryCode = form.watch("countryCode");
+  const regionCode = form.watch("regionCode");
+  const selectedCountry = countries.find(
+    (country) => country.code === countryCode
   );
-  const scopePreview = scopePreviewLabel(scope, selectedJurisdiction);
+  const scopePreview = scopePreviewLabel(scope, selectedCountry, regionCode);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -92,7 +97,7 @@ export function NewHolidayModal({
     }
   };
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
+  const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       const result = await addCustomHolidayAction(
         buildCustomHolidayActionInput(values, organisationId)
@@ -114,7 +119,8 @@ export function NewHolidayModal({
         <DialogHeader>
           <DialogTitle>Add custom holiday</DialogTitle>
           <DialogDescription>
-            Create a custom public holiday for your organisation.
+            Add a company or one-off holiday. Official public holidays are
+            included automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -140,34 +146,21 @@ export function NewHolidayModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Applies to</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      if (value === "organisation") {
-                        form.setValue("jurisdictionId", undefined);
-                      }
-                    }}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="organisation">
-                        All organisation locations
-                      </SelectItem>
-                      <SelectItem
-                        disabled={jurisdictions.length === 0}
-                        value="jurisdiction"
-                      >
-                        One imported jurisdiction
+                      <SelectItem value="everywhere">Everyone</SelectItem>
+                      <SelectItem value="country">
+                        One country or region
                       </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Organisation-wide holidays apply regardless of a person's
+                    Holidays for everyone apply regardless of a person&apos;s
                     location.
                   </FormDescription>
                   <FormMessage />
@@ -175,38 +168,70 @@ export function NewHolidayModal({
               )}
             />
 
-            {scope === "jurisdiction" ? (
-              <FormField
-                control={form.control}
-                name="jurisdictionId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Jurisdiction</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a jurisdiction" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {jurisdictions.map((jurisdiction) => (
-                          <SelectItem
-                            key={jurisdiction.id}
-                            value={jurisdiction.id}
-                          >
-                            {jurisdictionLabel(jurisdiction)}
+            {scope === "country" ? (
+              <>
+                <FormField
+                  control={form.control}
+                  name="countryCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue("regionCode", NATIONWIDE);
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a country" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country.code} value={country.code}>
+                              {country.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="regionCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State or region</FormLabel>
+                      <Select
+                        disabled={!selectedCountry}
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value={NATIONWIDE}>
+                            Whole country
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Jurisdictions are created when holidays are refreshed from
-                      the source.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                          {selectedCountry?.regions.map((region) => (
+                            <SelectItem key={region.code} value={region.code}>
+                              {region.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             ) : null}
 
             <div
@@ -227,27 +252,6 @@ export function NewHolidayModal({
                     <Input type="date" {...field} />
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="recursAnnually"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg bg-muted p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Recurs annually</FormLabel>
-                    <FormDescription>
-                      This holiday will automatically apply every year.
-                    </FormDescription>
-                  </div>
                 </FormItem>
               )}
             />
@@ -273,37 +277,34 @@ export function NewHolidayModal({
 }
 
 export function buildCustomHolidayActionInput(
-  values: z.infer<typeof formSchema>,
+  values: FormValues,
   organisationId: string
 ) {
+  const everywhere = values.scope === "everywhere";
   return {
-    appliesToAllJurisdictions: values.scope === "organisation",
+    appliesToAllJurisdictions: everywhere,
+    countryCode: everywhere ? null : (values.countryCode ?? null),
     date: new Date(values.date),
-    jurisdictionId:
-      values.scope === "jurisdiction" ? (values.jurisdictionId ?? null) : null,
     name: values.name,
     organisationId,
-    recursAnnually: values.recursAnnually,
+    regionCode:
+      everywhere || values.regionCode === NATIONWIDE ? null : values.regionCode,
   };
 }
 
-function jurisdictionLabel(jurisdiction: {
-  country_code: string;
-  region_code: string | null;
-}) {
-  return jurisdiction.region_code
-    ? `${jurisdiction.country_code}-${jurisdiction.region_code}`
-    : `${jurisdiction.country_code} national`;
-}
-
 function scopePreviewLabel(
-  scope: "jurisdiction" | "organisation",
-  jurisdiction: { country_code: string; region_code: string | null } | undefined
+  scope: FormValues["scope"],
+  country: HolidayCountryOption | undefined,
+  regionCode: string
 ) {
-  if (scope === "organisation") {
-    return "All organisation locations";
+  if (scope === "everywhere") {
+    return "Everyone in the organisation";
   }
-  return jurisdiction
-    ? jurisdictionLabel(jurisdiction)
-    : "Choose a jurisdiction";
+  if (!country) {
+    return "Choose a country";
+  }
+  const region = country.regions.find((option) => option.code === regionCode);
+  return region
+    ? `${region.label}, ${country.label}`
+    : `All of ${country.label}`;
 }

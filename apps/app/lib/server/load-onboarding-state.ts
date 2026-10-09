@@ -1,6 +1,7 @@
 import "server-only";
 import { getXeroConnectionStateForScope } from "@repo/availability";
 import {
+  isCountryCode,
   toXeroConnectionDisplayState,
   type XeroConnectionDisplayState,
   xeroRecoveryMessage,
@@ -20,7 +21,6 @@ export interface OnboardingState {
   activeFeedCount: number;
   completedRequiredCount: number;
   isComplete: boolean;
-  publicHolidayJurisdictionCount: number;
   requiredCount: number;
   steps: OnboardingStep[];
   xeroConnectionState: XeroConnectionDisplayState;
@@ -42,18 +42,23 @@ export async function loadOnboardingState({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   };
-  const [connection, publicHolidayJurisdictionCount, activeFeedCount] =
-    await Promise.all([
-      getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
-      database.publicHolidayJurisdiction.count({
-        where: { ...scope, is_enabled: true },
-      }),
-      database.feed.count({
-        where: { ...scope, status: { in: ["active", "paused"] } },
-      }),
-    ]);
+  const [connection, organisation, activeFeedCount] = await Promise.all([
+    getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
+    database.organisation.findFirst({
+      select: { country_code: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        id: organisationId,
+      },
+    }),
+    database.feed.count({
+      where: { ...scope, status: { in: ["active", "paused"] } },
+    }),
+  ]);
   const xeroConnectionState = toXeroConnectionDisplayState(connection);
-  const hasPublicHolidays = publicHolidayJurisdictionCount > 0;
+  // Official holidays apply automatically once the country is supported.
+  const hasPublicHolidays = isCountryCode(organisation?.country_code);
   const hasFeeds = activeFeedCount > 0;
   const required: Array<{ complete: boolean; id: OnboardingStep["id"] }> = [
     { complete: hasPublicHolidays, id: "holidays" },
@@ -72,7 +77,7 @@ export async function loadOnboardingState({
       ctaHref: "/settings/holidays",
       ctaLabel: "Review holidays",
       description:
-        "Team Calendar imports your country's public holidays. Check regional dates and add any of your own.",
+        "Official public holidays apply automatically for your country and each location's state or region. Review them and add local or company days.",
       id: "holidays",
       status: status("holidays", hasPublicHolidays),
       title: "Review public holidays",
@@ -96,7 +101,6 @@ export async function loadOnboardingState({
     activeFeedCount,
     completedRequiredCount,
     isComplete: completedRequiredCount === required.length,
-    publicHolidayJurisdictionCount,
     requiredCount: required.length,
     steps,
     xeroConnectionState,

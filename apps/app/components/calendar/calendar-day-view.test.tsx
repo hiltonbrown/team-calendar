@@ -113,6 +113,7 @@ function rangeWithEvents() {
             isSuppressed: false,
             locationNames: ["Brisbane"],
             name: "Queensland Day",
+            startsAt: null,
           },
         ],
       },

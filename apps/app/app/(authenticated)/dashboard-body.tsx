@@ -3,14 +3,9 @@ import {
   getAdminView,
   getEmployeeView,
   getManagerView,
-  getXeroConnectionStateForScope,
   resolveDashboardRole,
 } from "@repo/availability";
-import {
-  type ClerkOrgId,
-  type OrganisationId,
-  toXeroConnectionDisplayState,
-} from "@repo/core";
+import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { AdminEmptyView } from "@/components/dashboard/admin-empty-view";
 import { AdminView } from "@/components/dashboard/admin-view";
@@ -25,6 +20,8 @@ interface DashboardBodyProps {
   orgQueryValue: string | null;
   orgRole: string | null | undefined;
   userId: string;
+  /** "2026-10-12": any date in the timeline week to show. */
+  weekAnchor?: string;
 }
 /**
  * Data-heavy half of the dashboard. Rendered inside a Suspense boundary so the
@@ -37,6 +34,7 @@ export async function DashboardBody({
   orgRole,
   organisationId,
   userId,
+  weekAnchor,
 }: DashboardBodyProps) {
   const [actingPerson, roleResult] = await Promise.all([
     database.person.findFirst({
@@ -62,10 +60,12 @@ export async function DashboardBody({
     actingPersonId: actingPerson?.id ?? null,
     cache,
     clerkOrgId,
+    now: new Date(),
     organisationId,
     orgQueryValue,
     role: roleResult.value,
     userId,
+    weekAnchor,
   });
   return content;
 }
@@ -73,38 +73,32 @@ interface RenderDashboardInput {
   actingPersonId: string | null;
   cache: ReturnType<typeof createDashboardCache>;
   clerkOrgId: string;
+  now: Date;
   organisationId: string;
   orgQueryValue: string | null;
   role: "admin" | "employee" | "manager" | "owner" | "viewer";
   userId: string;
+  weekAnchor: string | undefined;
 }
 async function renderDashboard({
   role,
   actingPersonId,
   cache,
   clerkOrgId,
+  now,
   organisationId,
   orgQueryValue,
   userId,
+  weekAnchor,
 }: RenderDashboardInput) {
   if (!actingPersonId) {
     if (role === "owner" || role === "admin") {
-      const connection = await getXeroConnectionStateForScope({
-        clerkOrgId,
-        organisationId,
-      });
-      return (
-        <AdminEmptyView
-          orgQueryValue={orgQueryValue}
-          roleLabel={role === "owner" ? "Owner" : "Admin"}
-          xeroConnectionState={toXeroConnectionDisplayState(connection)}
-        />
-      );
+      return <AdminEmptyView now={now} orgQueryValue={orgQueryValue} />;
     }
-    return <ViewerView />;
+    return <ViewerView now={now} orgQueryValue={orgQueryValue} />;
   }
   if (role === "viewer") {
-    return <ViewerView />;
+    return <ViewerView now={now} orgQueryValue={orgQueryValue} />;
   }
   if (role === "owner" || role === "admin") {
     const result = await getAdminView(
@@ -114,6 +108,7 @@ async function renderDashboard({
         organisationId,
         personId: actingPersonId,
         userId,
+        weekAnchor,
       },
       cache
     );
@@ -122,6 +117,7 @@ async function renderDashboard({
     }
     return (
       <AdminView
+        now={now}
         orgQueryValue={orgQueryValue}
         personId={actingPersonId}
         view={result.value}
@@ -136,6 +132,7 @@ async function renderDashboard({
         organisationId,
         personId: actingPersonId,
         userId,
+        weekAnchor,
       },
       cache
     );
@@ -144,6 +141,7 @@ async function renderDashboard({
     }
     return (
       <ManagerView
+        now={now}
         orgQueryValue={orgQueryValue}
         personId={actingPersonId}
         view={result.value}
@@ -157,6 +155,7 @@ async function renderDashboard({
       organisationId,
       personId: actingPersonId,
       userId,
+      weekAnchor,
     },
     cache
   );
@@ -165,6 +164,7 @@ async function renderDashboard({
   }
   return (
     <EmployeeView
+      now={now}
       orgQueryValue={orgQueryValue}
       personId={actingPersonId}
       view={result.value}

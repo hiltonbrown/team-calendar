@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   hasUnresolved: vi.fn().mockResolvedValue(false),
   leaveBalanceFindFirst: vi.fn(),
   leaveBalanceFindMany: vi.fn(),
-  listForOrganisation: vi.fn(),
+  loadHolidaysForYears: vi.fn(),
   locationFindMany: vi.fn(),
   logError: vi.fn(),
   managerScopePersonIds: vi.fn(),
@@ -103,10 +103,8 @@ vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,
   computeWorkingDaysFromReferenceData:
     mocks.computeWorkingDaysFromReferenceData,
+  loadHolidaysForYears: mocks.loadHolidaysForYears,
   workingDayYearsForInput: mocks.workingDayYearsForInput,
-}));
-vi.mock("../holidays/holiday-service", () => ({
-  listForOrganisation: mocks.listForOrganisation,
 }));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
@@ -262,7 +260,7 @@ describe("approval-service", () => {
       balance_unit: "days",
       updated_at: new Date("2026-04-01T00:00:00.000Z"),
     });
-    mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
+    mocks.loadHolidaysForYears.mockResolvedValue(new Map());
     mocks.locationFindMany.mockResolvedValue([]);
     mocks.dispatchNotification.mockResolvedValue({
       ok: true,
@@ -1429,7 +1427,7 @@ describe("approval-service", () => {
     }
     expect(mocks.locationFindMany).toHaveBeenCalledOnce();
     expect(mocks.organisationFindFirst).toHaveBeenCalledOnce();
-    expect(mocks.listForOrganisation).toHaveBeenCalledOnce();
+    expect(mocks.loadHolidaysForYears).toHaveBeenCalledOnce();
     expect(mocks.leaveBalanceFindMany).toHaveBeenCalledOnce();
     expect(mocks.leaveBalanceFindFirst).not.toHaveBeenCalled();
     expect(mocks.computeWorkingDaysFromReferenceData).toHaveBeenCalledTimes(2);
@@ -1801,7 +1799,7 @@ describe("approval-service", () => {
       country_code: "AU",
       timezone: "Australia/Brisbane",
     });
-    mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
+    mocks.loadHolidaysForYears.mockResolvedValue(new Map());
     mocks.leaveBalanceFindMany.mockResolvedValue([]);
     const result = await listForApprover({
       ...input,

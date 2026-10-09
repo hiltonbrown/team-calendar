@@ -131,7 +131,7 @@ Task Management
 | Testing | Vitest |
 | Linting | Biome 2 + Ultracite |
 | Real-time notifications | SSE via Vercel streaming |
-| Public holiday data | Nager.Date API |
+| Public holiday data | Bundled AU, NZ and UK data files (`docs/public-holidays.md`) |
 
 ---
 
@@ -546,7 +546,7 @@ Optional variables with format constraints must be absent (commented out), not `
 6. Leave submission workflow: draft, submit, Xero write-back, approval state machine
 7. Leave approval workflow: manager approve/decline, Xero write-back
 8. Manual availability CRUD
-9. Public holiday data: API sourcing, manual overrides, per-location configuration
+9. Public holiday data: bundled reference files, custom holidays, per-location preferences
 10. SSE notification infrastructure and in-app notification delivery
 11. Feed model and token model
 12. ICS renderer with stable UID and privacy modes

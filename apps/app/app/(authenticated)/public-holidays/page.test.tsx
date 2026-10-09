@@ -2,11 +2,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  listForOrganisation: vi.fn(),
+  auth: vi.fn(),
   locationFindMany: vi.fn(),
-  organisationFindFirst: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
+  resolvePublicHolidays: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, scopedOrganisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: scopedOrganisationId,
@@ -14,13 +14,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@repo/availability", () => ({
-  listForOrganisation: mocks.listForOrganisation,
+  resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
-    location: { findMany: mocks.locationFindMany },
-    organisation: { findFirst: mocks.organisationFindFirst },
-  },
+  database: { location: { findMany: mocks.locationFindMany } },
   scopedQuery: mocks.scopedQuery,
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
@@ -29,21 +26,31 @@ vi.mock("@/lib/auth/require-page-role", () => ({
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
-vi.mock("@repo/auth/server", () => ({
-  auth: vi.fn().mockResolvedValue({ orgRole: "org:admin" }),
-}));
+vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
 vi.mock("../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,
 }));
 vi.mock("./public-holidays-list", () => ({
   PublicHolidaysList: ({
+    canManage,
     filters,
+    groups,
   }: {
-    filters: { includeSuppressed: boolean; locationId?: string; year: number };
+    canManage: boolean;
+    filters: { includeHidden: boolean; year: number };
+    groups: Array<{ holidays: Array<{ name: string }>; name: string }>;
   }) => (
     <div>
-      Public holiday list {filters.year}{" "}
-      {filters.includeSuppressed ? "including suppressed" : "active only"}
+      <p>
+        Public holiday list {filters.year}{" "}
+        {filters.includeHidden ? "including hidden" : "active only"}
+      </p>
+      <p>{canManage ? "can manage" : "read only"}</p>
+      {groups.map((group) => (
+        <p key={group.name}>
+          {group.name}: {group.holidays.map((row) => row.name).join(", ")}
+        </p>
+      ))}
     </div>
   ),
 }));
@@ -52,32 +59,44 @@ const Page = (await import("./page")).default;
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const locationId = "00000000-0000-4000-8000-000000000010";
-const PUBLIC_HOLIDAY_LIST_2026_PATTERN = /Public holiday list 2026/;
-const INCLUDING_SUPPRESSED_PATTERN = /including suppressed/;
+
+function holiday(overrides: Record<string, unknown>) {
+  return {
+    area: null,
+    classification: "non_working",
+    date: "2026-12-25",
+    hidden: false,
+    key: "au-national-2026-12-25-christmas-day",
+    kind: "public",
+    locationId: null,
+    name: "Christmas Day",
+    origin: "official",
+    startsAt: null,
+    ...overrides,
+  };
+}
 
 describe("PublicHolidaysPage", () => {
   afterEach(() => cleanup());
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
       clerkOrgId: "org_1",
       organisationId,
     });
-    mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
-    mocks.locationFindMany.mockResolvedValue([]);
-    mocks.organisationFindFirst.mockResolvedValue({
-      country_code: "AU",
-      region_code: null,
-    });
+    mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: [] });
+    mocks.locationFindMany.mockResolvedValue([
+      { id: locationId, name: "Brisbane" },
+    ]);
   });
 
-  it("requires viewer access and passes URL filters to the service", async () => {
+  it("requires viewer access and resolves the selected year with hidden rows", async () => {
     render(
       await Page({
         searchParams: Promise.resolve({
-          includeSuppressed: "true",
-          locationId,
+          includeHidden: "true",
           org: organisationId,
           year: "2026",
         }),
@@ -85,21 +104,52 @@ describe("PublicHolidaysPage", () => {
     );
 
     expect(mocks.requirePageRole).toHaveBeenCalledWith("org:viewer");
-    expect(mocks.listForOrganisation).toHaveBeenCalledWith(
-      "org_1",
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
+      clerkOrgId: "org_1",
+      from: "2026-01-01",
+      includeHidden: true,
       organisationId,
-      {
-        includeSuppressed: true,
-        locationId,
-        year: 2026,
-      }
+      to: "2026-12-31",
+    });
+    expect(mocks.locationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { clerk_org_id: "org_1", organisation_id: organisationId },
+      })
     );
-    expect(screen.getByText(PUBLIC_HOLIDAY_LIST_2026_PATTERN)).toBeDefined();
-    expect(screen.getByText(INCLUDING_SUPPRESSED_PATTERN)).toBeDefined();
+    expect(
+      screen.getByText("Public holiday list 2026 including hidden")
+    ).toBeDefined();
+    expect(screen.getByText("can manage")).toBeDefined();
+  });
+
+  it("groups holidays by location and leaves hidden rows out by default", async () => {
+    mocks.resolvePublicHolidays.mockResolvedValue({
+      ok: true,
+      value: [
+        holiday({ locationId }),
+        holiday({ hidden: true, locationId, name: "Boxing Day" }),
+        holiday({ locationId: null, name: "Founders Day", origin: "custom" }),
+      ],
+    });
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("Brisbane: Christmas Day")).toBeDefined();
+    expect(
+      screen.getByText("People without a location: Founders Day")
+    ).toBeDefined();
+  });
+
+  it("shows the list read-only to viewers", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText("read only")).toBeDefined();
   });
 
   it("renders the shared fetch error state on loader failure", async () => {
-    mocks.listForOrganisation.mockResolvedValue({
+    mocks.resolvePublicHolidays.mockResolvedValue({
       error: { code: "internal", message: "Database unavailable" },
       ok: false,
     });
@@ -107,20 +157,5 @@ describe("PublicHolidaysPage", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Unable to load public holidays")).toBeDefined();
-  });
-
-  it("loads the organisation with its own ID and Clerk tenant scope", async () => {
-    render(await Page({ searchParams: Promise.resolve({}) }));
-
-    expect(mocks.organisationFindFirst).toHaveBeenCalledWith({
-      select: { country_code: true, region_code: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: "org_1",
-        id: organisationId,
-      },
-    });
-    const [query] = mocks.organisationFindFirst.mock.calls[0];
-    expect(query.where).not.toHaveProperty("organisation_id");
   });
 });

@@ -8,9 +8,10 @@ import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "./components/header";
 import { DashboardBody } from "./dashboard-body";
+import { parseDashboardWeekParam } from "./dashboard-week-param";
 
 export const metadata: Metadata = {
-  description: "Role-aware overview of leave, availability, and sync status.",
+  description: "Who is in this week, coverage and requests waiting for you.",
   title: "Dashboard | Team Calendar",
 };
 
@@ -45,6 +46,7 @@ export default async function DashboardPage({
               orgQueryValue={orgQueryValue}
               orgRole={orgRole}
               userId={userId}
+              weekAnchor={parseDashboardWeekParam(params.week)}
             />
           </Suspense>
         ) : (

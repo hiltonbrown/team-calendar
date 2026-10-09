@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   feedCount: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
-  publicHolidayJurisdictionCount: vi.fn(),
+  organisationFindFirst: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/availability", () => ({
@@ -12,7 +12,7 @@ vi.mock("@repo/availability", () => ({
 vi.mock("@repo/database", () => ({
   database: {
     feed: { count: mocks.feedCount },
-    publicHolidayJurisdiction: { count: mocks.publicHolidayJurisdictionCount },
+    organisation: { findFirst: mocks.organisationFindFirst },
   },
 }));
 
@@ -29,7 +29,7 @@ describe("loadOnboardingState", () => {
       ok: true,
       value: { state: "connected" },
     });
-    mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
+    mocks.organisationFindFirst.mockResolvedValue({ country_code: "AU" });
     mocks.feedCount.mockResolvedValue(1);
   });
 
@@ -89,7 +89,7 @@ describe("loadOnboardingState", () => {
   );
 
   it("marks the first unfinished step as next", async () => {
-    mocks.publicHolidayJurisdictionCount.mockResolvedValue(0);
+    mocks.organisationFindFirst.mockResolvedValue({ country_code: "XX" });
     mocks.feedCount.mockResolvedValue(0);
     const state = await loadOnboardingState(input);
     expect(state.steps.map((step) => step.status)).toEqual(["next", "pending"]);
@@ -98,16 +98,19 @@ describe("loadOnboardingState", () => {
 
   it("scopes every count to the tenant", async () => {
     await loadOnboardingState(input);
-    for (const count of [
-      mocks.feedCount,
-      mocks.publicHolidayJurisdictionCount,
-    ]) {
-      expect(count).toHaveBeenCalledWith({
+    expect(mocks.feedCount).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        clerk_org_id: "org_1",
+        organisation_id: input.organisationId,
+      }),
+    });
+    expect(mocks.organisationFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: "org_1",
-          organisation_id: input.organisationId,
+          id: input.organisationId,
         }),
-      });
-    }
+      })
+    );
   });
 });

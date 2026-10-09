@@ -1,4 +1,5 @@
 import { auth, clerkClient } from "@repo/auth/server";
+import { isCountryCode, REGIONS } from "@repo/core";
 import { database } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
@@ -66,6 +67,14 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
         regionCode: organisation.region_code,
         timezone: organisation.timezone ?? "Australia/Brisbane",
       }}
+      regionOptions={
+        isCountryCode(organisation.country_code)
+          ? REGIONS[organisation.country_code].map((region) => ({
+              label: region.label,
+              value: region.code,
+            }))
+          : []
+      }
     />
   );
 };

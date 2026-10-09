@@ -78,6 +78,8 @@ describe("OwnFeedActions", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "active feed limit"
     );
-    expect(button.disabled).toBe(false);
+    // The transition settles after the error renders; retry is available
+    // once it has.
+    await waitFor(() => expect(button.disabled).toBe(false));
   });
 });

@@ -228,7 +228,7 @@ describe("feed services", () => {
         country_code: "AU",
         created_at: new Date("2020-01-01"),
         holiday_date: old.startsAt,
-        holiday_type: "public",
+        holiday_type: "custom",
         name: "Historical holiday",
         source: "manual",
       },
@@ -383,7 +383,7 @@ describe("feed services", () => {
         ...seeded.scope,
         country_code: "AU",
         holiday_date: seeded.startsAt,
-        holiday_type: "public",
+        holiday_type: "custom",
         name: "Owned holiday",
         source: "manual",
       },
@@ -1558,13 +1558,10 @@ async function cleanTestData() {
   await database.auditEvent.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
-  await database.publicHolidayAssignment.deleteMany({
+  await database.publicHolidayPreference.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
   await database.publicHoliday.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
-  });
-  await database.publicHolidayJurisdiction.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
   await database.feedEventPublication.deleteMany({
@@ -1590,6 +1587,19 @@ async function cleanTestData() {
   });
   await database.location.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  // Audit rows reference the organisation; clear them by organisation just
+  // before it goes so a late write from the previous test cannot block cleanup.
+  const organisations = await database.organisation.findMany({
+    select: { id: true },
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.auditEvent.deleteMany({
+    where: {
+      organisation_id: {
+        in: organisations.map((organisation) => organisation.id),
+      },
+    },
   });
   await database.organisation.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },

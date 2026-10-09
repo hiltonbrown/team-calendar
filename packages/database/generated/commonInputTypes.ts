@@ -742,16 +742,6 @@ export type Enumpublic_holiday_sourceFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel> | $Enums.public_holiday_source
 }
 
-export type Enumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.public_holiday_source | Prisma.Enumpublic_holiday_sourceFieldRefInput<$PrismaModel>
-  in?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
-  notIn?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_source
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
-}
-
 export type Enumpublic_holiday_typeFilter<$PrismaModel = never> = {
   equals?: $Enums.public_holiday_type | Prisma.Enumpublic_holiday_typeFieldRefInput<$PrismaModel>
   in?: $Enums.public_holiday_type[] | Prisma.ListEnumpublic_holiday_typeFieldRefInput<$PrismaModel>
@@ -764,6 +754,16 @@ export type Enumpublic_holiday_day_classificationFilter<$PrismaModel = never> = 
   in?: $Enums.public_holiday_day_classification[] | Prisma.ListEnumpublic_holiday_day_classificationFieldRefInput<$PrismaModel>
   notIn?: $Enums.public_holiday_day_classification[] | Prisma.ListEnumpublic_holiday_day_classificationFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumpublic_holiday_day_classificationFilter<$PrismaModel> | $Enums.public_holiday_day_classification
+}
+
+export type Enumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.public_holiday_source | Prisma.Enumpublic_holiday_sourceFieldRefInput<$PrismaModel>
+  in?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_source
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
 }
 
 export type Enumpublic_holiday_typeWithAggregatesFilter<$PrismaModel = never> = {
@@ -786,21 +786,21 @@ export type Enumpublic_holiday_day_classificationWithAggregatesFilter<$PrismaMod
   _max?: Prisma.NestedEnumpublic_holiday_day_classificationFilter<$PrismaModel>
 }
 
-export type Enumpublic_holiday_assignment_scope_typeFilter<$PrismaModel = never> = {
-  equals?: $Enums.public_holiday_assignment_scope_type | Prisma.Enumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel> | $Enums.public_holiday_assignment_scope_type
+export type Enumpublic_holiday_settingFilter<$PrismaModel = never> = {
+  equals?: $Enums.public_holiday_setting | Prisma.Enumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  in?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  notIn?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumpublic_holiday_settingFilter<$PrismaModel> | $Enums.public_holiday_setting
 }
 
-export type Enumpublic_holiday_assignment_scope_typeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.public_holiday_assignment_scope_type | Prisma.Enumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_assignment_scope_type
+export type Enumpublic_holiday_settingWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.public_holiday_setting | Prisma.Enumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  in?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  notIn?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumpublic_holiday_settingWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_setting
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumpublic_holiday_settingFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumpublic_holiday_settingFilter<$PrismaModel>
 }
 
 export type Enumfeed_statusFilter<$PrismaModel = never> = {
@@ -1751,16 +1751,6 @@ export type NestedEnumpublic_holiday_sourceFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel> | $Enums.public_holiday_source
 }
 
-export type NestedEnumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.public_holiday_source | Prisma.Enumpublic_holiday_sourceFieldRefInput<$PrismaModel>
-  in?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
-  notIn?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_source
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
-}
-
 export type NestedEnumpublic_holiday_typeFilter<$PrismaModel = never> = {
   equals?: $Enums.public_holiday_type | Prisma.Enumpublic_holiday_typeFieldRefInput<$PrismaModel>
   in?: $Enums.public_holiday_type[] | Prisma.ListEnumpublic_holiday_typeFieldRefInput<$PrismaModel>
@@ -1773,6 +1763,16 @@ export type NestedEnumpublic_holiday_day_classificationFilter<$PrismaModel = nev
   in?: $Enums.public_holiday_day_classification[] | Prisma.ListEnumpublic_holiday_day_classificationFieldRefInput<$PrismaModel>
   notIn?: $Enums.public_holiday_day_classification[] | Prisma.ListEnumpublic_holiday_day_classificationFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumpublic_holiday_day_classificationFilter<$PrismaModel> | $Enums.public_holiday_day_classification
+}
+
+export type NestedEnumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.public_holiday_source | Prisma.Enumpublic_holiday_sourceFieldRefInput<$PrismaModel>
+  in?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.public_holiday_source[] | Prisma.ListEnumpublic_holiday_sourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumpublic_holiday_sourceWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_source
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumpublic_holiday_sourceFilter<$PrismaModel>
 }
 
 export type NestedEnumpublic_holiday_typeWithAggregatesFilter<$PrismaModel = never> = {
@@ -1795,21 +1795,21 @@ export type NestedEnumpublic_holiday_day_classificationWithAggregatesFilter<$Pri
   _max?: Prisma.NestedEnumpublic_holiday_day_classificationFilter<$PrismaModel>
 }
 
-export type NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel = never> = {
-  equals?: $Enums.public_holiday_assignment_scope_type | Prisma.Enumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel> | $Enums.public_holiday_assignment_scope_type
+export type NestedEnumpublic_holiday_settingFilter<$PrismaModel = never> = {
+  equals?: $Enums.public_holiday_setting | Prisma.Enumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  in?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  notIn?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumpublic_holiday_settingFilter<$PrismaModel> | $Enums.public_holiday_setting
 }
 
-export type NestedEnumpublic_holiday_assignment_scope_typeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.public_holiday_assignment_scope_type | Prisma.Enumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  in?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.public_holiday_assignment_scope_type[] | Prisma.ListEnumpublic_holiday_assignment_scope_typeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_assignment_scope_type
+export type NestedEnumpublic_holiday_settingWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.public_holiday_setting | Prisma.Enumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  in?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  notIn?: $Enums.public_holiday_setting[] | Prisma.ListEnumpublic_holiday_settingFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumpublic_holiday_settingWithAggregatesFilter<$PrismaModel> | $Enums.public_holiday_setting
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumpublic_holiday_assignment_scope_typeFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumpublic_holiday_settingFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumpublic_holiday_settingFilter<$PrismaModel>
 }
 
 export type NestedEnumfeed_statusFilter<$PrismaModel = never> = {

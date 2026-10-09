@@ -11,7 +11,6 @@ const mocks = vi.hoisted(() => ({
       update: vi.fn(),
     },
   },
-  ensureDefaultPublicHolidaysForOrganisation: vi.fn(),
   getActiveOrgContext: vi.fn(),
   headers: vi.fn(),
   revalidatePath: vi.fn(),
@@ -21,10 +20,6 @@ vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   clerkClient: mocks.clerkClient,
   currentUser: mocks.currentUser,
-}));
-vi.mock("@repo/availability", () => ({
-  ensureDefaultPublicHolidaysForOrganisation:
-    mocks.ensureDefaultPublicHolidaysForOrganisation,
 }));
 vi.mock("@repo/database", () => ({ database: mocks.database }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
@@ -53,15 +48,6 @@ describe("general settings organisation actions", () => {
     });
     mocks.headers.mockResolvedValue(new Headers());
     mocks.database.auditEvent.create.mockResolvedValue({});
-    mocks.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue({
-      ok: true,
-      value: {
-        importedCount: 0,
-        importedYears: [],
-        skippedCount: 0,
-        skippedYears: [],
-      },
-    });
   });
 
   it.each(["NZ", "UK"] as const)(
@@ -139,8 +125,55 @@ describe("general settings organisation actions", () => {
       },
       where: { id: organisationId },
     });
-    expect(
-      mocks.ensureDefaultPublicHolidaysForOrganisation
-    ).not.toHaveBeenCalled();
+  });
+
+  it("stores a region label as its registry code", async () => {
+    mocks.database.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      name: "Australian Payroll",
+      region_code: null,
+      timezone: "Australia/Brisbane",
+    });
+    mocks.database.organisation.update.mockResolvedValue({
+      country_code: "AU",
+      name: "Australian Payroll",
+      region_code: "QLD",
+      timezone: "Australia/Brisbane",
+    });
+
+    const result = await updateOrganisationAction({
+      organisationId,
+      regionCode: "Queensland",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.database.organisation.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ region_code: "QLD" }),
+      })
+    );
+  });
+
+  it("rejects a region that is not in the organisation's country", async () => {
+    mocks.database.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      name: "Australian Payroll",
+      region_code: "QLD",
+      timezone: "Australia/Brisbane",
+    });
+
+    const result = await updateOrganisationAction({
+      organisationId,
+      regionCode: "Scotland",
+    });
+
+    expect(result).toEqual({
+      error: {
+        code: "validation_error",
+        message: "Choose a state or region in that country.",
+      },
+      ok: false,
+    });
+    expect(mocks.database.organisation.update).not.toHaveBeenCalled();
   });
 });

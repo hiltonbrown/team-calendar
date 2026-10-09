@@ -23,6 +23,7 @@ describe("GeneralClient", () => {
           regionCode: "QLD",
           timezone: "Australia/Brisbane",
         }}
+        regionOptions={[{ label: "Queensland", value: "QLD" }]}
       />
     );
 

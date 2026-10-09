@@ -66,9 +66,8 @@ export const ModelName = {
   AvailabilityPublication: 'AvailabilityPublication',
   LeaveBalance: 'LeaveBalance',
   XeroPersonMatch: 'XeroPersonMatch',
-  PublicHolidayJurisdiction: 'PublicHolidayJurisdiction',
   PublicHoliday: 'PublicHoliday',
-  PublicHolidayAssignment: 'PublicHolidayAssignment',
+  PublicHolidayPreference: 'PublicHolidayPreference',
   Feed: 'Feed',
   FeedEventPublication: 'FeedEventPublication',
   FeedScope: 'FeedScope',
@@ -150,6 +149,7 @@ export const TeamScalarFieldEnum = {
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
   name: 'name',
+  minimum_available_people: 'minimum_available_people',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -479,29 +479,10 @@ export const XeroPersonMatchScalarFieldEnum = {
 export type XeroPersonMatchScalarFieldEnum = (typeof XeroPersonMatchScalarFieldEnum)[keyof typeof XeroPersonMatchScalarFieldEnum]
 
 
-export const PublicHolidayJurisdictionScalarFieldEnum = {
-  id: 'id',
-  clerk_org_id: 'clerk_org_id',
-  organisation_id: 'organisation_id',
-  country_code: 'country_code',
-  region_code: 'region_code',
-  source: 'source',
-  is_enabled: 'is_enabled',
-  created_by_user_id: 'created_by_user_id',
-  updated_by_user_id: 'updated_by_user_id',
-  archived_at: 'archived_at',
-  created_at: 'created_at',
-  updated_at: 'updated_at'
-} as const
-
-export type PublicHolidayJurisdictionScalarFieldEnum = (typeof PublicHolidayJurisdictionScalarFieldEnum)[keyof typeof PublicHolidayJurisdictionScalarFieldEnum]
-
-
 export const PublicHolidayScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
-  jurisdiction_id: 'jurisdiction_id',
   source: 'source',
   source_remote_id: 'source_remote_id',
   country_code: 'country_code',
@@ -512,7 +493,6 @@ export const PublicHolidayScalarFieldEnum = {
   holiday_type: 'holiday_type',
   default_classification: 'default_classification',
   notes_internal: 'notes_internal',
-  source_payload_json: 'source_payload_json',
   created_by_user_id: 'created_by_user_id',
   updated_by_user_id: 'updated_by_user_id',
   archived_at: 'archived_at',
@@ -523,24 +503,20 @@ export const PublicHolidayScalarFieldEnum = {
 export type PublicHolidayScalarFieldEnum = (typeof PublicHolidayScalarFieldEnum)[keyof typeof PublicHolidayScalarFieldEnum]
 
 
-export const PublicHolidayAssignmentScalarFieldEnum = {
+export const PublicHolidayPreferenceScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
-  public_holiday_id: 'public_holiday_id',
-  scope_type: 'scope_type',
-  scope_value: 'scope_value',
-  day_classification: 'day_classification',
-  include_in_feeds: 'include_in_feeds',
-  notes_internal: 'notes_internal',
+  holiday_key: 'holiday_key',
+  location_id: 'location_id',
+  setting: 'setting',
   created_by_user_id: 'created_by_user_id',
   updated_by_user_id: 'updated_by_user_id',
-  archived_at: 'archived_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
 
-export type PublicHolidayAssignmentScalarFieldEnum = (typeof PublicHolidayAssignmentScalarFieldEnum)[keyof typeof PublicHolidayAssignmentScalarFieldEnum]
+export type PublicHolidayPreferenceScalarFieldEnum = (typeof PublicHolidayPreferenceScalarFieldEnum)[keyof typeof PublicHolidayPreferenceScalarFieldEnum]
 
 
 export const FeedScalarFieldEnum = {

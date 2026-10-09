@@ -22,8 +22,11 @@ vi.mock("@repo/database", () => ({
   },
   scopedQuery: mocks.scopedQuery,
 }));
-vi.mock("../holidays/holiday-service", () => ({
-  listForOrganisation: mocks.holidayList,
+vi.mock("../holidays/resolve-public-holidays", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("../holidays/resolve-public-holidays")
+  >()),
+  resolvePublicHolidays: mocks.holidayList,
 }));
 
 const { aggregateLeaveReports, listLeaveReportRecordsForDrilldown } =
@@ -115,7 +118,7 @@ describe("leave reports service", () => {
         expect(result.value.leaveTypeDonut).toEqual([
           {
             days: 5,
-            label: "Annual Leave",
+            label: "Annual leave",
             percentage: 100,
             recordType: "annual_leave",
           },
@@ -175,44 +178,32 @@ describe("leave reports service", () => {
       expect("xero_write_error_raw" in queryCall.select).toBe(false);
     });
 
-    it("deducts public holidays according to centralised applicability rules", async () => {
+    it("deducts non-working holidays resolved for each person's location", async () => {
+      const resolved = (
+        date: string,
+        overrides: Record<string, unknown> = {}
+      ) => ({
+        area: null,
+        classification: "non_working",
+        date,
+        hidden: false,
+        key: `au-nsw-${date}-holiday`,
+        kind: "public",
+        locationId: "00000000-0000-4000-8000-000000000201",
+        name: "Holiday",
+        origin: "official",
+        startsAt: null,
+        ...overrides,
+      });
       mocks.holidayList.mockResolvedValue({
         ok: true,
         value: [
-          {
-            archived_at: null,
-            assignments: [
-              {
-                archived_at: null,
-                day_classification: "non_working",
-                scope_type: "location",
-                scope_value: "00000000-0000-4000-8000-000000000201",
-              },
-            ],
-            country_code: "AU",
-            default_classification: "working",
-            holiday_date: new Date("2026-05-05T00:00:00.000Z"),
-            name: "Location Override Holiday",
-            region_code: "NSW",
-          },
-          {
-            archived_at: null,
-            assignments: [],
-            country_code: "CUSTOM",
-            default_classification: "non_working",
-            holiday_date: new Date("2026-05-06T00:00:00.000Z"),
-            name: "Custom Day",
-            region_code: null,
-          },
-          {
-            archived_at: null,
-            assignments: [],
-            country_code: "AU",
-            default_classification: "non_working",
-            holiday_date: new Date("2026-05-07T00:00:00.000Z"),
-            name: "Mismatched Region Holiday",
-            region_code: "WA",
-          },
+          resolved("2026-05-05"),
+          resolved("2026-05-06", { kind: "custom", origin: "custom" }),
+          resolved("2026-05-07", {
+            locationId: "00000000-0000-4000-8000-000000000999",
+          }),
+          resolved("2026-05-08", { classification: "working" }),
         ],
       });
 
@@ -232,7 +223,7 @@ describe("leave reports service", () => {
 
       expect(result.ok).toBe(true);
       if (result.ok) {
-        // 5 total days minus 2 applicable holidays (Location Override Holiday and Custom Day) = 3 days
+        // 5 days minus the two non-working holidays for this location = 3 days
         expect(result.value.summaryStats.totalLeaveDays).toBe(3);
       }
     });
