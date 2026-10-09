@@ -127,9 +127,13 @@ export function isStepComplete(
       if (!snapshot.actingUserLinked) {
         return false;
       }
+      // A failed people import must not trap the admin; they continue and
+      // review people once the scheduled sync recovers.
       return (
         snapshot.mode === "manual" ||
-        (snapshot.import.people === "complete" && snapshot.pendingMatches === 0)
+        ((snapshot.import.people === "complete" ||
+          snapshot.import.people === "failed") &&
+          snapshot.pendingMatches === 0)
       );
     case "invites":
       return true;
