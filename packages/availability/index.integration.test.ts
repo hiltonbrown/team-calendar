@@ -47,6 +47,7 @@ const {
   listTeamRecordsPage,
   listTeamRecords,
   getRecord,
+  loadWizardSnapshot,
   updateManualAvailability,
 } = await import("./index");
 const { database } = await import("@repo/database");
@@ -122,6 +123,15 @@ const createTenant = async (tenant: TenantFixture) => {
   });
 };
 const cleanTestData = async () => {
+  await database.xeroPersonMatch.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.syncRun.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.xeroConnection.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
   await database.outboundOperation.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
@@ -1194,5 +1204,83 @@ describe("release list-query evidence", () => {
       );
       expect(allHistory.value.window).toEqual({ from: null, to: null });
     }
+  });
+});
+
+describe("onboarding wizard snapshot", () => {
+  test("reads import progress since the latest request within the tenant", async () => {
+    const requestedAt = new Date("2026-10-09T01:00:00.000Z");
+    await database.organisation.update({
+      data: { onboarding_step: "people", timezone: "Australia/Sydney" },
+      where: { id: tenantA.organisationId },
+    });
+    await database.person.update({
+      data: { clerk_user_id: "user_wizard_admin" },
+      where: { id: tenantA.personId },
+    });
+    const connection = await database.xeroConnection.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        initial_sync_requested_at: requestedAt,
+        // Left over from an earlier connection, so it must not count.
+        last_full_leave_records_sync_at: new Date("2026-10-01T00:00:00.000Z"),
+        last_full_people_sync_at: new Date("2026-10-09T01:05:00.000Z"),
+        organisation_id: tenantA.organisationId,
+        payroll_region: "AU",
+        xero_tenant_id: fixture.key("xero_tenant"),
+      },
+    });
+    await database.syncRun.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+        run_type: "leave_records",
+        started_at: new Date("2026-10-09T01:06:00.000Z"),
+        status: "failed",
+        xero_connection_id: connection.id,
+      },
+    });
+    await database.xeroPersonMatch.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        detected_reason: "same_email",
+        organisation_id: tenantA.organisationId,
+        xero_person_id: tenantA.personId,
+      },
+    });
+
+    const actor = {
+      actingRole: "org:admin",
+      clerkOrgId: tenantA.clerkOrgId,
+      organisationId: tenantA.organisationId,
+      userId: "user_wizard_admin",
+    };
+    await expect(loadWizardSnapshot(actor)).resolves.toEqual({
+      ok: true,
+      value: {
+        actingUserLinked: true,
+        completed: false,
+        import: { balances: "running", leave: "failed", people: "complete" },
+        mode: "xero",
+        pendingMatches: 1,
+        step: "people",
+        timezoneConfirmed: true,
+      },
+    });
+    await expect(
+      loadWizardSnapshot({
+        ...actor,
+        clerkOrgId: tenantB.clerkOrgId,
+        organisationId: tenantB.organisationId,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      value: {
+        actingUserLinked: false,
+        mode: "undecided",
+        pendingMatches: 0,
+        step: "details",
+      },
+    });
   });
 });

@@ -106,6 +106,24 @@ export {
   suppressHoliday,
 } from "./src/holidays/holiday-service";
 export * from "./src/holidays/nager-client";
+export {
+  completeMemberWelcome,
+  loadWelcomeEligibility,
+  type WelcomeActor,
+} from "./src/onboarding/welcome-service";
+export type {
+  StageStatus,
+  WizardMode,
+  WizardSnapshot,
+} from "./src/onboarding/wizard-rules";
+export {
+  advanceWizard,
+  finishWizard,
+  isOnboardingAdmin,
+  loadWizardSnapshot,
+  type WizardActor,
+  type WizardError,
+} from "./src/onboarding/wizard-service";
 export * from "./src/people/alternative-contact-service";
 export {
   type AlternativeContactServiceError,
@@ -254,7 +272,6 @@ export {
   type TimelinePage,
 } from "./src/sync/sync-monitor-service";
 export * from "./src/xero-connection-state";
-
 export {
   acquireXeroWriteClaim,
   noUnresolvedSubmitOperationWhere,
