@@ -2,12 +2,22 @@ import * as React from "react"
 
 import { cn } from "@repo/design-system/lib/utils"
 
-function Card({ className, ...props }: React.ComponentProps<"div">) {
+type CardVariant = "default" | "plain"
+
+// Default: the elev-card hairline, so a card stays visible on the near-white page.
+// Plain: no edge, for a card at least two surface steps above its parent.
+function Card({
+  className,
+  variant = "default",
+  ...props
+}: React.ComponentProps<"div"> & { variant?: CardVariant }) {
   return (
     <div
       data-slot="card"
+      data-variant={variant}
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl py-6",
+        variant === "default" && "shadow-(--elev-card)",
         className
       )}
       {...props}
