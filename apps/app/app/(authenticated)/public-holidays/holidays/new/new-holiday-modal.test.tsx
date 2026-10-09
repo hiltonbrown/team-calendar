@@ -38,16 +38,11 @@ class ResizeObserverMock {
 globalThis.ResizeObserver = ResizeObserverMock;
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const jurisdictions = [
+const countries = [
   {
-    country_code: "AU",
-    id: "00000000-0000-4000-8000-000000000101",
-    region_code: null,
-  },
-  {
-    country_code: "AU",
-    id: "00000000-0000-4000-8000-000000000102",
-    region_code: "QLD",
+    code: "AU",
+    label: "Australia",
+    regions: [{ code: "QLD", label: "Queensland" }],
   },
 ];
 
@@ -64,17 +59,16 @@ describe("NewHolidayModal", () => {
     vi.clearAllMocks();
   });
 
-  it("previews and submits an organisation-wide holiday", async () => {
+  it("previews and submits a holiday for everyone", async () => {
     render(
       <NewHolidayModal
-        jurisdictions={jurisdictions}
+        countries={countries}
+        defaultCountryCode="AU"
         organisationId={organisationId}
       />
     );
 
-    expect(
-      screen.getAllByText("All organisation locations").length
-    ).toBeGreaterThan(1);
+    expect(screen.getByText("Everyone in the organisation")).toBeTruthy();
     fillRequiredFields();
     fireEvent.click(screen.getByRole("button", { name: "Add holiday" }));
 
@@ -82,32 +76,34 @@ describe("NewHolidayModal", () => {
       expect(mocks.addCustomHolidayAction).toHaveBeenCalledWith(
         expect.objectContaining({
           appliesToAllJurisdictions: true,
-          jurisdictionId: null,
+          countryCode: null,
           organisationId,
+          regionCode: null,
         })
       );
     });
   });
 
   it.each([
-    ["AU national", jurisdictions[0].id],
-    ["AU-QLD", jurisdictions[1].id],
-  ])("builds the supported %s jurisdiction scope", (_label, id) => {
+    ["the whole country", "__all__", null],
+    ["one region", "QLD", "QLD"],
+  ])("builds a country scope for %s", (_label, regionCode, expected) => {
     expect(
       buildCustomHolidayActionInput(
         {
+          countryCode: "AU",
           date: "2026-09-14",
-          jurisdictionId: id,
           name: "Company day",
-          recursAnnually: false,
-          scope: "jurisdiction",
+          regionCode,
+          scope: "country",
         },
         organisationId
       )
     ).toMatchObject({
       appliesToAllJurisdictions: false,
-      jurisdictionId: id,
+      countryCode: "AU",
       organisationId,
+      regionCode: expected,
     });
   });
 });

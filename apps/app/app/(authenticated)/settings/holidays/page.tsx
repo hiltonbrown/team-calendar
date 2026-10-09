@@ -1,11 +1,21 @@
-import { listForOrganisation } from "@repo/availability";
+import {
+  listLocalHolidayOptions,
+  type ResolvedPublicHoliday,
+  resolvePublicHolidays,
+} from "@repo/availability";
+import { toDateOnly } from "@repo/core";
+import { database, scopedQuery } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
-import { HolidaysClient } from "./holidays-client";
+import {
+  HolidaysClient,
+  type LocalHolidayGroup,
+  type UpcomingHoliday,
+} from "./holidays-client";
 
 export const metadata: Metadata = {
-  description: "Manage public holiday imports and custom holidays.",
+  description: "Review public holidays and switch on local days by location.",
   title: "Holidays - Settings - Team Calendar",
 };
 
@@ -13,24 +23,80 @@ interface HolidaysPageProps {
   searchParams: Promise<{ org?: string }>;
 }
 
-// Settings > Holidays is a summary and launch surface for admins and owners.
-// `/public-holidays` is the single operational list for review and mutations.
+const UPCOMING_LIMIT = 8;
+
+// Settings > Holidays summarises coverage and holds the per-location local day
+// switches. `/public-holidays` is the operational list for review and overrides.
 const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
   await requirePageRole("org:admin");
   const { org } = await searchParams;
   const { clerkOrgId, organisationId } = await requireActiveOrgPageContext(org);
-  const holidaysResult = await listForOrganisation(clerkOrgId, organisationId);
+  const today = new Date();
+  const range = {
+    clerkOrgId,
+    from: toDateOnly(today),
+    organisationId,
+    to: `${today.getUTCFullYear() + 2}-12-31`,
+  };
+  const [holidaysResult, localResult, locations] = await Promise.all([
+    resolvePublicHolidays(range),
+    listLocalHolidayOptions(range),
+    database.location.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+      where: scopedQuery(clerkOrgId, organisationId),
+    }),
+  ]);
 
   if (!holidaysResult.ok) {
     throw new Error(holidaysResult.error.message);
   }
+  if (!localResult.ok) {
+    throw new Error(localResult.error.message);
+  }
+
+  const options = new Map(
+    localResult.value.map((group) => [group.locationId, group.holidays])
+  );
+  const localGroups: LocalHolidayGroup[] = locations.map((location) => ({
+    holidays: options.get(location.id) ?? [],
+    locationId: location.id,
+    locationName: location.name,
+  }));
 
   return (
     <HolidaysClient
-      holidays={holidaysResult.value}
+      coverageEnd={range.to}
+      localGroups={localGroups}
       organisationId={organisationId}
+      summary={summarise(holidaysResult.value)}
     />
   );
 };
+
+function summarise(holidays: ResolvedPublicHoliday[]): {
+  customCount: number;
+  officialCount: number;
+  upcoming: UpcomingHoliday[];
+} {
+  const unique = new Map<string, ResolvedPublicHoliday>();
+  for (const holiday of holidays) {
+    if (!unique.has(holiday.key)) {
+      unique.set(holiday.key, holiday);
+    }
+  }
+  const all = [...unique.values()];
+  return {
+    customCount: all.filter((holiday) => holiday.origin === "custom").length,
+    officialCount: all.filter((holiday) => holiday.origin === "official")
+      .length,
+    upcoming: all.slice(0, UPCOMING_LIMIT).map((holiday) => ({
+      date: holiday.date,
+      key: holiday.key,
+      name: holiday.name,
+      startsAt: holiday.startsAt,
+    })),
+  };
+}
 
 export default HolidaysPage;

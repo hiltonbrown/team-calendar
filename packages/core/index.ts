@@ -102,19 +102,20 @@ export type {
 } from "./src/public-holidays/reference/reference-holidays";
 export {
   findReferenceHoliday,
-  listLocalReferenceHolidays,
   listReferenceHolidays,
   PUBLIC_HOLIDAY_DATA_VERSION,
 } from "./src/public-holidays/reference/reference-holidays";
 export type {
   HolidayClassification,
   HolidayPreferenceSetting,
+  LocalHolidayOption,
   ResolvedPublicHoliday,
   ResolveHolidayData,
 } from "./src/public-holidays/resolve";
 export {
   CUSTOM_HOLIDAY_KEY_PREFIX,
   customHolidayKey,
+  localHolidayOptions,
   nonWorkingHolidayDates,
   resolvePublicHolidaysFromData,
 } from "./src/public-holidays/resolve";

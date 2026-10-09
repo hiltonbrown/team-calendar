@@ -4,6 +4,7 @@ import type {
   ReferenceHoliday,
 } from "./reference/reference-holidays";
 import {
+  localHolidayOptions,
   type ResolveHolidayData,
   resolvePublicHolidaysFromData,
 } from "./resolve";
@@ -297,5 +298,51 @@ describe("resolvePublicHolidaysFromData", () => {
     expect(result.some((holiday) => holiday.key === "custom:c-old")).toBe(
       false
     );
+  });
+});
+
+describe("localHolidayOptions", () => {
+  it("lists a location's local days as off until it opts in", () => {
+    expect(localHolidayOptions(data(), listReference)).toEqual([
+      {
+        holidays: [
+          {
+            area: "Brisbane",
+            date: "2026-08-12",
+            enabled: false,
+            key: "au-qld-2026-08-12-royal-queensland-show",
+            name: "Royal Queensland Show",
+          },
+        ],
+        locationId: "loc-qld",
+      },
+    ]);
+  });
+
+  it("marks a local day on for the location that opted in", () => {
+    const [option] = localHolidayOptions(
+      data({
+        preferences: [
+          {
+            holidayKey: "au-qld-2026-08-12-royal-queensland-show",
+            locationId: "loc-qld",
+            setting: "non_working",
+          },
+        ],
+      }),
+      listReference
+    );
+    expect(option?.holidays[0]?.enabled).toBe(true);
+  });
+
+  it("gives a location in another region none of its local days", () => {
+    expect(
+      localHolidayOptions(
+        data({
+          locations: [{ countryCode: "AU", id: "loc-nsw", regionCode: "NSW" }],
+        }),
+        listReference
+      )
+    ).toEqual([{ holidays: [], locationId: "loc-nsw" }]);
   });
 });

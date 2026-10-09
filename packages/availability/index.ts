@@ -13,7 +13,6 @@ export type {
 } from "@repo/core";
 export {
   findReferenceHoliday,
-  listLocalReferenceHolidays,
   listReferenceHolidays,
   PUBLIC_HOLIDAY_DATA_VERSION,
 } from "@repo/core";

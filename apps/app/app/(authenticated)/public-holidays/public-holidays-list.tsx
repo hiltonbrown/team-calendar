@@ -1,5 +1,6 @@
 "use client";
 
+import type { ResolvedPublicHoliday } from "@repo/availability";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,11 +30,12 @@ import {
 } from "@repo/design-system/components/ui/table";
 import { cn } from "@repo/design-system/lib/utils";
 import {
-  DownloadIcon,
+  BriefcaseIcon,
+  CalendarOffIcon,
+  EyeOffIcon,
   PlusIcon,
   RotateCcwIcon,
   TrashIcon,
-  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -42,11 +44,12 @@ import { EmptyState } from "@/components/states/empty-state";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
 import {
   deleteCustomHolidayAction,
-  importFromSourceAction,
+  hideHolidayAction,
   restoreHolidayAction,
-  suppressHolidayAction,
+  setHolidayClassificationAction,
 } from "./_actions";
 import {
+  HOLIDAY_YEAR_OPTIONS,
   PublicHolidayFilterSchema,
   type PublicHolidayFilters,
 } from "./_schemas";
@@ -54,197 +57,101 @@ import {
 // Radix Select rejects empty-string item values, so the "no filter" option
 // carries this sentinel and maps back to undefined at the state boundary.
 const ALL_LOCATIONS = "all";
+const CUSTOM_PREFIX = "custom:";
 
-interface PublicHolidayFromDB {
-  archived_at: Date | null;
-  holiday_date: Date;
-  holiday_type: string;
-  id: string;
-  jurisdiction?: {
-    country_code: string;
-    region_code: string | null;
-  } | null;
+export interface HolidayGroup {
+  holidays: ResolvedPublicHoliday[];
+  /** null is the organisation level, for people without a location. */
+  locationId: string | null;
   name: string;
-  organisation_id: string;
-  source: "nager" | "manual";
 }
 
 interface PublicHolidaysListProps {
   canManage: boolean;
   filters: PublicHolidayFilters;
-  holidays: PublicHolidayFromDB[];
+  groups: HolidayGroup[];
+  hasOfficialHolidays: boolean;
   locations: Array<{ id: string; name: string }>;
   organisationId: string;
-  refreshTargets: Array<{
-    countryCode: string;
-    label: string;
-    regionCode: string | null;
-  }>;
 }
 
-type ConfirmedAction = "delete" | "suppress";
+type Confirmation =
+  | { action: "delete"; holiday: ResolvedPublicHoliday }
+  | { action: "hide"; holiday: ResolvedPublicHoliday };
 
-const TYPE_CONFIG: Record<string, { className: string; label: string }> = {
-  authorities: {
-    className: "bg-muted text-muted-foreground",
-    label: "Authorities",
-  },
-  bank: {
-    className: "bg-primary/10 text-primary",
-    label: "Bank holiday",
-  },
-  custom: {
-    className: "bg-primary/10 text-primary",
-    label: "Custom",
-  },
-  observance: {
-    className: "bg-muted text-muted-foreground",
-    label: "Observance",
-  },
-  optional: {
-    className: "bg-muted text-muted-foreground",
-    label: "Optional",
-  },
-  public: {
-    className: "bg-primary/10 text-primary",
-    label: "Public holiday",
-  },
-  school: {
-    className: "bg-tertiary/10 text-tertiary",
-    label: "School",
-  },
-};
+type ActionResult =
+  | { ok: true; value: { message: string } }
+  | { error: string; ok: false };
 
-const FALLBACK_TYPE_CONFIG = {
-  className: "bg-muted text-muted-foreground",
-  label: "Holiday",
-};
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-GB", {
+function formatDate(date: string): string {
+  return new Date(`${date}T00:00:00.000Z`).toLocaleDateString("en-AU", {
     day: "numeric",
-    month: "short",
+    month: "long",
+    timeZone: "UTC",
+    weekday: "long",
     year: "numeric",
   });
 }
 
-function formatDayOfWeek(date: Date): string {
-  return date.toLocaleDateString("en-GB", { weekday: "long" });
+function kindLabel(holiday: ResolvedPublicHoliday): string {
+  if (holiday.kind === "part_day") {
+    return `Part day from ${holiday.startsAt ?? ""}`;
+  }
+  if (holiday.kind === "local") {
+    return `Local: ${holiday.area ?? ""}`;
+  }
+  return holiday.kind === "custom" ? "Custom" : "Public holiday";
+}
+
+/** The classification a holiday has before any location override. */
+function defaultClassification(holiday: ResolvedPublicHoliday) {
+  return holiday.kind === "part_day" ? "working" : "non_working";
 }
 
 export function PublicHolidaysList({
   canManage,
   filters,
-  holidays,
+  groups,
+  hasOfficialHolidays,
   locations,
   organisationId,
-  refreshTargets,
 }: PublicHolidaysListProps) {
   const [isPending, startTransition] = useTransition();
-  const [pendingHolidayId, setPendingHolidayId] = useState<string | null>(null);
-  const [refreshPending, setRefreshPending] = useState(false);
-  const [confirmation, setConfirmation] = useState<{
-    action: ConfirmedAction;
-    holiday: PublicHolidayFromDB;
-  } | null>(null);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [, setFilterParams] = useFilterParams(PublicHolidayFilterSchema);
 
-  const executeConfirmedAction = () => {
-    if (!confirmation) {
-      return;
-    }
-    const { action, holiday } = confirmation;
-    setPendingHolidayId(holiday.id);
+  const run = (rowKey: string, action: () => Promise<ActionResult>) => {
+    setPendingKey(rowKey);
     startTransition(async () => {
-      const result =
-        action === "suppress"
-          ? await suppressHolidayAction({
-              holidayId: holiday.id,
-              organisationId: holiday.organisation_id,
-            })
-          : await deleteCustomHolidayAction({
-              holidayId: holiday.id,
-              organisationId: holiday.organisation_id,
-            });
+      const result = await action();
       if (result.ok) {
-        toast.success(
-          action === "suppress"
-            ? `${holiday.name} suppressed and removed from future calendar publication.`
-            : `${holiday.name} permanently deleted.`
-        );
+        toast.success(result.value.message);
         setConfirmation(null);
       } else {
         toast.error(result.error);
       }
-      setPendingHolidayId(null);
+      setPendingKey(null);
     });
   };
 
-  const handleRestore = (id: string, orgId: string) => {
-    setPendingHolidayId(id);
-    startTransition(async () => {
-      const result = await restoreHolidayAction({
-        holidayId: id,
-        organisationId: orgId,
-      });
-      if (result.ok) {
-        toast.success("Holiday restored to calendars and future feeds.");
-      } else {
-        toast.error(result.error);
-      }
-      setPendingHolidayId(null);
-    });
-  };
-
-  const handleRefresh = () => {
-    setRefreshPending(true);
-    startTransition(async () => {
-      let importedCount = 0;
-      let skippedCount = 0;
-      for (const target of refreshTargets) {
-        const result = await importFromSourceAction({
-          countryCode: target.countryCode,
-          organisationId,
-          regionCode: target.regionCode,
-          year: filters.year,
-        });
-        if (!result.ok) {
-          toast.error(`Could not refresh ${target.label}: ${result.error}`);
-          setRefreshPending(false);
-          return;
-        }
-        importedCount += result.value.importedCount;
-        skippedCount += result.value.skippedCount;
-      }
-      toast.success(
-        `Holiday source refreshed: ${importedCount} added, ${skippedCount} already current.`
-      );
-      setRefreshPending(false);
-    });
-  };
-
-  if (holidays.length === 0) {
-    return (
-      <div className="flex flex-col gap-6">
-        <FilterBar
-          filters={filters}
-          locations={locations}
-          setFilterParams={setFilterParams}
-        />
-        {canManage ? (
-          <ManagementActions
-            onRefresh={handleRefresh}
-            refreshPending={refreshPending}
-            refreshTargets={refreshTargets}
-          />
-        ) : null}
-        <EmptyState
-          description="Refresh your organisation's country holidays from the source, or add a custom date for a company-specific holiday."
-          title="No public holidays"
-        />
-      </div>
+  const confirm = () => {
+    if (!confirmation) {
+      return;
+    }
+    const { holiday } = confirmation;
+    run(`${holiday.locationId}:${holiday.key}`, () =>
+      confirmation.action === "hide"
+        ? hideHolidayAction({ holidayKey: holiday.key, organisationId })
+        : deleteCustomHolidayAction({
+            holidayId: holiday.key.slice(CUSTOM_PREFIX.length),
+            name: holiday.name,
+            organisationId,
+          })
     );
-  }
+  };
+
+  const isEmpty = groups.every((group) => group.holidays.length === 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -253,204 +160,292 @@ export function PublicHolidaysList({
         locations={locations}
         setFilterParams={setFilterParams}
       />
+      {canManage ? <ManagementBar /> : null}
 
-      {canManage ? (
-        <ManagementActions
-          onRefresh={handleRefresh}
-          refreshPending={refreshPending}
-          refreshTargets={refreshTargets}
+      {isEmpty && !hasOfficialHolidays ? (
+        <EmptyState
+          description={`Official holidays for ${filters.year} are not available yet. They are added each year in September. You can add a custom holiday in the meantime.`}
+          title={`No public holidays for ${filters.year}`}
         />
-      ) : null}
+      ) : (
+        groups.map((group) => (
+          <section
+            aria-label={`Public holidays for ${group.name}`}
+            className="rounded-2xl bg-muted p-3 xl:p-0"
+            key={group.locationId ?? "organisation"}
+          >
+            <h2 className="px-1 pb-2 font-semibold text-title-sm xl:px-4 xl:pt-4">
+              {group.name}
+            </h2>
+            {group.holidays.length === 0 ? (
+              <p className="px-1 pb-3 text-body-sm text-muted-foreground xl:px-4 xl:pb-4">
+                No public holidays apply here in {filters.year}.
+              </p>
+            ) : (
+              <HolidayTable
+                canManage={canManage}
+                group={group}
+                onConfirm={setConfirmation}
+                onRun={run}
+                organisationId={organisationId}
+                pendingKey={pendingKey}
+              />
+            )}
+          </section>
+        ))
+      )}
 
-      <section
-        aria-label="Public holiday details and management actions"
-        className="rounded-2xl bg-muted p-3 xl:p-0"
-      >
-        <Table className="block w-full xl:table">
-          <TableHeader className="sr-only xl:table-header-group">
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Day</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Source</TableHead>
-              {canManage ? (
-                <TableHead className="text-right">Actions</TableHead>
-              ) : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="block space-y-3 xl:table-row-group xl:space-y-0">
-            {holidays.map((holiday) => {
-              const typeConfig =
-                TYPE_CONFIG[holiday.holiday_type.toLowerCase()] ??
-                FALLBACK_TYPE_CONFIG;
-              const isSuppressed = holiday.archived_at !== null;
-
-              return (
-                <TableRow
-                  className={cn(
-                    "grid gap-3 rounded-2xl bg-background p-4 xl:table-row xl:rounded-none xl:bg-transparent xl:p-0",
-                    isSuppressed && "opacity-60"
-                  )}
-                  key={holiday.id}
-                >
-                  <TableCell
-                    className={cn(
-                      "whitespace-normal font-medium xl:table-cell xl:whitespace-nowrap xl:p-2",
-                      isSuppressed && "line-through"
-                    )}
-                  >
-                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
-                      Date
-                    </span>
-                    {formatDate(new Date(holiday.holiday_date))}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "xl:table-cell xl:p-2",
-                      isSuppressed && "line-through"
-                    )}
-                  >
-                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
-                      Day
-                    </span>
-                    {formatDayOfWeek(new Date(holiday.holiday_date))}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "whitespace-normal break-words xl:table-cell xl:p-2",
-                      isSuppressed && "line-through"
-                    )}
-                  >
-                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
-                      Name
-                    </span>
-                    {holiday.name}
-                  </TableCell>
-                  <TableCell className="xl:table-cell xl:p-2">
-                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
-                      Type
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge
-                        className={cn(
-                          "whitespace-nowrap font-normal",
-                          typeConfig.className,
-                          isSuppressed && "opacity-50"
-                        )}
-                        variant="secondary"
-                      >
-                        {typeConfig.label}
-                      </Badge>
-                      {isSuppressed ? (
-                        <Badge variant="secondary">Suppressed</Badge>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-normal text-label-lg text-muted-foreground xl:table-cell xl:p-2">
-                    <span className="mb-1 block text-label-md xl:hidden">
-                      Source
-                    </span>
-                    {sourceLabelForHoliday(holiday)}
-                  </TableCell>
-                  {canManage ? (
-                    <TableCell className="xl:table-cell xl:p-2 xl:text-right">
-                      <div className="flex justify-end gap-2">
-                        {isSuppressed ? (
-                          <Button
-                            aria-label={`Restore ${holiday.name}`}
-                            disabled={pendingHolidayId === holiday.id}
-                            onClick={() =>
-                              handleRestore(holiday.id, holiday.organisation_id)
-                            }
-                            size="icon"
-                            title="Restore holiday"
-                            variant="ghost"
-                          >
-                            <RotateCcwIcon className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button
-                            aria-label={`Suppress ${holiday.name}`}
-                            disabled={pendingHolidayId === holiday.id}
-                            onClick={() =>
-                              setConfirmation({ action: "suppress", holiday })
-                            }
-                            size="icon"
-                            title="Suppress holiday"
-                            variant="ghost"
-                          >
-                            <XIcon className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {holiday.source === "manual" && (
-                          <Button
-                            aria-label={`Delete ${holiday.name}`}
-                            disabled={pendingHolidayId === holiday.id}
-                            onClick={() =>
-                              setConfirmation({ action: "delete", holiday })
-                            }
-                            size="icon"
-                            title="Delete custom holiday"
-                            variant="ghost"
-                          >
-                            <TrashIcon className="h-4 w-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </section>
       <HolidayConfirmation
         confirmation={confirmation}
         disabled={isPending}
         onCancel={() => setConfirmation(null)}
-        onConfirm={executeConfirmedAction}
+        onConfirm={confirm}
       />
     </div>
   );
 }
 
-function ManagementActions({
-  onRefresh,
-  refreshPending,
-  refreshTargets,
+function HolidayTable({
+  canManage,
+  group,
+  onConfirm,
+  onRun,
+  organisationId,
+  pendingKey,
 }: {
-  onRefresh: () => void;
-  refreshPending: boolean;
-  refreshTargets: PublicHolidaysListProps["refreshTargets"];
+  canManage: boolean;
+  group: HolidayGroup;
+  onConfirm: (confirmation: Confirmation) => void;
+  onRun: (rowKey: string, action: () => Promise<ActionResult>) => void;
+  organisationId: string;
+  pendingKey: string | null;
 }) {
+  return (
+    <Table className="block w-full xl:table">
+      <TableHeader className="sr-only xl:table-header-group">
+        <TableRow>
+          <TableHead>Date</TableHead>
+          <TableHead>Name</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Source</TableHead>
+          <TableHead>Day</TableHead>
+          {canManage ? (
+            <TableHead className="text-right">Actions</TableHead>
+          ) : null}
+        </TableRow>
+      </TableHeader>
+      <TableBody className="block space-y-3 xl:table-row-group xl:space-y-0">
+        {group.holidays.map((holiday) => {
+          const rowKey = `${holiday.locationId}:${holiday.key}`;
+          return (
+            <TableRow
+              className={cn(
+                "grid gap-3 rounded-2xl bg-background p-4 xl:table-row xl:rounded-none xl:bg-transparent xl:p-0",
+                holiday.hidden && "text-muted-foreground"
+              )}
+              key={rowKey}
+            >
+              <Cell label="Date">{formatDate(holiday.date)}</Cell>
+              <Cell label="Name">{holiday.name}</Cell>
+              <Cell label="Type">
+                <div className="flex flex-wrap gap-2">
+                  <Badge
+                    className="whitespace-nowrap font-normal"
+                    variant="secondary"
+                  >
+                    {kindLabel(holiday)}
+                  </Badge>
+                  {holiday.hidden ? (
+                    <Badge variant="outline">Hidden</Badge>
+                  ) : null}
+                </div>
+              </Cell>
+              <Cell label="Source">
+                {holiday.origin === "custom" ? "Custom" : "Official"}
+              </Cell>
+              <Cell label="Day">
+                {holiday.classification === "working"
+                  ? "Working day"
+                  : "Day off"}
+              </Cell>
+              {canManage ? (
+                <TableCell className="xl:table-cell xl:p-2 xl:text-right">
+                  <HolidayActions
+                    disabled={pendingKey === rowKey}
+                    holiday={holiday}
+                    locationId={group.locationId}
+                    onConfirm={onConfirm}
+                    onRun={(action) => onRun(rowKey, action)}
+                    organisationId={organisationId}
+                  />
+                </TableCell>
+              ) : null}
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+function Cell({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <TableCell className="whitespace-normal break-words xl:table-cell xl:p-2">
+      <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
+        {label}
+      </span>
+      {children}
+    </TableCell>
+  );
+}
+
+function HolidayActions({
+  disabled,
+  holiday,
+  locationId,
+  onConfirm,
+  onRun,
+  organisationId,
+}: {
+  disabled: boolean;
+  holiday: ResolvedPublicHoliday;
+  locationId: string | null;
+  onConfirm: (confirmation: Confirmation) => void;
+  onRun: (action: () => Promise<ActionResult>) => void;
+  organisationId: string;
+}) {
+  if (holiday.hidden) {
+    return (
+      <div className="flex justify-end gap-2">
+        <Button
+          aria-label={`Restore ${holiday.name}`}
+          disabled={disabled}
+          onClick={() =>
+            onRun(() =>
+              restoreHolidayAction({
+                holidayKey: holiday.key,
+                locationId: null,
+                organisationId,
+              })
+            )
+          }
+          size="icon"
+          title="Restore holiday"
+          variant="ghost"
+        >
+          <RotateCcwIcon className="size-4" />
+        </Button>
+      </div>
+    );
+  }
+  const isOverridden =
+    locationId !== null &&
+    holiday.kind !== "local" &&
+    holiday.classification !== defaultClassification(holiday);
+  const nextClassification =
+    holiday.classification === "working" ? "non_working" : "working";
+  return (
+    <div className="flex justify-end gap-2">
+      {locationId ? (
+        <Button
+          aria-label={`Mark ${holiday.name} as ${nextClassification === "working" ? "a working day" : "a non-working day"}`}
+          disabled={disabled}
+          onClick={() =>
+            onRun(() =>
+              setHolidayClassificationAction({
+                classification: nextClassification,
+                holidayKey: holiday.key,
+                locationId,
+                organisationId,
+              })
+            )
+          }
+          size="icon"
+          title={
+            nextClassification === "working"
+              ? "Mark as working day"
+              : "Mark as non-working day"
+          }
+          variant="ghost"
+        >
+          {nextClassification === "working" ? (
+            <BriefcaseIcon className="size-4" />
+          ) : (
+            <CalendarOffIcon className="size-4" />
+          )}
+        </Button>
+      ) : null}
+      {isOverridden ? (
+        <Button
+          aria-label={`Reset ${holiday.name} to its default`}
+          disabled={disabled}
+          onClick={() =>
+            onRun(() =>
+              restoreHolidayAction({
+                holidayKey: holiday.key,
+                locationId,
+                organisationId,
+              })
+            )
+          }
+          size="icon"
+          title="Reset to default"
+          variant="ghost"
+        >
+          <RotateCcwIcon className="size-4" />
+        </Button>
+      ) : null}
+      <Button
+        aria-label={`Hide ${holiday.name}`}
+        disabled={disabled}
+        onClick={() => onConfirm({ action: "hide", holiday })}
+        size="icon"
+        title="Hide for all locations"
+        variant="ghost"
+      >
+        <EyeOffIcon className="size-4" />
+      </Button>
+      {holiday.origin === "custom" ? (
+        <Button
+          aria-label={`Delete ${holiday.name}`}
+          disabled={disabled}
+          onClick={() => onConfirm({ action: "delete", holiday })}
+          size="icon"
+          title="Delete custom holiday"
+          variant="ghost"
+        >
+          <TrashIcon className="size-4 text-destructive" />
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function ManagementBar() {
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="font-medium text-body-sm">Holiday administration</p>
         <p className="mt-1 text-body-sm text-muted-foreground">
-          Refresh {refreshTargets.map((target) => target.label).join(", ")} for
-          the selected year, or add a company-specific date.
+          Official holidays apply automatically for each location&apos;s state
+          or region. Switch on local days in{" "}
+          <Link className="underline" href="/settings/holidays">
+            Settings, Holidays
+          </Link>
+          .
         </p>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button
-          aria-busy={refreshPending}
-          disabled={refreshPending || refreshTargets.length === 0}
-          onClick={onRefresh}
-          type="button"
-          variant="secondary"
-        >
-          <DownloadIcon className="size-4" />
-          {refreshPending ? "Refreshing…" : "Refresh from source"}
-        </Button>
-        <Button asChild>
-          <Link href="/public-holidays/holidays/new">
-            <PlusIcon className="size-4" /> Add custom holiday
-          </Link>
-        </Button>
-      </div>
+      <Button asChild>
+        <Link href="/public-holidays/holidays/new">
+          <PlusIcon className="size-4" /> Add custom holiday
+        </Link>
+      </Button>
     </div>
   );
 }
@@ -461,16 +456,16 @@ function HolidayConfirmation({
   onCancel,
   onConfirm,
 }: {
-  confirmation: {
-    action: ConfirmedAction;
-    holiday: PublicHolidayFromDB;
-  } | null;
+  confirmation: Confirmation | null;
   disabled: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const isDelete = confirmation?.action === "delete";
-  const confirmationLabel = confirmationButtonLabel(isDelete, disabled);
+  let confirmLabel = isDelete ? "Delete holiday" : "Hide holiday";
+  if (disabled) {
+    confirmLabel = "Updating…";
+  }
   return (
     <AlertDialog
       onOpenChange={(open) => {
@@ -483,13 +478,12 @@ function HolidayConfirmation({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {isDelete ? "Permanently delete" : "Suppress"}{" "}
-            {confirmation?.holiday.name}?
+            {isDelete ? "Delete" : "Hide"} {confirmation?.holiday.name}?
           </AlertDialogTitle>
           <AlertDialogDescription>
             {isDelete
-              ? "This custom holiday will be permanently deleted and removed from calendars and future feed publication. This cannot be undone."
-              : "This holiday will be removed from calendars and future feed publication. You can restore it later by including suppressed holidays."}
+              ? "This custom holiday will be deleted and removed from calendars and future feeds. This cannot be undone."
+              : "This holiday will be hidden for every location and removed from calendars and future feeds. You can restore it by including hidden holidays."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -506,27 +500,12 @@ function HolidayConfirmation({
               onConfirm();
             }}
           >
-            {confirmationLabel}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
-}
-
-function confirmationButtonLabel(isDelete: boolean, disabled: boolean) {
-  if (disabled) {
-    return "Updating…";
-  }
-  return isDelete ? "Delete permanently" : "Suppress holiday";
-}
-
-function sourceLabelForHoliday(holiday: PublicHolidayFromDB) {
-  let label = holiday.source === "nager" ? "Nager.Date" : "Manual";
-  if (holiday.jurisdiction?.country_code) {
-    label += ` (${holiday.jurisdiction.country_code}${holiday.jurisdiction.region_code ? `-${holiday.jurisdiction.region_code}` : ""})`;
-  }
-  return label;
 }
 
 function FilterBar({
@@ -540,17 +519,29 @@ function FilterBar({
 }) {
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-2xl bg-muted p-4">
-      <label className="flex flex-col gap-1 text-label-lg">
+      <label
+        className="flex flex-col gap-1 text-label-lg"
+        htmlFor="holiday-year-filter"
+      >
         <span className="font-medium">Year</span>
-        <input
-          className="min-h-11 rounded-xl bg-background px-3 py-2"
-          defaultValue={filters.year}
-          min={2000}
-          onChange={(event) =>
-            setFilterParams({ year: Number(event.currentTarget.value) })
-          }
-          type="number"
-        />
+        <Select
+          defaultValue={String(filters.year)}
+          onValueChange={(value) => setFilterParams({ year: Number(value) })}
+        >
+          <SelectTrigger
+            className="min-h-11 min-w-28 rounded-xl bg-background"
+            id="holiday-year-filter"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {HOLIDAY_YEAR_OPTIONS.map((year) => (
+              <SelectItem key={year} value={String(year)}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </label>
       <label
         className="flex flex-col gap-1 text-label-lg"
@@ -583,15 +574,13 @@ function FilterBar({
       </label>
       <label className="flex min-h-11 items-center gap-2 text-label-lg">
         <input
-          checked={filters.includeSuppressed}
+          checked={filters.includeHidden}
           onChange={(event) =>
-            setFilterParams({
-              includeSuppressed: event.currentTarget.checked,
-            })
+            setFilterParams({ includeHidden: event.currentTarget.checked })
           }
           type="checkbox"
         />
-        <span className="font-medium">Include suppressed</span>
+        <span className="font-medium">Include hidden</span>
       </label>
     </div>
   );

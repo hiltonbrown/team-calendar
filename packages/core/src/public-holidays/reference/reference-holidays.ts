@@ -118,20 +118,3 @@ export function findReferenceHoliday(id: string): ReferenceHoliday | null {
   }
   return null;
 }
-
-export function listLocalReferenceHolidays(input: {
-  country: CountryCode;
-  from: string;
-  region: string | null;
-  to: string;
-}): ReferenceHoliday[] {
-  return (REFERENCE_HOLIDAYS.get(input.country) ?? []).filter(
-    (holiday) =>
-      holiday.kind === "local" &&
-      holiday.date >= input.from &&
-      holiday.date <= input.to &&
-      (holiday.region === null ||
-        input.region === null ||
-        holiday.region === input.region)
-  );
-}

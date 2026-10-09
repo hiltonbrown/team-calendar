@@ -270,6 +270,53 @@ export function resolvePublicHolidaysFromData(
     );
 }
 
+export interface LocalHolidayOption {
+  area: string | null;
+  /** YYYY-MM-DD. */
+  date: string;
+  enabled: boolean;
+  key: string;
+  name: string;
+}
+
+/** The optional local days each location can switch on, with their current state. */
+export function localHolidayOptions(
+  data: ResolveHolidayData,
+  listReference: ListReferenceHolidays = listReferenceHolidays
+): Array<{ holidays: LocalHolidayOption[]; locationId: string }> {
+  return data.locations.map((location) => {
+    const { countryCode, regionCode } = jurisdictionFor(
+      location,
+      data.organisation
+    );
+    if (!isCountryCode(countryCode)) {
+      return { holidays: [], locationId: location.id };
+    }
+    const holidays = listReference({
+      country: countryCode,
+      from: data.from,
+      region: regionCode,
+      to: data.to,
+    })
+      .filter((holiday) => holiday.kind === "local")
+      .map((holiday) => {
+        const setting = locationSetting(
+          data.preferences,
+          holiday.id,
+          location.id
+        );
+        return {
+          area: holiday.area,
+          date: holiday.date,
+          enabled: setting === "working" || setting === "non_working",
+          key: holiday.id,
+          name: holiday.name,
+        };
+      });
+    return { holidays, locationId: location.id };
+  });
+}
+
 /** Non-working holiday dates for one subject (a location, or null for the organisation level). */
 export function nonWorkingHolidayDates(
   holidays: readonly ResolvedPublicHoliday[],

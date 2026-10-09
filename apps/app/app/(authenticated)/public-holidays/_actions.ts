@@ -5,245 +5,280 @@ import { currentUser } from "@repo/auth/server";
 import {
   addCustomHoliday,
   deleteCustomHoliday,
-  importForJurisdiction,
-  restoreHoliday,
-  suppressHoliday,
+  hidePublicHoliday,
+  restorePublicHoliday,
+  setLocalHolidayEnabled,
+  setPublicHolidayClassification,
 } from "@repo/availability";
+import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
-const ImportHolidaySchema = z.object({
-  countryCode: z.string().length(2),
-  organisationId: z.string().uuid(),
-  regionCode: z.string().nullable(),
-  year: z.number().int().min(2000).max(2100),
-});
+type ActionResult<T> = { ok: true; value: T } | { error: string; ok: false };
 
-const canManageHolidays = async (): Promise<boolean> =>
-  (await requireRole("org:admin")) || (await requireRole("org:owner"));
+interface AdminContext {
+  actingUserId: string;
+  clerkOrgId: ClerkOrgId;
+  organisationId: OrganisationId;
+  role: "admin" | "owner";
+}
 
-export async function importFromSourceAction(
-  input: z.infer<typeof ImportHolidaySchema>
-) {
-  const parsed = ImportHolidaySchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Invalid input",
-      ok: false as const,
-    };
+async function resolveAdminContext(
+  organisationId: string
+): Promise<ActionResult<AdminContext>> {
+  let role: "admin" | "owner" | null = null;
+  if (await requireRole("org:owner")) {
+    role = "owner";
+  } else if (await requireRole("org:admin")) {
+    role = "admin";
   }
-
-  const hasAccess = await canManageHolidays();
-  if (!hasAccess) {
-    return { error: "Permission denied", ok: false as const };
+  if (!role) {
+    return { error: "Permission denied", ok: false };
   }
-
   const user = await currentUser();
   if (!user) {
-    return { error: "You need to sign in again.", ok: false as const };
+    return { error: "You need to sign in again.", ok: false };
   }
-
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false as const };
+  const context = await getActiveOrgContext(organisationId);
+  if (!context.ok) {
+    return { error: context.error.message, ok: false };
   }
+  return {
+    ok: true,
+    value: {
+      actingUserId: user.id,
+      clerkOrgId: context.value.clerkOrgId as ClerkOrgId,
+      organisationId: context.value.organisationId as OrganisationId,
+      role,
+    },
+  };
+}
 
-  const result = await importForJurisdiction({
-    clerkOrgId: contextResult.value.clerkOrgId,
-    countryCode: parsed.data.countryCode,
-    organisationId: contextResult.value.organisationId,
-    regionCode: parsed.data.regionCode,
-    userId: user.id,
-    year: parsed.data.year,
-  });
-
-  if (!result.ok) {
-    return { error: result.error.message, ok: false as const };
-  }
-
+function revalidateHolidayPaths() {
   revalidatePath("/public-holidays");
   revalidatePath("/settings/holidays");
   revalidatePath("/calendar");
+  revalidatePath("/");
+}
 
-  return result;
+function firstIssue(error: z.ZodError): string {
+  return error.issues[0]?.message ?? "Invalid input";
 }
 
 const AddCustomHolidaySchema = z.object({
   appliesToAllJurisdictions: z.boolean(),
+  countryCode: z.string().nullable(),
   date: z.coerce.date(),
-  jurisdictionId: z.string().uuid().nullable(),
-  name: z.string().min(1).max(100),
+  name: z.string().trim().min(1, "Enter a holiday name").max(100),
   organisationId: z.string().uuid(),
-  recursAnnually: z.boolean(),
+  regionCode: z.string().nullable(),
 });
 
 export async function addCustomHolidayAction(
-  input: z.infer<typeof AddCustomHolidaySchema>
-) {
+  input: z.input<typeof AddCustomHolidaySchema>
+): Promise<ActionResult<{ id: string; message: string }>> {
   const parsed = AddCustomHolidaySchema.safeParse(input);
   if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Invalid input",
-      ok: false as const,
-    };
+    return { error: firstIssue(parsed.error), ok: false };
   }
-
-  const hasAccess = await canManageHolidays();
-  if (!hasAccess) {
-    return { error: "Permission denied", ok: false as const };
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
   }
-
-  const user = await currentUser();
-  if (!user) {
-    return { error: "You need to sign in again.", ok: false as const };
-  }
-
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false as const };
-  }
-
   const result = await addCustomHoliday({
     appliesToAllJurisdictions: parsed.data.appliesToAllJurisdictions,
-    clerkOrgId: contextResult.value.clerkOrgId,
+    clerkOrgId: context.value.clerkOrgId,
+    countryCode: parsed.data.countryCode,
     date: parsed.data.date,
-    jurisdictionId: parsed.data.jurisdictionId,
     name: parsed.data.name,
-    organisationId: contextResult.value.organisationId,
-    recursAnnually: parsed.data.recursAnnually,
-    userId: user.id,
+    organisationId: context.value.organisationId,
+    regionCode: parsed.data.regionCode,
+    userId: context.value.actingUserId,
   });
-
   if (!result.ok) {
-    return { error: result.error.message, ok: false as const };
+    return { error: result.error.message, ok: false };
   }
-
-  revalidatePath("/public-holidays");
-  revalidatePath("/settings/holidays");
-  revalidatePath("/calendar");
-
-  return result;
+  revalidateHolidayPaths();
+  return {
+    ok: true,
+    value: { id: result.value.id, message: `${parsed.data.name} added.` },
+  };
 }
 
-const HolidayIdSchema = z.object({
+const DeleteCustomHolidaySchema = z.object({
   holidayId: z.string().uuid(),
+  name: z.string().max(200),
   organisationId: z.string().uuid(),
 });
 
-export async function suppressHolidayAction(
-  input: z.infer<typeof HolidayIdSchema>
-) {
-  const parsed = HolidayIdSchema.safeParse(input);
+export async function deleteCustomHolidayAction(
+  input: z.input<typeof DeleteCustomHolidaySchema>
+): Promise<ActionResult<{ message: string }>> {
+  const parsed = DeleteCustomHolidaySchema.safeParse(input);
   if (!parsed.success) {
-    return { error: "Invalid input", ok: false as const };
+    return { error: firstIssue(parsed.error), ok: false };
   }
-
-  const hasAccess = await canManageHolidays();
-  if (!hasAccess) {
-    return { error: "Permission denied", ok: false as const };
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
   }
-
-  const user = await currentUser();
-  if (!user) {
-    return { error: "You need to sign in again.", ok: false as const };
-  }
-
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false as const };
-  }
-
-  const result = await suppressHoliday(
-    contextResult.value.clerkOrgId,
-    contextResult.value.organisationId,
-    parsed.data.holidayId,
-    user.id
+  const result = await deleteCustomHoliday(
+    context.value.clerkOrgId,
+    context.value.organisationId,
+    parsed.data.holidayId
   );
-
   if (!result.ok) {
-    return { error: result.error.message, ok: false as const };
+    return { error: result.error.message, ok: false };
   }
+  revalidateHolidayPaths();
+  return { ok: true, value: { message: `${parsed.data.name} deleted.` } };
+}
 
-  revalidatePath("/public-holidays");
-  revalidatePath("/settings/holidays");
-  revalidatePath("/calendar");
+const HolidayKeySchema = z.object({
+  holidayKey: z.string().min(1).max(200),
+  organisationId: z.string().uuid(),
+});
+const ScopedKeySchema = HolidayKeySchema.extend({
+  locationId: z.string().uuid().nullable(),
+});
+const ClassificationSchema = HolidayKeySchema.extend({
+  classification: z.enum(["working", "non_working"]),
+  locationId: z.string().uuid(),
+});
+const LocalDaySchema = HolidayKeySchema.extend({
+  enabled: z.boolean(),
+  locationId: z.string().uuid(),
+});
 
-  return result;
+function where(locationName: string | null) {
+  return locationName ? `for ${locationName}` : "for all locations";
+}
+
+export async function hideHolidayAction(
+  input: z.input<typeof HolidayKeySchema>
+): Promise<ActionResult<{ message: string }>> {
+  const parsed = HolidayKeySchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error), ok: false };
+  }
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await hidePublicHoliday({
+    actingRole: context.value.role,
+    actingUserId: context.value.actingUserId,
+    clerkOrgId: context.value.clerkOrgId,
+    holidayKey: parsed.data.holidayKey,
+    locationId: null,
+    organisationId: context.value.organisationId,
+  });
+  if (!result.ok) {
+    return { error: result.error.message, ok: false };
+  }
+  revalidateHolidayPaths();
+  return {
+    ok: true,
+    value: { message: `${result.value.holidayName} hidden for all locations.` },
+  };
 }
 
 export async function restoreHolidayAction(
-  input: z.infer<typeof HolidayIdSchema>
-) {
-  const parsed = HolidayIdSchema.safeParse(input);
+  input: z.input<typeof ScopedKeySchema>
+): Promise<ActionResult<{ message: string }>> {
+  const parsed = ScopedKeySchema.safeParse(input);
   if (!parsed.success) {
-    return { error: "Invalid input", ok: false as const };
+    return { error: firstIssue(parsed.error), ok: false };
   }
-
-  const hasAccess = await canManageHolidays();
-  if (!hasAccess) {
-    return { error: "Permission denied", ok: false as const };
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
   }
-
-  const user = await currentUser();
-  if (!user) {
-    return { error: "You need to sign in again.", ok: false as const };
-  }
-
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false as const };
-  }
-
-  const result = await restoreHoliday(
-    contextResult.value.clerkOrgId,
-    contextResult.value.organisationId,
-    parsed.data.holidayId,
-    user.id
-  );
-
+  const result = await restorePublicHoliday({
+    actingRole: context.value.role,
+    actingUserId: context.value.actingUserId,
+    clerkOrgId: context.value.clerkOrgId,
+    holidayKey: parsed.data.holidayKey,
+    locationId: parsed.data.locationId,
+    organisationId: context.value.organisationId,
+  });
   if (!result.ok) {
-    return { error: result.error.message, ok: false as const };
+    return { error: result.error.message, ok: false };
   }
-
-  revalidatePath("/public-holidays");
-  revalidatePath("/settings/holidays");
-  revalidatePath("/calendar");
-
-  return result;
+  revalidateHolidayPaths();
+  return {
+    ok: true,
+    value: {
+      message: `${result.value.holidayName} restored ${where(result.value.locationName)}.`,
+    },
+  };
 }
 
-export async function deleteCustomHolidayAction(
-  input: z.infer<typeof HolidayIdSchema>
-) {
-  const parsed = HolidayIdSchema.safeParse(input);
+export async function setHolidayClassificationAction(
+  input: z.input<typeof ClassificationSchema>
+): Promise<ActionResult<{ message: string }>> {
+  const parsed = ClassificationSchema.safeParse(input);
   if (!parsed.success) {
-    return { error: "Invalid input", ok: false as const };
+    return { error: firstIssue(parsed.error), ok: false };
   }
-
-  const hasAccess = await canManageHolidays();
-  if (!hasAccess) {
-    return { error: "Permission denied", ok: false as const };
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
   }
-
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false as const };
-  }
-
-  const result = await deleteCustomHoliday(
-    contextResult.value.clerkOrgId,
-    contextResult.value.organisationId,
-    parsed.data.holidayId
-  );
-
+  const result = await setPublicHolidayClassification({
+    actingRole: context.value.role,
+    actingUserId: context.value.actingUserId,
+    classification: parsed.data.classification,
+    clerkOrgId: context.value.clerkOrgId,
+    holidayKey: parsed.data.holidayKey,
+    locationId: parsed.data.locationId,
+    organisationId: context.value.organisationId,
+  });
   if (!result.ok) {
-    return { error: result.error.message, ok: false as const };
+    return { error: result.error.message, ok: false };
   }
+  revalidateHolidayPaths();
+  const kind =
+    parsed.data.classification === "working"
+      ? "a working day"
+      : "a non-working day";
+  return {
+    ok: true,
+    value: {
+      message: `${result.value.holidayName} is now ${kind} ${where(result.value.locationName)}.`,
+    },
+  };
+}
 
-  revalidatePath("/public-holidays");
-  revalidatePath("/settings/holidays");
-  revalidatePath("/calendar");
-
-  return result;
+export async function setLocalHolidayEnabledAction(
+  input: z.input<typeof LocalDaySchema>
+): Promise<ActionResult<{ message: string }>> {
+  const parsed = LocalDaySchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: firstIssue(parsed.error), ok: false };
+  }
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await setLocalHolidayEnabled({
+    actingRole: context.value.role,
+    actingUserId: context.value.actingUserId,
+    clerkOrgId: context.value.clerkOrgId,
+    enabled: parsed.data.enabled,
+    holidayKey: parsed.data.holidayKey,
+    locationId: parsed.data.locationId,
+    organisationId: context.value.organisationId,
+  });
+  if (!result.ok) {
+    return { error: result.error.message, ok: false };
+  }
+  revalidateHolidayPaths();
+  return {
+    ok: true,
+    value: {
+      message: `${result.value.holidayName} switched ${parsed.data.enabled ? "on" : "off"} ${where(result.value.locationName)}.`,
+    },
+  };
 }

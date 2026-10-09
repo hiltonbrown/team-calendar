@@ -2,7 +2,9 @@ import {
   appError,
   type ClerkOrgId,
   type ListReferenceHolidays,
+  type LocalHolidayOption,
   listReferenceHolidays,
+  localHolidayOptions,
   type OrganisationId,
   type ResolvedPublicHoliday,
   type Result,
@@ -13,6 +15,7 @@ import { loadHolidayResolutionData } from "@repo/database";
 export type {
   HolidayClassification,
   HolidayPreferenceSetting,
+  LocalHolidayOption,
   ResolvedPublicHoliday,
   ResolveHolidayData,
 } from "@repo/core";
@@ -55,6 +58,30 @@ export async function resolvePublicHolidays(
   } catch {
     return {
       error: appError("internal", "Failed to resolve public holidays"),
+      ok: false,
+    };
+  }
+}
+
+/** Each location's optional local days and whether the location has switched them on. */
+export async function listLocalHolidayOptions(
+  input: Omit<ResolvePublicHolidaysInput, "includeHidden">,
+  listReference: ListReferenceHolidays = listReferenceHolidays
+): Promise<
+  Result<Array<{ holidays: LocalHolidayOption[]; locationId: string }>>
+> {
+  try {
+    const data = await loadHolidayResolutionData(input);
+    if (!data) {
+      return {
+        error: appError("not_found", "Organisation not found"),
+        ok: false,
+      };
+    }
+    return { ok: true, value: localHolidayOptions(data, listReference) };
+  } catch {
+    return {
+      error: appError("internal", "Failed to load local holidays"),
       ok: false,
     };
   }
