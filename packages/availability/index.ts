@@ -100,6 +100,7 @@ export {
   type ManagerDashboardView,
   resolveDashboardRole,
 } from "./src/dashboard/dashboard-service";
+export * from "./src/dashboard/timeline-week";
 export * from "./src/duration/working-days";
 export { computeWorkingDays } from "./src/duration/working-days";
 export * from "./src/holidays/holiday-preferences";

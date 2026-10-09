@@ -122,6 +122,39 @@ describe("calendar-service", () => {
       "2026-04-13"
     );
   });
+  it("returns each person's job title and team id", async () => {
+    const result = await getCalendarRange(baseInput);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(
+      result.value.people.map(({ id, jobTitle, teamId, teamName }) => ({
+        id,
+        jobTitle,
+        teamId,
+        teamName,
+      }))
+    ).toEqual([
+      {
+        id: ids.manager,
+        jobTitle: "Operations lead",
+        teamId: ids.team,
+        teamName: "Operations",
+      },
+      {
+        id: ids.person,
+        jobTitle: null,
+        teamId: ids.team,
+        teamName: "Operations",
+      },
+    ]);
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ job_title: true }),
+      })
+    );
+  });
   it.each(["all_teams", "my_team", "team"] as const)(
     "excludes indirect reports from %s under direct-only visibility",
     async (type) => {
@@ -538,6 +571,7 @@ function person(
     employment_type: "employee",
     first_name: firstName,
     id,
+    job_title: firstName === "Morgan" ? "Operations lead" : null,
     last_name: lastName,
     location: {
       country_code: "AU",

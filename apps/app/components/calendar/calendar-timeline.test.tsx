@@ -232,10 +232,12 @@ function person(overrides: { displayName: string; id: string }) {
     displayName: overrides.displayName,
     firstName: overrides.displayName.split(" ")[0] ?? overrides.displayName,
     id: overrides.id,
+    jobTitle: null,
     lastName: overrides.displayName.split(" ")[1] ?? "",
     locationName: "Brisbane",
     locationTimezone: "Australia/Brisbane",
     personType: "employee",
+    teamId: null,
     teamName: "Operations",
     xeroSyncFailedCountInRange: 0,
   } as const;

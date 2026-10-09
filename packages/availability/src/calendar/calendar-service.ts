@@ -66,10 +66,12 @@ export interface CalendarPerson {
   displayName: string;
   firstName: string;
   id: string;
+  jobTitle: string | null;
   lastName: string;
   locationName: string | null;
   locationTimezone: string | null;
   personType: person_type | "contractor" | "employee";
+  teamId: string | null;
   teamName: string | null;
   xeroSyncFailedCountInRange: number;
 }
@@ -187,6 +189,7 @@ interface ScopedPerson {
   employment_type: string;
   first_name: string;
   id: string;
+  job_title: string | null;
   last_name: string;
   location: {
     country_code: string | null;
@@ -740,10 +743,12 @@ function toCalendarPerson(
     displayName: `${person.first_name} ${person.last_name}`,
     firstName: person.first_name,
     id: person.id,
+    jobTitle: person.job_title,
     lastName: person.last_name,
     locationName: person.location?.name ?? null,
     locationTimezone: person.location?.timezone ?? null,
     personType: effectivePersonType(person),
+    teamId: person.team?.id ?? null,
     teamName: person.team?.name ?? null,
     xeroSyncFailedCountInRange,
   };
@@ -1059,6 +1064,7 @@ const personSelect = {
   employment_type: true,
   first_name: true,
   id: true,
+  job_title: true,
   last_name: true,
   location: {
     select: {
