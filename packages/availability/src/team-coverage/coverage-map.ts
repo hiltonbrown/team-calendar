@@ -1,11 +1,11 @@
-import { availability_record_type } from "@repo/database/generated/enums";
-import type { CalendarEvent } from "../calendar/calendar-service";
 import {
   addDaysToDateKey,
   dateKeyInTimeZone,
   dayOfWeekOfDateKey,
   zonedStartOfDay,
-} from "../dashboard/date-keys";
+} from "@repo/core";
+import { availability_record_type } from "@repo/database/generated/enums";
+import type { CalendarEvent } from "../calendar/calendar-service";
 
 /** A team without a minimum is at peak when more than this share is away. */
 export const PEAK_AWAY_THRESHOLD_PERCENT = 20;

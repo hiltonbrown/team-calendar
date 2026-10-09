@@ -1,5 +1,10 @@
 import type { Result } from "@repo/core";
-import { appError } from "@repo/core";
+import {
+  addDaysToDateKey,
+  appError,
+  dateKeysBetween,
+  zonedStartOfDay,
+} from "@repo/core";
 import { z } from "zod";
 import type { availability_record_type } from "../../generated/enums";
 import { type Database, database } from "../client";
@@ -145,7 +150,7 @@ export async function countAwayPeopleByTeamAndDay(
   try {
     const days = dateKeysBetween(input.from, input.to).map((dateKey) => ({
       dateKey,
-      end: zonedStartOfDay(nextDateKey(dateKey), input.timezone),
+      end: zonedStartOfDay(addDaysToDateKey(dateKey, 1), input.timezone),
       start: zonedStartOfDay(dateKey, input.timezone),
     }));
     const counts: AwayPeopleByTeamAndDay = new Map(
@@ -208,52 +213,4 @@ export async function countAwayPeopleByTeamAndDay(
       ok: false,
     };
   }
-}
-
-function dateKeysBetween(from: string, to: string): string[] {
-  const keys: string[] = [];
-  for (let key = from; key <= to; key = nextDateKey(key)) {
-    keys.push(key);
-  }
-  return keys;
-}
-
-function nextDateKey(dateKey: string): string {
-  const date = new Date(`${dateKey}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
-}
-
-/** UTC instant of local midnight on `dateKey` in `timezone`. */
-function zonedStartOfDay(dateKey: string, timezone: string): Date {
-  const target = Date.parse(`${dateKey}T00:00:00.000Z`);
-  let guess = target;
-  // Two passes settle the offset, including across daylight saving changes.
-  for (let pass = 0; pass < 2; pass += 1) {
-    guess += target - localWallClockAsUtc(new Date(guess), timezone);
-  }
-  return new Date(guess);
-}
-
-function localWallClockAsUtc(date: Date, timezone: string): number {
-  const parts = new Intl.DateTimeFormat("en-AU", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-    month: "2-digit",
-    second: "2-digit",
-    timeZone: timezone,
-    year: "numeric",
-  }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value ?? "0");
-  return Date.UTC(
-    value("year"),
-    value("month") - 1,
-    value("day"),
-    value("hour") % 24,
-    value("minute"),
-    value("second")
-  );
 }

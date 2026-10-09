@@ -3,6 +3,7 @@ import {
   addDaysToDateKey,
   dateKeyInTimeZone,
   dateKeyOfUtcDate,
+  dateKeysBetween,
   dayOfWeekOfDateKey,
   zonedStartOfDay,
 } from "./date-keys";
@@ -38,5 +39,15 @@ describe("date keys", () => {
     expect(
       zonedStartOfDay("2026-10-05", "Australia/Sydney").toISOString()
     ).toBe("2026-10-04T13:00:00.000Z");
+  });
+
+  it("lists every date key in an inclusive range, across months", () => {
+    expect(dateKeysBetween("2026-09-29", "2026-10-02")).toEqual([
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+    ]);
+    expect(dateKeysBetween("2026-10-02", "2026-10-01")).toEqual([]);
   });
 });

@@ -80,7 +80,14 @@ export {
   formatAvailabilityRecordType,
   getAvailabilityRecordLabel,
 } from "./src/availability-record-label";
-
+export {
+  addDaysToDateKey,
+  dateKeyInTimeZone,
+  dateKeyOfUtcDate,
+  dateKeysBetween,
+  dayOfWeekOfDateKey,
+  zonedStartOfDay,
+} from "./src/date-keys";
 export type {
   ApproveLeaveInput,
   DeclineLeaveInput,

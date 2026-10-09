@@ -24,6 +24,15 @@ export function addDaysToDateKey(dateKey: string, days: number): string {
   return dateKeyOfUtcDate(date);
 }
 
+/** Every date key from `from` to `to`, inclusive. */
+export function dateKeysBetween(from: string, to: string): string[] {
+  const keys: string[] = [];
+  for (let key = from; key <= to; key = addDaysToDateKey(key, 1)) {
+    keys.push(key);
+  }
+  return keys;
+}
+
 /** 0 for Sunday to 6 for Saturday. */
 export function dayOfWeekOfDateKey(dateKey: string): number {
   return new Date(`${dateKey}T00:00:00.000Z`).getUTCDay();

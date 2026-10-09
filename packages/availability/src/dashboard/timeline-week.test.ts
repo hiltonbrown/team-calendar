@@ -1,3 +1,4 @@
+import { addDaysToDateKey, zonedStartOfDay } from "@repo/core";
 import { describe, expect, it } from "vitest";
 import type {
   CalendarDay,
@@ -6,7 +7,6 @@ import type {
   CalendarRange,
   PublicHolidayCell,
 } from "../calendar/calendar-service";
-import { addDaysToDateKey, zonedStartOfDay } from "./date-keys";
 import { buildTimelineWeek, timelineProvenance } from "./timeline-week";
 
 const TIMEZONE = "Australia/Brisbane";

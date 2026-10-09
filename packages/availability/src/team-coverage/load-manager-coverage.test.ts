@@ -1,3 +1,4 @@
+import { addDaysToDateKey } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CalendarDay,
@@ -6,7 +7,6 @@ import type {
   CalendarRange,
   PublicHolidayCell,
 } from "../calendar/calendar-service";
-import { addDaysToDateKey } from "../dashboard/date-keys";
 
 const mocks = vi.hoisted(() => ({
   countAwayPeopleByTeamAndDay: vi.fn(),

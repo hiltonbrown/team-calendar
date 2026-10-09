@@ -1,10 +1,9 @@
-import { appError, type Result } from "@repo/core";
+import { appError, dateKeyOfUtcDate, type Result } from "@repo/core";
 import {
   countAwayPeopleByTeamAndDay,
   listTeamsWithCoverageMinimum,
 } from "@repo/database/queries/teams";
 import type { CalendarDay, CalendarRange } from "../calendar/calendar-service";
-import { dateKeyOfUtcDate } from "../dashboard/date-keys";
 import {
   AWAY_RECORD_TYPES,
   buildCoverageMap,
