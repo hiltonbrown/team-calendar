@@ -33,7 +33,7 @@ Public holidays come from the Nager.Date API (`packages/availability/src/holiday
 
 There is exactly one file per country, and each file holds only that country's entries: `au.json` (Australia), `nz.json` (New Zealand) and `uk.json` (United Kingdom). No combined or shared holiday file exists. Each file's top-level `country` must match its file name and every entry in it; adding a country later means adding one new file.
 
-`packages/availability/src/holidays/reference/data/au.json`, `nz.json` and `uk.json` (the example below shows the shape; the real `source` values are the official URLs). JSON so non-developers can edit them; parsed once at module load with Zod, and the build fails on invalid data.
+`packages/availability/src/holidays/reference/data/au.json`, `nz.json` and `uk.json`. JSON so non-developers can edit them; parsed once at module load with Zod, and the build fails on invalid data.
 
 ```json
 {
@@ -44,8 +44,7 @@ There is exactly one file per country, and each file holds only that country's e
       "date": "2026-10-05",
       "name": "King's Birthday",
       "region": "QLD",
-      "kind": "public",
-      "source": "<official Queensland Government page URL>"
+      "kind": "public"
     },
     {
       "id": "au-sa-2026-12-24-christmas-eve",
@@ -53,8 +52,7 @@ There is exactly one file per country, and each file holds only that country's e
       "name": "Christmas Eve",
       "region": "SA",
       "kind": "part_day",
-      "startsAt": "19:00",
-      "source": "<official South Australian Government page URL>"
+      "startsAt": "19:00"
     },
     {
       "id": "au-qld-2026-08-12-royal-queensland-show",
@@ -62,8 +60,7 @@ There is exactly one file per country, and each file holds only that country's e
       "name": "Royal Queensland Show",
       "region": "QLD",
       "kind": "local",
-      "area": "Brisbane",
-      "source": "<official Queensland Government page URL>"
+      "area": "Brisbane"
     }
   ]
 }
@@ -75,7 +72,6 @@ Field rules:
 - `date`: ISO date. Substitute and additional days are separate entries named as the official source names them (for example "Boxing Day (additional day)").
 - `region`: `null` for national, otherwise a code from the region registry below.
 - `kind`: `public` (full day, non-working by default), `part_day` (requires `startsAt` as `HH:mm`, working day by default), `local` (requires `area`; hidden until opted in).
-- `source`: the official page the date was taken from (https only).
 
 ### Region registry
 
@@ -111,7 +107,7 @@ One function decides what applies: `resolvePublicHolidays({ clerkOrgId, organisa
    - `part_day`: shown as working with its start time unless hidden or set to non-working.
    - `local`: shown only when the location has a `working` or `non_working` row for it.
 5. Add custom holidays with their existing country, region and "all jurisdictions" semantics, then apply the same preferences.
-6. Return `ResolvedPublicHoliday[]`: `{ key, date, name, kind, startsAt, area, classification, origin: "official" | "custom", sourceUrl, locationId }`.
+6. Return `ResolvedPublicHoliday[]`: `{ key, date, name, kind, startsAt, area, classification, origin: "official" | "custom", locationId }`.
 
 All readers use this function: calendar cells, current status, feed projection, dashboard next holiday, onboarding state, organisation settings, the Public holidays page and Settings, Holidays. No reader queries holiday tables directly.
 
@@ -124,7 +120,7 @@ All readers use this function: calendar cells, current status, feed projection, 
 
 ## User interface
 
-- **Public holidays page:** a year selector and a list grouped by location, each holiday showing name, date, kind (Part day from 19:00, Local: Brisbane), classification and origin ("Official", linking to its source, or "Custom"). Actions per holiday and location: Hide, Mark as working day, Mark as non-working day, Restore. Import controls and the country fetch are removed. Empty state for a year beyond the data: "Official holidays for 2029 are not available yet. They are added each October." with an Add custom holiday action.
+- **Public holidays page:** a year selector and a list grouped by location, each holiday showing name, date, kind (Part day from 19:00, Local: Brisbane), classification and origin ("Official" or "Custom"). Actions per holiday and location: Hide, Mark as working day, Mark as non-working day, Restore. Import controls and the country fetch are removed. Empty state for a year beyond the data: "Official holidays for 2029 are not available yet. They are added each October." with an Add custom holiday action.
 - **Settings, Holidays:** per location, a "Local holidays" list for its region with a switch per local day (off by default; switching on creates a `non_working` row). Saving ends with a receipt and an audit event.
 - **Location and General settings:** the region field becomes a select from the registry for the chosen country.
 - Admin changes write audit events: `public_holidays.hidden`, `public_holidays.restored`, `public_holidays.classification_changed`, `public_holidays.local_day_enabled`, `public_holidays.local_day_disabled`.
@@ -134,8 +130,8 @@ All readers use this function: calendar cells, current status, feed projection, 
 Documented in `docs/public-holidays.md`:
 
 1. From 1 October CI fails with a message naming each missing country, region and year.
-2. A team member adds the next year's entries from the official sources listed in the document (one per jurisdiction), each with its `source` URL, and checks recently announced one-off days.
-3. Bump `PUBLIC_HOLIDAY_DATA_VERSION`, run `bun run test`, open a pull request; a second person checks the entries against the sources.
+2. A team member adds the next year's entries from each jurisdiction's official government public holidays page and checks recently announced one-off days.
+3. Bump `PUBLIC_HOLIDAY_DATA_VERSION`, run `bun run test`, open a pull request; a second person checks the entries against the official pages.
 4. One-off holidays announced mid-year (for example a national day of mourning): admins can add a custom holiday immediately; the team adds the official entry in the next release.
 
 ## Out of scope
