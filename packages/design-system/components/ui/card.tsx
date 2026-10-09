@@ -6,6 +6,7 @@ type CardVariant = "default" | "plain"
 
 // Default: the elev-card hairline, so a card stays visible on the near-white page.
 // Plain: no edge, for a card at least two surface steps above its parent.
+// Forced colours drop shadows and flatten surfaces, so every card gets a real border there.
 function Card({
   className,
   variant = "default",
@@ -16,7 +17,7 @@ function Card({
       data-slot="card"
       data-variant={variant}
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl py-6",
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl py-6 forced-colors:border forced-colors:border-[CanvasText]",
         variant === "default" && "shadow-(--elev-card)",
         className
       )}
@@ -42,7 +43,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-title"
-      className={cn("text-title-lg font-medium", className)}
+      className={cn("text-title-lg font-semibold", className)}
       {...props}
     />
   )

@@ -184,7 +184,7 @@ The palette is sage-led on near-grey neutrals with a faint green tint. Green is 
 
 `surface` is the page canvas. `surface-container-low` creates navigation and contextual bands. `surface-container` groups related work. `surface-container-lowest` is the card and elevated opaque base. `surface-container-high` is the neutral hover surface. `surface-container-highest` is the opaque fallback for frost and the strongest neutral field fill.
 
-Cards use `surface-container-lowest`. The default card carries the `elev-card` hairline so it stays visible on the near-white page. Use `variant="plain"` only for a card on a parent at least two surface steps darker (`surface-container-high` or below), where the tonal step alone separates it. Never combine the hairline with a border.
+Cards use `surface-container-lowest`. The default card carries the `elev-card` hairline so it stays visible on the near-white page. Use `variant="plain"` only for a card on a parent at least two surface steps darker (`surface-container-high` or below), where the tonal step alone separates it. Never combine the hairline with a border; the only card border is the forced-colours fallback.
 
 ### Dark mode
 
