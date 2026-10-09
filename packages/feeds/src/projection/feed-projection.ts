@@ -289,11 +289,8 @@ async function projectPublicHolidays(input: {
   const subjects = new Set<string | null>(
     [...input.personLocations.values()].map((location) => location?.id ?? null)
   );
-  const customUpdatedAt = new Map(
-    data.customHolidays.map((holiday) => [
-      `custom:${holiday.id}`,
-      holiday.updatedAt,
-    ])
+  const customHolidays = new Map(
+    data.customHolidays.map((holiday) => [`custom:${holiday.id}`, holiday])
   );
   const dataVersionAt = startOfUtcDay(PUBLIC_HOLIDAY_DATA_VERSION);
   const events: PreviewEvent[] = [];
@@ -324,10 +321,9 @@ async function projectPublicHolidays(input: {
     const startsAt = startOfUtcDay(holiday.date);
     const endsAt = new Date(startsAt);
     endsAt.setUTCDate(endsAt.getUTCDate() + 1);
-    const publishedAt =
-      holiday.origin === "custom"
-        ? (customUpdatedAt.get(holiday.key) ?? dataVersionAt)
-        : dataVersionAt;
+    const custom = customHolidays.get(holiday.key);
+    const publishedAt = custom?.updatedAt ?? dataVersionAt;
+    const firstPublishableAt = custom?.createdAt ?? publishedAt;
     events.push({
       allDay: true,
       contactabilityStatus: null,
@@ -336,7 +332,7 @@ async function projectPublicHolidays(input: {
       endsAt,
       eventClass: input.privacyMode === "named" ? "PUBLIC" : "PRIVATE",
       hasPublication: Boolean(
-        input.lastRenderedAt && publishedAt <= input.lastRenderedAt
+        input.lastRenderedAt && firstPublishableAt <= input.lastRenderedAt
       ),
       isPublicHoliday: true,
       location: null,

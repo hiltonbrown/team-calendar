@@ -38,6 +38,8 @@ export interface ResolveHolidayData {
     id: string;
     name: string;
     regionCode: string | null;
+    /** Creation time; a feed rendered after it has already published the holiday. */
+    createdAt?: Date;
     /** Last change, used as the feed publication time for custom holidays. */
     updatedAt?: Date;
   }>;

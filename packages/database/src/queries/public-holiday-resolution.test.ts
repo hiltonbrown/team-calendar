@@ -22,6 +22,7 @@ function fakeClient(organisation: unknown) {
       findMany: vi.fn().mockResolvedValue([
         {
           country_code: "CUSTOM",
+          created_at: new Date("2026-01-15T00:00:00.000Z"),
           default_classification: "non_working",
           holiday_date: new Date("2026-03-02T00:00:00.000Z"),
           id: "h-1",
@@ -77,6 +78,7 @@ describe("loadHolidayResolutionData", () => {
       customHolidays: [
         {
           countryCode: "CUSTOM",
+          createdAt: new Date("2026-01-15T00:00:00.000Z"),
           date: "2026-03-02",
           defaultClassification: "non_working",
           id: "h-1",

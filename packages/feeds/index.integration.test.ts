@@ -223,7 +223,7 @@ describe("feed services", () => {
         country_code: "AU",
         created_at: new Date("2020-01-01"),
         holiday_date: old.startsAt,
-        holiday_type: "public",
+        holiday_type: "custom",
         name: "Historical holiday",
         source: "manual",
       },
@@ -254,7 +254,7 @@ describe("feed services", () => {
         ?.published_sequence
     ).toBe(1);
     expect(
-      rows.find((row) => row.source_key === `holiday:${holiday.id}`)
+      rows.find((row) => row.source_key === `holiday:custom:${holiday.id}`)
         ?.published_sequence
     ).toBe(1);
     expect(
@@ -378,7 +378,7 @@ describe("feed services", () => {
         ...seeded.scope,
         country_code: "AU",
         holiday_date: seeded.startsAt,
-        holiday_type: "public",
+        holiday_type: "custom",
         name: "Owned holiday",
         source: "manual",
       },
@@ -395,7 +395,7 @@ describe("feed services", () => {
       where: {
         ...seeded.scope,
         feed_id: created.feedId,
-        source_key: `holiday:${holiday.id}`,
+        source_key: `holiday:custom:${holiday.id}`,
       },
     });
     expect(ledger.published_sequence).toBe(1);
@@ -1177,13 +1177,10 @@ async function cleanTestData() {
   await database.auditEvent.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
-  await database.publicHolidayAssignment.deleteMany({
+  await database.publicHolidayPreference.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
   await database.publicHoliday.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
-  });
-  await database.publicHolidayJurisdiction.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
   await database.feedEventPublication.deleteMany({

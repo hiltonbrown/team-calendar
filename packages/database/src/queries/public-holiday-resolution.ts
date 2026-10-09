@@ -45,6 +45,7 @@ export async function loadHolidayResolutionData(
     client.publicHoliday.findMany({
       select: {
         country_code: true,
+        created_at: true,
         default_classification: true,
         holiday_date: true,
         id: true,
@@ -70,6 +71,7 @@ export async function loadHolidayResolutionData(
   return {
     customHolidays: customHolidays.map((holiday) => ({
       countryCode: holiday.country_code,
+      createdAt: holiday.created_at,
       date: toDateOnly(holiday.holiday_date),
       defaultClassification: holiday.default_classification,
       id: holiday.id,

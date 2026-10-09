@@ -13,25 +13,6 @@ import type { TenantContext } from "./index";
 
 vi.mock("server-only", () => ({}));
 vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });
-vi.mock("./src/holidays/nager-client", () => ({
-  getPublicHolidays: vi.fn().mockImplementation((_countryCode, year) =>
-    Promise.resolve({
-      ok: true,
-      value: [
-        {
-          counties: null,
-          countryCode: "AU",
-          date: `${year}-01-01`,
-          fixed: true,
-          global: true,
-          localName: "New Year's Day",
-          name: "New Year's Day",
-          types: ["Public"],
-        },
-      ],
-    })
-  ),
-}));
 const fixture = allocateLiveTestFixture(
   "packages/availability/index.integration.test.ts"
 );
@@ -131,9 +112,6 @@ const cleanTestData = async () => {
   await database.availabilityRecord.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
-  await database.publicHolidayAssignment.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
-  });
   await database.person.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
@@ -149,10 +127,10 @@ const cleanTestData = async () => {
   await database.feed.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
-  await database.publicHoliday.deleteMany({
+  await database.publicHolidayPreference.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
-  await database.publicHolidayJurisdiction.deleteMany({
+  await database.publicHoliday.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
   await database.location.deleteMany({
@@ -440,7 +418,7 @@ describe("current user person identity", () => {
       })
     ).resolves.toBe(1);
   });
-  test("provisions default public holidays when ensuring an organisation", async () => {
+  test("stores no official public holidays when ensuring an organisation", async () => {
     await cleanTestData();
     await createProvisioningOrganisation();
     const context = await ensureOrganisationForClerk({
@@ -452,47 +430,15 @@ describe("current user person identity", () => {
       where: { clerk_org_id: provisioningClerkOrgId },
     });
     expect(orgCount).toBe(1);
-    const jurisdictions = await database.publicHolidayJurisdiction.findMany({
-      where: {
-        clerk_org_id: provisioningClerkOrgId,
-        country_code: "AU",
-        organisation_id: context.organisationId,
-        region_code: null,
-      },
-    });
-    expect(jurisdictions.length).toBeGreaterThanOrEqual(1);
-    const currentYear = new Date().getUTCFullYear();
-    const holidays = await database.publicHoliday.findMany({
-      where: {
-        clerk_org_id: provisioningClerkOrgId,
-        organisation_id: context.organisationId,
-        source: "nager",
-      },
-    });
-    const holidayYears = holidays.map((h) => h.holiday_date.getUTCFullYear());
-    expect(holidayYears).toContain(currentYear);
-    expect(holidayYears).toContain(currentYear + 1);
-    const initialHolidayCount = holidays.length;
-    await ensureOrganisationForClerk({
-      clerkOrgId: provisioningClerkOrgId,
-      countryCode: "AU",
-      name: "Default holiday provisioning test",
-    });
-    const finalJurisdictions = await database.publicHolidayJurisdiction.count({
-      where: {
-        clerk_org_id: provisioningClerkOrgId,
-        organisation_id: context.organisationId,
-      },
-    });
-    expect(finalJurisdictions).toBe(jurisdictions.length);
-    const finalHolidayCount = await database.publicHoliday.count({
-      where: {
-        clerk_org_id: provisioningClerkOrgId,
-        organisation_id: context.organisationId,
-        source: "nager",
-      },
-    });
-    expect(finalHolidayCount).toBe(initialHolidayCount);
+    // Official holidays come from the bundled reference files at read time.
+    await expect(
+      database.publicHoliday.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          organisation_id: context.organisationId,
+        },
+      })
+    ).resolves.toBe(0);
   });
   test("returns an existing linked person", async () => {
     await database.person.update({
@@ -800,7 +746,7 @@ describe("release list-query evidence", () => {
         country_code: "AU",
         default_classification: "non_working",
         holiday_date: new Date("2026-10-04T00:00:00.000Z"),
-        holiday_type: "public",
+        holiday_type: "custom",
         id: holidayId,
         name: "Local date proof day",
         organisation_id: tenantA.organisationId,
@@ -808,28 +754,17 @@ describe("release list-query evidence", () => {
         source_remote_id: fixture.key("people-holiday", 0),
       },
     });
-    await database.publicHolidayAssignment.createMany({
-      data: [
-        {
-          clerk_org_id: tenantA.clerkOrgId,
-          day_classification: "working",
-          id: fixture.id("people-holiday-assignment", 0),
-          organisation_id: tenantA.organisationId,
-          public_holiday_id: holidayId,
-          scope_type: "location",
-          scope_value: workingOverrideLocationId,
-        },
-        {
-          archived_at: new Date("2026-09-01T00:00:00.000Z"),
-          clerk_org_id: tenantA.clerkOrgId,
-          day_classification: "working",
-          id: fixture.id("people-holiday-assignment", 1),
-          organisation_id: tenantA.organisationId,
-          public_holiday_id: holidayId,
-          scope_type: "location",
-          scope_value: archivedOverrideLocationId,
-        },
-      ],
+    // The archived-override location has no preference, so the holiday keeps
+    // its default non-working classification there.
+    await database.publicHolidayPreference.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        holiday_key: `custom:${holidayId}`,
+        id: fixture.id("people-holiday-preference", 0),
+        location_id: workingOverrideLocationId,
+        organisation_id: tenantA.organisationId,
+        setting: "working",
+      },
     });
     const oracle = await computeCurrentStatusForPeople({
       at,
