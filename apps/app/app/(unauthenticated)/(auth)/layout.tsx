@@ -1,6 +1,6 @@
 import { ModeToggle } from "@repo/design-system/components/mode-toggle";
 import type { ReactNode } from "react";
-import { BrandPanel, MobileBrand } from "../components/brand-panel";
+import { BrandPanel, MobileBrand } from "@/components/brand/brand-panel";
 
 interface AuthLayoutProps {
   readonly children: ReactNode;
