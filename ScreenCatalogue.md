@@ -60,7 +60,9 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-01 | Sign in | `/sign-in` | Matches | Copy centralised into a shared `signInCopy` export; text and behaviour unchanged. |
 | S-31 | Sign up | `/sign-up` | Matches | Copy centralised into a shared `signUpCopy` export; text and behaviour unchanged. |
 | S-02 | Organisation selection | `/session-tasks/choose-organization` | Matches | Confirmed no `AuthFormFrame`/`embeddedAuthAppearance` is used here at all; resolves a prior open question. |
-| S-03 | Dashboard | `/` | Drifted | Undocumented onboarding checklist and Xero-connection-conditional card/banner logic added; `ViewerView` empty state improved; card radius is 16px (`rounded-xl`), not 16px-claimed-as-`rounded-2xl`. |
+| S-03 | Dashboard | `/` | Drifted | Onboarding panel removed 9 October 2026 (first run goes through S-32); Xero-connection-conditional card/banner logic; card radius is 16px (`rounded-xl`), not 16px-claimed-as-`rounded-2xl`. |
+| S-32 | Setup wizard | `/onboarding` | Matches | Added 9 October 2026: blocking five-step owner/admin setup ending on the team calendar. |
+| S-33 | Member welcome | `/welcome` | Matches | Added 9 October 2026: one-time three-step welcome for linked members. |
 | S-04 | Plans | `/plans` | Drifted | New `StatusOverview` summary-card row undocumented; pending-status colour and provenance-icon fixes both re-confirmed still correct. |
 | S-05 | New / edit plan | `/plans/new`, `/plans/[planId]/edit` | Drifted | Legacy-redirect query-param preservation now fully implemented; live balance-counter proposal remains open; undocumented empty-people-list message found. |
 | S-06 | Leave submission confirmation | `components/plans/submit-confirmation-modal.tsx` | Drifted | Retry-mode button literal is "Retry submission", not "Retry Xero sync"; everything else re-verified correct. |
@@ -87,7 +89,7 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-27 | Settings: Members | `/settings/members` | Matches | No drift found. |
 | S-28 | Settings: Xero connect | `/settings/integrations/xero/connect` | Matches | Reconciled 7 October: connect/reconnect audit distinction, one persisted queued full initial import and request-timestamp completion check. Live import NOT VERIFIED. |
 | S-29 | Settings: Xero person matches | `/settings/integrations/xero/matches` | Matches | No drift; Clerk-ID field is placeholder+fallback rather than a literal pre-filled value, functionally equivalent. |
-| S-30 | Settings: Getting started | `/settings/getting-started` | Matches | No drift; derived-state logic, step set, and badge labels all verified exactly. |
+| S-30 | Settings: Getting started | `/settings/getting-started` | Matches | Reduced 9 October 2026 to post-wizard recommendations: holidays, feed, and Xero when manual-only or needing attention. |
 | E-01 | Empty state | Component | Matches | No drift. |
 | E-02 | Data fetch error | Component | Matches | No drift. |
 | E-03 | 404 | `apps/app/app/(authenticated)/not-found.tsx` | Matches | Confirmed only one `not-found.tsx` exists in the whole app; no global (unauthenticated) 404. |
@@ -155,6 +157,8 @@ Not re-investigated in this pass; no divergence signal surfaced incidentally. Ca
 | S-31 | Sign up | `/sign-up` | Unauthenticated | Unauthenticated | Matches | `apps/app/app/(unauthenticated)/(auth)/sign-up/[[...sign-up]]/page.tsx` |
 | S-02 | Organisation selection | `/session-tasks/choose-organization` | Unauthenticated (post sign-up Clerk task) | Authenticated, pre-organisation | Matches | `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx` |
 | S-03 | Dashboard | `/` | `requirePageRole("org:viewer")` | All | Drifted | `apps/app/app/(authenticated)/page.tsx:24` |
+| S-32 | Setup wizard | `/onboarding` | Owner/admin check in page; layout first-run gate | Owner, Admin | Matches | `apps/app/app/(setup)/onboarding/page.tsx` |
+| S-33 | Member welcome | `/welcome` | `loadWelcomeEligibility` in page; layout first-run gate | Manager, Viewer (linked) | Matches | `apps/app/app/(setup)/welcome/page.tsx` |
 | S-04 | Plans | `/plans` | `requirePageRole("org:viewer")` | All | Drifted | `apps/app/app/(authenticated)/plans/page.tsx:34` |
 | S-05 | New / edit plan | `/plans/new`, `/plans/[planId]/edit` (+ `@modal`) | No `requirePageRole`; implicit viewer via `currentUser()` + `requireActiveOrgPageContext` | All | Drifted | `apps/app/app/(authenticated)/plans/record-form-data.ts:24-161` |
 | S-06 | Leave submission confirmation | `components/plans/submit-confirmation-modal.tsx` | Inherits caller's guard | Employee (submit), any actor with a `xero_sync_failed` record (retry) | Drifted | `apps/app/components/plans/submit-confirmation-modal.tsx:182` |
@@ -262,17 +266,43 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ## Core screens
 
+### S-32: Setup wizard
+
+**Route:** `/onboarding` in the `(setup)` route group (split brand layout, no app sidebar). `?step=` revisits an earlier completed step; later steps cannot be reached.
+**Guard:** Signed-in owner or admin; members are redirected to `/`. The `(authenticated)` layout redirects owners and admins here while `organisations.onboarding_completed_at` is null, except on `/settings/integrations/xero/connect` and `/settings/integrations/xero/matches`. A completed organisation redirects to `/calendar`.
+**Evidence:** `apps/app/app/(setup)/onboarding/{page,_actions}.tsx`; `apps/app/app/(setup)/onboarding/steps/*.tsx`; `apps/app/lib/server/onboarding-gate.ts`; `packages/availability/src/onboarding/*`; `packages/database/src/queries/onboarding.ts`. Spec: `docs/superpowers/specs/2026-10-09-onboarding-design.md`.
+
+**Purpose:** Blocking first-run setup that ends on a populated team calendar.
+
+**User interactions, as-built:** Five steps with a step indicator and Back to earlier steps: (1) organisation name, Australia (fixed) and an Australian timezone, saved through the General settings action; (2) Connect Xero Payroll (OAuth returns to `/onboarding`; a failed or cancelled callback returns with a plain-language reason) or "Set up without Xero" behind a confirmation; (3) People: import progress polled every 3 seconds, up to ten possible duplicates resolved inline (more link to S-29), link yourself to a roster person or create your record, add people by hand in manual mode; a failed people import does not block; (4) Invite: roster with Manager default for people with direct reports and Viewer otherwise, per-row results, Skip for now; (5) Finish: per-stage import status, Open team calendar once leave is imported or failed, Open calendar now while it runs, immediate finish in manual mode. Every step's completion is validated on the server; a stale tab cannot skip ahead.
+
+**States:** Load error state; per-step inline errors that keep input; Xero return messages; import running, complete and failed.
+
+---
+
+### S-33: Member welcome
+
+**Route:** `/welcome` in the `(setup)` route group, `?step=identity|balances|calendar`.
+**Guard:** Signed-in member (manager or viewer) linked to a person whose `welcome_completed_at` is null; everyone else is redirected to `/`. The `(authenticated)` layout redirects eligible members here once.
+**Evidence:** `apps/app/app/(setup)/welcome/{page,_actions}.tsx`; `apps/app/app/(setup)/welcome/steps/*.tsx`; `packages/availability/src/onboarding/welcome-service.ts`.
+
+**Purpose:** One-time welcome for invited members.
+
+**User interactions, as-built:** (1) This is you: name, email, team and manager; (2) Your leave balances from Xero, with an explanation instead of zeros when none exist; (3) Add your calendar (optional): creates the member's personal feed on request (S-13 self-service) and shows provider actions and the full URL; when the plan's feed limit blocks creation, the organisation feed is shown instead. Done, Skip and "Skip to dashboard" all mark the welcome as seen.
+
+---
+
 ### S-03: Dashboard
 
 **Route:** `/` (root of the authenticated app). No `/dashboard` alias exists; `components/dashboard/` is a shared component library, not a second route. No modal behaviour.
 **Guard:** `requirePageRole("org:viewer")` (`page.tsx:24`). Access: all roles.
-**Evidence:** `apps/app/app/(authenticated)/page.tsx:1-56`; `dashboard-body.tsx:1-201`; `packages/availability/src/dashboard/dashboard-service.ts`; `apps/app/components/dashboard/{admin-view,manager-view,employee-view,viewer-view,admin-empty-view,dashboard-skeleton,dashboard-scaffold,quick-actions-card,dashboard-live-updates,xero-disconnected-banner,dashboard-card-shell}.tsx`; `apps/app/components/onboarding/{dismissible-onboarding-panel,onboarding-checklist}.tsx`; `apps/app/lib/server/load-onboarding-state.ts`.
+**Evidence:** `apps/app/app/(authenticated)/page.tsx:1-56`; `dashboard-body.tsx:1-201`; `packages/availability/src/dashboard/dashboard-service.ts`; `apps/app/components/dashboard/{admin-view,manager-view,employee-view,viewer-view,admin-empty-view,dashboard-skeleton,dashboard-scaffold,quick-actions-card,dashboard-live-updates,xero-disconnected-banner,dashboard-card-shell}.tsx`; `apps/app/app/(authenticated)/dashboard-body.test.tsx`.
 **Country context:** Public holiday callouts filtered by the acting person's or team's `location_id`/`region_code`, same underlying data as S-11.
 
 **Purpose:** Role-appropriate at-a-glance summary and entry point.
 
 **User interactions, as-built:** Each card exposes an optional "Review" CTA linking deeper into the app; `QuickActionsCard` hard-codes three shortcuts ("Create a new plan", "View my calendar", "Open notifications"); `DashboardLiveUpdates` subscribes to SSE and shows a toast with a "Refresh" action, no auto-refresh. **Two features new since the 16 August pass:**
-1. **Dismissible onboarding checklist.** `DashboardBody` renders `DismissibleOnboardingPanel` above the role view whenever the acting role is owner or admin, regardless of whether the admin has a linked person record. It shows an `OnboardingChecklist` (four required steps plus a conditional "Connect Xero" step) and a "Dismiss onboarding" button; dismissal is stored per `clerkOrgId:organisationId:userId` in `localStorage` and the panel self-hides once complete. This overlaps in purpose with S-30 and reads the same underlying `loadOnboardingState()`: worth confirming with product whether both surfaces are intended, or whether the dashboard panel should just deep-link to S-30 instead of duplicating it.
+1. **No onboarding surface (9 October 2026).** The dismissible onboarding panel was removed. Owners and admins finish the S-32 setup wizard before reaching the dashboard; recommended next steps live only on S-30. An admin without a linked person sees `AdminEmptyView`, which reads the Xero connection state directly.
 2. **Xero-connection-conditional card visibility and banner.** Each role view reads `hasActiveXeroConnection` and renders an `XeroDisconnectedBanner` when false, while conditionally hiding `SyncHealthCard`/`OrgPendingApprovalsCard` (admin), `ApprovalQueueCard` (manager), and `BalancesCard` (all roles) when Xero is not connected. The banner's `connectHref` differs by role.
 
 **Role variations:** Each of `resolveDashboardRole()`'s five roles (owner/admin/manager/employee/viewer) renders a distinct card set, now further conditioned on Xero connection status as above. `ViewerView` (no linked person record) is no longer a bare stub: it now includes a "What you can do" card with next-step guidance and two buttons ("Organisation settings", "View people").
@@ -838,9 +868,9 @@ Automatic token refresh has no manual control. Normal disconnect completes synch
 **Guard:** `requirePageRole("org:admin")` + layout gate. Access: Admin, Owner.
 **Evidence:** `apps/app/app/(authenticated)/settings/getting-started/page.tsx:21`; `apps/app/components/onboarding/onboarding-checklist.tsx:76-98`; `apps/app/lib/server/load-onboarding-state.ts:34-223`.
 
-**Purpose:** Derived-state onboarding checklist, shared with the dashboard widget (see S-03's new panel, which duplicates this surface's purpose).
+**Purpose:** The only checklist: recommended next steps after the S-32 setup wizard.
 
-**User interactions, as-built:** No manual "mark complete"; every step's status is derived live from database counts. Steps: Review organisation profile; Connect Xero (shown only while no connection exists, not counted toward the required-steps ratio); Add or sync people; Review public holidays; Review calendar feed. Status badges: Done/Next/Later/Optional.
+**User interactions, as-built:** No manual "mark complete"; every step's status is derived live from database counts. Steps: Review public holidays; Add the calendar to your calendar app; and Connect Xero Payroll (manual-only organisations) or Xero connection (when the connection needs attention), not counted toward the progress ratio. The wizard owns the organisation profile and people. Status badges: Done/Next/Later/Optional.
 
 ---
 
@@ -934,7 +964,7 @@ Numbered independently of the change table above for cross-reference clarity.
 
 9. **The design-tokens documentation itself contained two factual errors**, now corrected: no `secondary-container` token exists in the codebase, and `#5E4F99` (previously attributed to `accent`) actually belongs to the unrelated `editorial-accent` token. **Recommended rule:** when documenting design tokens, cite the actual CSS custom property name, not an inferred pairing.
 
-10. **The dashboard's new onboarding checklist may duplicate S-30.** Both read the same `loadOnboardingState()` derived state and serve the same purpose. **Recommended rule:** confirm with product whether both surfaces are intentional, or whether the dashboard panel should link out to S-30 instead of rendering its own copy.
+10. ~~**The dashboard's new onboarding checklist may duplicate S-30.**~~ **Resolved 9 October 2026:** the dashboard panel was removed; S-30 is the only checklist and the S-32 wizard owns first-run setup.
 
 ---
 
@@ -944,7 +974,7 @@ Numbered independently of the change table above for cross-reference clarity.
 
 2. **Is a user-facing `/support` screen in scope?** `apps/api` has a working endpoint with no `apps/app` caller. If in scope, its intended audience and placement need a product decision before a screen entry can be written.
 
-3. **Should the dashboard's new onboarding checklist and S-30 both exist, or should one defer to the other?** New question raised by this pass; both currently render independently from the same derived state.
+3. ~~**Should the dashboard's new onboarding checklist and S-30 both exist, or should one defer to the other?**~~ **Decided 9 October 2026:** S-30 only; the dashboard panel was removed (see S-32 and the onboarding spec).
 
 4. **What should `E-05` show for an aggregate failure (e.g. `sync-client.tsx`'s tenant-level card, or `person-profile-content.tsx`'s multi-record view) now that the component supports a single `failedAction`?** The per-record call sites (`/plans`, `/leave-approvals`) are a straightforward wiring fix; the aggregate ones are not.
 
