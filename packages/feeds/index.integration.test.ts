@@ -254,7 +254,7 @@ describe("feed services", () => {
         ?.published_sequence
     ).toBe(1);
     expect(
-      rows.find((row) => row.source_key === `holiday:custom:${holiday.id}`)
+      rows.find((row) => row.source_key === `holiday:${holiday.id}`)
         ?.published_sequence
     ).toBe(1);
     expect(
@@ -395,7 +395,7 @@ describe("feed services", () => {
       where: {
         ...seeded.scope,
         feed_id: created.feedId,
-        source_key: `holiday:custom:${holiday.id}`,
+        source_key: `holiday:${holiday.id}`,
       },
     });
     expect(ledger.published_sequence).toBe(1);

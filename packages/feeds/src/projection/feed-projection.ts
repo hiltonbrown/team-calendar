@@ -324,6 +324,12 @@ async function projectPublicHolidays(input: {
     const custom = customHolidays.get(holiday.key);
     const publishedAt = custom?.updatedAt ?? dataVersionAt;
     const firstPublishableAt = custom?.createdAt ?? publishedAt;
+    // Custom holidays keep the identity they had before bundled holidays, so
+    // subscribed calendars update them in place instead of re-adding them.
+    const sourceRecordId = custom ? custom.id : holiday.key;
+    const publishedUid = custom
+      ? `${custom.id}${icsUidSuffix}`
+      : `${input.organisationId}-${holiday.key}${icsUidSuffix}`;
     events.push({
       allDay: true,
       contactabilityStatus: null,
@@ -338,9 +344,9 @@ async function projectPublicHolidays(input: {
       location: null,
       publishedAt,
       publishedSequence: 0,
-      publishedUid: `${input.organisationId}-${holiday.key}${icsUidSuffix}`,
+      publishedUid,
       recordType: "public_holiday",
-      sourceRecordId: holiday.key,
+      sourceRecordId,
       startsAt,
       summary: title,
     });

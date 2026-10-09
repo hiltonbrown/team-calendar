@@ -332,7 +332,7 @@ describe("projectFeedEvents", () => {
     const holidays = result.value.filter((event) => event.isPublicHoliday);
     expect(holidays.map((event) => event.sourceRecordId)).toEqual([
       "au-qld-2026-06-23-eve",
-      "custom:c-1",
+      "c-1",
     ]);
     expect(holidays[0]).toMatchObject({
       allDay: true,
@@ -344,7 +344,7 @@ describe("projectFeedEvents", () => {
     expect(holidays[1]).toMatchObject({
       displayName: "Public holiday: Company Holiday",
       publishedAt: new Date("2026-06-01T00:00:00.000Z"),
-      publishedUid: `${"40000000-0000-4000-8000-000000000001"}-custom:c-1@ical.teamcalendar.online`,
+      publishedUid: "c-1@ical.teamcalendar.online",
     });
   });
 
