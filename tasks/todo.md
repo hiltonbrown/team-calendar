@@ -1,5 +1,24 @@
 # Current work
 
+## Bundled public holidays (plan `docs/superpowers/plans/2026-10-09-bundled-public-holidays.md`)
+
+- [x] Region registry, reference schema and loader; one data file each for AU, NZ and UK.
+- [x] Starter data (basics only; the user will add the full range by hand).
+- [x] `public_holiday_preferences`; Nager rows, jurisdictions and assignments removed; custom holidays kept.
+- [x] Resolver in `@repo/core`, tenant loader in `@repo/database`, preference service in `@repo/availability`.
+- [x] Working days, approvals, calendar, dashboard, reports, current status and feeds read through the resolver.
+- [x] Public Holidays page, custom holiday modal, Settings > Holidays local day switches, registry regions in General settings.
+- [x] `docs/public-holidays.md`; PRODUCT.md, AGENTS.md and ScreenCatalogue.md updated; no runtime Nager references remain.
+
+### Review
+
+- `bun run check`: passes. `bun run typecheck`: 19 of 19 tasks. `bun run test`: 18 of 18 tasks.
+- `bun run test:integration` (local PostgreSQL): database 54, availability 25, app 10 and jobs 84 pass. Feeds passes 22 of 22 when run in its package with `TC_TEST_KV_*` set to a local Redis HTTP shim; under turbo those variables are filtered, so it fails to load. The Xero OAuth suite has the same 17 failures as before this work.
+- Data gaps: ACT, NT, SA, TAS and VIC have no entries (official sites blocked in the sandbox); NSW, WA and NZ cover 2026 to 2027 only (2028 not yet published). QLD and UK cover 2026 to 2028.
+- Deviations from the plan: resolver and reference data live in `@repo/core` and the loader in `@repo/database` (feeds cannot depend on availability); the jurisdiction removal migration is split in two; NZ anniversary days are national `local` entries with the province as the area; QLD Christmas Eve starts at 18:00; WA regional King's Birthday is not modelled; `recursAnnually` was a no-op and is removed; there is no location editing UI, so no location region picker.
+- NOT VERIFIED: visual rendering of the holiday screens (needs Clerk and other services); review the Vercel preview.
+- `bun.lock` shows an unrelated `next` 16.3.6 to 16.3.8 sync from `bun install`; left uncommitted.
+
 ## Design system sync (Claude Design System artifact, 9 October 2026)
 
 Bring code and docs in line with the reviewed Team Calendar design system. Brand mark unchanged.
