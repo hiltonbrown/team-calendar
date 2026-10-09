@@ -27,6 +27,7 @@ const {
   createInitialTokenWithClient,
   ensureDefaultCalendarFeed,
   getFeedDetail,
+  getFeedOversightCounts,
   getOwnFeedEligibility,
   listFeeds,
   pauseFeed,
@@ -1257,6 +1258,54 @@ describe("feed services", () => {
         patch: { name: "Admin rename" },
       })
     ).resolves.toMatchObject({ ok: true, value: { isOwnedByActor: false } });
+  });
+
+  test("applies the plan feed limit to self-service feeds", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Kim" });
+    await createTestFeed();
+    await createTestFeed();
+    await expect(
+      createOwnFeed(ownFeedRequest(employee.userId, "personal"))
+    ).resolves.toEqual({
+      error: {
+        code: "validation_error",
+        message: "Your current plan has reached its active feed limit.",
+      },
+      ok: false,
+    });
+  });
+
+  test("counts live and personal feeds for administrators only", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Jo" });
+    await createOwnFeed(ownFeedRequest(employee.userId, "personal"));
+    const orgFeed = await createTestFeed();
+    const base = {
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    };
+    await expect(
+      getFeedOversightCounts({ ...base, actingRole: "org:admin" })
+    ).resolves.toEqual({ ok: true, value: { personal: 1, total: 2 } });
+    await archiveFeed({
+      ...base,
+      actingRole: "org:admin",
+      feedId: orgFeed.feedId,
+    });
+    await expect(
+      getFeedOversightCounts({ ...base, actingRole: "org:admin" })
+    ).resolves.toEqual({ ok: true, value: { personal: 1, total: 1 } });
+    await expect(
+      getFeedOversightCounts({ ...base, actingRole: "org:viewer" })
+    ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    await expect(
+      getFeedOversightCounts({
+        ...base,
+        actingRole: "org:admin",
+        clerkOrgId: otherTenant.clerkOrgId,
+        organisationId: otherTenant.organisationId,
+      })
+    ).resolves.toEqual({ ok: true, value: { personal: 0, total: 0 } });
   });
 
   test("lists ownership, creator, last fetch and type filter within the tenant", async () => {

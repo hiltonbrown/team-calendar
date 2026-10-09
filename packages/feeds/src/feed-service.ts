@@ -923,6 +923,38 @@ export async function createOwnFeed(
   }
 }
 
+export async function getFeedOversightCounts(
+  input: unknown
+): Promise<Result<{ personal: number; total: number }, FeedServiceError>> {
+  const parsed = DashboardSummarySchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error);
+  }
+  if (!isAdminOrOwner(parsed.data.actingRole)) {
+    return notAuthorised();
+  }
+  const where = {
+    archived_at: null,
+    clerk_org_id: parsed.data.clerkOrgId,
+    organisation_id: parsed.data.organisationId,
+    status: { in: ["active", "paused"] satisfies feed_status[] },
+  };
+  try {
+    const [total, personal] = await Promise.all([
+      database.feed.count({ where }),
+      database.feed.count({
+        where: {
+          ...where,
+          scopes: { every: { scope_type: "self" }, some: {} },
+        },
+      }),
+    ]);
+    return { ok: true, value: { personal, total } };
+  } catch {
+    return unknownError("Failed to count feeds.");
+  }
+}
+
 export async function getFeedSummaryForDashboard(
   input: unknown
 ): Promise<Result<DashboardFeedSummary, FeedServiceError>> {

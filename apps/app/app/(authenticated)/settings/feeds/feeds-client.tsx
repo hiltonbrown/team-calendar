@@ -1,7 +1,6 @@
 "use client";
 
 import type { OrganisationSettings } from "@repo/availability";
-import { Button } from "@repo/design-system/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,10 +15,7 @@ import {
 } from "@repo/design-system/components/ui/radio-group";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import { Switch } from "@repo/design-system/components/ui/switch";
-import type { FeedListItem } from "@repo/feeds";
-import Link from "next/link";
 import { useState, useTransition } from "react";
-import { withOrg } from "@/lib/navigation/org-url";
 import {
   type SettingSaveState,
   SettingSaveStatus,
@@ -28,18 +24,11 @@ import { SettingsSectionHeader } from "../components/settings-section-header";
 import { updateFeedDefaultsAction } from "./_actions";
 
 interface FeedsClientProps {
-  feeds: FeedListItem[];
   organisationId: string;
-  orgQueryValue: string | null;
   settings: OrganisationSettings;
 }
 
-export const FeedsClient = ({
-  feeds,
-  orgQueryValue,
-  organisationId,
-  settings,
-}: FeedsClientProps) => {
+export const FeedsClient = ({ organisationId, settings }: FeedsClientProps) => {
   const [state, setState] = useState({
     defaultFeedPrivacyMode: settings.defaultFeedPrivacyMode,
     feedsIncludePublicHolidaysDefault:
@@ -78,7 +67,7 @@ export const FeedsClient = ({
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Organisation defaults for new feeds. Detailed feed lifecycle actions stay in the main feed area."
+        description="Organisation defaults for new feeds, and an overview of every feed. Open a feed to pause, rotate or archive it."
         title="Feeds"
       />
 
@@ -163,39 +152,6 @@ export const FeedsClient = ({
             id="feed-holidays-status"
             state={saveState.publicHolidays}
           />
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-xl">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle>All feeds</CardTitle>
-            <Button asChild>
-              <Link href={withOrg("/feeds/new", orgQueryValue)}>
-                Create new feed
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {feeds.map((feed) => (
-            <div
-              className="flex items-center justify-between rounded-xl bg-muted/30 p-3 text-label-lg"
-              key={feed.id}
-            >
-              <div>
-                <p className="font-medium">{feed.name}</p>
-                <p className="text-muted-foreground">
-                  {feed.scopeSummary} · {feed.status}
-                </p>
-              </div>
-              <Button asChild variant="outline">
-                <Link href={withOrg(`/feeds/${feed.id}`, orgQueryValue)}>
-                  Open
-                </Link>
-              </Button>
-            </div>
-          ))}
         </CardContent>
       </Card>
     </div>

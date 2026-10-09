@@ -27,14 +27,15 @@ function byName(a: FeedListItem, b: FeedListItem): number {
 function pickRecommended(candidates: FeedListItem[]): FeedListItem | null {
   const own = (kind: FeedListItem["kind"]) =>
     candidates.find((feed) => feed.isOwnedByActor && feed.kind === kind);
-  const organisation = candidates
+  const [oldestOrganisation] = candidates
     .filter((feed) => feed.kind === "organisation")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const [firstByName] = [...candidates].sort(byName);
   return (
     own("personal") ??
     own("manager_team") ??
-    organisation ??
-    [...candidates].sort(byName)[0] ??
+    oldestOrganisation ??
+    firstByName ??
     null
   );
 }
