@@ -10,7 +10,9 @@ SET "country_code" = j."country_code", "region_code" = j."region_code"
 FROM "public_holiday_jurisdictions" AS j
 WHERE h."jurisdiction_id" = j."id" AND h."source" = 'manual';
 
--- 2. Location overrides on custom holidays become preferences.
+-- 2. Location overrides on custom holidays become preferences. Suppressed
+-- holidays are skipped (step 3 hides them everywhere, and a location row would
+-- override that), as are overrides equal to the default, which change nothing.
 INSERT INTO "public_holiday_preferences"
   ("id", "clerk_org_id", "organisation_id", "holiday_key", "location_id", "setting",
    "created_by_user_id", "updated_by_user_id", "created_at", "updated_at")
@@ -23,6 +25,8 @@ JOIN "locations" AS l ON l."id"::text = a."scope_value"
   AND l."organisation_id" = h."organisation_id"
   AND l."clerk_org_id" = h."clerk_org_id"
 WHERE a."scope_type" = 'location' AND a."archived_at" IS NULL AND h."source" = 'manual'
+  AND h."archived_at" IS NULL
+  AND a."day_classification"::text <> h."default_classification"::text
 ON CONFLICT DO NOTHING;
 
 -- 3. Suppressed custom holidays become organisation-wide hidden preferences.

@@ -142,6 +142,24 @@ async function seed() {
     ids.locationA,
     "working",
   ]);
+  // An override on a suppressed holiday must not undo its organisation-wide hide.
+  await scratch.query(assignment, [
+    randomUUID(),
+    "org_b",
+    ids.orgB,
+    ids.customSuppressed,
+    ids.locationB,
+    "working",
+  ]);
+  // An override equal to the default classification changes nothing.
+  await scratch.query(assignment, [
+    randomUUID(),
+    "org_a",
+    ids.orgA,
+    ids.customAll,
+    ids.locationA,
+    "non_working",
+  ]);
   // A location from another organisation must not become a preference.
   await scratch.query(assignment, [
     randomUUID(),
