@@ -10,11 +10,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   advanceStepAction: vi.fn(),
   assign: vi.fn(),
+  replace: vi.fn(),
   saveDetailsAction: vi.fn(),
   skipXeroAction: vi.fn(),
   startXeroFromOnboardingAction: vi.fn(),
 }));
 vi.mock("../_actions", () => mocks);
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+}));
 
 class ResizeObserverMock {
   disconnect() {
@@ -42,7 +46,12 @@ describe("DetailsStep", () => {
   it("defaults a non-Australian timezone to Sydney and submits the details", async () => {
     mocks.saveDetailsAction.mockResolvedValue({ ok: true, value: {} });
     render(
-      <DetailsStep name="Acme" organisationId={organisationId} timezone="UTC" />
+      <DetailsStep
+        doneHref="/onboarding"
+        name="Acme"
+        organisationId={organisationId}
+        timezone="UTC"
+      />
     );
     expect(document.activeElement?.textContent).toBe("Your organisation");
     fireEvent.change(screen.getByLabelText("Organisation name"), {
@@ -65,6 +74,7 @@ describe("DetailsStep", () => {
     });
     render(
       <DetailsStep
+        doneHref="/onboarding"
         name="Acme"
         organisationId={organisationId}
         timezone="Australia/Perth"
@@ -111,6 +121,7 @@ describe("XeroStep", () => {
     render(
       <XeroStep
         connected={false}
+        doneHref="/onboarding"
         organisationId={organisationId}
         returnMessage={null}
       />
@@ -128,6 +139,7 @@ describe("XeroStep", () => {
     render(
       <XeroStep
         connected={false}
+        doneHref="/onboarding"
         organisationId={organisationId}
         returnMessage="You cancelled the Xero connection."
       />
@@ -153,6 +165,7 @@ describe("XeroStep", () => {
     render(
       <XeroStep
         connected
+        doneHref="/onboarding"
         organisationId={organisationId}
         returnMessage={null}
       />
@@ -163,6 +176,9 @@ describe("XeroStep", () => {
         from: "xero",
         organisationId,
       })
+    );
+    await waitFor(() =>
+      expect(mocks.replace).toHaveBeenCalledWith("/onboarding")
     );
   });
 });

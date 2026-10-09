@@ -14,11 +14,12 @@ const mocks = vi.hoisted(() => ({
   createSelfAction: vi.fn(),
   linkSelfAction: vi.fn(),
   refresh: vi.fn(),
+  replace: vi.fn(),
   resolveXeroPersonMatchAction: vi.fn(),
   sendInvitesAction: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: mocks.refresh }),
+  useRouter: () => ({ refresh: mocks.refresh, replace: mocks.replace }),
 }));
 vi.mock("../_actions", () => ({
   addPersonAction: mocks.addPersonAction,
@@ -53,6 +54,7 @@ const DID_NOT_FINISH = /did not finish/;
 
 const baseProps = {
   actingPerson: { id: "p0", name: "Ava Lee" },
+  doneHref: "/onboarding",
   matches: [],
   mode: "xero" as const,
   organisationId,
@@ -235,7 +237,13 @@ describe("InviteStep", () => {
   ];
 
   it("defaults managers to Manager and others to Viewer, and offers no owner role", () => {
-    render(<InviteStep organisationId={organisationId} roster={roster} />);
+    render(
+      <InviteStep
+        doneHref="/onboarding"
+        organisationId={organisationId}
+        roster={roster}
+      />
+    );
     expect(
       screen.getByRole("combobox", { name: "Role for Mia Chen" }).textContent
     ).toBe("Manager");
@@ -259,7 +267,13 @@ describe("InviteStep", () => {
         ],
       },
     });
-    render(<InviteStep organisationId={organisationId} roster={roster} />);
+    render(
+      <InviteStep
+        doneHref="/onboarding"
+        organisationId={organisationId}
+        roster={roster}
+      />
+    );
     fireEvent.click(screen.getByRole("button", { name: "Send 2 invitations" }));
     expect(await screen.findByText("Invitation sent")).toBeTruthy();
     expect(
@@ -279,7 +293,13 @@ describe("InviteStep", () => {
 
   it("skips without sending", async () => {
     mocks.advanceStepAction.mockResolvedValue({ ok: true, value: {} });
-    render(<InviteStep organisationId={organisationId} roster={[]} />);
+    render(
+      <InviteStep
+        doneHref="/onboarding"
+        organisationId={organisationId}
+        roster={[]}
+      />
+    );
     expect(screen.getByLabelText("Email address")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
     await waitFor(() =>
@@ -287,6 +307,9 @@ describe("InviteStep", () => {
         from: "invites",
         organisationId,
       })
+    );
+    await waitFor(() =>
+      expect(mocks.replace).toHaveBeenCalledWith("/onboarding")
     );
     expect(mocks.sendInvitesAction).not.toHaveBeenCalled();
   });

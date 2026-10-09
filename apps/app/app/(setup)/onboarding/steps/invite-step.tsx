@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@repo/design-system/components/ui/select";
 import { CheckIcon, CircleAlertIcon, PlusIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { RosterPerson } from "@/lib/server/load-onboarding-people";
 import {
@@ -60,12 +61,15 @@ function manualRow(): InviteRow {
 }
 
 export function InviteStep({
+  doneHref,
   organisationId,
   roster,
 }: {
+  doneHref: string;
   organisationId: string;
   roster: RosterPerson[];
 }) {
+  const router = useRouter();
   const [rows, setRows] = useState<InviteRow[]>(() =>
     roster.length > 0 ? rowsFromRoster(roster) : [manualRow()]
   );
@@ -120,7 +124,9 @@ export function InviteStep({
       });
       if (!result.ok) {
         setError(result.error.message);
+        return;
       }
+      router.replace(doneHref);
     });
   };
 

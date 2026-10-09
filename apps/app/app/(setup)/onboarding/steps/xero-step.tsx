@@ -13,6 +13,7 @@ import {
 } from "@repo/design-system/components/ui/alert-dialog";
 import { Button } from "@repo/design-system/components/ui/button";
 import { CheckIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   advanceStepAction,
@@ -47,13 +48,16 @@ export function xeroReturnMessage(input: {
 
 export function XeroStep({
   connected,
+  doneHref,
   organisationId,
   returnMessage,
 }: {
   connected: boolean;
+  doneHref: string;
   organisationId: string;
   returnMessage: string | null;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(returnMessage);
   const [isPending, startTransition] = useTransition();
 
@@ -77,7 +81,9 @@ export function XeroStep({
       const result = await action();
       if (!result.ok) {
         setError(result.error?.message ?? "Something went wrong. Try again.");
+        return;
       }
+      router.replace(doneHref);
     });
   };
 

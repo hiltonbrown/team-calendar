@@ -31,6 +31,7 @@ const INLINE_MATCH_LIMIT = 10;
 
 interface PeopleStepProps {
   actingPerson: { id: string; name: string } | null;
+  doneHref: string;
   matches: XeroPersonMatchView[];
   mode: "manual" | "xero";
   organisationId: string;
@@ -63,7 +64,7 @@ export function PeopleStep(props: PeopleStepProps) {
         setError(result.error?.message ?? "Something went wrong. Try again.");
         return;
       }
-      router.refresh();
+      router.replace(props.doneHref);
     });
   };
 

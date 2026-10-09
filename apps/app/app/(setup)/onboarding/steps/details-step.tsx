@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@repo/design-system/components/ui/select";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useState, useTransition } from "react";
 import {
   AU_TIMEZONES,
@@ -21,14 +22,17 @@ import { saveDetailsAction } from "../_actions";
 import { ActionError, StepHeading } from "./step-heading";
 
 export function DetailsStep({
+  doneHref,
   name,
   organisationId,
   timezone,
 }: {
+  doneHref: string;
   name: string;
   organisationId: string;
   timezone: string | null;
 }) {
+  const router = useRouter();
   const [nameValue, setNameValue] = useState(name);
   const [timezoneValue, setTimezoneValue] = useState<AuTimezone>(
     isAuTimezone(timezone) ? timezone : DEFAULT_AU_TIMEZONE
@@ -47,7 +51,9 @@ export function DetailsStep({
       });
       if (!result.ok) {
         setError(result.error.message);
+        return;
       }
+      router.replace(doneHref);
     });
   };
 
