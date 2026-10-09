@@ -1,68 +1,76 @@
 import type { EmployeeDashboardView } from "@repo/availability";
-import { ActionItemsCard } from "./action-items-card";
-import { buildPersonalCalendarTimeline } from "./ambient-calendar-data";
-import { AmbientCalendarField } from "./ambient-calendar-field";
 import { BalancesCard } from "./balances-card";
+import { formatFullDate } from "./dashboard-format";
+import { DashboardGrid } from "./dashboard-grid";
+import { DashboardHeader, REQUEST_LEAVE_ACTION } from "./dashboard-header";
 import {
-  DashboardScaffold,
-  toDashboardHeaderProps,
-} from "./dashboard-scaffold";
+  DEFAULT_DASHBOARD_TIMEZONE,
+  showBalances,
+} from "./dashboard-view-state";
+import { MyRequests } from "./my-requests";
+import { NeedsReply } from "./needs-reply";
 import { NextPublicHolidayCard } from "./next-public-holiday-card";
-import { QuickActionsCard } from "./quick-actions-card";
-import { XeroDisconnectedBanner } from "./xero-disconnected-banner";
+import { TimelineSection } from "./timeline-section";
 
 interface EmployeeViewProps {
+  now: Date;
   orgQueryValue: string | null;
   personId: string;
   view: EmployeeDashboardView;
 }
+
 export function EmployeeView({
-  view,
+  now,
   orgQueryValue,
   personId,
+  view,
 }: EmployeeViewProps) {
-  const xero = view.header.xeroConnectionState === "connected";
-  const timeline = buildPersonalCalendarTimeline(view, {
-    now: new Date(),
-    timezone: view.header.timezone ?? "Australia/Brisbane",
-  });
+  const timezone = view.header.timezone ?? DEFAULT_DASHBOARD_TIMEZONE;
   return (
-    <DashboardScaffold
-      banner={
-        xero ? null : (
-          <XeroDisconnectedBanner
-            connectHref="/settings/integrations"
-            orgQueryValue={orgQueryValue}
-            xeroConnectionState={view.header.xeroConnectionState}
-          />
-        )
-      }
-      feature={
-        <AmbientCalendarField model={timeline} orgQueryValue={orgQueryValue} />
-      }
-      header={toDashboardHeaderProps(view.header)}
-      lead={
-        <ActionItemsCard
-          orgQueryValue={orgQueryValue}
-          state={view.actionItems}
-        />
-      }
-      rail={
-        <>
-          <QuickActionsCard orgQueryValue={orgQueryValue} />
-          <NextPublicHolidayCard
-            orgQueryValue={orgQueryValue}
-            state={view.publicHolidays}
-          />
-          {xero ? (
-            <BalancesCard
+    <div className="space-y-6">
+      <DashboardHeader
+        dateLabel={formatFullDate(now, timezone)}
+        locationLabel={view.header.locationName}
+        orgQueryValue={orgQueryValue}
+        primaryAction={REQUEST_LEAVE_ACTION}
+        scopeLine="Your leave and availability"
+      />
+      <TimelineSection
+        now={now}
+        orgQueryValue={orgQueryValue}
+        state={view.timeline}
+        viewerRole="employee"
+      />
+      <DashboardGrid
+        lead={
+          <>
+            <NeedsReply
               orgQueryValue={orgQueryValue}
-              personId={personId}
-              state={view.balances}
+              state={view.actionItems}
             />
-          ) : null}
-        </>
-      }
-    />
+            <MyRequests
+              orgQueryValue={orgQueryValue}
+              state={view.myRequests}
+              timezone={timezone}
+            />
+          </>
+        }
+        rail={
+          <>
+            {showBalances(view.balances) ? (
+              <BalancesCard
+                orgQueryValue={orgQueryValue}
+                personId={personId}
+                state={view.balances}
+              />
+            ) : null}
+            <NextPublicHolidayCard
+              orgQueryValue={orgQueryValue}
+              state={view.publicHolidays}
+            />
+          </>
+        }
+      />
+    </div>
   );
 }

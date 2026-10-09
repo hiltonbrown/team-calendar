@@ -1,3 +1,7 @@
+import type {
+  DashboardApprovalQueue,
+  DashboardSection,
+} from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
 import Link from "next/link";
 import { withOrg } from "@/lib/navigation/org-url";
@@ -5,6 +9,34 @@ import { withOrg } from "@/lib/navigation/org-url";
 export interface DashboardHeaderAction {
   href: string;
   label: string;
+}
+
+export const REQUEST_LEAVE_ACTION: DashboardHeaderAction = {
+  href: "/plans/new",
+  label: "Request leave",
+};
+
+/**
+ * "Review N requests" leads when requests are waiting, with Request leave as
+ * the secondary action; otherwise Request leave is the primary action.
+ */
+export function approvalHeaderActions(
+  queue: DashboardSection<DashboardApprovalQueue>
+): {
+  primaryAction: DashboardHeaderAction;
+  secondaryAction?: DashboardHeaderAction;
+} {
+  const count = queue.status === "ready" ? queue.data.count : 0;
+  if (count === 0) {
+    return { primaryAction: REQUEST_LEAVE_ACTION };
+  }
+  return {
+    primaryAction: {
+      href: "/leave-approvals?status=submitted",
+      label: count === 1 ? "Review 1 request" : `Review ${count} requests`,
+    },
+    secondaryAction: REQUEST_LEAVE_ACTION,
+  };
 }
 
 interface DashboardHeaderProps {
