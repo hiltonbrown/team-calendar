@@ -24,7 +24,7 @@ Public holidays come from the Nager.Date API (`packages/availability/src/holiday
 | Horizon | Current year plus two (2026 to 2028 at release). |
 | Part days | Stored with a start time (SA and NT Christmas Eve and New Year's Eve from 19:00). The day stays a working day; the calendar and feeds show "Public holiday from 19:00". |
 | Existing data | Delete everything imported from Nager.Date, including its suppressions and location overrides. Custom holidays and their location overrides are kept. |
-| Upkeep | Manual, by the team, once a year. A CI test fails from 1 October until the year after next is present for every jurisdiction. |
+| Upkeep | Manual, by the team, once a year in September. No tests run on the data files. |
 | Jurisdictions | Automatic: each location's country and region, falling back to the organisation's country and region, then to national holidays only. The manual jurisdiction list and import controls are removed. |
 
 ## Reference data
@@ -33,7 +33,7 @@ Public holidays come from the Nager.Date API (`packages/availability/src/holiday
 
 There is exactly one file per country, and each file holds only that country's entries: `au.json` (Australia), `nz.json` (New Zealand) and `uk.json` (United Kingdom). No combined or shared holiday file exists. Each file's top-level `country` must match its file name and every entry in it; adding a country later means adding one new file.
 
-`packages/availability/src/holidays/reference/data/au.json`, `nz.json` and `uk.json`. JSON so non-developers can edit them; parsed once at module load with Zod, and the build fails on invalid data.
+`packages/availability/src/holidays/reference/data/au.json`, `nz.json` and `uk.json`. JSON so non-developers can edit them; parsed once at module load with Zod; an invalid entry stops the app starting with an error naming the file and entry. No tests run on the data files.
 
 ```json
 {
@@ -83,9 +83,9 @@ Field rules:
 
 Countries use the product's existing codes (`AU`, `NZ`, `UK`).
 
-### Coverage rule
+### Years kept
 
-For a given date `today`, the file must contain, for every country and for every region of that country that has at least one entry: all of `today`'s year and the next year, and from 1 October also the year after next. A region "has" a year when it, or the national list, has at least one `public` entry in that year (national holidays count for every region). Years older than `today`'s year minus one may be removed.
+Each file holds the current year plus two. Years older than last year may be removed.
 
 ## Organisation data
 
@@ -129,10 +129,9 @@ All readers use this function: calendar cells, current status, feed projection, 
 
 Documented in `docs/public-holidays.md`:
 
-1. From 1 October CI fails with a message naming each missing country, region and year.
-2. A team member adds the next year's entries from each jurisdiction's official government public holidays page and checks recently announced one-off days.
-3. Bump `PUBLIC_HOLIDAY_DATA_VERSION`, run `bun run test`, open a pull request; a second person checks the entries against the official pages.
-4. One-off holidays announced mid-year (for example a national day of mourning): admins can add a custom holiday immediately; the team adds the official entry in the next release.
+1. Each September (a recurring team calendar reminder, not a test), a team member adds the next year's entries from each jurisdiction's official government public holidays page and checks recently announced one-off days.
+2. Bump `PUBLIC_HOLIDAY_DATA_VERSION`, start the app locally to confirm the files load, open a pull request; a second person checks the entries against the official pages.
+3. One-off holidays announced mid-year (for example a national day of mourning): admins can add a custom holiday immediately; the team adds the official entry in the next release.
 
 ## Out of scope
 

@@ -1,6 +1,6 @@
 # Bundled Public Holidays Implementation Plan
 
-> **For agentic workers (Codex):** Execute this plan task by task, in order. Steps use checkbox syntax for tracking. Each task starts with a failing test, then the smallest change that makes it pass. Do not start a task until the previous task's tests pass and its commit exists. This document authorises no execution in the planning turn.
+> **For agentic workers (Codex):** Execute this plan task by task, in order. Steps use checkbox syntax for tracking. Each code task starts with a failing test, then the smallest change that makes it pass. The holiday data files have no tests (Tasks 1 to 3). Do not start a task until the previous task's tests pass and its commit exists. This document authorises no execution in the planning turn.
 
 **Goal:** Replace the Nager.Date API with a bundled, officially sourced holiday file for Australia, New Zealand and the United Kingdom, resolved per location at read time, with organisation changes stored as small preferences.
 
@@ -39,7 +39,6 @@ Finish Prisma generation before tests that import generated types. Commit each t
 | `packages/availability/src/holidays/reference/schema.ts` | new | Zod schema for data files |
 | `packages/availability/src/holidays/reference/data/{au,nz,uk}.json` | new | Official entries 2026 to 2028 |
 | `packages/availability/src/holidays/reference/reference-holidays.ts` | new | Parse once, `PUBLIC_HOLIDAY_DATA_VERSION`, `listReferenceHolidays` |
-| `packages/availability/src/holidays/reference/coverage.ts` | new | `findMissingCoverage(today)` |
 | `packages/availability/src/holidays/resolve-public-holidays.ts` | new | The resolver |
 | `packages/availability/src/holidays/holiday-preferences.ts` | new | Hide, restore, classification, local-day opt-in, audit |
 | `packages/availability/src/holidays/holiday-service.ts` | rewrite | Custom holidays only |
@@ -96,7 +95,7 @@ export async function resolvePublicHolidays(input: {
 
 ## Review focus
 
-1. Data integrity: unique ids, valid dates, regions from the registry, part days with times, local days with areas (Task 1 tests); spot-check of entries against the official pages (Tasks 2, 3).
+1. Data integrity: unique ids, valid dates, regions from the registry, part days with times, local days with areas (enforced by the load-time schema, not tests); spot-check of entries against the official pages (Tasks 2, 3).
 2. Precedence: location preference beats organisation preference; local days never show without an opt-in; part days stay working by default (Task 5).
 3. Tenancy: preferences and custom holidays never cross organisations (Tasks 5, 6).
 4. Migration safety: Nager rows, jurisdictions and their assignments go; custom holidays and their location assignments survive as preferences (Task 4).
@@ -104,16 +103,14 @@ export async function resolvePublicHolidays(input: {
 
 ---
 
-### Task 1: Region registry, data schema, loader and coverage check
+### Task 1: Region registry, data schema and loader
 
-**Files:** `packages/core/src/regions.ts` (+ test, export from core root); `packages/availability/src/holidays/reference/{schema.ts,reference-holidays.ts,coverage.ts}` (+ tests); empty `data/{au,nz,uk}.json` with `{ "country": "AU", "entries": [] }` and so on.
+**Files:** `packages/core/src/regions.ts` (+ test, export from core root); `packages/availability/src/holidays/reference/{schema.ts,reference-holidays.ts}` (no tests); empty `data/{au,nz,uk}.json` with `{ "country": "AU", "entries": [] }` and so on.
 
 - [ ] Failing tests for `regions.ts`: every code in the spec's registry is present with a label; `normaliseRegionCode("AU", "Queensland")` is `QLD`, `("UK", "scotland")` is `SCT`, unknown values return null.
 - [ ] Keep one data file per country (`au.json`, `nz.json`, `uk.json`), each holding only that country's entries; the loader imports the three files separately and there is no combined data file.
-- [ ] Failing tests for the schema: exactly the files `au.json`, `nz.json` and `uk.json` exist in `data/`; each file's `country` matches its file name (`au.json` is `AU`) and every entry's id prefix matches that country; rejects duplicate ids across all files, ids not matching `^(au|nz|uk)-(national|[a-z]+)-\d{4}-\d{2}-\d{2}-[a-z0-9-]+$`, ids whose embedded country, region or date disagree with the fields, invalid dates, regions outside the registry, unknown fields (strict schema), `part_day` without `startsAt`, `startsAt` on other kinds, `local` without `area`, `area` on other kinds.
-- [ ] Failing tests for `coverage.ts` with an injected `today` and fixture data: on 30 September 2026 requires 2026 and 2027; on 1 October 2026 also 2028; national entries satisfy every region; the result lists `{ country, region, year }` gaps in a stable order; a message formatter produces `Missing public holidays: AU QLD 2028, UK SCT 2028. Add them to packages/availability/src/holidays/reference/data (see docs/public-holidays.md).`
-- [ ] Add `reference-data.test.ts` that validates the real files and calls `findMissingCoverage(new Date())`, failing with the formatted message. Mark it `it.todo` until Task 3 fills the data, then switch it to a real test in Task 3.
-- [ ] Commit `feat(availability): reference public holiday schema and coverage check`.
+- [ ] Write the Zod schema (no tests) so loading fails with an error naming the file and entry when: the files are not exactly `au.json`, `nz.json` and `uk.json`; a file's `country` does not match its file name (`au.json` must be `AU`) or an entry's id prefix does not match that country; an id is duplicated across files; an id does not match `^(au|nz|uk)-(national|[a-z]+)-\d{4}-\d{2}-\d{2}-[a-z0-9-]+$` or its embedded country, region or date disagrees with the fields; a date is invalid; a region is outside the registry; an unknown field is present (strict schema); a `part_day` lacks `startsAt`, or another kind has one; a `local` lacks `area`, or another kind has one.
+- [ ] Commit `feat(availability): reference public holiday schema and loader`.
 
 ### Task 2: Australian data, 2026 to 2028
 
@@ -127,11 +124,11 @@ export async function resolvePublicHolidays(input: {
 
 ### Task 3: New Zealand and United Kingdom data, 2026 to 2028
 
-**Files:** `data/nz.json`, `data/uk.json`, `reference-data.test.ts`.
+**Files:** `data/nz.json`, `data/uk.json`.
 
 - [ ] NZ: national holidays (including Matariki and Mondayised days) from the New Zealand Government's employment public holidays source; each provincial anniversary day as `local` with its region code and `area` (for example Auckland Anniversary Day, region `AUK`).
 - [ ] UK: separate entries for `EAW`, `SCT` and `NIR` from GOV.UK bank holidays, including substitute days as published.
-- [ ] Switch `reference-data.test.ts` from `it.todo` to a real test; it must pass today (9 October 2026 requires 2026 to 2028).
+- [ ] Start the app locally and confirm all three files load without a schema error.
 - [ ] Commit `feat(availability): bundle NZ and UK public holidays 2026 to 2028`.
 
 ### Task 4: Schema and migrations
@@ -209,5 +206,4 @@ export async function resolvePublicHolidays(input: {
 - [ ] `bun run fix`, then `bun run check`, `bun run typecheck`, `bun run test`, `bun run test:integration`; all pass.
 - [ ] `rg -i "nager" --glob '!docs/superpowers/**'` returns nothing.
 - [ ] With network access blocked for the app process, run `bun run dev`, create an organisation with a QLD location and check: holidays appear on the calendar, dashboard and Public holidays page; enabling Royal Queensland Show for the location shows it; an SA location shows Christmas Eve from 19:00 as a working day; a feed with public holidays includes them.
-- [ ] Temporarily set the clock in `reference-data.test.ts` to 1 October 2028 and confirm the failure message names the missing 2030 entries, then revert.
 - [ ] Add a review section to `tasks/todo.md` with evidence and any gaps marked NOT VERIFIED. Commit `docs: record bundled public holidays verification`.
