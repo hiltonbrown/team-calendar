@@ -8,6 +8,7 @@ import {
   type Result,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
+import { Prisma } from "@repo/database/generated/client";
 import { z } from "zod";
 
 export type HolidayPreferenceError =
@@ -45,6 +46,10 @@ const scopeOf = (input: Base) =>
     input.clerkOrgId as ClerkOrgId,
     input.organisationId as OrganisationId
   );
+const isUniqueConflict = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === "P2002";
+
 type Transaction = Parameters<Parameters<typeof database.$transaction>[0]>[0];
 
 const failure = (
@@ -192,37 +197,48 @@ async function applyPreference(
       holiday_key: input.holidayKey,
       location_id: input.locationId,
     };
-    await database.$transaction(async (tx) => {
-      const existing = await tx.publicHolidayPreference.findFirst({
-        select: { id: true, setting: true },
-        where,
+    const write = () =>
+      database.$transaction(async (tx) => {
+        const existing = await tx.publicHolidayPreference.findFirst({
+          select: { id: true, setting: true },
+          where,
+        });
+        if (setting === null) {
+          await tx.publicHolidayPreference.deleteMany({ where });
+        } else if (existing) {
+          await tx.publicHolidayPreference.update({
+            data: { setting, updated_by_user_id: input.actingUserId },
+            where: { id: existing.id },
+          });
+        } else {
+          await tx.publicHolidayPreference.create({
+            data: {
+              clerk_org_id: input.clerkOrgId,
+              created_by_user_id: input.actingUserId,
+              holiday_key: input.holidayKey,
+              location_id: input.locationId,
+              organisation_id: input.organisationId,
+              setting,
+              updated_by_user_id: input.actingUserId,
+            },
+          });
+        }
+        await writeAudit(tx, input, action, {
+          after: setting,
+          before: existing?.setting ?? null,
+          locationId: input.locationId,
+        });
       });
-      if (setting === null) {
-        await tx.publicHolidayPreference.deleteMany({ where });
-      } else if (existing) {
-        await tx.publicHolidayPreference.update({
-          data: { setting, updated_by_user_id: input.actingUserId },
-          where: { id: existing.id },
-        });
-      } else {
-        await tx.publicHolidayPreference.create({
-          data: {
-            clerk_org_id: input.clerkOrgId,
-            created_by_user_id: input.actingUserId,
-            holiday_key: input.holidayKey,
-            location_id: input.locationId,
-            organisation_id: input.organisationId,
-            setting,
-            updated_by_user_id: input.actingUserId,
-          },
-        });
+    try {
+      await write();
+    } catch (error) {
+      // Two admins can insert the same preference at once; the unique indexes
+      // reject the second insert, and one retry then updates the winning row.
+      if (!isUniqueConflict(error)) {
+        throw error;
       }
-      await writeAudit(tx, input, action, {
-        after: setting,
-        before: existing?.setting ?? null,
-        locationId: input.locationId,
-      });
-    });
+      await write();
+    }
 
     return {
       ok: true,

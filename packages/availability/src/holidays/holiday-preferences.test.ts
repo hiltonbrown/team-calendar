@@ -43,6 +43,7 @@ vi.mock("@repo/core", async (importOriginal) => ({
   }),
 }));
 
+import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   hidePublicHoliday,
@@ -130,6 +131,31 @@ describe("holiday preferences", () => {
       data: expect.objectContaining({
         action: "public_holidays.classification_changed",
       }),
+    });
+  });
+
+  it("retries once and updates when a concurrent insert wins the unique index", async () => {
+    db.publicHolidayPreference.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "pref-race", setting: "hidden" });
+    db.publicHolidayPreference.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint", {
+        clientVersion: "test",
+        code: "P2002",
+      })
+    );
+
+    const result = await hidePublicHoliday({
+      ...base,
+      holidayKey: CHRISTMAS,
+      locationId: null,
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(db.$transaction).toHaveBeenCalledTimes(2);
+    expect(db.publicHolidayPreference.update).toHaveBeenCalledWith({
+      data: expect.objectContaining({ setting: "hidden" }),
+      where: { id: "pref-race" },
     });
   });
 

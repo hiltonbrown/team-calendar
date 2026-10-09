@@ -246,6 +246,7 @@ export type PublicHolidayPreferenceOrderByWithRelationInput = {
 export type PublicHolidayPreferenceWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   organisation_id_holiday_key_location_id?: Prisma.PublicHolidayPreferenceOrganisation_idHoliday_keyLocation_idCompoundUniqueInput
+  organisation_id_holiday_key?: Prisma.PublicHolidayPreferenceOrganisation_idHoliday_keyCompoundUniqueInput
   AND?: Prisma.PublicHolidayPreferenceWhereInput | Prisma.PublicHolidayPreferenceWhereInput[]
   OR?: Prisma.PublicHolidayPreferenceWhereInput[]
   NOT?: Prisma.PublicHolidayPreferenceWhereInput | Prisma.PublicHolidayPreferenceWhereInput[]
@@ -260,7 +261,7 @@ export type PublicHolidayPreferenceWhereUniqueInput = Prisma.AtLeast<{
   updated_at?: Prisma.DateTimeFilter<"PublicHolidayPreference"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   location?: Prisma.XOR<Prisma.LocationNullableScalarRelationFilter, Prisma.LocationWhereInput> | null
-}, "id" | "organisation_id_holiday_key_location_id">
+}, "id" | "organisation_id_holiday_key_location_id" | "organisation_id_holiday_key">
 
 export type PublicHolidayPreferenceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -397,6 +398,11 @@ export type PublicHolidayPreferenceOrganisation_idHoliday_keyLocation_idCompound
   organisation_id: string
   holiday_key: string
   location_id: string
+}
+
+export type PublicHolidayPreferenceOrganisation_idHoliday_keyCompoundUniqueInput = {
+  organisation_id: string
+  holiday_key: string
 }
 
 export type PublicHolidayPreferenceCountOrderByAggregateInput = {

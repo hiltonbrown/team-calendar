@@ -852,6 +852,8 @@ model PublicHolidayPreference {
   location     Location?    @relation(fields: [location_id], references: [id], onDelete: Cascade)
 
   @@unique([organisation_id, holiday_key, location_id])
+  // NULL location_ids are distinct in the index above, so organisation-wide rows need their own.
+  @@unique([organisation_id, holiday_key], map: "public_holiday_preferences_organisation_wide_key", where: raw("location_id IS NULL"))
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@map("public_holiday_preferences")
