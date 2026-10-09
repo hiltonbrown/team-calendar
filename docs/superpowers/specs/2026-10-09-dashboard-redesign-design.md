@@ -1,6 +1,6 @@
 # Dashboard Redesign Design
 
-**Status:** Approved for planning, 9 October 2026.
+**Status:** Approved for planning, 9 October 2026. Second pass against the code after the bundled public holidays change, 9 October 2026.
 **Visual reference:** Design canvas "Dashboard Design Review" (claude.ai artifact `VR5vykfCwyy1tHznfyT7f3`), boards Manager, Employee, Admin, Mobile, Timeline and Coverage.
 **Implementation plan:** [Dashboard redesign plan](../plans/2026-10-09-dashboard-redesign.md).
 
@@ -39,11 +39,13 @@ A presentational component in `packages/design-system/components/team-timeline/`
 
 - Toolbar: previous and next week links, a Today link (sage fill when the current week is shown), week label (`Mon 5 to Sun 11 Oct`) and sub-label (`This week · 2026`), and a legend.
 - Grid: 220px person column and seven day columns at `minmax(7rem, 1fr)`, minimum width 62rem, inside a card that scrolls sideways on narrow screens with the "Swipe to see the full week" hint below 768px.
-- Day header: weekday, date, a `Today` pill on today and a warning-style holiday chip naming the public holiday. Today's column is tinted `primary` at 5% (8% in the header); holiday columns are tinted `warning-container`.
+- Day header: weekday, date, a `Today` pill on today and a warning-style holiday chip naming a full-day public holiday (part-day holidays, which carry a start time, are not marked; they are working days). Today's column is tinted `primary` at 5% (8% in the header); holiday columns are tinted `warning-container`.
 - Rows: avatar initials, name, secondary line (job title, or team and location for admins), a `You` pill on the viewer's own row, alternating row tones.
 - Blocks: `secondary` fill for Xero-synced records, `accent-container` for manual records, neutral `surface-container-high` with the label "Unavailable" for private records. Each block carries a 14px icon: `RefreshCw` for Xero records (the design system replaces the homepage leaf), `House` for working from home, `Briefcase` for client site and another office, `GraduationCap` for training, `Plane` for travel, `Circle` for other. Labels show from two days, day counts from three days.
-- Detail strip: selecting a block shows person, type, dates, duration, secondary line, note (when visible under privacy rules) and a provenance chip (`Synced from Xero` or `Manual entry`) with its icon. Close returns focus to the block.
+- Detail strip: selecting a block shows person, type, dates, duration, secondary line, note (`notesInternal`, only when the calendar service returns it) and a provenance chip with its icon: `Synced from Xero` when the record's `sourceType` is `xero` or `xero_leave`, `Leave request` for `team_calendar_leave`, otherwise `Manual entry`. Close returns focus to the block.
 - Keyboard: blocks are buttons with arrow-key movement as on the homepage; navigation and close targets are 44px.
+
+Days and the Today pill use the calendar's `range.timezone` (the organisation timezone). The header date uses the person's timezone; the two can differ only for people in another timezone near midnight.
 
 Week navigation uses a `week` search parameter (`?week=2026-10-12`, any date in the target week) so the dashboard stays server-rendered. Only selection state is client-side.
 
@@ -53,18 +55,19 @@ Records shown: approved only (current dashboard filter), privacy applied by the 
 
 ## Coverage map (manager)
 
-- Rows: one per team that has people in the manager's scope; people without a team form a "No team" row.
+- Rows: one per team that has at least one person in the manager's scope; people in scope without a team form a "No team" row.
+- Team size is the team's full active headcount (the same count used to validate minimums), not only the people the manager can see. Away counts come from a counts-only read of approved records for every active member of those teams; no names or record details from outside the manager's scope are returned.
 - Columns: the next five working days from today (Monday to Friday, skipping weekends).
-- Cell value: people in, of team size (`5 of 7`). "In" excludes people with an approved record for which the existing `isAwayEvent` rule is true (`packages/availability/src/dashboard/dashboard-service.ts`), deduplicated by person.
+- Cell value: people in, of team size (`5 of 7`). "In" excludes people with an approved record for which the existing `isAwayEvent` rule is true (`packages/availability/src/dashboard/dashboard-service.ts`), deduplicated by person. `isAwayEvent` treats working from home and private records as in.
 - States:
   - **Short:** fewer in than the team minimum. `warning-container` fill, alert-triangle icon, label "Short by N".
   - **At minimum:** exactly the minimum. `chart-4` fill, label "At minimum".
   - **Covered:** above the minimum. Neutral `surface-container` fill.
   - **No minimum set:** teams with a null minimum use the existing peak rule (more than 20% away). Peak days use the Short styling with the label "Peak"; other days are neutral.
-  - **Public holiday:** `surface-container-high` with "Holiday" when the holiday applies to all locations in the team.
+  - **Public holiday:** `surface-container-high` with "Holiday" when a full-day, non-working public holiday applies to every location represented in the team (people without a location use the organisation level).
 - Summary line above the grid: the first Short or Peak cell (`Next shortfall: Customer support, Monday 12 October, 1 of 3 in (minimum 2)`), or "Every team is covered for the next five working days."
-- Key below the grid and a footnote: "Counts approved leave, training, travel and client site. Working from home counts as in."
-- Cells link to `/calendar?scopeType=team&scopeValue=<teamId>&view=day&date=<date>`.
+- Key below the grid and a footnote: "Counts approved leave and time away, such as training, travel, client sites and other offices. Working from home counts as in."
+- Cells link to `/calendar?scopeType=team&scopeValue=<teamId>&view=day&anchor=<date>` (the calendar reads `anchor`). The "No team" row does not link.
 - Colour is never the only cue: every non-covered cell has text and an accessible label (`Monday 12 October, Customer support: 1 of 3 in, short by 1`).
 
 ### Minimum staffing data
@@ -80,7 +83,7 @@ View sections: `syncHealth`, `orgWideXeroSyncFailed`, `teamXeroSyncFailed`, `act
 
 ## Copy
 
-- One record-type label map in `apps/app/components/availability/record-type-labels.ts` (`annual_leave` to "Annual leave", `wfh` to "Working from home" and so on); no `replaceAll("_", " ")` in dashboard code.
+- One record-type label map: the existing `AVAILABILITY_RECORD_TYPE_LABELS` in `packages/core/src/availability-record-label.ts`, moved to sentence case (`annual_leave` to "Annual leave", `wfh` to "Working from home" and so on). The app adds only an icon map. No `replaceAll("_", " ")` in dashboard code.
 - Status chips use `approvalStatusLabel` with an icon (clock for Pending, check for Approved).
 - Card descriptions are removed unless they add scope.
 - Australian English, no em dashes, dates as `9 October 2026` or `Fri 9 Oct`, times in 24-hour format.
@@ -90,4 +93,3 @@ View sections: `syncHealth`, `orgWideXeroSyncFailed`, `teamXeroSyncFailed`, `act
 - Migrating the marketing homepage to the shared component (follow-up; it keeps its own demo data and `home.css` contract tests).
 - Showing the impact of a pending request on coverage in approval rows (follow-up once minimums are in use).
 - Teammate visibility for employees (needs a product and privacy decision).
-- The palette changes listed in the design system README (`primary` `#46734a` and others) are a separate change.

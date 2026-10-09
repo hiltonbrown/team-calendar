@@ -10,7 +10,7 @@
 
 **Spec:** [Dashboard redesign design](../specs/2026-10-09-dashboard-redesign-design.md). Read it, `AGENTS.md`, `DESIGN.md` and `.impeccable.md` before starting. Visual reference: the "Dashboard Design Review" canvas (Manager, Employee, Admin, Mobile, Timeline and Coverage boards). Where the canvas and the spec differ, the spec wins (employee timeline is self-only; admin approval rows have no approver column).
 
-**Inspected base:** `381293a` on `claude/upbeat-ramanujan-fs2ax0`.
+**Inspected base:** `381293a` on `claude/upbeat-ramanujan-fs2ax0`; second pass against `19e2028` (after the bundled public holidays change). The "Second-pass corrections" section below overrides any conflicting line in the tasks.
 
 ## Global constraints
 
@@ -35,6 +35,28 @@ bun run migrate                                  # Prisma format, generate, migr
 
 Run `bun run build` (or the database package's generate step) after the schema change and before tests that import generated Prisma types; do not run it in parallel with tests. Commit each task with the suggested conventional message, staging only that task's files.
 
+## Second-pass corrections (binding)
+
+Checked against `19e2028`. Where a task below says otherwise, these win.
+
+1. **Calendar types.** Use the exported `CalendarRange` (`packages/availability/src/calendar/calendar-service.ts`), not the private `CalendarRangeData` alias. `CalendarDay.date` is UTC midnight of the date; use `CalendarDay.isToday`. Notes are `notesInternal`. There is no masked flag: a private peer arrives as `recordType: "private"`, a masked peer keeps its type with `displayName: "Team member"`; treat both as private on the timeline.
+2. **Holidays.** `PublicHolidayCell.isSuppressed` is always false now (hidden holidays never reach the calendar). Drop it. Mark a day as a holiday only for `startsAt === null` cells with `appliesToAllLocationsInView`; label with `publicHolidayLabel` from `apps/app/components/calendar/public-holiday-label.ts`.
+3. **Provenance.** Derive from `sourceType`, not `recordTypeCategory` (which is `xero_leave` for every non-manual source, including `team_calendar_leave`).
+4. **CalendarPerson.** Add `jobTitle` (from `people.job_title`) and `teamId` (already selected as `team.id`) with a calendar-service test, in Task 4.
+5. **Roles.** The calendar role enum is `admin | manager | owner | viewer`. Employees call `getCalendarRange` with `role: "viewer"`, `scope: { type: "my_self" }` and `actingPersonId`. Filter with `approvalStatus: ["approved"]`.
+6. **Coverage team size and away counts (Task 5).** `my_team` returns only the manager and their reports, so grouping `range.people` gives partial teams. Instead: teams are those with at least one person in the manager's scope; size is the full active headcount from Task 1's `listTeamsWithCoverageMinimum`; away counts come from a new counts-only database helper `countAwayPeopleByTeamAndDay({ clerkOrgId, organisationId, teamIds, from, to, timezone })` in `packages/database/src/queries/teams.ts` that reads approved records of active people in those teams and applies the same away rule (export `AWAY_RECORD_TYPES` from the coverage module and pass it in). It returns numbers only. `buildCoverageMap` stays pure and takes the counts, team list and days (see the updated interface).
+7. **Away rule.** `isAwayEvent` treats `private` and `wfh` as in and counts `public_holiday`, `other`, `offsite_meeting`, `another_office` and `contractor_unavailable` as away. Keep the rule; use the spec's updated footnote.
+8. **Calendar links.** The calendar reads `anchor`, not `date`: `/calendar?scopeType=team&scopeValue=<teamId>&view=day&anchor=<dateKey>`.
+9. **Database pattern (Task 1).** New file `packages/database/src/queries/teams.ts`, re-exported through `packages/database/queries/teams.ts` and the package exports, following `people.ts`. `Team` has no `archived_at`; active people are `archived_at: null, is_active: true`.
+10. **Audit pattern (Task 2).** Copy the transactional pattern in `packages/availability/src/holidays/holiday-preferences.ts` (update and `auditEvent.create` in one `$transaction`, with `before_value` and `after_value`), not `organisation-settings-service.ts`, which is not transactional.
+11. **Settings nav (Task 3).** Add a "Coverage" item to the Organisation group in the static `NAV_GROUPS` (`settings/components/settings-nav.tsx`) and its test. Settings is already owner and admin only (`settings/layout.tsx`), so no per-role filter.
+12. **Design-system tests (Task 6).** The package has no jsdom or Testing Library. Add `vitest.config.ts` with the jsdom environment and dev dependencies `@testing-library/react`, `@testing-library/dom` and `jsdom` at the versions `apps/app` uses. This is the one allowed dependency change.
+13. **Homepage parity (Task 6).** ArrowRight and ArrowLeft move to the next or previous block in DOM order without wrapping; ArrowDown and ArrowUp move the same way but wrap. Detail dates read `Mon 5 Oct`, `Mon 5 to Wed 7 Oct` or `Mon 28 Sep to Fri 2 Oct`. The day count reads `3d` and hides below 768px. The legend text differs from the homepage on purpose. Use the 20px card radius (DESIGN.md) and the 3px focus ring.
+14. **Labels (Task 8).** Reuse `AVAILABILITY_RECORD_TYPE_LABELS` in `@repo/core`, moved to sentence case, and update tests that assert the old title case. The app adds only `record-type-icons.ts`.
+15. **Cache (Task 7).** `cacheKey` lives in `dashboard-service.ts`; include `weekAnchor` in it. The admin view gains its first calendar call.
+16. **Removals (Tasks 8 and 9).** `admin-empty-view.tsx` imports `DashboardLayout`, `XeroDisconnectedBanner` and the old header props; rewrite it in Task 9 before deleting those files. Delete `dashboard-scaffold.tsx` in Task 9 once the views no longer use it. Also remove `formatPercentage` (`dashboard-format.ts`), `uniqueRecordTypes` and `byDateDescending` when they become unused, and the `ambient-calendar-*` rules in `apps/app/app/styles.css`.
+17. **Timezones.** Timeline days and coverage days use `range.timezone` (organisation); the header date uses the person's timezone.
+
 ## File map
 
 | File | Status | Responsibility |
@@ -46,8 +68,9 @@ Run `bun run build` (or the database package's generate step) after the schema c
 | `packages/availability/src/dashboard/coverage-map.ts` | new | Coverage cells and summary |
 | `packages/availability/src/dashboard/dashboard-service.ts` | modify | New sections, removed sections, `weekAnchor` |
 | `packages/design-system/components/team-timeline/team-timeline.tsx` | new | Presentational timeline (client: selection) |
-| `packages/design-system/components/team-timeline/types.ts` | new | Neutral props |
-| `apps/app/components/availability/record-type-labels.ts` | new | Record-type labels and icon keys |
+| (types) | in `team-timeline.tsx` | Props are exported from the component file; `./components/*` resolves to `*.tsx` only |
+| `packages/core/src/availability-record-label.ts` | modify | Existing label map moved to sentence case |
+| `apps/app/components/availability/record-type-icons.ts` | new | Record-type icon keys |
 | `apps/app/components/dashboard/timeline-adapter.ts` | new | Week model to `TeamTimeline` props |
 | `apps/app/components/dashboard/coverage-map.tsx` | new | Coverage card |
 | `apps/app/components/dashboard/approval-rows.tsx` | new | Waiting for approval list |
@@ -65,7 +88,7 @@ Run `bun run build` (or the database package's generate step) after the schema c
 export interface TimelineWeekDay {
   date: Date;              // start of day in the range timezone
   dateKey: string;         // "2026-10-09"
-  holidayName: string | null; // only when the holiday applies to all locations in view and is not suppressed
+  holidayName: string | null; // full-day (startsAt === null) holiday with appliesToAllLocationsInView; label via publicHolidayLabel
   isToday: boolean;
 }
 export interface TimelineWeekEntry {
@@ -73,8 +96,8 @@ export interface TimelineWeekEntry {
   endIndex: number;        // 0 to 6, inclusive
   id: string;              // CalendarEvent.id
   isPrivate: boolean;      // recordType "private" or privacy-masked
-  note: string | null;     // only what the calendar service already exposes
-  provenance: "manual" | "xero";
+  note: string | null;     // CalendarEvent.notesInternal (already null for peers)
+  provenance: "leave_request" | "manual" | "xero"; // from sourceType: xero|xero_leave -> xero, team_calendar_leave -> leave_request
   recordType: string;      // CalendarRecordType
   startIndex: number;      // 0 to 6
   startsAt: Date;
@@ -103,7 +126,7 @@ export interface TimelineWeek {
 export function buildTimelineWeek(input: {
   actingPersonId: string;
   onlyPeopleWithEntries: boolean;
-  range: CalendarRangeData;            // week view
+  range: CalendarRange;                // week view (exported from @repo/availability)
   rowLimit: number;
   today: Date;
 }): TimelineWeek;
@@ -131,8 +154,9 @@ export interface CoverageMap {
   rows: CoverageRow[];
 }
 export function buildCoverageMap(input: {
-  minimumsByTeamId: ReadonlyMap<string, number | null>;
-  ranges: readonly CalendarRangeData[]; // week views covering the next five working days
+  awayByTeamAndDay: ReadonlyMap<string, ReadonlyMap<string, number>>; // teamId ("none" for no team) -> dateKey -> people away
+  days: Array<{ date: Date; dateKey: string; isToday: boolean; fullDayHolidayForAllLocations: boolean }>;
+  teams: ReadonlyArray<{ id: string | null; name: string; size: number; minimum: number | null }>;
   today: Date;
 }): CoverageMap;
 ```
@@ -140,7 +164,7 @@ export function buildCoverageMap(input: {
 The design-system props mirror `TimelineWeek` but carry display strings only (labels, date labels, icon keys, tone). The design-system package must not import `@repo/availability`.
 
 ```typescript
-// packages/design-system/components/team-timeline/types.ts
+// packages/design-system/components/team-timeline/team-timeline.tsx (exported types)
 export type TeamTimelineTone = "manual" | "private" | "xero";
 export type TeamTimelineIcon = "client" | "home" | "other" | "private" | "training" | "travel" | "xero";
 export interface TeamTimelineBlock {
@@ -272,7 +296,7 @@ Port the homepage timeline's markup and behaviour from `apps/web/app/components/
 
 **Files:** new `record-type-labels.ts`, `timeline-adapter.ts`, `coverage-map.tsx`, `approval-rows.tsx`, `my-requests.tsx`, `needs-reply.tsx` with co-located tests; rewrite `dashboard-header.tsx`; delete removed components and their tests.
 
-- [ ] `record-type-labels.ts`: `recordTypeLabel(type)` and `recordTypeIcon(type)` for every `availability_record_type` value plus `private` ("Unavailable"). Icons: leave types and `public_holiday` to `xero` when provenance is Xero else `other`; `wfh` home; `client_site`, `another_office`, `offsite_meeting` client; `training` training; `travel`, `travelling` travel; others other. Test every enum value has a label (iterate the generated enum).
+- [ ] Labels: move `AVAILABILITY_RECORD_TYPE_LABELS` to sentence case; `record-type-icons.ts` exports `recordTypeIcon(type, provenance)` for every `availability_record_type` value plus `private`. Icons: leave types and `public_holiday` to `xero` when provenance is Xero else `other`; `wfh` home; `client_site`, `another_office`, `offsite_meeting` client; `training` training; `travel`, `travelling` travel; others other. Test every enum value has a label (iterate the generated enum).
 - [ ] `timeline-adapter.ts`: `toTeamTimelineProps(week, { role, orgQueryValue })` producing labels: week label `Mon 5 to Sun 11 Oct` (`Mon 28 Sep to Sun 4 Oct` across months), sub-label `This week · 2026`, `Last week`, `Next week` or `Week of 19 Oct`; entry date labels as in the homepage `Detail`; duration `1 day` or `N days`; provenance `Synced from Xero` or `Manual entry`; private entries labelled "Unavailable" with provenance `Private`; secondary line job title (manager, employee) or `team, location` (admin); corner label `Me`, `My team` or `All teams`; footer `Showing 12 of 31 people.` or `Showing 10 of 48 people away this week.` or null; hrefs `?week=<dateKey>` merged with `withOrg`. Tests cover each label rule.
 - [ ] `coverage-map.tsx` (server component): card per spec and the canvas Coverage board, five day columns, one row per team, cells as links, key, footnote, summary line. Tests: states map to classes and text, accessible labels, no colour-only state.
 - [ ] `approval-rows.tsx`, `my-requests.tsx`, `needs-reply.tsx`: per spec; status chips with icons via `approvalStatusLabel`; provenance chips with `RefreshCwIcon` or `PencilIcon` and a 1px ring of their text colour at 30%; empty states per spec. Tests for each.
