@@ -592,10 +592,52 @@
       "kind": "public"
     },
     {
-      "id": "au-national-2027-03-28-easter-sunday",
+      "id": "au-act-2027-03-28-easter-sunday",
       "date": "2027-03-28",
       "name": "Easter Sunday",
-      "region": null,
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2027-03-28-easter-sunday",
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2027-03-28-easter-sunday",
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
+      "id": "au-qld-2027-03-28-easter-sunday",
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2027-03-28-easter-sunday",
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2027-03-28-easter-sunday",
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-wa-2027-03-28-easter-sunday",
+      "date": "2027-03-28",
+      "name": "Easter Sunday",
+      "region": "WA",
       "kind": "public"
     },
     {
@@ -1209,10 +1251,52 @@
       "kind": "public"
     },
     {
-      "id": "au-national-2028-04-16-easter-sunday",
+      "id": "au-act-2028-04-16-easter-sunday",
       "date": "2028-04-16",
       "name": "Easter Sunday",
-      "region": null,
+      "region": "ACT",
+      "kind": "public"
+    },
+    {
+      "id": "au-nsw-2028-04-16-easter-sunday",
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "region": "NSW",
+      "kind": "public"
+    },
+    {
+      "id": "au-nt-2028-04-16-easter-sunday",
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "region": "NT",
+      "kind": "public"
+    },
+    {
+      "id": "au-qld-2028-04-16-easter-sunday",
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "region": "QLD",
+      "kind": "public"
+    },
+    {
+      "id": "au-sa-2028-04-16-easter-sunday",
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "region": "SA",
+      "kind": "public"
+    },
+    {
+      "id": "au-vic-2028-04-16-easter-sunday",
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "region": "VIC",
+      "kind": "public"
+    },
+    {
+      "id": "au-wa-2028-04-16-easter-sunday",
+      "date": "2028-04-16",
+      "name": "Easter Sunday",
+      "region": "WA",
       "kind": "public"
     },
     {

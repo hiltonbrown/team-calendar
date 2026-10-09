@@ -2,24 +2,10 @@
   "country": "UK",
   "entries": [
     {
-      "id": "uk-eaw-2026-01-01-new-years-day",
+      "id": "uk-national-2026-01-01-new-years-day",
       "date": "2026-01-01",
       "name": "New Year's Day",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2026-01-01-new-years-day",
-      "date": "2026-01-01",
-      "name": "New Year's Day",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2026-01-01-new-years-day",
-      "date": "2026-01-01",
-      "name": "New Year's Day",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -37,24 +23,10 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2026-04-03-good-friday",
+      "id": "uk-national-2026-04-03-good-friday",
       "date": "2026-04-03",
       "name": "Good Friday",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2026-04-03-good-friday",
-      "date": "2026-04-03",
-      "name": "Good Friday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2026-04-03-good-friday",
-      "date": "2026-04-03",
-      "name": "Good Friday",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -72,45 +44,17 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2026-05-04-early-may-bank-holiday",
+      "id": "uk-national-2026-05-04-early-may-bank-holiday",
       "date": "2026-05-04",
       "name": "Early May bank holiday",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2026-05-04-early-may-bank-holiday",
-      "date": "2026-05-04",
-      "name": "Early May bank holiday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2026-05-04-early-may-bank-holiday",
-      "date": "2026-05-04",
-      "name": "Early May bank holiday",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2026-05-25-spring-bank-holiday",
+      "id": "uk-national-2026-05-25-spring-bank-holiday",
       "date": "2026-05-25",
       "name": "Spring bank holiday",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2026-05-25-spring-bank-holiday",
-      "date": "2026-05-25",
-      "name": "Spring bank holiday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2026-05-25-spring-bank-holiday",
-      "date": "2026-05-25",
-      "name": "Spring bank holiday",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -156,66 +100,24 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2026-12-25-christmas-day",
+      "id": "uk-national-2026-12-25-christmas-day",
       "date": "2026-12-25",
       "name": "Christmas Day",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2026-12-25-christmas-day",
-      "date": "2026-12-25",
-      "name": "Christmas Day",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2026-12-25-christmas-day",
-      "date": "2026-12-25",
-      "name": "Christmas Day",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2026-12-28-boxing-day-substitute-day",
+      "id": "uk-national-2026-12-28-boxing-day-substitute-day",
       "date": "2026-12-28",
       "name": "Boxing Day (substitute day)",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2026-12-28-boxing-day-substitute-day",
-      "date": "2026-12-28",
-      "name": "Boxing Day (substitute day)",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2026-12-28-boxing-day-substitute-day",
-      "date": "2026-12-28",
-      "name": "Boxing Day (substitute day)",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2027-01-01-new-years-day",
+      "id": "uk-national-2027-01-01-new-years-day",
       "date": "2027-01-01",
       "name": "New Year's Day",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2027-01-01-new-years-day",
-      "date": "2027-01-01",
-      "name": "New Year's Day",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2027-01-01-new-years-day",
-      "date": "2027-01-01",
-      "name": "New Year's Day",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -233,24 +135,10 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2027-03-26-good-friday",
+      "id": "uk-national-2027-03-26-good-friday",
       "date": "2027-03-26",
       "name": "Good Friday",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2027-03-26-good-friday",
-      "date": "2027-03-26",
-      "name": "Good Friday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2027-03-26-good-friday",
-      "date": "2027-03-26",
-      "name": "Good Friday",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -268,45 +156,17 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2027-05-03-early-may-bank-holiday",
+      "id": "uk-national-2027-05-03-early-may-bank-holiday",
       "date": "2027-05-03",
       "name": "Early May bank holiday",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2027-05-03-early-may-bank-holiday",
-      "date": "2027-05-03",
-      "name": "Early May bank holiday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2027-05-03-early-may-bank-holiday",
-      "date": "2027-05-03",
-      "name": "Early May bank holiday",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2027-05-31-spring-bank-holiday",
+      "id": "uk-national-2027-05-31-spring-bank-holiday",
       "date": "2027-05-31",
       "name": "Spring bank holiday",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2027-05-31-spring-bank-holiday",
-      "date": "2027-05-31",
-      "name": "Spring bank holiday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2027-05-31-spring-bank-holiday",
-      "date": "2027-05-31",
-      "name": "Spring bank holiday",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -345,66 +205,24 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2027-12-27-christmas-day-substitute-day",
+      "id": "uk-national-2027-12-27-christmas-day-substitute-day",
       "date": "2027-12-27",
       "name": "Christmas Day (substitute day)",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2027-12-27-christmas-day-substitute-day",
-      "date": "2027-12-27",
-      "name": "Christmas Day (substitute day)",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2027-12-27-christmas-day-substitute-day",
-      "date": "2027-12-27",
-      "name": "Christmas Day (substitute day)",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2027-12-28-boxing-day-substitute-day",
+      "id": "uk-national-2027-12-28-boxing-day-substitute-day",
       "date": "2027-12-28",
       "name": "Boxing Day (substitute day)",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2027-12-28-boxing-day-substitute-day",
-      "date": "2027-12-28",
-      "name": "Boxing Day (substitute day)",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2027-12-28-boxing-day-substitute-day",
-      "date": "2027-12-28",
-      "name": "Boxing Day (substitute day)",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2028-01-03-new-years-day-substitute-day",
+      "id": "uk-national-2028-01-03-new-years-day-substitute-day",
       "date": "2028-01-03",
       "name": "New Year's Day (substitute day)",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2028-01-03-new-years-day-substitute-day",
-      "date": "2028-01-03",
-      "name": "New Year's Day (substitute day)",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2028-01-03-new-years-day-substitute-day",
-      "date": "2028-01-03",
-      "name": "New Year's Day (substitute day)",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -422,24 +240,10 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2028-04-14-good-friday",
+      "id": "uk-national-2028-04-14-good-friday",
       "date": "2028-04-14",
       "name": "Good Friday",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2028-04-14-good-friday",
-      "date": "2028-04-14",
-      "name": "Good Friday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2028-04-14-good-friday",
-      "date": "2028-04-14",
-      "name": "Good Friday",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -457,45 +261,17 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2028-05-01-early-may-bank-holiday",
+      "id": "uk-national-2028-05-01-early-may-bank-holiday",
       "date": "2028-05-01",
       "name": "Early May bank holiday",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2028-05-01-early-may-bank-holiday",
-      "date": "2028-05-01",
-      "name": "Early May bank holiday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2028-05-01-early-may-bank-holiday",
-      "date": "2028-05-01",
-      "name": "Early May bank holiday",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2028-05-29-spring-bank-holiday",
+      "id": "uk-national-2028-05-29-spring-bank-holiday",
       "date": "2028-05-29",
       "name": "Spring bank holiday",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2028-05-29-spring-bank-holiday",
-      "date": "2028-05-29",
-      "name": "Spring bank holiday",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2028-05-29-spring-bank-holiday",
-      "date": "2028-05-29",
-      "name": "Spring bank holiday",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     },
     {
@@ -534,45 +310,17 @@
       "kind": "public"
     },
     {
-      "id": "uk-eaw-2028-12-25-christmas-day",
+      "id": "uk-national-2028-12-25-christmas-day",
       "date": "2028-12-25",
       "name": "Christmas Day",
-      "region": "EAW",
+      "region": null,
       "kind": "public"
     },
     {
-      "id": "uk-nir-2028-12-25-christmas-day",
-      "date": "2028-12-25",
-      "name": "Christmas Day",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2028-12-25-christmas-day",
-      "date": "2028-12-25",
-      "name": "Christmas Day",
-      "region": "SCT",
-      "kind": "public"
-    },
-    {
-      "id": "uk-eaw-2028-12-26-boxing-day",
+      "id": "uk-national-2028-12-26-boxing-day",
       "date": "2028-12-26",
       "name": "Boxing Day",
-      "region": "EAW",
-      "kind": "public"
-    },
-    {
-      "id": "uk-nir-2028-12-26-boxing-day",
-      "date": "2028-12-26",
-      "name": "Boxing Day",
-      "region": "NIR",
-      "kind": "public"
-    },
-    {
-      "id": "uk-sct-2028-12-26-boxing-day",
-      "date": "2028-12-26",
-      "name": "Boxing Day",
-      "region": "SCT",
+      "region": null,
       "kind": "public"
     }
   ]
