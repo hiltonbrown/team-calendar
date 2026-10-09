@@ -176,7 +176,8 @@ Keep one-off task evidence in that task's review, not here.
 ## Dashboard design
 
 - Dashboards hold frequently checked, up-to-the-minute information only. Do not
-  put Xero sync failures, sync health metrics or other rare exception states on
+  put Xero sync failures, sync health metrics, Xero connection banners or other
+  rare exception or setup states on
   a dashboard; they belong in the action receipt, notifications and the Sync
   page.
 - The marketing homepage team timeline (`DemoTeamCalendar`, `.tl-*` in
