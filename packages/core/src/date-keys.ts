@@ -71,3 +71,42 @@ function localWallClockAsUtc(date: Date, timezone: string): number {
     value("second")
   );
 }
+
+/**
+ * Whether a record falls on a local day. All-day records are stored as UTC
+ * dates, inclusive of the end date (Xero writes a one-day leave as midnight
+ * to midnight; forms write the end as 23:59:59.999Z), so they match by date
+ * key. Timed records match when they overlap the day's local boundaries.
+ */
+export function recordFallsOnDay(
+  record: { allDay: boolean; endsAt: Date; startsAt: Date },
+  day: { dateKey: string; end: Date; start: Date }
+): boolean {
+  if (record.allDay) {
+    return (
+      dateKeyOfUtcDate(record.startsAt) <= day.dateKey &&
+      day.dateKey <= dateKeyOfUtcDate(record.endsAt)
+    );
+  }
+  return record.startsAt < day.end && record.endsAt > day.start;
+}
+
+/**
+ * Query bounds that load every record `recordFallsOnDay` can match for the
+ * local days `from` to `to`: records ending at or after `start` and starting
+ * before `end`.
+ */
+export function recordQueryWindow(
+  from: string,
+  to: string,
+  timezone: string
+): { end: Date; start: Date } {
+  const localStart = zonedStartOfDay(from, timezone);
+  const localEnd = zonedStartOfDay(addDaysToDateKey(to, 1), timezone);
+  const utcStart = new Date(`${from}T00:00:00.000Z`);
+  const utcEnd = new Date(`${addDaysToDateKey(to, 1)}T00:00:00.000Z`);
+  return {
+    end: localEnd > utcEnd ? localEnd : utcEnd,
+    start: localStart < utcStart ? localStart : utcStart,
+  };
+}

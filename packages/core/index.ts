@@ -86,6 +86,8 @@ export {
   dateKeyOfUtcDate,
   dateKeysBetween,
   dayOfWeekOfDateKey,
+  recordFallsOnDay,
+  recordQueryWindow,
   zonedStartOfDay,
 } from "./src/date-keys";
 export type {

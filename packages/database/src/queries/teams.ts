@@ -3,6 +3,8 @@ import {
   addDaysToDateKey,
   appError,
   dateKeysBetween,
+  recordFallsOnDay,
+  recordQueryWindow,
   zonedStartOfDay,
 } from "@repo/core";
 import { z } from "zod";
@@ -159,18 +161,18 @@ export async function countAwayPeopleByTeamAndDay(
         new Map(days.map((day) => [day.dateKey, 0])),
       ])
     );
-    const rangeStart = days[0]?.start;
-    const rangeEnd = days.at(-1)?.end;
     if (
-      !(rangeStart && rangeEnd) ||
+      days.length === 0 ||
       input.teamIds.length === 0 ||
       input.awayRecordTypes.length === 0
     ) {
       return { ok: true, value: counts };
     }
+    const window = recordQueryWindow(input.from, input.to, input.timezone);
     const scope = scopedTo(input);
     const records = await database.availabilityRecord.findMany({
       select: {
+        all_day: true,
         ends_at: true,
         person: { select: { team_id: true } },
         person_id: true,
@@ -180,14 +182,14 @@ export async function countAwayPeopleByTeamAndDay(
         ...scope,
         approval_status: "approved",
         archived_at: null,
-        ends_at: { gt: rangeStart },
+        ends_at: { gte: window.start },
         person: {
           ...scope,
           ...activePersonFilter,
           team_id: { in: [...input.teamIds] },
         },
         record_type: { in: [...input.awayRecordTypes] },
-        starts_at: { lt: rangeEnd },
+        starts_at: { lt: window.end },
       },
     });
     const awayPeople = new Map<string, Set<string>>();
@@ -197,7 +199,16 @@ export async function countAwayPeopleByTeamAndDay(
         continue;
       }
       for (const day of days) {
-        if (record.starts_at < day.end && record.ends_at > day.start) {
+        if (
+          recordFallsOnDay(
+            {
+              allDay: record.all_day,
+              endsAt: record.ends_at,
+              startsAt: record.starts_at,
+            },
+            day
+          )
+        ) {
           const key = `${teamId}|${day.dateKey}`;
           const people = awayPeople.get(key) ?? new Set<string>();
           people.add(record.person_id);

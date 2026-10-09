@@ -33,11 +33,13 @@ const teamB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const brisbane = "Australia/Brisbane";
 
 const buildRecord = (overrides: {
+  allDay?: boolean;
   endsAt: string;
   personId: string;
   startsAt: string;
   teamId?: string | null;
 }) => ({
+  all_day: overrides.allDay ?? false,
   ends_at: new Date(overrides.endsAt),
   person: {
     team_id: overrides.teamId === undefined ? teamA : overrides.teamId,
@@ -208,8 +210,9 @@ describe("team queries", () => {
         approval_status: "approved",
         archived_at: null,
         clerk_org_id: scope.clerkOrgId,
-        // Brisbane is UTC+10: 12 October local midnight to 15 October local midnight.
-        ends_at: { gt: new Date("2026-10-11T14:00:00.000Z") },
+        // Brisbane is UTC+10: from 12 October local midnight, through the
+        // end of the all-day UTC date 14 October.
+        ends_at: { gte: new Date("2026-10-11T14:00:00.000Z") },
         organisation_id: scope.organisationId,
         person: {
           archived_at: null,
@@ -219,7 +222,7 @@ describe("team queries", () => {
           team_id: { in: [teamA, teamB] },
         },
         record_type: { in: ["annual_leave", "training"] },
-        starts_at: { lt: new Date("2026-10-14T14:00:00.000Z") },
+        starts_at: { lt: new Date("2026-10-15T00:00:00.000Z") },
       });
       expect(Object.keys(query.select)).not.toContain("notes_internal");
     });
@@ -284,10 +287,52 @@ describe("team queries", () => {
       });
     });
 
-    it("resolves day boundaries across a daylight saving change", async () => {
-      mocks.recordFindMany.mockResolvedValue([]);
+    it("counts all-day records on their stored dates only", async () => {
+      mocks.recordFindMany.mockResolvedValue([
+        // A form-entered one-day leave on 12 October.
+        buildRecord({
+          allDay: true,
+          endsAt: "2026-10-12T23:59:59.999Z",
+          personId: "p1",
+          startsAt: "2026-10-12T00:00:00.000Z",
+        }),
+        // A Xero one-day leave on 14 October (midnight to midnight).
+        buildRecord({
+          allDay: true,
+          endsAt: "2026-10-14T00:00:00.000Z",
+          personId: "p2",
+          startsAt: "2026-10-14T00:00:00.000Z",
+        }),
+      ]);
 
-      await countAwayPeopleByTeamAndDay({
+      const result = await countAwayPeopleByTeamAndDay(countInput());
+
+      expect(
+        result.ok && Object.fromEntries(result.value.get(teamA) ?? [])
+      ).toEqual({
+        "2026-10-12": 1,
+        "2026-10-13": 0,
+        "2026-10-14": 1,
+      });
+    });
+
+    it("resolves day boundaries across a daylight saving change", async () => {
+      mocks.recordFindMany.mockResolvedValue([
+        // 23:30 on 4 October in Sydney, after the change to UTC+11.
+        buildRecord({
+          endsAt: "2026-10-04T13:00:00.000Z",
+          personId: "p1",
+          startsAt: "2026-10-04T12:30:00.000Z",
+        }),
+        // 00:30 on 5 October in Sydney.
+        buildRecord({
+          endsAt: "2026-10-04T14:00:00.000Z",
+          personId: "p2",
+          startsAt: "2026-10-04T13:30:00.000Z",
+        }),
+      ]);
+
+      const result = await countAwayPeopleByTeamAndDay({
         ...countInput({ from: "2026-10-04", to: "2026-10-04" }),
         timezone: "Australia/Sydney",
       });
@@ -295,11 +340,11 @@ describe("team queries", () => {
       const query = mocks.recordFindMany.mock.calls[0]?.[0];
       // Sydney moves from UTC+10 to UTC+11 at 02:00 on 4 October 2026.
       expect(query.where.ends_at).toEqual({
-        gt: new Date("2026-10-03T14:00:00.000Z"),
+        gte: new Date("2026-10-03T14:00:00.000Z"),
       });
-      expect(query.where.starts_at).toEqual({
-        lt: new Date("2026-10-04T13:00:00.000Z"),
-      });
+      expect(
+        result.ok && Object.fromEntries(result.value.get(teamA) ?? [])
+      ).toEqual({ "2026-10-04": 1 });
     });
 
     it("skips the query when there are no teams", async () => {

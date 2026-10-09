@@ -122,6 +122,19 @@ describe("calendar-service", () => {
       "2026-04-13"
     );
   });
+  it("shows a one-day all-day record on its own date only in Brisbane", async () => {
+    const result = await getCalendarRange(baseInput);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const daysWithRecord = result.value.days
+      .filter((day) =>
+        day.events.some((event) => event.id === "approved-record")
+      )
+      .map((day) => day.date.toISOString().slice(0, 10));
+    expect(daysWithRecord).toEqual(["2026-04-15"]);
+  });
   it("returns each person's job title and team id", async () => {
     const result = await getCalendarRange(baseInput);
     expect(result.ok).toBe(true);
@@ -313,16 +326,19 @@ describe("calendar-service", () => {
       mocks.availabilityFindMany.mockResolvedValue([
         {
           ...record("inside", ids.person),
+          all_day: false,
           ends_at: new Date(end),
           starts_at: new Date(start),
         },
         {
           ...record("ends-at-start", ids.person),
+          all_day: false,
           ends_at: new Date(start),
           starts_at: new Date(new Date(start).getTime() - 3_600_000),
         },
         {
           ...record("starts-at-end", ids.person),
+          all_day: false,
           ends_at: new Date(new Date(end).getTime() + 3_600_000),
           starts_at: new Date(end),
         },
@@ -610,7 +626,8 @@ function record(id: string, personId: string) {
     approval_status: "approved",
     archived_at: null,
     contactability: "contactable",
-    ends_at: new Date("2026-04-16T00:00:00.000Z"),
+    // Form-entered all-day leave on 15 April: the end is inclusive.
+    ends_at: new Date("2026-04-15T23:59:59.999Z"),
     id,
     notes_internal: "Private note",
     person: recordPerson,

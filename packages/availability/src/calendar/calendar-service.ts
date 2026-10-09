@@ -1,6 +1,7 @@
 import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { recordFallsOnDay, recordQueryWindow } from "@repo/core";
 import { database, scopedTo } from "@repo/database";
 import type {
   availability_approval_status,
@@ -283,7 +284,11 @@ export async function getCalendarRange(
     const visiblePersonIds = new Set(visiblePeople.map((person) => person.id));
     const records = await loadRecords(
       parsed.data,
-      range,
+      recordQueryWindow(
+        localRange.startDateOnly,
+        addDays(localRange.endDateOnly, -1),
+        timezone
+      ),
       [...visiblePersonIds],
       {
         showPendingOnCalendar: settingsResult.ok
@@ -309,23 +314,25 @@ export async function getCalendarRange(
       range,
       timezone,
     });
-    const failedCounts = countFailedByPerson(events);
     const dayBoundaries = dayDateOnly.map((dateOnly) => ({
+      dateKey: dateOnly,
       dateOnly,
       end: zonedStartOfDayToUtc(addDays(dateOnly, 1), timezone),
       start: zonedStartOfDayToUtc(dateOnly, timezone),
     }));
+    const eventsInView = events.filter((event) =>
+      dayBoundaries.some((day) => recordFallsOnDay(event, day))
+    );
+    const failedCounts = countFailedByPerson(eventsInView);
     const today = dateOnlyInTimeZone(new Date(), timezone);
-    const days = dayBoundaries.map(({ dateOnly, end, start }) => ({
-      date: dateOnlyToUtcDate(dateOnly),
+    const days = dayBoundaries.map((day) => ({
+      date: dateOnlyToUtcDate(day.dateOnly),
       dayOfWeek: dateOnlyToUtcDate(
-        dateOnly
+        day.dateOnly
       ).getUTCDay() as CalendarDay["dayOfWeek"],
-      events: events.filter(
-        (event) => event.startsAt < end && event.endsAt > start
-      ),
-      isToday: dateOnly === today,
-      publicHolidays: holidays.get(dateOnly) ?? [],
+      events: eventsInView.filter((event) => recordFallsOnDay(event, day)),
+      isToday: day.dateOnly === today,
+      publicHolidays: holidays.get(day.dateOnly) ?? [],
     }));
     const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
@@ -346,7 +353,7 @@ export async function getCalendarRange(
         truncated: totalPeopleInScope > MAX_VISIBLE_PEOPLE,
         view: parsed.data.view,
         xeroConnectionState,
-        xeroSyncFailedCount: events.filter(
+        xeroSyncFailedCount: eventsInView.filter(
           (event) => event.approvalStatus === "xero_sync_failed"
         ).length,
       },
@@ -557,7 +564,7 @@ function applyPeopleFilters(
 }
 async function loadRecords(
   input: ParsedRangeInput,
-  range: CalendarRange["range"],
+  range: { end: Date; start: Date },
   personIds: string[],
   options: {
     showPendingOnCalendar: boolean;
@@ -591,7 +598,7 @@ async function loadRecords(
         organisationId: input.organisationId,
       }),
       archived_at: null,
-      ends_at: { gt: range.start },
+      ends_at: { gte: range.start },
       OR: approvalOr,
       person_id: { in: personIds },
       record_type: input.filters.recordType?.length
