@@ -111,7 +111,16 @@ INSERT INTO "tmp_region_map" ("country", "value", "code") VALUES
   ('UK', 'nir', 'NIR'),
   ('UK', 'northern ireland', 'NIR'),
   ('UK', 'england', 'EAW'),
-  ('UK', 'wales', 'EAW');
+  ('UK', 'wales', 'EAW'),
+  ('UK', 'eng', 'EAW'),
+  ('UK', 'wls', 'EAW');
+
+-- Custom holidays copied their jurisdiction's raw region in step 1. Unknown
+-- values are left as they are so a regional holiday never becomes national.
+UPDATE "public_holidays" AS h
+SET "region_code" = m."code"
+FROM "tmp_region_map" AS m
+WHERE m."country" = h."country_code" AND m."value" = lower(trim(h."region_code"));
 
 UPDATE "organisations" AS o
 SET "region_code" = m."code"

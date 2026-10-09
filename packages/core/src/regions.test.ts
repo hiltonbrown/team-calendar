@@ -54,6 +54,8 @@ describe("region registry", () => {
     expect(normaliseRegionCode("AU", " New South Wales ")).toBe("NSW");
     expect(normaliseRegionCode("UK", "scotland")).toBe("SCT");
     expect(normaliseRegionCode("UK", "England")).toBe("EAW");
+    expect(normaliseRegionCode("UK", "ENG")).toBe("EAW");
+    expect(normaliseRegionCode("UK", "WLS")).toBe("EAW");
     expect(normaliseRegionCode("UK", "Wales")).toBe("EAW");
     expect(normaliseRegionCode("NZ", "Auckland")).toBe("AUK");
     expect(normaliseRegionCode("NZ", "Hawke's Bay")).toBe("HKB");

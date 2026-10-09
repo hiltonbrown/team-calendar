@@ -45,7 +45,7 @@ const ids = {
 async function seed() {
   await scratch.query(
     `INSERT INTO organisations (id, clerk_org_id, name, country_code, region_code, updated_at)
-     VALUES ($1, 'org_a', 'A', 'AU', 'Queensland', now()), ($2, 'org_b', 'B', 'UK', 'scotland', now())`,
+     VALUES ($1, 'org_a', 'A', 'AU', 'Queensland', now()), ($2, 'org_b', 'B', 'UK', 'ENG', now())`,
     [ids.orgA, ids.orgB]
   );
   await scratch.query(
@@ -56,7 +56,7 @@ async function seed() {
   );
   await scratch.query(
     `INSERT INTO public_holiday_jurisdictions (id, clerk_org_id, organisation_id, country_code, region_code, source, updated_at)
-     VALUES ($1, 'org_a', $2, 'AU', 'NSW', 'nager', now()), ($3, 'org_b', $4, 'UK', NULL, 'nager', now())`,
+     VALUES ($1, 'org_a', $2, 'AU', 'nsw', 'nager', now()), ($3, 'org_b', $4, 'UK', NULL, 'nager', now())`,
     [ids.jurisdictionA, ids.orgA, ids.jurisdictionB, ids.orgB]
   );
   const holiday = `INSERT INTO public_holidays
@@ -254,7 +254,7 @@ describe("replace imported public holidays migration", () => {
     );
     expect(organisations.rows).toEqual([
       { id: ids.orgA, region_code: "QLD" },
-      { id: ids.orgB, region_code: "SCT" },
+      { id: ids.orgB, region_code: "EAW" },
     ]);
     expect(locations.rows).toEqual([
       { id: ids.locationB, region_code: null },

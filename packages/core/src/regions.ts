@@ -55,7 +55,7 @@ export const REGIONS: Record<CountryCode, readonly RegionDefinition[]> = {
 const REGION_ALIASES: Record<CountryCode, Record<string, string>> = {
   AU: {},
   NZ: { "manawatu whanganui": "MWT", "manawatu-whanganui": "MWT" },
-  UK: { england: "EAW", wales: "EAW" },
+  UK: { eng: "EAW", england: "EAW", wales: "EAW", wls: "EAW" },
 };
 
 export function isCountryCode(
