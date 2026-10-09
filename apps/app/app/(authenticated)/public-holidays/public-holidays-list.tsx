@@ -511,7 +511,7 @@ function HolidayConfirmation({
           <AlertDialogDescription>
             {isDelete
               ? "This custom holiday will be deleted and removed from calendars and future feeds. This cannot be undone."
-              : "This holiday will be hidden for every location and removed from calendars and future feeds. You can restore it by including hidden holidays."}
+              : "This holiday will be hidden for every location and removed from calendars and future feeds, except at locations where you have changed it to a working or non-working day. You can restore it by including hidden holidays."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

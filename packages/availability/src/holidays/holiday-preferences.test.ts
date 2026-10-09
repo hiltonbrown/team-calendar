@@ -113,6 +113,29 @@ describe("holiday preferences", () => {
   it("updates an existing preference instead of duplicating it", async () => {
     db.publicHolidayPreference.findFirst.mockResolvedValue({
       id: "pref-1",
+      setting: "non_working",
+    });
+    await setPublicHolidayClassification({
+      ...base,
+      classification: "working",
+      holidayKey: CHRISTMAS,
+      locationId: LOCATION,
+    });
+    expect(db.publicHolidayPreference.update).toHaveBeenCalledWith({
+      data: expect.objectContaining({ setting: "working" }),
+      where: { id: "pref-1" },
+    });
+    expect(db.publicHolidayPreference.create).not.toHaveBeenCalled();
+    expect(db.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "public_holidays.classification_changed",
+      }),
+    });
+  });
+
+  it("removes a location row when the classification returns to the default", async () => {
+    db.publicHolidayPreference.findFirst.mockResolvedValue({
+      id: "pref-1",
       setting: "working",
     });
     await setPublicHolidayClassification({
@@ -121,10 +144,13 @@ describe("holiday preferences", () => {
       holidayKey: CHRISTMAS,
       locationId: LOCATION,
     });
-    expect(db.publicHolidayPreference.update).toHaveBeenCalledWith({
-      data: expect.objectContaining({ setting: "non_working" }),
-      where: { id: "pref-1" },
+    expect(db.publicHolidayPreference.deleteMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        holiday_key: CHRISTMAS,
+        location_id: LOCATION,
+      }),
     });
+    expect(db.publicHolidayPreference.update).not.toHaveBeenCalled();
     expect(db.publicHolidayPreference.create).not.toHaveBeenCalled();
     expect(db.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

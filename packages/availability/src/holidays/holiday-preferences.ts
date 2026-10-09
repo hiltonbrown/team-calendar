@@ -2,6 +2,7 @@ import {
   type ClerkOrgId,
   CUSTOM_HOLIDAY_KEY_PREFIX,
   findReferenceHoliday,
+  type HolidayClassification,
   type HolidayPreferenceSetting,
   type OrganisationId,
   type Result,
@@ -54,26 +55,50 @@ const failure = (
   ok: false,
 });
 
-async function resolveHoliday(
-  input: Base
-): Promise<{ kind: string; name: string } | null> {
+interface PreferenceTarget {
+  /** null for local days, which have no default and only exist once opted in. */
+  defaultClassification: HolidayClassification | null;
+  kind: string;
+  name: string;
+}
+
+function referenceDefault(kind: string): HolidayClassification | null {
+  if (kind === "local") {
+    return null;
+  }
+  return kind === "part_day" ? "working" : "non_working";
+}
+
+async function resolveHoliday(input: Base): Promise<PreferenceTarget | null> {
   if (input.holidayKey.startsWith(CUSTOM_HOLIDAY_KEY_PREFIX)) {
     const id = input.holidayKey.slice(CUSTOM_HOLIDAY_KEY_PREFIX.length);
     if (!z.string().uuid().safeParse(id).success) {
       return null;
     }
     const custom = await database.publicHoliday.findFirst({
-      select: { name: true },
+      select: { default_classification: true, name: true },
       where: {
         ...scopeOf(input),
         id,
         source: "manual",
       },
     });
-    return custom ? { kind: "custom", name: custom.name } : null;
+    return custom
+      ? {
+          defaultClassification: custom.default_classification,
+          kind: "custom",
+          name: custom.name,
+        }
+      : null;
   }
   const reference = findReferenceHoliday(input.holidayKey);
-  return reference ? { kind: reference.kind, name: reference.name } : null;
+  return reference
+    ? {
+        defaultClassification: referenceDefault(reference.kind),
+        kind: reference.kind,
+        name: reference.name,
+      }
+    : null;
 }
 
 async function resolveLocationName(
@@ -130,9 +155,12 @@ async function writeAudit(
  */
 async function applyPreference(
   input: Base & { locationId: string | null },
-  setting: HolidayPreferenceSetting | null,
+  requested:
+    | HolidayPreferenceSetting
+    | null
+    | ((holiday: PreferenceTarget) => HolidayPreferenceSetting | null),
   action: string,
-  check?: (holiday: { kind: string }) => string | null
+  check?: (holiday: PreferenceTarget) => string | null
 ): Promise<Result<HolidayPreferenceReceipt, HolidayPreferenceError>> {
   if (!(input.actingRole === "owner" || input.actingRole === "admin")) {
     return failure(
@@ -149,6 +177,8 @@ async function applyPreference(
     if (problem) {
       return failure("validation_error", problem);
     }
+    const setting =
+      typeof requested === "function" ? requested(holiday) : requested;
     const location = await resolveLocationName(input, input.locationId);
     if (!location.ok) {
       return failure(
@@ -241,7 +271,12 @@ export function setPublicHolidayClassification(
   return value.ok
     ? applyPreference(
         value.value,
-        value.value.classification,
+        // A classification equal to the default is stored as no row, so the
+        // location returns to the default and follows organisation-wide hides.
+        (holiday) =>
+          holiday.defaultClassification === value.value.classification
+            ? null
+            : value.value.classification,
         "public_holidays.classification_changed"
       )
     : Promise.resolve(value);
