@@ -7,6 +7,7 @@ import {
   type PreviewEvent,
   projectFeedEvents,
 } from "../projection/feed-projection";
+import { isFeedOwner } from "../scope/feed-ownership";
 import {
   canViewFeed,
   isAdminOrOwner,
@@ -75,7 +76,17 @@ export async function previewFeed(
     const actingPersonId = actingPerson?.id ?? null;
 
     const requestedPrivacy = parsed.data.privacyMode ?? feed.privacy_mode;
-    if (!isAdminOrOwner(role) && requestedPrivacy !== feed.privacy_mode) {
+    const ownsFeed = isFeedOwner(
+      {
+        createdByUserId: feed.created_by_user_id,
+        scopes: feed.scopes.map((scope) => ({ scopeType: scope.scope_type })),
+      },
+      parsed.data.actingUserId
+    );
+    if (
+      !(isAdminOrOwner(role) || ownsFeed) &&
+      requestedPrivacy !== feed.privacy_mode
+    ) {
       return notAuthorised();
     }
 

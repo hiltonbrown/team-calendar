@@ -53,7 +53,7 @@ describe("Feed detail modal preview loading", () => {
     mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
     mocks.detail.mockResolvedValue({
       ok: true,
-      value: { id: feedId, privacyMode: "named" },
+      value: { id: feedId, isOwnedByActor: false, privacyMode: "named" },
     });
   });
   afterEach(cleanup);
@@ -110,6 +110,22 @@ describe("Feed detail modal preview loading", () => {
       expect.objectContaining({
         canManage: true,
         previewErrors: { masked: "Masked preview unavailable" },
+        previews: { masked: [], named: [], private: [] },
+      })
+    );
+  });
+
+  it("lets the owner of a personal feed manage it and preview every mode", async () => {
+    mocks.detail.mockResolvedValue({
+      ok: true,
+      value: { id: feedId, isOwnedByActor: true, privacyMode: "named" },
+    });
+    mocks.preview.mockResolvedValue({ ok: true, value: [] });
+    render(await FeedDetailPage(pageInput()));
+    expect(mocks.feedDetail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canManage: true,
+        isAdmin: false,
         previews: { masked: [], named: [], private: [] },
       })
     );

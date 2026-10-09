@@ -34,9 +34,11 @@ import {
   resumeFeedAction,
   rotateTokenAction,
 } from "@/app/(authenticated)/feeds/_actions";
+import { FeedProviderButtons } from "./feed-provider-buttons";
+import { FeedSettingsForm } from "./feed-settings-form";
 import { FeedStatusDot } from "./feed-status-dot";
 import { feedPrivacyDescription, feedPrivacyLabel } from "./privacy-mode-copy";
-import { SubscribeInstructions } from "./subscribe-instructions";
+import { SubscribeUrlField } from "./subscribe-url-field";
 
 interface PreviewEvent {
   description: string | null;
@@ -77,12 +79,16 @@ interface TokenDisclosure {
 export function FeedDetail({
   canManage,
   detail,
+  isAdmin,
   organisationId,
   previews,
   previewErrors = {},
 }: {
+  /** Admins, or the owner of a personal or team feed. */
   canManage: boolean;
   detail: FeedDetailData;
+  /** Restore and new subscribe URLs stay with administrators. */
+  isAdmin: boolean;
   organisationId: string;
   previews: Partial<Record<"masked" | "named" | "private", PreviewEvent[]>>;
   previewErrors?: Partial<Record<"masked" | "named" | "private", string>>;
@@ -195,19 +201,66 @@ export function FeedDetail({
         confirmation={confirmation}
         errorMessage={message?.tone === "error" ? message.text : null}
         feedName={detail.name}
+        isAdmin={isAdmin}
         isPending={isPending}
         onArchive={() => transition("archive")}
         onClose={() => setConfirmation(null)}
         onRotate={rotate}
       />
 
-      <SubscribeInstructions
-        feeds={
-          subscribeUrl
-            ? [{ id: detail.id, name: detail.name, subscribeUrl }]
-            : []
-        }
-      />
+      <section
+        aria-labelledby="feed-subscribe-heading"
+        className="space-y-4 rounded-xl bg-muted p-5"
+      >
+        <h3 className="font-semibold text-title-md" id="feed-subscribe-heading">
+          Add to your calendar
+        </h3>
+        {detail.status === "paused" ? (
+          <p className="flex items-center gap-2 text-body-sm text-muted-foreground">
+            <PauseIcon aria-hidden="true" className="size-4" />
+            This feed is paused and not updating subscribed calendars.
+          </p>
+        ) : null}
+        {subscribeUrl ? (
+          <>
+            <FeedProviderButtons
+              feedName={detail.name}
+              subscribeUrl={subscribeUrl}
+            />
+            <SubscribeUrlField
+              description="Anyone with this URL can subscribe. Share it only with people who should see this feed."
+              feedName={detail.name}
+              url={subscribeUrl}
+            />
+          </>
+        ) : (
+          <p className="text-body-sm text-muted-foreground">
+            {detail.status === "archived"
+              ? "Archived feeds do not publish a subscribe URL."
+              : "This feed has no active subscribe URL."}
+          </p>
+        )}
+      </section>
+
+      {canManage && detail.status !== "archived" ? (
+        <details className="rounded-xl bg-muted p-5 text-label-lg">
+          <summary className="cursor-pointer font-semibold">
+            Feed settings
+          </summary>
+          <div className="mt-4">
+            <FeedSettingsForm
+              feed={{
+                id: detail.id,
+                includesPublicHolidays: detail.includesPublicHolidays,
+                name: detail.name,
+                privacyMode: detail.privacyMode,
+              }}
+              key={`${detail.name}:${detail.privacyMode}:${detail.includesPublicHolidays}`}
+              organisationId={organisationId}
+            />
+          </div>
+        </details>
+      ) : null}
 
       <section className="rounded-xl bg-muted p-5">
         <h3 className="font-semibold text-title-md">Preview and visibility</h3>
@@ -244,6 +297,7 @@ export function FeedDetail({
       {canManage ? (
         <TokenLifecycle
           detail={detail}
+          isAdmin={isAdmin}
           isPending={isPending}
           onIssue={issue}
           onRotate={() => setConfirmation("rotate")}
@@ -270,12 +324,14 @@ function resolveSubscribeUrl(
 
 function TokenLifecycle({
   detail,
+  isAdmin,
   isPending,
   onIssue,
   onRotate,
   onTransition,
 }: {
   detail: FeedDetailData;
+  isAdmin: boolean;
   isPending: boolean;
   onIssue: () => void;
   onRotate: () => void;
@@ -312,16 +368,19 @@ function TokenLifecycle({
           : "This feed has no active token."}
       </p>
       <div className="mt-5 flex flex-wrap gap-2">
-        <Button
-          disabled={isPending || detail.status === "archived"}
-          onClick={() => (detail.activeTokenHint ? onRotate() : onIssue())}
-          type="button"
-          variant="secondary"
-        >
-          <RotateCwIcon className="mr-2 size-4" />
-          {detail.activeTokenHint ? "Rotate token" : "Create subscribe URL"}
-        </Button>
+        {detail.activeTokenHint || isAdmin ? (
+          <Button
+            disabled={isPending || detail.status === "archived"}
+            onClick={() => (detail.activeTokenHint ? onRotate() : onIssue())}
+            type="button"
+            variant="secondary"
+          >
+            <RotateCwIcon className="mr-2 size-4" />
+            {detail.activeTokenHint ? "Rotate token" : "Create subscribe URL"}
+          </Button>
+        ) : null}
         <FeedLifecycleActions
+          canRestore={isAdmin}
           isPending={isPending}
           onTransition={onTransition}
           status={detail.status}
@@ -332,10 +391,12 @@ function TokenLifecycle({
 }
 
 function FeedLifecycleActions({
+  canRestore,
   isPending,
   onTransition,
   status,
 }: {
+  canRestore: boolean;
   isPending: boolean;
   onTransition: (action: "archive" | "pause" | "restore" | "resume") => void;
   status: "active" | "archived" | "paused";
@@ -343,11 +404,13 @@ function FeedLifecycleActions({
   const isArchived = status === "archived";
   return (
     <div className="flex flex-wrap gap-2">
-      <FeedLifecycleToggle
-        isPending={isPending}
-        onTransition={onTransition}
-        status={status}
-      />
+      {isArchived && !canRestore ? null : (
+        <FeedLifecycleToggle
+          isPending={isPending}
+          onTransition={onTransition}
+          status={status}
+        />
+      )}
       <Button
         disabled={isPending || isArchived}
         onClick={() => onTransition("archive")}
@@ -365,6 +428,7 @@ function FeedConfirmationDialog({
   confirmation,
   errorMessage,
   feedName,
+  isAdmin,
   isPending,
   onArchive,
   onClose,
@@ -373,6 +437,7 @@ function FeedConfirmationDialog({
   confirmation: "archive" | "rotate" | null;
   errorMessage: string | null;
   feedName: string;
+  isAdmin: boolean;
   isPending: boolean;
   onArchive: () => void;
   onClose: () => void;
@@ -397,7 +462,7 @@ function FeedConfirmationDialog({
             <AlertDialogDescription>
               {isRotate
                 ? "Rotating the token invalidates the current subscribe URL. Subscribers will need the new URL to continue syncing."
-                : "Archiving this feed stops it from publishing and revokes its tokens. Existing subscribers will see a stopped calendar. You can restore the feed from the Archived filter, but its tokens must be recreated."}
+                : `Archiving this feed stops it from publishing and revokes its tokens. Existing subscribers will see a stopped calendar. ${isAdmin ? "You can restore it from the archived feeds in Settings, but its tokens must be recreated." : "Only an administrator can restore it."}`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {errorMessage ? (

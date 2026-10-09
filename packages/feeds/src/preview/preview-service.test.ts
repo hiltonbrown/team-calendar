@@ -242,6 +242,26 @@ describe("previewFeed", () => {
       expect(mocks.canViewFeed).not.toHaveBeenCalled();
     });
 
+    it("lets the owner of a personal feed preview other privacy modes", async () => {
+      mocks.feedFindFirst.mockResolvedValueOnce({
+        ...mockFeedRecord,
+        created_by_user_id: "user_owner",
+        privacy_mode: "masked",
+        scopes: [{ scope_type: "self", scope_value: null }],
+      });
+      mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
+      mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
+
+      const result = await previewFeed({
+        ...baseInput,
+        actingRole: "org:viewer",
+        actingUserId: "user_owner",
+        privacyMode: "named",
+      });
+
+      expect(result.ok).toBe(true);
+    });
+
     it("allows non-admin requesting feed standard privacy mode", async () => {
       mocks.feedFindFirst.mockResolvedValueOnce({
         ...mockFeedRecord,

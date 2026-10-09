@@ -22,7 +22,7 @@ const FeedDetailPage = async ({
     notFound();
   }
   const role = normaliseRole(orgRole);
-  const canManage =
+  const isAdmin =
     role === "org:admin" ||
     role === "org:owner" ||
     role === "admin" ||
@@ -38,6 +38,8 @@ const FeedDetailPage = async ({
   if (!detail.ok) {
     notFound();
   }
+  // Owners of a personal or team feed manage it like an administrator.
+  const canManage = isAdmin || detail.value.isOwnedByActor;
   const modes = canManage
     ? (["named", "masked", "private"] as const)
     : ([detail.value.privacyMode] as const);
@@ -79,6 +81,7 @@ const FeedDetailPage = async ({
         <FeedDetail
           canManage={canManage}
           detail={detail.value}
+          isAdmin={isAdmin}
           organisationId={organisationId}
           previewErrors={previewErrors}
           previews={previews}
