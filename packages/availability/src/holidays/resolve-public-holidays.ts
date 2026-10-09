@@ -63,12 +63,18 @@ export async function resolvePublicHolidays(
   }
 }
 
-/** Each location's optional local days and whether the location has switched them on. */
-export async function listLocalHolidayOptions(
+/**
+ * Settings > Holidays data from one tenant load: the resolved holidays and each
+ * location's optional local days with whether the location has switched them on.
+ */
+export async function loadHolidaySettings(
   input: Omit<ResolvePublicHolidaysInput, "includeHidden">,
   listReference: ListReferenceHolidays = listReferenceHolidays
 ): Promise<
-  Result<Array<{ holidays: LocalHolidayOption[]; locationId: string }>>
+  Result<{
+    holidays: ResolvedPublicHoliday[];
+    localOptions: Array<{ holidays: LocalHolidayOption[]; locationId: string }>;
+  }>
 > {
   try {
     const data = await loadHolidayResolutionData(input);
@@ -78,10 +84,16 @@ export async function listLocalHolidayOptions(
         ok: false,
       };
     }
-    return { ok: true, value: localHolidayOptions(data, listReference) };
+    return {
+      ok: true,
+      value: {
+        holidays: resolvePublicHolidaysFromData(data, listReference),
+        localOptions: localHolidayOptions(data, listReference),
+      },
+    };
   } catch {
     return {
-      error: appError("internal", "Failed to load local holidays"),
+      error: appError("internal", "Failed to load holiday settings"),
       ok: false,
     };
   }

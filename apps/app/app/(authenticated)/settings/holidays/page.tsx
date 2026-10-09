@@ -1,7 +1,6 @@
 import {
-  listLocalHolidayOptions,
+  loadHolidaySettings,
   type ResolvedPublicHoliday,
-  resolvePublicHolidays,
 } from "@repo/availability";
 import { toDateOnly } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
@@ -38,9 +37,8 @@ const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
     organisationId,
     to: `${today.getUTCFullYear() + 2}-12-31`,
   };
-  const [holidaysResult, localResult, locations] = await Promise.all([
-    resolvePublicHolidays(range),
-    listLocalHolidayOptions(range),
+  const [settingsResult, locations] = await Promise.all([
+    loadHolidaySettings(range),
     database.location.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
@@ -48,15 +46,15 @@ const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
     }),
   ]);
 
-  if (!holidaysResult.ok) {
-    throw new Error(holidaysResult.error.message);
-  }
-  if (!localResult.ok) {
-    throw new Error(localResult.error.message);
+  if (!settingsResult.ok) {
+    throw new Error(settingsResult.error.message);
   }
 
   const options = new Map(
-    localResult.value.map((group) => [group.locationId, group.holidays])
+    settingsResult.value.localOptions.map((group) => [
+      group.locationId,
+      group.holidays,
+    ])
   );
   const localGroups: LocalHolidayGroup[] = locations.map((location) => ({
     holidays: options.get(location.id) ?? [],
@@ -69,7 +67,7 @@ const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
       coverageEnd={range.to}
       localGroups={localGroups}
       organisationId={organisationId}
-      summary={summarise(holidaysResult.value)}
+      summary={summarise(settingsResult.value.holidays)}
     />
   );
 };

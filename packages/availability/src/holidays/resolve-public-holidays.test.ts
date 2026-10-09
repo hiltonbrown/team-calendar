@@ -9,7 +9,7 @@ import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { loadHolidayResolutionData } from "@repo/database";
 import { describe, expect, it } from "vitest";
 import {
-  listLocalHolidayOptions,
+  loadHolidaySettings,
   resolvePublicHolidays,
 } from "./resolve-public-holidays";
 
@@ -68,8 +68,8 @@ describe("resolvePublicHolidays", () => {
   });
 });
 
-describe("listLocalHolidayOptions", () => {
-  it("lists local days for each loaded location", async () => {
+describe("loadHolidaySettings", () => {
+  it("resolves holidays and local days from one load", async () => {
     vi.mocked(loadHolidayResolutionData).mockResolvedValue({
       customHolidays: [],
       from: "2026-01-01",
@@ -79,7 +79,7 @@ describe("listLocalHolidayOptions", () => {
       to: "2026-12-31",
     });
 
-    const result = await listLocalHolidayOptions(range, () => [
+    const result = await loadHolidaySettings(range, () => [
       {
         area: "Brisbane",
         country: "AU",
@@ -92,20 +92,24 @@ describe("listLocalHolidayOptions", () => {
       },
     ]);
 
+    expect(loadHolidayResolutionData).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
       ok: true,
-      value: [
-        {
-          holidays: [{ enabled: false, name: "Royal Queensland Show" }],
-          locationId: "loc-1",
-        },
-      ],
+      value: {
+        holidays: [],
+        localOptions: [
+          {
+            holidays: [{ enabled: false, name: "Royal Queensland Show" }],
+            locationId: "loc-1",
+          },
+        ],
+      },
     });
   });
 
   it("returns not_found when the organisation is outside the tenant", async () => {
     vi.mocked(loadHolidayResolutionData).mockResolvedValue(null);
-    expect(await listLocalHolidayOptions(range)).toMatchObject({
+    expect(await loadHolidaySettings(range)).toMatchObject({
       error: { code: "not_found" },
       ok: false,
     });
