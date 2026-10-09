@@ -23,21 +23,29 @@ export interface ReferenceHoliday {
  */
 export const PUBLIC_HOLIDAY_DATA_VERSION = "2026-10-09";
 
-const FILES: ReadonlyArray<{
+export interface ReferenceHolidayFile {
   country: CountryCode;
   data: unknown;
   fileName: string;
-}> = [
+}
+
+const FILES: readonly ReferenceHolidayFile[] = [
   { country: "AU", data: auData, fileName: "au.json" },
   { country: "NZ", data: nzData, fileName: "nz.json" },
   { country: "UK", data: ukData, fileName: "uk.json" },
 ];
 
-function loadReferenceHolidays(): ReadonlyMap<CountryCode, ReferenceHoliday[]> {
+/**
+ * Validates and indexes reference files by country. Throws naming the file and
+ * entry on invalid data or a duplicate id.
+ */
+export function parseReferenceHolidayFiles(
+  files: readonly ReferenceHolidayFile[]
+): ReadonlyMap<CountryCode, ReferenceHoliday[]> {
   const byCountry = new Map<CountryCode, ReferenceHoliday[]>();
   const seenIds = new Map<string, string>();
 
-  for (const file of FILES) {
+  for (const file of files) {
     const parsed = referenceFileSchema(file.country).safeParse(file.data);
     if (!parsed.success) {
       const [issue] = parsed.error.issues;
@@ -85,7 +93,7 @@ function loadReferenceHolidays(): ReadonlyMap<CountryCode, ReferenceHoliday[]> {
 }
 
 // Parsed once per process; invalid data stops the app with a named entry.
-const REFERENCE_HOLIDAYS = loadReferenceHolidays();
+const REFERENCE_HOLIDAYS = parseReferenceHolidayFiles(FILES);
 
 export interface ListReferenceHolidaysInput {
   country: CountryCode;
