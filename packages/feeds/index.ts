@@ -6,5 +6,6 @@ export * from "./src/projection/feed-projection";
 export { establishFeedRepresentation } from "./src/publication/feed-representation";
 export * from "./src/publication/publication-service";
 export * from "./src/render/render-feed";
+export * from "./src/scope/feed-ownership";
 export * from "./src/scope/feed-scope";
 export * from "./src/tokens/token-service";

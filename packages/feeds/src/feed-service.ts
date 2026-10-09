@@ -11,6 +11,13 @@ import type {
 import { z } from "zod";
 import { invalidateFeedCache } from "./cache/feed-cache";
 import {
+  type FeedKind,
+  feedKind,
+  isFeedOwner,
+  type OwnFeedKind,
+  ownFeedScopeType,
+} from "./scope/feed-ownership";
+import {
   canViewFeed,
   createScopeRows,
   FeedScopesSchema,
@@ -44,9 +51,14 @@ export type FeedServiceError =
 export interface FeedListItem {
   activeTokenHint: ActiveTokenHint | null;
   createdAt: Date;
+  createdByName: string | null;
+  createdByUserId: string | null;
   description: string | null;
   id: string;
   includesPublicHolidays: boolean;
+  isOwnedByActor: boolean;
+  kind: FeedKind;
+  lastFetchedAt: Date | null;
   lastRenderedAt: Date | null;
   name: string;
   privacyMode: availability_privacy_mode;
@@ -60,9 +72,12 @@ export interface FeedDetail {
   activeTokenHint: ActiveTokenHint | null;
   archivedAt: Date | null;
   createdAt: Date;
+  createdByUserId: string | null;
   description: string | null;
   id: string;
   includesPublicHolidays: boolean;
+  isOwnedByActor: boolean;
+  kind: FeedKind;
   lastEtag: string | null;
   lastRenderedAt: Date | null;
   name: string;
@@ -144,6 +159,9 @@ const ListFeedsSchema = z.object({
       status: z
         .array(z.enum(["active", "paused", "archived"]))
         .default(["active", "paused"]),
+      type: z
+        .array(z.enum(["org", "team", "person", "self", "manager_team"]))
+        .optional(),
     })
     .default({ status: ["active", "paused"] }),
   organisationId: z.string().uuid(),
@@ -163,6 +181,27 @@ const DetailSchema = z.object({
   feedId: z.string().uuid(),
   organisationId: z.string().uuid(),
 });
+
+const OwnFeedSchema = z.object({
+  actingRole: RoleSchema,
+  actingUserId: z.string().min(1),
+  clerkOrgId: z.string().min(1),
+  kind: z.enum(["personal", "team"]),
+  organisationId: z.string().uuid(),
+});
+
+const OwnFeedEligibilitySchema = z.object({
+  actingUserId: z.string().min(1),
+  clerkOrgId: z.string().min(1),
+  organisationId: z.string().uuid(),
+});
+
+export interface OwnFeedEligibility {
+  hasDirectReports: boolean;
+  personalFeedId: string | null;
+  personId: string | null;
+  teamFeedId: string | null;
+}
 
 const DashboardSummarySchema = z.object({
   actingRole: RoleSchema,
@@ -390,7 +429,11 @@ export async function updateFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
+  const permission = await authoriseFeedChange(parsed.data);
+  if (!permission.ok) {
+    return permission;
+  }
+  if (parsed.data.patch.scopes && !permission.value.isAdmin) {
     return notAuthorised();
   }
 
@@ -491,8 +534,9 @@ export async function archiveFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
+  const permission = await authoriseFeedChange(parsed.data);
+  if (!permission.ok) {
+    return permission;
   }
 
   try {
@@ -605,6 +649,9 @@ export async function listFeeds(
         privacy_mode: parsed.data.filters.privacyMode?.length
           ? { in: parsed.data.filters.privacyMode }
           : undefined,
+        scopes: parsed.data.filters.type?.length
+          ? { some: { scope_type: { in: parsed.data.filters.type } } }
+          : undefined,
         status: { in: statuses },
       },
     });
@@ -620,6 +667,7 @@ export async function listFeeds(
       return { error: scopeData.error, ok: false };
     }
     const preloadedScopeData = scopeData ? scopeData.value : undefined;
+    const creatorNames = creatorNamesByUserId(preloadedScopeData?.people ?? []);
 
     const visibleItems: FeedListItem[] = [];
     for (const feed of feeds) {
@@ -645,23 +693,14 @@ export async function listFeeds(
         preloaded: preloadedScopeData,
         scopes: feed.scopes,
       });
-      visibleItems.push({
-        activeTokenHint: activeToken(feed.tokens),
-        createdAt: feed.created_at,
-        description: truncate(feed.description),
-        id: feed.id,
-        includesPublicHolidays: feed.includes_public_holidays,
-        lastRenderedAt: feed.last_rendered_at,
-        name: feed.name,
-        privacyMode: feed.privacy_mode,
-        scopeCount: feed.scopes.length,
-        scopeSummary: scopeSummary(
-          scopes,
-          labels.ok ? labels.value : undefined
-        ),
-        status: feed.status,
-        subscribeUrl: activeSubscribeUrl(feed.tokens),
-      });
+      visibleItems.push(
+        toFeedListItem({
+          actingUserId: parsed.data.actingUserId,
+          creatorNames,
+          feed,
+          labels: labels.ok ? labels.value : undefined,
+        })
+      );
     }
     return { ok: true, value: visibleItems };
   } catch {
@@ -728,9 +767,15 @@ export async function getFeedDetail(
         activeTokenHint: activeToken(feed.tokens),
         archivedAt: feed.archived_at,
         createdAt: feed.created_at,
+        createdByUserId: feed.created_by_user_id,
         description: feed.description,
         id: feed.id,
         includesPublicHolidays: feed.includes_public_holidays,
+        isOwnedByActor: isFeedOwner(
+          { createdByUserId: feed.created_by_user_id, scopes },
+          parsed.data.actingUserId
+        ),
+        kind: feedKind(scopes),
         lastEtag: feed.last_etag,
         lastRenderedAt: feed.last_rendered_at,
         name: feed.name,
@@ -745,6 +790,136 @@ export async function getFeedDetail(
     };
   } catch {
     return unknownError("Failed to load feed detail.");
+  }
+}
+
+export async function getOwnFeedEligibility(
+  input: unknown
+): Promise<Result<OwnFeedEligibility, FeedServiceError>> {
+  const parsed = OwnFeedEligibilitySchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error);
+  }
+  try {
+    const value = await loadOwnFeedState(database, parsed.data);
+    return {
+      ok: true,
+      value: {
+        hasDirectReports: value.hasDirectReports,
+        personalFeedId: value.personalFeedId,
+        personId: value.person?.id ?? null,
+        teamFeedId: value.teamFeedId,
+      },
+    };
+  } catch {
+    return unknownError("Failed to load your feed options.");
+  }
+}
+
+// Self-service creation for a person's own calendar or their direct reports.
+// Scopes are fixed here rather than accepted from the caller, so a non-admin
+// can never publish anything wider than their own team.
+export async function createOwnFeed(
+  input: unknown
+): Promise<Result<{ created: boolean; feedId: string }, FeedServiceError>> {
+  const parsed = OwnFeedSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error);
+  }
+  const kind: OwnFeedKind = parsed.data.kind;
+
+  try {
+    const result = await database.$transaction(async (tx) => {
+      // Serialises concurrent self-service requests for the Clerk org, so a
+      // double submit returns the feed the first request created.
+      await lockPlanLimitMutations(tx, parsed.data.clerkOrgId);
+      const state = await loadOwnFeedState(tx, parsed.data);
+      if (!state.person) {
+        throw new RollbackError({
+          code: "validation_error",
+          message:
+            "Your account is not linked to a person yet. Ask an administrator to link it.",
+        });
+      }
+      const existingId =
+        kind === "personal" ? state.personalFeedId : state.teamFeedId;
+      if (existingId) {
+        return { created: false, feedId: existingId };
+      }
+      if (kind === "team" && !state.hasDirectReports) {
+        throw new RollbackError({
+          code: "not_authorised",
+          message: "A team feed needs at least one direct report.",
+        });
+      }
+
+      await assertWithinFeedLimit(tx, parsed.data);
+      const settings = await tx.organisationSettings.findFirst({
+        select: {
+          default_feed_privacy_mode: true,
+          feeds_include_public_holidays_default: true,
+        },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          organisation_id: parsed.data.organisationId,
+        },
+      });
+      const privacyMode = settings?.default_feed_privacy_mode ?? "named";
+      const name = ownFeedName(kind, state.person.firstName);
+      const slug = await makeUniqueSlug(tx, parsed.data, name);
+      const scopeType = ownFeedScopeType(kind);
+      const feed = await tx.feed.create({
+        data: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          created_by_user_id: parsed.data.actingUserId,
+          includes_public_holidays:
+            settings?.feeds_include_public_holidays_default ?? false,
+          name,
+          organisation_id: parsed.data.organisationId,
+          privacy_mode: privacyMode,
+          scopes: {
+            create: createScopeRows({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+              scopes: [{ scopeType, scopeValue: null }],
+            }),
+          },
+          slug,
+          status: "active",
+        },
+        select: { id: true },
+      });
+
+      const token = await createInitialTokenWithClient(tx, {
+        actingUserId: parsed.data.actingUserId,
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: feed.id,
+        organisationId: parsed.data.organisationId,
+      });
+      if (!token.ok) {
+        throw new RollbackError(mapTokenError(token.error));
+      }
+
+      await auditFeed(tx, parsed.data, "feeds.created", feed.id, {
+        actingUserId: parsed.data.actingUserId,
+        feedId: feed.id,
+        name,
+        ownFeedKind: kind,
+        privacyMode,
+        scopeCount: 1,
+      });
+      return { created: true, feedId: feed.id };
+    });
+
+    if (result.created) {
+      await invalidateFeedCache({ feedId: result.feedId });
+    }
+    return { ok: true, value: result };
+  } catch (error) {
+    if (error instanceof RollbackError) {
+      return { error: error.serviceError, ok: false };
+    }
+    return unknownError("Failed to create your feed.");
   }
 }
 
@@ -802,8 +977,9 @@ async function transitionFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
+  const permission = await authoriseFeedChange(parsed.data);
+  if (!permission.ok) {
+    return permission;
   }
 
   try {
@@ -835,6 +1011,176 @@ async function transitionFeed(
   } catch {
     return unknownError("Failed to update feed status.");
   }
+}
+
+type FeedReadClient = Pick<Prisma.TransactionClient, "feed" | "person">;
+
+async function loadOwnFeedState(
+  client: FeedReadClient,
+  input: { actingUserId: string; clerkOrgId: string; organisationId: string }
+): Promise<{
+  hasDirectReports: boolean;
+  person: { firstName: string; id: string } | null;
+  personalFeedId: string | null;
+  teamFeedId: string | null;
+}> {
+  const scope = {
+    clerk_org_id: input.clerkOrgId,
+    organisation_id: input.organisationId,
+  };
+  const person = await client.person.findFirst({
+    select: { first_name: true, id: true },
+    where: { ...scope, archived_at: null, clerk_user_id: input.actingUserId },
+  });
+  const ownFeed = (scopeType: "manager_team" | "self") =>
+    client.feed.findFirst({
+      orderBy: { created_at: "asc" },
+      select: { id: true },
+      where: {
+        ...scope,
+        archived_at: null,
+        created_by_user_id: input.actingUserId,
+        scopes: { every: { scope_type: scopeType }, some: {} },
+        status: { in: ["active", "paused"] },
+      },
+    });
+  const [personalFeed, teamFeed, directReport] = await Promise.all([
+    ownFeed("self"),
+    ownFeed("manager_team"),
+    person
+      ? client.person.findFirst({
+          select: { id: true },
+          where: {
+            ...scope,
+            archived_at: null,
+            is_active: true,
+            manager_person_id: person.id,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
+  return {
+    hasDirectReports: Boolean(directReport),
+    person: person ? { firstName: person.first_name, id: person.id } : null,
+    personalFeedId: personalFeed?.id ?? null,
+    teamFeedId: teamFeed?.id ?? null,
+  };
+}
+
+function ownFeedName(kind: OwnFeedKind, firstName: string): string {
+  const trimmed = firstName.trim();
+  if (kind === "personal") {
+    return trimmed ? `${trimmed}'s calendar` : "My calendar";
+  }
+  return trimmed ? `${trimmed}'s team` : "My team";
+}
+
+// Admins and owners manage every feed; anyone else may change only a
+// personal or team feed they created.
+async function authoriseFeedChange(input: {
+  actingRole: string;
+  actingUserId: string;
+  clerkOrgId: string;
+  feedId: string;
+  organisationId: string;
+}): Promise<Result<{ isAdmin: boolean }, FeedServiceError>> {
+  if (isAdminOrOwner(normaliseRole(input.actingRole))) {
+    return { ok: true, value: { isAdmin: true } };
+  }
+  try {
+    const feed = await database.feed.findFirst({
+      select: {
+        created_by_user_id: true,
+        scopes: { select: { scope_type: true } },
+      },
+      where: scopedFeed(input),
+    });
+    if (!feed) {
+      return feedNotFound();
+    }
+    const owned = isFeedOwner(
+      {
+        createdByUserId: feed.created_by_user_id,
+        scopes: feed.scopes.map((scope) => ({ scopeType: scope.scope_type })),
+      },
+      input.actingUserId
+    );
+    return owned ? { ok: true, value: { isAdmin: false } } : notAuthorised();
+  } catch {
+    return unknownError("Failed to check feed permissions.");
+  }
+}
+
+function creatorNamesByUserId(
+  people: {
+    clerk_user_id: string | null;
+    first_name: string;
+    last_name: string;
+  }[]
+): Map<string, string> {
+  return new Map(
+    people.flatMap((person) =>
+      person.clerk_user_id
+        ? [
+            [
+              person.clerk_user_id,
+              [person.first_name, person.last_name].filter(Boolean).join(" "),
+            ] as const,
+          ]
+        : []
+    )
+  );
+}
+
+function toFeedListItem(input: {
+  actingUserId: string;
+  creatorNames: Map<string, string>;
+  feed: FeedListRow;
+  labels: ResolvedFeedScope[] | undefined;
+}): FeedListItem {
+  const { feed } = input;
+  const scopes = feed.scopes.map((scope) => ({
+    scopeType: scope.scope_type,
+    scopeValue: scope.scope_value,
+  }));
+  return {
+    activeTokenHint: activeToken(feed.tokens),
+    createdAt: feed.created_at,
+    createdByName: feed.created_by_user_id
+      ? (input.creatorNames.get(feed.created_by_user_id) ?? null)
+      : null,
+    createdByUserId: feed.created_by_user_id,
+    description: truncate(feed.description),
+    id: feed.id,
+    includesPublicHolidays: feed.includes_public_holidays,
+    isOwnedByActor: isFeedOwner(
+      { createdByUserId: feed.created_by_user_id, scopes },
+      input.actingUserId
+    ),
+    kind: feedKind(scopes),
+    lastFetchedAt: lastFetchedAt(feed.tokens),
+    lastRenderedAt: feed.last_rendered_at,
+    name: feed.name,
+    privacyMode: feed.privacy_mode,
+    scopeCount: feed.scopes.length,
+    scopeSummary: scopeSummary(scopes, input.labels),
+    status: feed.status,
+    subscribeUrl: activeSubscribeUrl(feed.tokens),
+  };
+}
+
+function lastFetchedAt(tokens: TokenRow[]): Date | null {
+  let latest: Date | null = null;
+  for (const token of tokens) {
+    if (
+      token.status === "active" &&
+      token.last_used_at &&
+      (!latest || token.last_used_at > latest)
+    ) {
+      latest = token.last_used_at;
+    }
+  }
+  return latest;
 }
 
 async function loadFeedForUpdate(
@@ -1093,3 +1439,4 @@ const feedDetailSelect = {
 } satisfies Prisma.FeedSelect;
 
 type TokenRow = Prisma.FeedTokenGetPayload<{ select: typeof tokenSelect }>;
+type FeedListRow = Prisma.FeedGetPayload<{ select: typeof feedListSelect }>;

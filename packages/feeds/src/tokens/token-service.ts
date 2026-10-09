@@ -12,6 +12,7 @@ import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { z } from "zod";
 import { invalidateFeedCache } from "../cache/feed-cache";
+import { isFeedOwner } from "../scope/feed-ownership";
 import { scopedFeed } from "../scope/scoped-feed";
 
 export type FeedActorRole =
@@ -266,15 +267,17 @@ export async function rotateToken(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
-  }
+  const isAdmin = isAdminOrOwner(parsed.data.actingRole);
 
   try {
     const result = await database.$transaction(async (tx) => {
       await lockFeedForTokenChange(tx, parsed.data);
       const feed = await tx.feed.findFirst({
-        select: { id: true },
+        select: {
+          created_by_user_id: true,
+          id: true,
+          scopes: { select: { scope_type: true } },
+        },
         where: {
           ...scopedFeed(parsed.data),
           archived_at: null,
@@ -283,6 +286,23 @@ export async function rotateToken(
       });
       if (!feed) {
         return feedNotFound();
+      }
+      // Owners of a personal or team feed may rotate its URL themselves.
+      if (
+        !(
+          isAdmin ||
+          isFeedOwner(
+            {
+              createdByUserId: feed.created_by_user_id,
+              scopes: feed.scopes.map((scope) => ({
+                scopeType: scope.scope_type,
+              })),
+            },
+            parsed.data.actingUserId
+          )
+        )
+      ) {
+        return notAuthorised();
       }
 
       const activeTokens = await tx.feedToken.findMany({

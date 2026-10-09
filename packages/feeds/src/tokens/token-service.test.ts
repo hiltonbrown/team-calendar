@@ -225,7 +225,11 @@ describe("feed token lifecycle with a mocked database", () => {
       "71000000-0000-4000-8000-000000000010"
     );
     expect(mocks.feedFindFirst).toHaveBeenCalledWith({
-      select: { id: true },
+      select: {
+        created_by_user_id: true,
+        id: true,
+        scopes: { select: { scope_type: true } },
+      },
       where: {
         ...scopedFeed(),
         archived_at: null,
@@ -255,6 +259,34 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(mocks.invalidateFeedCache).toHaveBeenCalledWith({
       feedId: baseInput.feedId,
     });
+  });
+
+  it("lets the owner of a personal feed rotate it and refuses anyone else", async () => {
+    mocks.feedTokenFindMany.mockResolvedValue([
+      { id: "71000000-0000-4000-8000-000000000010" },
+    ]);
+    mocks.feedFindFirst.mockResolvedValue({
+      created_by_user_id: "user_owner",
+      id: baseInput.feedId,
+      scopes: [{ scope_type: "self" }],
+    });
+
+    await expect(
+      rotateToken({
+        ...baseInput,
+        actingRole: "org:viewer",
+        actingUserId: "user_owner",
+      })
+    ).resolves.toMatchObject({ ok: true });
+    mocks.feedTokenUpdateMany.mockClear();
+    await expect(
+      rotateToken({
+        ...baseInput,
+        actingRole: "org:viewer",
+        actingUserId: "user_other",
+      })
+    ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    expect(mocks.feedTokenUpdateMany).not.toHaveBeenCalled();
   });
 
   it("returns a stable conflict when concurrent initialisation loses", async () => {
