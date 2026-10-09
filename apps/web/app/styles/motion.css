@@ -4,7 +4,7 @@
  * because "it keeps itself in sync" is the whole product. Everything else is a
  * quiet arrival, and nothing at all once the hero has left the viewport.
  *
- * DESIGN.md scopes Persuade motion to 400-720ms entrances. There is no
+ * DESIGN.md limits marketing motion to 400 to 720ms entrances. There is no
  * scroll-driven parallax below the fold: a marketing page that moves in five
  * places teaches the reader to ignore movement, which costs us the one place it
  * carries meaning.
