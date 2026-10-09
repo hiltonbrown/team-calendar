@@ -108,6 +108,15 @@ export type {
   RedisRestTransportErrorCode,
 } from "./src/redis-rest-transport";
 export { executeRedisRestCommand } from "./src/redis-rest-transport";
+export type { CountryCode, RegionDefinition } from "./src/regions";
+export {
+  COUNTRIES,
+  isCountryCode,
+  isRegionCode,
+  normaliseRegionCode,
+  REGIONS,
+  regionLabel,
+} from "./src/regions";
 export type {
   SupportIssuePayload,
   SupportSubmissionCategory,
