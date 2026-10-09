@@ -5,9 +5,9 @@ import {
   ArrowRightIcon,
   CalendarDaysIcon,
   CircleAlertIcon,
-  LeafIcon,
   MoveHorizontalIcon,
   PencilIcon,
+  RefreshCwIcon,
   SparklesIcon,
   UsersIcon,
 } from "lucide-react";
@@ -407,7 +407,7 @@ function ProvenanceIcon({
     );
   }
   return (
-    <LeafIcon
+    <RefreshCwIcon
       aria-label={
         provenance === "xero" ? "Xero record" : "Team Calendar record"
       }

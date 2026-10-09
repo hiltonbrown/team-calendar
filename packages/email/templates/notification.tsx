@@ -45,7 +45,7 @@ export const NotificationEmailTemplate: NotificationEmailTemplateComponent = ({
               <Text className="m-0 text-zinc-600">{body}</Text>
               {actionUrl ? (
                 <Button
-                  className="mt-6 rounded-md bg-[#336A3B] px-4 py-3 font-medium text-white"
+                  className="mt-6 rounded-md bg-[#46734A] px-4 py-3 font-medium text-white"
                   href={actionUrl}
                 >
                   Open in Team Calendar
@@ -54,7 +54,7 @@ export const NotificationEmailTemplate: NotificationEmailTemplateComponent = ({
               <Hr className="my-6" />
               <Text className="m-0 text-xs text-zinc-500">
                 To change email notifications, open your{" "}
-                <a className="text-[#336A3B]" href={unsubscribeUrl}>
+                <a className="text-[#46734A]" href={unsubscribeUrl}>
                   notification preferences
                 </a>
                 .

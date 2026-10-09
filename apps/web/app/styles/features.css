@@ -444,7 +444,7 @@
 
 .fmkt-pathway__icon--xero {
   /* Keep the fixed vendor cyan paired with dark ink in either theme. */
-  color: #1c1a26;
+  color: #1f2120;
   background: var(--marketing-xero-cyan);
 }
 
@@ -568,7 +568,7 @@
   font: 600 1rem / 1 var(--marketing-font);
   text-anchor: middle;
   /* Xero cyan stays fixed across themes, so its contrasting ink does too. */
-  fill: #1c1a26;
+  fill: #1f2120;
 }
 
 .fmkt-sync-label {
@@ -1888,7 +1888,7 @@
 /* ---- Final CTA ---- */
 
 /* The page's one drenched moment: a full-bleed forest-green band that the
-   calm product app never goes near. Anchored on the brand green #336a3b. */
+   calm product app never goes near. Anchored on the brand green #46734a. */
 .fmkt-cta {
   position: relative;
   padding: clamp(80px, 11vw, 132px) 0;

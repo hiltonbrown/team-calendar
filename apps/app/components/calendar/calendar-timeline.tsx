@@ -14,8 +14,8 @@ import {
   ArrowUpRightIcon,
   CalendarRangeIcon,
   ChevronRightIcon,
-  LeafIcon,
   PencilIcon,
+  RefreshCwIcon,
   UsersIcon,
   XIcon,
 } from "lucide-react";
@@ -256,7 +256,7 @@ function RunwayHeader({
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-label-sm text-muted-foreground">
             <LegendItem
-              icon={<LeafIcon className="size-3.5" />}
+              icon={<RefreshCwIcon className="size-3.5" />}
               label="Xero leave"
             />
             <LegendItem
@@ -513,7 +513,9 @@ function TimelineEventButton({
     event.recordType === "private"
       ? "Private"
       : getAvailabilityRecordLabel(event.recordType);
-  const ProvenanceIcon = isManualCalendarEvent(event) ? PencilIcon : LeafIcon;
+  const ProvenanceIcon = isManualCalendarEvent(event)
+    ? PencilIcon
+    : RefreshCwIcon;
   const duration = segment.endIndex - segment.startIndex + 1;
   const treatment = treatmentLabel(event.renderTreatment);
 
@@ -575,7 +577,7 @@ function RunwayDetail({
       ? "Private"
       : getAvailabilityRecordLabel(event.recordType);
   const sourceLabel = calendarEventSourceLabel(event);
-  const SourceIcon = isManualCalendarEvent(event) ? PencilIcon : LeafIcon;
+  const SourceIcon = isManualCalendarEvent(event) ? PencilIcon : RefreshCwIcon;
 
   return (
     <div
@@ -769,7 +771,7 @@ function MobileEventButton({
     event.recordType === "private"
       ? "Private"
       : getAvailabilityRecordLabel(event.recordType);
-  const SourceIcon = isManualCalendarEvent(event) ? PencilIcon : LeafIcon;
+  const SourceIcon = isManualCalendarEvent(event) ? PencilIcon : RefreshCwIcon;
   return (
     <button
       aria-pressed={selected}

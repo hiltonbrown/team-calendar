@@ -35,10 +35,10 @@ import {
   CheckCircle2Icon,
   CircleDashedIcon,
   Clock3Icon,
-  LeafIcon,
   MoreHorizontalIcon,
   PencilIcon,
   PlusIcon,
+  RefreshCwIcon,
   RotateCcwIcon,
   XCircleIcon,
 } from "lucide-react";
@@ -1062,15 +1062,15 @@ function SourceBadge({ sourceType }: { sourceType: string }) {
     <Badge
       className={
         isManual
-          ? "border-transparent bg-accent-container text-on-accent-container ring-1 ring-on-accent-container/15"
-          : "border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary/60"
+          ? "border-transparent bg-accent-container text-on-accent-container ring-1 ring-on-accent-container/30"
+          : "border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary-foreground/30"
       }
       variant="secondary"
     >
       {isManual ? (
         <PencilIcon className="size-3" />
       ) : (
-        <LeafIcon className="size-3" />
+        <RefreshCwIcon className="size-3" />
       )}
       {isManual ? "Manual" : "Xero"}
     </Badge>

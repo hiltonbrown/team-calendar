@@ -441,12 +441,12 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 ## Design system summary
 
-- Brand colour: `#336A3B` (deep forest green). Primary actions, CTAs, brand moments. Not decoration.
+- Brand colour: `#46734A` (deep forest green). Primary actions, CTAs, brand moments. Not decoration.
 - Font: Plus Jakarta Sans.
 - Border radius: 20px (cards/containers), 16px (dialogs/sheets/popovers/dropdowns), 14px (buttons/inputs), 12px (chips/small elements). No 4px or 8px.
 - No borders for content separation. Use tonal layering (surface colour shifts).
 - No `#000000` for text. Use `on-surface` token.
-- No drop shadows except on floating elements.
+- No drop shadows except on floating elements and the default card's `elev-card` hairline.
 - Light-first. Dark mode receives equal care.
 - Full token tables in DESIGN.md.
 

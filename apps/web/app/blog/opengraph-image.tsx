@@ -23,7 +23,7 @@ const OpenGraphImage = () =>
     >
       <div
         style={{
-          color: "#336a3b",
+          color: "#46734a",
           display: "flex",
           fontSize: 30,
           fontWeight: 700,
@@ -49,7 +49,7 @@ const OpenGraphImage = () =>
       </div>
       <div
         style={{
-          background: "#336a3b",
+          background: "#46734a",
           borderRadius: 16,
           display: "flex",
           height: 18,

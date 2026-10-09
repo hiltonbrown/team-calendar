@@ -2,7 +2,7 @@
 name: Team Calendar
 description: Multi-tenant leave management and availability publishing for teams on Xero Payroll
 colors:
-  primary: "#336A3B"
+  primary: "#46734A"
   on-primary: "#FFFFFF"
   primary-container: "#6DA671"
   on-primary-container: "#1B3620"
@@ -17,23 +17,23 @@ colors:
   warning: "#7A5900"
   warning-container: "#FFDF91"
   on-warning-container: "#271900"
-  surface: "#FCF8FF"
+  surface: "#FBFCFB"
   surface-container-lowest: "#FFFFFF"
-  surface-container-low: "#F6F1FF"
-  surface-container: "#F1EBFD"
-  surface-container-high: "#EBE5F7"
-  surface-container-highest: "#E5E0F1"
-  surface-variant: "#E0DDE6"
-  on-surface: "#1C1A26"
-  on-surface-variant: "#46454E"
-  inverse-surface: "#312F3C"
-  inverse-on-surface: "#F3EFF8"
-  outline: "#777680"
-  outline-variant: "#C1C9BD"
-  error: "#BA1A1A"
-  error-container: "#FFDAD6"
-  on-error-container: "#410002"
-  success: "#6DA671"
+  surface-container-low: "#F7F9F8"
+  surface-container: "#F3F5F4"
+  surface-container-high: "#EDEFEE"
+  surface-container-highest: "#E7EAE8"
+  surface-variant: "#E1E2E1"
+  on-surface: "#1F2120"
+  on-surface-variant: "#494A49"
+  inverse-surface: "#353635"
+  inverse-on-surface: "#F3F4F3"
+  outline: "#7A7C7B"
+  outline-variant: "#C2C4C3"
+  error: "#A83224"
+  error-container: "#FBE1DA"
+  on-error-container: "#410E06"
+  success: "#46734A"
 typography:
   display:
     fontFamily: "Plus Jakarta Sans, sans-serif"
@@ -50,7 +50,7 @@ typography:
   title:
     fontFamily: "Plus Jakarta Sans, sans-serif"
     fontSize: "1.375rem"
-    fontWeight: 500
+    fontWeight: 600
     lineHeight: 1.35
     letterSpacing: "0"
   body:
@@ -83,7 +83,7 @@ components:
     padding: "8px 16px"
     height: "36px"
   button-primary-hover:
-    backgroundColor: "#336A3BE6"
+    backgroundColor: "color-mix(in srgb, {colors.primary} 90%, {colors.on-surface})"
     textColor: "{colors.on-primary}"
   button-secondary:
     backgroundColor: "{colors.secondary-container}"
@@ -99,7 +99,7 @@ components:
     height: "36px"
   button-destructive:
     backgroundColor: "{colors.error}"
-    textColor: "{colors.on-primary}"
+    textColor: "#FFFFFF"
     rounded: "{rounded.md}"
     padding: "8px 16px"
     height: "36px"
@@ -108,6 +108,7 @@ components:
     textColor: "{colors.on-surface}"
     rounded: "{rounded.xl}"
     padding: "24px"
+    shadow: "var(--elev-card)"
   input:
     backgroundColor: "transparent"
     textColor: "{colors.on-surface}"
@@ -162,15 +163,15 @@ Authentication is an Operate threshold with one scoped brand-panel exception. It
 
 ## Colors
 
-The palette is sage-led with cool lavender neutrals. Green is a scarce action and provenance signal, lavender marks manual records and information, muted ochre marks attention, and red is reserved for destructive or failed states.
+The palette is sage-led on near-grey neutrals with a faint green tint. Green is a scarce action and provenance signal, lavender marks manual records and information, muted ochre marks attention, and red is reserved for destructive or failed states.
 
 ### Semantic roles
 
 | Meaning | Token | Required companion |
 |---|---|---|
 | Primary action and brand anchor | `primary` | Verb-led label |
-| Successful outcome or healthy metric | `success` / `primary-container` | Success copy or icon |
-| Xero-synced provenance | `secondary-container` | Leaf icon and “Xero” or equivalent label |
+| Successful outcome or healthy metric | `success` (aliases `primary`) / `primary-container` | Success copy or icon |
+| Xero-synced provenance | `secondary-container` | Sync icon (`RefreshCwIcon`) and “Xero” or equivalent label |
 | Manual provenance | `accent-container` | Pencil icon and “Manual” or equivalent label |
 | Attention, expiry, or partial success | `warning-container` | Warning icon and actionable label |
 | Failure or destructive action | `error` / `error-container` | Error icon, problem statement, recovery |
@@ -183,7 +184,7 @@ The palette is sage-led with cool lavender neutrals. Green is a scarce action an
 
 `surface` is the page canvas. `surface-container-low` creates navigation and contextual bands. `surface-container` groups related work. `surface-container-lowest` is the card and elevated opaque base. `surface-container-high` is the neutral hover surface. `surface-container-highest` is the opaque fallback for frost and the strongest neutral field fill.
 
-Cards use `surface-container-lowest` on a `surface`, `surface-container-low`, or `surface-container` parent. Do not place white cards on an unbounded white canvas without a tonal parent.
+Cards use `surface-container-lowest`. The default card carries the `elev-card` hairline so it stays visible on the near-white page. Use `variant="plain"` only for a card on a parent at least two surface steps darker (`surface-container-high` or below), where the tonal step alone separates it. Never combine the hairline with a border; the only card border is the forced-colours fallback.
 
 ### Dark mode
 
@@ -191,20 +192,22 @@ Dark mode preserves semantic roles rather than mechanically inverting light valu
 
 | Token | Dark value | Token | Dark value |
 |---|---|---|---|
-| `primary` | `#8FD496` | `surface` | `#131218` |
-| `primary-container` | `#1F5226` | `surface-container-lowest` | `#0E0D13` |
-| `secondary-container` | `#374E2E` | `surface-container-low` | `#1C1B22` |
-| `editorial-accent` | `#C8BFFF` | `surface-container` | `#211F26` |
-| `accent-container` | `#46398B` | `surface-container-high` | `#2B2931` |
+| `primary` | `#8FD496` | `surface` | `#151515` |
+| `primary-container` | `#1F5226` | `surface-container-lowest` | `#101010` |
+| `secondary-container` | `#374E2E` | `surface-container-low` | `#1E1F1E` |
+| `editorial-accent` | `#C8BFFF` | `surface-container` | `#222322` |
+| `accent-container` | `#46398B` | `surface-container-high` | `#2C2E2D` |
 | `warning` | `#E8C247` | `warning-container` | `#5C4300` |
-| `error` | `#FFB4AB` | `surface-container-highest` | `#36343C` |
-| `on-surface` | `#E6E1EC` | `on-surface-variant` | `#C8C5D0` |
+| `error` | `#FFB5A6` | `surface-container-highest` | `#373938` |
+| `error-container` | `#8C1D0F` | `on-error-container` | `#FFDCD3` |
+| `supportive-green` | `#B8C9AB` | `outline` | `#949594` |
+| `on-surface` | `#E6E7E6` | `on-surface-variant` | `#CACBCA` |
 
 Theme resolution defaults to the system preference. A manual selection is stored per device by the theme provider. Database persistence is not part of the current product contract.
 
 ### Charts
 
-Charts use the sage family, but colour never identifies a series alone. Every multi-series chart pairs colour with at least one of: a distinct stroke dash, marker shape, direct label, icon, or adjacent data table. The lightest sage is a fill or area colour, not a thin line on a light canvas. Purple remains reserved for manual provenance and is not a generic chart series colour.
+Charts use the sage ramp `chart-1` to `chart-4` (light `#1F3D23`, `#46734A`, `#7FA882`, `#B4D3B3`; dark `#D2ECD3`, `#8FD496`, `#5A9A60`, `#2F5A34`) with `chart-5` aliasing `tertiary`. Colour never identifies a series alone. Every multi-series chart pairs colour with at least one of: a distinct stroke dash, marker shape, direct label, icon, or adjacent data table. The lightest sage is a fill or area colour, not a thin line on a light canvas. Purple remains reserved for manual provenance and is not a generic chart series colour.
 
 ### Named rules
 
@@ -212,7 +215,7 @@ Charts use the sage family, but colour never identifies a series alone. Every mu
 
 **The Provenance Rule.** Xero and manual source colours always pair with a source icon or visible label. Approval, sync, and publication status use separate words, icons, and semantic containers.
 
-**The No-Cream Rule.** Neutral surfaces tint toward lavender. Warm near-white backgrounds are outside the visual world.
+**The No-Cream Rule.** Neutral surfaces carry a faint green tint and read as near-grey. Warm near-white backgrounds are outside the visual world.
 
 **The Adapter Rule.** Framework aliases such as `--accent`, `--secondary`, and `--ring` may map to product tokens, but documentation and product code name the semantic role first.
 
@@ -232,7 +235,7 @@ Charts use the sage family, but colour never identifies a series alone. Every mu
 
 - **Display:** `display-lg`, `display-md`, and `display-sm`; semi-bold; 1.1–1.2 line height; `-0.02em` tracking. Use for Persuade heroes and occasional orientation-heavy app entry points.
 - **Headline:** `headline-lg` and `headline-md`; semi-bold; 1.25–1.3 line height. Use for major app sections and page titles.
-- **Title:** `title-lg`, `title-md`, and `title-sm`; medium; 1.35–1.4 line height. Use for cards, components, navigation, and dense section labels.
+- **Title:** `title-lg`, `title-md`, and `title-sm`; semi-bold; 1.35–1.4 line height. Use for cards, components, navigation, and dense section labels.
 - **Body:** `body-lg`, `body-md`, and `body-sm`; regular; 1.6 line height. Prose measure stays between 65 and 75 characters where practical.
 - **Label:** `label-lg`, `label-md`, and `label-sm`; medium; 1.3–1.4 line height; `0.01em` to `0.05em` tracking. Uppercase is limited to short metadata and table categories.
 
@@ -282,7 +285,7 @@ Persuade may use fluid display type, generous section spacing, sticky narrative 
 
 ## Elevation & Depth
 
-Persistent depth comes from tonal layering. Cards, rows, calendar cells, form fields, dashboard tiles, and tables do not use ramp shadows as decoration. A card may use the shared `shadow-sm` hairline when it needs separation from a nearly identical parent surface.
+Persistent depth comes from tonal layering. Rows, calendar cells, form fields, dashboard tiles, and tables do not use ramp shadows as decoration. Cards carry the `elev-card` hairline by default (light: two soft 10% shadows; dark: a 1px `#494A49` edge, because shadows do not read on near-black); `variant="plain"` removes it on darker parents.
 
 Transient surfaces use elevation as a structural signal:
 
@@ -301,7 +304,7 @@ Operate motion is 150–250ms, ease-out, and tied to state changes. Persuade may
 
 **The Frost Means Floating Rule.** Blur is never a background treatment beneath primary content. If a surface does not float above the task, it does not receive frost.
 
-**The Hairline Ceiling Rule.** `shadow-sm` is the strongest persistent card shadow. Everything stronger belongs to named transient elevation.
+**The Hairline Ceiling Rule.** `elev-card` is the strongest persistent card shadow. Everything stronger belongs to named transient elevation.
 
 ## Shapes
 
@@ -321,21 +324,23 @@ Borders are ghosted and semantic. Form fields, grids, focus indicators, forced-c
 
 ## Components
 
-Every interactive component defines default, hover, focus-visible, active, disabled, loading where applicable, error, and success behaviour. Focus uses a full-opacity 3px semantic ring. The former 50% ring composited to only about 2.05–2.22:1 on light surfaces; the full primary ring reaches about 4.98–6.43:1. Error rings and boundaries use the full error colour. Disabled controls keep labels readable and explain unavailable actions when the reason is not obvious.
+Every interactive component defines default, hover, focus-visible, active, disabled, loading where applicable, error, and success behaviour. Focus uses a solid 3px `ring` outline offset 2px from the control, so it never merges with a filled button and survives forced-colours mode; reset with `outline-hidden`, never `outline-none`. The primary ring reaches at least 4.5:1 on every light surface and 6.6:1 in dark. Error rings and boundaries use the full error colour. Disabled controls use an opaque `surface-container-highest` fill with `muted-foreground` text, never 50% opacity, and explain unavailable actions when the reason is not obvious. A loading button (`aria-busy`) keeps its variant colours and blocks repeat clicks.
+
+Hover moves each button fill 10% away from its own label colour, so label contrast rises: primary and destructive mix toward `on-surface`, secondary mixes toward `background`. Links are underlined at rest and thicken to 2px on hover.
 
 ### Buttons
 
 - **Default:** 36px visual height on precise pointers, 44px minimum hit area on coarse pointers; `text-sm`, medium weight, 14px corners.
 - **Primary:** `primary` fill and `on-primary` text. Use once per decision region.
 - **Secondary:** `secondary-container` fill and `on-secondary-container` text.
-- **Outline:** page fill with a ghost boundary, no decorative shadow.
+- **Outline:** page fill with an `outline` boundary (at least 3:1), no decorative shadow.
 - **Ghost:** transparent until hover, then neutral `surface-container-high`.
 - **Destructive:** `error` fill and explicit destructive copy.
 - **Loading:** preserve the button width, show a spinner plus a stable verb, set `aria-busy`, and prevent duplicate submission.
 
 ### Inputs and fields
 
-Labels remain visible above fields and are programmatically associated. Help and error text use `aria-describedby`; errors use `aria-invalid` and `role="alert"` when introduced dynamically. Input text is 1rem on narrow/touch layouts and may reduce to body-sm on precise desktop layouts. Fields use a ghost boundary and no shadow.
+Labels remain visible above fields and are programmatically associated. Help and error text use `aria-describedby`; errors use `aria-invalid` and `role="alert"` when introduced dynamically. Input text is 1rem on narrow/touch layouts and may reduce to body-sm on precise desktop layouts. Fields use an `outline` boundary (at least 3:1) and no shadow; an invalid field takes a 2px destructive boundary.
 
 Validation preserves the user’s input. Error summaries receive focus only after a failed submission and link back to affected fields. Dates, numbers, names, and long notes must tolerate 30% text expansion, emoji, accents, and long unbroken content.
 
@@ -349,7 +354,7 @@ The calendar is a scan surface, not a form grid. Every visible record communicat
 
 1. person or privacy-safe display name;
 2. availability or leave type;
-3. provenance through leaf/Xero or pencil/manual cue;
+3. provenance through sync/Xero or pencil/manual cue;
 4. exception state such as pending, draft, failed, or private.
 
 Month cells show up to three records, then a labelled “more” path to day detail. Week and day views preserve chronological order. All-day records precede timed records. Public holidays occupy a labelled warning treatment and never reuse manual-provenance lavender.
@@ -360,9 +365,9 @@ Calendar structure uses native headings, groups, lists, and buttons unless a com
 
 ### Provenance chips and status badges
 
-Xero provenance uses sage, a leaf icon, and “Xero” language. Manual provenance uses lavender, a pencil icon, and “Manual” language. Provenance never substitutes for approval or sync status.
+Xero provenance uses sage, a sync icon (`RefreshCwIcon`), and “Xero” language. Manual provenance uses lavender, a pencil icon, and “Manual” language. Provenance never substitutes for approval or sync status.
 
-Pending, draft, failed, warning, private, and success badges use their own copy and semantic container. Status dots must have adjacent text. Informational “New” or “Beta” badges may use lavender because they do not represent record provenance inside the operational calendar.
+Pending, draft, failed, warning, private, and success badges use their own copy and semantic container. Every tinted chip takes a 1px ring of its own text colour at 30%, because the fills alone sit at about 1.2:1 on neutral surfaces. Status dots must have adjacent text. Informational “New” or “Beta” badges may use lavender because they do not represent record provenance inside the operational calendar.
 
 ### High-stakes actions
 
@@ -406,9 +411,9 @@ First-use states explain the source of balances and leave data without requiring
 
 ### Signature surfaces
 
-The auth brand panel is the single Operate-adjacent surface where green may lead as a broad brand moment. Its gradient, glow, provenance dots, and geometric glyph are scoped to authentication and never reused on data surfaces.
+The auth brand panel is the single Operate-adjacent surface where green may lead as a broad brand moment. Its gradient, glow, provenance dots, and geometric glyph (the brand mark, unchanged) are scoped to authentication and never reused on data surfaces.
 
-Marketing may use the primary-to-primary-container CTA gradient, fluid display type, vendor colours, and authored scroll composition. Those are Persuade tools, not shared app-component defaults.
+Marketing may use fluid display type, vendor colours, and authored scroll composition. Those are Persuade tools, not shared app-component defaults.
 
 ## Do's and Don'ts
 

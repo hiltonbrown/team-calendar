@@ -27,14 +27,14 @@ export interface AvailabilityStatusItem {
 }
 
 export const statusToneClasses: Record<AvailabilityStatusTone, string> = {
-  available: "bg-muted text-muted-foreground ring-muted-foreground/15",
+  available: "bg-muted text-muted-foreground ring-muted-foreground/30",
   failed: "bg-error-container text-destructive ring-destructive/30",
   holiday:
-    "bg-accent-container text-on-accent-container ring-accent-container/60",
-  leave: "bg-secondary text-secondary-foreground ring-secondary/60",
+    "bg-warning-container text-on-warning-container ring-on-warning-container/30",
+  leave: "bg-secondary text-secondary-foreground ring-secondary-foreground/30",
   manual:
-    "bg-accent-container text-on-accent-container ring-accent-container/60",
-  private: "bg-muted text-muted-foreground ring-muted-foreground/15",
+    "bg-accent-container text-on-accent-container ring-on-accent-container/30",
+  private: "bg-muted text-muted-foreground ring-muted-foreground/30",
 };
 
 export function toneForCalendarEvent(
