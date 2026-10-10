@@ -189,15 +189,17 @@ describe("shared Xero rate budgets", () => {
       url: "https://invalid.example",
     });
     const input = reservation();
+    // Long enough that a slow runner still reaches fetch before expiry.
+    const budgetMs = 100;
     expect(
-      await store.reserve({ ...input, deadline: createXeroDeadline(10) })
+      await store.reserve({ ...input, deadline: createXeroDeadline(budgetMs) })
     ).toMatchObject({ error: { reason: "infrastructure" }, ok: false });
     await store.observe({
-      deadline: createXeroDeadline(10),
+      deadline: createXeroDeadline(budgetMs),
       headers: new Headers(),
       rateClass: tenant,
     });
-    await store.release({ ...input, deadline: createXeroDeadline(10) });
+    await store.release({ ...input, deadline: createXeroDeadline(budgetMs) });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     await store.release({ ...input, deadline: createXeroDeadline(0) });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
