@@ -123,7 +123,11 @@ const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
             <Link href={withOrg("/feeds/new", orgQueryValue)}>New feed</Link>
           </Button>
         </div>
-        <FeedOversightFilterBar filters={filters} />
+        {/* Keyed on the URL filters so Back and Forward reset the controls. */}
+        <FeedOversightFilterBar
+          filters={filters}
+          key={[filters.search, filters.status, filters.type].join("|")}
+        />
         <FeedOversightList
           feeds={feeds}
           hasActiveFilters={hasActiveFilters}

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   currentUser: vi.fn(),
+  filterBarMounted: vi.fn(),
   getFeedOversightCounts: vi.fn(),
   getSettings: vi.fn(),
   listFeeds: vi.fn(),
@@ -31,9 +32,15 @@ vi.mock("@/lib/server/require-active-org-page-context", () => ({
 vi.mock("./feeds-client", () => ({
   FeedsClient: () => <div>Feed defaults</div>,
 }));
-vi.mock("./feed-oversight-filters", () => ({
-  FeedOversightFilterBar: () => <div>Feed filters</div>,
-}));
+vi.mock("./feed-oversight-filters", async () => {
+  const { useState } = await import("react");
+  return {
+    FeedOversightFilterBar: () => {
+      useState(() => mocks.filterBarMounted());
+      return <div>Feed filters</div>;
+    },
+  };
+});
 vi.mock("next/navigation", () => ({
   usePathname: () => "/settings/feeds",
   useRouter: () => ({ push: vi.fn() }),
@@ -103,6 +110,18 @@ describe("Settings feeds page", () => {
       screen.getByRole("link", { name: "New feed" }).getAttribute("href")
     ).toBe(`/feeds/new?org=${organisationId}`);
     expect(screen.queryByRole("navigation", { name: "Feed pages" })).toBeNull();
+  });
+
+  it("resets the filter controls when the URL filters change, not the page", async () => {
+    const pageFor = (params: Record<string, string>) =>
+      Page({
+        searchParams: Promise.resolve({ org: organisationId, ...params }),
+      });
+    const { rerender } = render(await pageFor({ search: "sales" }));
+    rerender(await pageFor({ cursor: feed(1).id, search: "sales" }));
+    expect(mocks.filterBarMounted).toHaveBeenCalledTimes(1);
+    rerender(await pageFor({ search: "support" }));
+    expect(mocks.filterBarMounted).toHaveBeenCalledTimes(2);
   });
 
   it("links to the next page with the last feed as cursor, keeping filters", async () => {
