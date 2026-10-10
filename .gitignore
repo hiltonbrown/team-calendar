@@ -112,3 +112,10 @@ tmp/
 tooling/release/.auth/
 tooling/release/test-results/
 tooling/release/playwright-report/
+
+# design-sync (Claude Design) build scratch
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
