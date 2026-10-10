@@ -46,12 +46,13 @@ export function recommendFeed(feeds: FeedListItem[]): FeedRecommendation {
   const ownPaused = relevant.filter(
     (feed) => feed.isOwnedByActor && feed.status === "paused"
   );
+  const ownPausedFeed =
+    ownPaused.find((feed) => feed.kind === "personal") ?? ownPaused[0] ?? null;
+  // The paused notice already shows that feed, so it is not listed again.
+  const shown = new Set([recommended?.id, ownPausedFeed?.id]);
   return {
-    others: relevant.filter((feed) => feed.id !== recommended?.id).sort(byName),
-    ownPausedFeed:
-      ownPaused.find((feed) => feed.kind === "personal") ??
-      ownPaused[0] ??
-      null,
+    others: relevant.filter((feed) => !shown.has(feed.id)).sort(byName),
+    ownPausedFeed,
     recommended,
   };
 }

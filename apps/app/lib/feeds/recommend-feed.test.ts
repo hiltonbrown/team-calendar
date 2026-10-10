@@ -61,6 +61,7 @@ describe("recommendFeed", () => {
     expect(result.recommended?.id).toBe(org.id);
     expect(result.ownPausedFeed?.id).toBe(paused.id);
     expect(result.others.map((item) => item.id)).not.toContain(archived.id);
+    expect(result.others.map((item) => item.id)).not.toContain(paused.id);
   });
 
   it("lists other usable feeds without the recommended one or other people's own feeds", () => {
