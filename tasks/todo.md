@@ -1,5 +1,11 @@
 # Current work
 
+## Xero multi-company accounts (plan `docs/superpowers/plans/2026-10-10-xero-multi-company.md`)
+
+- [x] Inspect schema, OAuth, refresh, disconnect, jobs, calendar, feeds and settings UI; record findings and gaps.
+- [ ] Confirm decisions D1 to D4 with the user.
+- [ ] Tasks 1 to 11 per the plan.
+
 ## Bundled public holidays (plan `docs/superpowers/plans/2026-10-09-bundled-public-holidays.md`)
 
 - [x] Region registry, reference schema and loader; one data file each for AU, NZ and UK.
