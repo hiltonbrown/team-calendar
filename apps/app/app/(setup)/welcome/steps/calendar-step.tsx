@@ -14,6 +14,9 @@ interface SubscribableFeed {
   subscribeUrl: string;
 }
 
+const EXISTING_FEED_UNAVAILABLE =
+  "You already have a calendar feed, but it is paused or has no active link. Ask an administrator to check it.";
+
 export function CalendarStep({
   fallbackFeed,
   homeHref,
@@ -45,6 +48,12 @@ export function CalendarStep({
       });
       if (!result.ok) {
         setCreateError(result.error.message);
+        return;
+      }
+      // An existing feed that is paused or has no active link cannot be
+      // shown here, so say so rather than refreshing to the same button.
+      if (!result.value.created) {
+        setCreateError(EXISTING_FEED_UNAVAILABLE);
         return;
       }
       router.refresh();

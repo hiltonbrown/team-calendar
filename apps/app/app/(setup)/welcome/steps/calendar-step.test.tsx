@@ -27,6 +27,7 @@ const { CalendarStep } = await import("./calendar-step");
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const ORG_INSTEAD = /organisation's calendar instead/;
 const FEED_LIMIT = /active feed limit/;
+const EXISTING_PAUSED = /paused or has no active link/;
 const orgFeed = {
   name: "All staff",
   subscribeUrl: "https://api.test/ical/org.ics",
@@ -86,6 +87,27 @@ describe("CalendarStep", () => {
     expect(await screen.findByDisplayValue(orgFeed.subscribeUrl)).toBeTruthy();
     expect(screen.getByText(ORG_INSTEAD)).toBeTruthy();
     expect(screen.getByText(FEED_LIMIT)).toBeTruthy();
+  });
+
+  it("explains an existing feed that is paused instead of refreshing", async () => {
+    mocks.createOwnFeedAction.mockResolvedValue({
+      ok: true,
+      value: { created: false, feedId: "f" },
+    });
+    render(
+      <CalendarStep
+        fallbackFeed={orgFeed}
+        homeHref="/"
+        organisationId={organisationId}
+        personalFeed={null}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create my calendar feed" })
+    );
+    expect(await screen.findByDisplayValue(orgFeed.subscribeUrl)).toBeTruthy();
+    expect(screen.getByText(EXISTING_PAUSED)).toBeTruthy();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("shows the full personal feed URL and completes on Done or Skip", async () => {
