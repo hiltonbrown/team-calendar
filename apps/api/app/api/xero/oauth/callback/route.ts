@@ -49,6 +49,10 @@ function failureTarget(state: string, code: string, appBaseUrl: string): URL {
   return target;
 }
 
+function appBaseUrlFor(request: Request): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? request.url;
+}
+
 function clearNonce(response: NextResponse): NextResponse {
   response.cookies.delete({
     name: "xero_oauth_nonce",
@@ -71,7 +75,17 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code"),
     state = url.searchParams.get("state");
-  const cancelled = url.searchParams.get("error") === "access_denied";
+  const providerError = url.searchParams.get("error");
+  const cancelled = providerError === "access_denied";
+  // Any other provider error arrives without a code; return the person to
+  // where they started rather than to a bare JSON response.
+  if (state && providerError && !cancelled) {
+    return clearNonce(
+      NextResponse.redirect(
+        failureTarget(state, "failed", appBaseUrlFor(request))
+      )
+    );
+  }
   if (!(state && (code || cancelled))) {
     return clearNonce(
       NextResponse.json(
@@ -108,7 +122,7 @@ export async function GET(request: Request) {
   const result: Awaited<ReturnType<typeof completeXeroOAuth>> = cancelled
     ? await cancelXeroOAuth(callback)
     : await completeXeroOAuth({ ...callback, code: code ?? "" });
-  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.url;
+  const appBaseUrl = appBaseUrlFor(request);
   if (!result.ok) {
     return clearNonce(
       NextResponse.redirect(failureTarget(state, result.error.code, appBaseUrl))

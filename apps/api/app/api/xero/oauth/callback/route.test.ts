@@ -311,6 +311,21 @@ describe("Xero OAuth callback route", () => {
     expect(await response.text()).not.toMatch(CREDENTIAL_PATTERN);
   });
 
+  it("returns a provider error other than denial to the signed return path", async () => {
+    mocks.readOAuthStateReturnTo.mockReturnValue("/onboarding?step=xero");
+    const response = await GET(
+      new Request(
+        "https://api.example.com/api/xero/oauth/callback?error=server_error&state=state"
+      )
+    );
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/onboarding");
+    expect(location.searchParams.get("xero_error")).toBe("failed");
+    expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
+    expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+    expect(mocks.cancelXeroOAuth).not.toHaveBeenCalled();
+  });
   it("clears the nonce on terminal callback validation failure", async () => {
     const response = await GET(
       new Request("https://api.example.com/api/xero/oauth/callback?state=state")
