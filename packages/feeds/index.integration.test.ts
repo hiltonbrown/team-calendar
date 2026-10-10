@@ -1122,6 +1122,17 @@ describe("feed services", () => {
       error: { code: "not_authorised" },
       ok: false,
     });
+    const inactive = await seedLinkedPerson({ firstName: "Gus" });
+    await database.person.update({
+      data: { is_active: false },
+      where: { id: inactive.id },
+    });
+    await expect(
+      createOwnFeed(ownFeedRequest(inactive.userId, "personal"))
+    ).resolves.toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
   });
 
   test("creates a team feed for a manager with direct reports", async () => {

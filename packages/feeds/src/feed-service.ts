@@ -1012,7 +1012,14 @@ async function loadOwnFeedState(
   };
   const person = await client.person.findFirst({
     select: { first_name: true, id: true },
-    where: { ...scope, archived_at: null, clerk_user_id: input.actingUserId },
+    where: {
+      ...scope,
+      archived_at: null,
+      clerk_user_id: input.actingUserId,
+      // Feed scope resolution skips inactive people, so their own feed
+      // would publish nobody.
+      is_active: true,
+    },
   });
   const ownFeed = (scopeType: "manager_team" | "self") =>
     client.feed.findFirst({
