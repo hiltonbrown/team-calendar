@@ -127,23 +127,26 @@ describe("wizard rules", () => {
     ).toBe(true);
   });
 
-  it("lets the admin past a failed people import", () => {
-    expect(
-      isStepComplete(
-        "people",
-        buildSnapshot(
-          inputs({
-            connection: {
-              balances: stage(null),
-              importRequestedAt: done,
-              leave: stage(null),
-              people: stage(null, "failed"),
-            },
-          })
+  it.each(["failed", "partial_success"] as const)(
+    "lets the admin past a %s people import",
+    (status) => {
+      expect(
+        isStepComplete(
+          "people",
+          buildSnapshot(
+            inputs({
+              connection: {
+                balances: stage(null),
+                importRequestedAt: done,
+                leave: stage(null),
+                people: stage(null, status),
+              },
+            })
+          )
         )
-      )
-    ).toBe(true);
-  });
+      ).toBe(true);
+    }
+  );
 
   it("finishes on leave complete, leave failed, manual mode or force", () => {
     const running = buildSnapshot(inputs());

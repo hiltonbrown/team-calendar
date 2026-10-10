@@ -78,9 +78,12 @@ export function deriveStage(
   if (stage.completedAt) {
     return "complete";
   }
+  // A partial run leaves no full watermark, so it would otherwise read as
+  // running forever and hold the admin on the people step.
   if (
     stage.latestRunStatus === "failed" ||
-    stage.latestRunStatus === "cancelled"
+    stage.latestRunStatus === "cancelled" ||
+    stage.latestRunStatus === "partial_success"
   ) {
     return "failed";
   }
