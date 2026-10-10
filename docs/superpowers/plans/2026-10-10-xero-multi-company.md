@@ -96,7 +96,7 @@ The migration creates `team_calendar_app` as `NOLOGIN` if absent and applies gra
 - Tenant tables: `SELECT, INSERT, UPDATE, DELETE` to `team_calendar_app`; sequences `USAGE, SELECT`.
 - `plans`, `plan_limits`: `SELECT` only, no RLS (global reference data).
 - `xero_authorisations`, `stripe_events`, `_prisma_migrations`: **no grant**. Tokens are unreachable from the tenant client; credential handling runs only through the system client in `packages/xero`.
-- `ALTER DEFAULT PRIVILEGES` so future tables follow the same rule; a catalogue test fails any table missed.
+- **No default privileges.** Grants stay explicit per table, issued in the same migration that enables RLS and the policy, so a new table is never readable before it is classified. The catalogue test fails any table that is neither a policy-protected tenant table, a listed reference table nor a listed no-grant table.
 
 ### Policies
 
@@ -106,10 +106,16 @@ For each of the 29 tables with `clerk_org_id`:
 ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON <t> TO team_calendar_app
   USING (clerk_org_id = current_setting('app.clerk_org_id', true))
-  WITH CHECK (clerk_org_id = current_setting('app.clerk_org_id', true));
+  WITH CHECK (
+    clerk_org_id = current_setting('app.clerk_org_id', true)
+    AND (organisation_id IS NULL OR EXISTS (
+      SELECT 1 FROM organisations o
+      WHERE o.id = organisation_id
+        AND o.clerk_org_id = current_setting('app.clerk_org_id', true)))
+  );
 ```
 
-A missing setting yields `NULL`, so queries return nothing and writes fail: the policy fails closed.
+A missing setting yields `NULL`, so queries return nothing and writes fail: the policy fails closed. The `WITH CHECK` pairing stops a write that carries the current account but another account's company. Many foreign keys reference only the global `organisations.id`, so `clerk_org_id` alone would let account A create, for example, account B's `organisation_settings` row and block B's own. Tables without `organisation_id` (`organisations`, `clerk_org_subscriptions`, `usage_counters`) use the account clause only. Existing composite `(organisation_id, clerk_org_id)` foreign keys stay; the policy covers the rest without rewriting every relation.
 
 ### Tenant context in the client
 
@@ -120,7 +126,7 @@ A missing setting yields `NULL`, so queries return nothing and writes fail: the 
 
 ### System client
 
-- `packages/database/src/system-client.ts` exports `systemDatabase` on the owner connection. A boundary test allowlists its importers:
+- `packages/database/src/system-client.ts` exports `systemDatabase` on the owner connection. A boundary test allowlists its importers, including relative imports inside `packages/database` itself:
   - `packages/xero` credential storage, refresh, OAuth sessions and authorisation cleanup;
   - Inngest fan-out that enumerates connections across accounts (`schedule-xero-syncs`, `recover-xero-import-dispatch`, `recount-usage`), which then hands each item to a tenant client;
   - the ICS endpoint's token lookup by `token_hash`, which then renders through `tenantDatabase(feed.clerk_org_id)`;
@@ -143,7 +149,7 @@ Two migrations, one per logical change:
    - `XeroConnection.released_at DateTime?`.
    - Replace `xero_tenant_id @unique` with partial unique `xero_connections_owned_tenant_key ON (xero_tenant_id) WHERE released_at IS NULL`; same for `remote_connection_id` (also `IS NOT NULL`). Prisma `@@unique(..., map, where: raw(...))`, as already used for `feed_tokens`.
    - `organisation_id @unique` stays: a released company is archived, never reconnected.
-   - `feed_scope_rule_type` gains `account`.
+   - `organisation_id` becomes nullable on `feeds`, `feed_tokens`, `feed_scopes` and `feed_event_publications`: `NULL` means the feed spans every company in the account, as `PRODUCT.md:463` already specifies. The existing default feed is migrated in place (same feed, same active token) to `organisation_id = NULL`, so current subscribers keep their URL and gain the other companies. No new scope enum value.
    - No token columns move; no per-tenant credential copies.
 
 Released connection rows, `sync_runs` and `audit_events` are the connection history; the partial index makes active ownership canonical. Ownership lookups across accounts (conflict checks) run through the system client because RLS hides other accounts' rows by design; the partial unique index remains the final guard.
@@ -170,16 +176,16 @@ Each task: failing tests first, implement, targeted tests, package gate, one con
 **Files:** `packages/database/src/tenant-client.ts`, `system-client.ts`, `client.ts`, `package.json` exports, `boundary.test.ts`.
 
 - [ ] `tenantDatabase`, `tenantTransaction`, `systemDatabase` per section 3.
-- [ ] Integration tests as `team_calendar_app`: account A cannot read, update or delete account B rows even with B's IDs in the `where`; insert with B's `clerk_org_id` fails `WITH CHECK`; no context returns zero rows; context does not survive into the next pooled query; raw SQL inside `tenantTransaction` is filtered.
+- [ ] Integration tests as `team_calendar_app`: account A cannot read, update or delete account B rows even with B's IDs in the `where`; insert with B's `clerk_org_id` fails `WITH CHECK`; insert with A's `clerk_org_id` and B's `organisation_id` (for example `organisation_settings`) fails `WITH CHECK`; no context returns zero rows; context does not survive into the next pooled query; raw SQL inside `tenantTransaction` is filtered.
 - [ ] Boundary test: only allowlisted modules import `systemDatabase`.
 
 #### Task 3: Migrate call sites
 
-Package by package, each its own commit: `availability`, `feeds`, `notifications`, `billing`, `jobs`, `xero` (tenant reads only), `apps/api`, `apps/app`.
+Package by package, each its own commit: `database` (internal `src/queries/*`, `src/organisation-settings/*` and other helpers importing `../client` by relative path take `clerkOrgId` and use `tenantDatabase`), `availability`, `feeds`, `notifications`, `billing`, `jobs`, `xero` (tenant reads only), `apps/api`, `apps/app`.
 
 - [ ] Replace `database` with `tenantDatabase(clerkOrgId)` or `tenantTransaction`; keep `scopedQuery` (application defence in depth and company filter).
 - [ ] Move cross-account paths to `systemDatabase` only where section 3 lists them.
-- [ ] Remove the default `database` export from non-allowlisted imports; typecheck proves no stragglers.
+- [ ] Remove the default `database` export and rename the owner client module, so relative imports inside `packages/database` also fail unless allowlisted; typecheck and the boundary test prove no stragglers.
 - [ ] Run each package's unit and integration suites against the app role.
 
 ### Stage 2: Multi-company accounts
@@ -204,7 +210,7 @@ Package by package, each its own commit: `availability`, `feeds`, `notifications
 **Files:** `packages/xero/src/oauth/service.ts`, `packages/availability/src/companies/create-company.ts` (extracted from `current-user-service.ts`), `packages/database/src/queries/billing.ts`.
 
 - [ ] "Add company" starts OAuth without `organisation_id`.
-- [ ] `completeXeroTenantSelection` accepts `tenantIds: string[]`. One `GET /connections` call per selection; for each tenant, its own transaction: AU check, `claimXeroTenant`, then `same_account` updates the existing connection (reconnect or authorisation replacement), `unowned` checks the entitlement under `pg_advisory_xact_lock('payroll-entities:<clerk_org_id>')` and creates company, default feed, connection, audit event and initial import request, `owned_elsewhere` returns neutral conflict.
+- [ ] `completeXeroTenantSelection` accepts `tenantIds: string[]`. One `GET /connections` call per selection; for each tenant, its own transaction: AU check, `claimXeroTenant`, then `same_account` updates the existing connection (reconnect or authorisation replacement), `unowned` checks the entitlement under `pg_advisory_xact_lock('payroll-entities:<clerk_org_id>')` and creates company, connection, audit event and initial import request (no per-company default feed; the account-wide default feed already covers it), `owned_elsewhere` returns neutral conflict.
 - [ ] Per-tenant outcomes; one failure does not roll back others.
 - [ ] Remove silent `ensureDefaultOrganisation` from read paths; keep it for first-run onboarding only.
 - [ ] Tests: one administrator connects three tenants, all bound to one account (tests 1, 2); repeated callback and selection create no duplicates (test 18).
@@ -217,7 +223,9 @@ Package by package, each its own commit: `availability`, `feeds`, `notifications
 #### Task 8: Disconnect and Remove company
 
 - [ ] Disconnect one of three tenants: the other two connections, cursors, people and feeds unchanged (test 12).
-- [ ] Remove company (owner only): disconnect if connected; set `released_at`; archive company, Xero-owned people and records; mark publications absent and invalidate KV for every affected feed; call Xero token revocation only when no connection still references the authorisation; audit `company_removed`; repeat calls have no further effect (test 18).
+- [ ] Remove company (`org:owner` only): run the existing remote-first disconnect; set `released_at` only after Xero confirms 204 or 404. A network error, 403, 5xx or other uncertain outcome stops removal with ownership and retryable state intact. Then archive company, Xero-owned people and records; mark publications absent and invalidate KV for every affected feed; audit `company_removed`; repeat calls have no further effect (test 18).
+- [ ] No whole-grant token revocation. Authorisation cleanup reuses the existing rule: delete only when no connection references it **and** no unexpired `selecting` OAuth session does (`disconnect.ts:242-260`), so an in-progress Add company flow survives.
+- [ ] Tests: uncertain remote failure leaves the tenant owned and the company active; removal during a live selecting session keeps the authorisation.
 - [ ] "Disconnect all" loops the same function with per-company results.
 
 #### Task 9: Consolidated calendar
@@ -232,9 +240,9 @@ Package by package, each its own commit: `availability`, `feeds`, `notifications
 
 #### Task 10: Account-wide feeds
 
-- [ ] `account` scope resolves people across `resolveAccountCompanies`; `self` resolves the user's people in every company; multi-company accounts' default feed uses `account`.
-- [ ] A record change in any company invalidates every `account` feed in the account; Remove company invalidates them all.
-- [ ] Tests: sensitive leave types and payroll fields absent from ICS (test 14); revoked token returns 404 with no cached body (test 15); an `account` feed never includes another account's companies; identical Xero IDs in two companies yield distinct UIDs.
+- [ ] An account feed (`organisation_id IS NULL`) resolves people across `resolveAccountCompanies`. `self` and `manager_team` resolve every acting `Person` the user has across companies, so a manager's direct reports in each company appear in one feed.
+- [ ] A record change in any company invalidates every account feed in the account; Remove company invalidates them all.
+- [ ] Tests: sensitive leave types and payroll fields absent from ICS (test 14); revoked token returns 404 with no cached body (test 15); an account feed never includes another account's companies; a manager with reports in two companies sees both in their team feed; adding a second company creates no extra default feed and keeps the existing feed URL; identical Xero IDs in two companies yield distinct UIDs.
 
 #### Task 11: Jobs isolation
 
@@ -243,8 +251,8 @@ Package by package, each its own commit: `availability`, `feeds`, `notifications
 
 #### Task 12: Integration permissions
 
-- [ ] Every mutating Xero action calls `requireRole('admin')` (Remove company: owner) before reading input and resolves the company server-side.
-- [ ] Tests: viewer and manager receive 403 for connect, select, reconnect, disconnect, remove, pause and sync (test 6); no response contains token fields, `xero_user_id` or raw payloads.
+- [ ] Every mutating Xero action checks `requireRole("org:admin")` or `requireRole("org:owner")`, as `apps/api/app/api/xero/oauth/start/route.ts` already does, before reading input, and resolves the company server-side. Remove company requires `org:owner`.
+- [ ] Tests: admin and owner succeed for connect, select, reconnect, disconnect, pause and sync; owner succeeds and admin is refused for Remove company; viewer and manager receive 403 for all of them (test 6); no response contains token fields, `xero_user_id` or raw payloads.
 
 #### Task 13: UI
 
