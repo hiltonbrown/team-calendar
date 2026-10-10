@@ -76,6 +76,13 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Tenancy and configuration
 
+- Treat database-enforced tenant isolation (PostgreSQL Row Level Security under a
+  restricted, non-owner, non-`BYPASSRLS` runtime role) as a baseline control.
+  If it is missing, report it as a defect and plan it first; never recommend
+  against it because application scoping already exists.
+- Treat a supported-but-unreachable capability (such as multiple Xero files per
+  account) as a product expansion to deliver, and confirm plan limits before
+  planning around existing entitlements.
 - Compose tenant-scoped database access with
   `scopedQuery(clerkOrgId, organisationId)`. Include both identifiers in update
   and delete filters, even when the record ID is unique.

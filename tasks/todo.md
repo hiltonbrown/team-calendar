@@ -1,5 +1,12 @@
 # Current work
 
+## Xero multi-company accounts (plan `docs/superpowers/plans/2026-10-10-xero-multi-company.md`)
+
+- [x] Inspect schema, OAuth, refresh, disconnect, jobs, calendar, feeds and settings UI; record findings and gaps.
+- [x] Confirmed: multi-file expansion; Premium allows up to 5 Xero files; Row Level Security required.
+- [ ] Stage 1: Row Level Security (Tasks 1 to 3).
+- [ ] Stage 2: multi-company accounts (Tasks 4 to 15).
+
 ## Bundled public holidays (plan `docs/superpowers/plans/2026-10-09-bundled-public-holidays.md`)
 
 - [x] Region registry, reference schema and loader; one data file each for AU, NZ and UK.
