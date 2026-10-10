@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   withinLimit: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   withinLimit: mocks.withinLimit,

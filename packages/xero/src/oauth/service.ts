@@ -363,6 +363,13 @@ function signState(payload: OAuthStatePayload, clientSecret: string): string {
   return `${encoded}.${signature}`;
 }
 
+// The signed state carries the caller's return path, so a failed callback can
+// send the person back to where they started with a safe error code.
+export function readOAuthStateReturnTo(state: string): string | null {
+  const verified = verifyState(state);
+  return verified.ok ? verified.value.returnTo : null;
+}
+
 function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
   const clientSecret = stateSecret();
   if (!clientSecret) {

@@ -4,127 +4,106 @@ import type { OnboardingState } from "@/lib/server/load-onboarding-state";
 import { OnboardingChecklist } from "./onboarding-checklist";
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
+const SETUP_COMPLETE = /Setup is complete/;
+
 describe("OnboardingChecklist", () => {
   afterEach(cleanup);
-  it("promotes one next action and discloses quieter remaining groups", () => {
+
+  it("presents post-setup recommendations with one next action", () => {
     const { container } = render(
       <OnboardingChecklist
         orgQueryValue={organisationId}
         state={incompleteState}
       />
     );
+    expect(
+      screen.getByRole("heading", { name: "Recommended next steps" })
+    ).toBeDefined();
+    expect(screen.getByText(SETUP_COMPLETE)).toBeDefined();
     const progress = screen.getByRole("progressbar", {
-      name: "Required setup progress",
+      name: "Recommended steps progress",
     });
     expect(progress.getAttribute("value")).toBe("1");
-    expect(progress.getAttribute("max")).toBe("4");
-    expect(screen.getByText("1 of 4 required steps complete.")).toBeDefined();
-    const nextAction = screen.getByRole("link", { name: "Add people" });
+    expect(progress.getAttribute("max")).toBe("2");
+    expect(
+      screen.getByText("1 of 2 recommended steps complete.")
+    ).toBeDefined();
+    const nextAction = screen.getByRole("link", { name: "Create a feed" });
     expect(nextAction.getAttribute("href")).toBe(
-      `/people?org=${organisationId}`
+      `/feeds?org=${organisationId}`
     );
     const primaryActions = [...container.querySelectorAll("a")].filter((link) =>
       link.classList.contains("bg-primary")
     );
-    expect(primaryActions).toHaveLength(1);
-    expect(primaryActions[0]).toBe(nextAction);
-    expect(screen.getByText("Completed (1)")).toBeDefined();
-    expect(screen.getByText("Optional and later (3)")).toBeDefined();
-    expect(screen.getByText("Done")).toBeDefined();
-    expect(screen.getByText("Next")).toBeDefined();
-    expect(screen.getByText("Optional")).toBeDefined();
-    expect(screen.getAllByText("Later")).toHaveLength(2);
+    expect(primaryActions).toEqual([nextAction]);
+    expect(screen.getByText("Connect Xero Payroll")).toBeDefined();
     for (const link of container.querySelectorAll("a")) {
       expect(link.getAttribute("href")).toContain(`org=${organisationId}`);
     }
   });
-  it("gives completed setup one clear return-to-work action", () => {
-    const { container } = render(
+
+  it("gives a finished list one clear return-to-work action", () => {
+    render(
       <OnboardingChecklist
         orgQueryValue={organisationId}
         state={completeState}
       />
     );
     expect(
-      screen.getByText("Setup complete. 4 of 4 required steps complete.")
+      screen.getByRole("heading", { name: "You're all set" })
     ).toBeDefined();
     expect(
-      screen
-        .getByRole("progressbar", { name: "Required setup progress" })
-        .getAttribute("value")
-    ).toBe("4");
+      screen.getByText("2 of 2 recommended steps complete.")
+    ).toBeDefined();
     expect(
       screen
         .getByRole("link", { name: "Return to dashboard" })
         .getAttribute("href")
     ).toBe(`/?org=${organisationId}`);
-    expect(
-      [...container.querySelectorAll("a")].filter((link) =>
-        link.classList.contains("bg-primary")
-      )
-    ).toHaveLength(1);
   });
 });
+
 const incompleteState: OnboardingState = {
   activeFeedCount: 0,
   completedRequiredCount: 1,
-  currentUserPersonLinked: false,
   isComplete: false,
-  pendingPersonMatchesCount: 0,
-  peopleCount: 0,
-  requiredCount: 4,
+  requiredCount: 2,
   steps: [
     {
-      ctaHref: "/settings/general",
-      ctaLabel: "Review profile",
-      description: "Organisation profile is ready.",
-      id: "profile",
-      status: "complete",
-      title: "Review organisation profile",
-    },
-    {
-      ctaHref: "/settings/integrations/xero",
-      ctaLabel: "Connect Xero",
-      description: "Connect now or skip for later.",
-      id: "xero",
-      status: "optional",
-      title: "Connect Xero",
-    },
-    {
-      ctaHref: "/people",
-      ctaLabel: "Add people",
-      description: "Add people manually or sync them.",
-      id: "people",
-      status: "next",
-      title: "Add or sync people",
-    },
-    {
       ctaHref: "/settings/holidays",
-      ctaLabel: "Review setup",
-      description: "Review regional and custom dates.",
+      ctaLabel: "Review holidays",
+      description: "Check regional dates.",
       id: "holidays",
-      status: "pending",
+      status: "complete",
       title: "Review public holidays",
     },
     {
       ctaHref: "/feeds",
-      ctaLabel: "Create feed",
+      ctaLabel: "Create a feed",
       description: "Create a calendar feed.",
       id: "feed",
-      status: "pending",
-      title: "Review calendar feed",
+      status: "next",
+      title: "Add the calendar to your calendar app",
+    },
+    {
+      ctaHref: "/settings/integrations/xero",
+      ctaLabel: "Connect Xero",
+      description: "Connect Xero Payroll.",
+      id: "xero",
+      status: "optional",
+      title: "Connect Xero Payroll",
     },
   ],
   xeroConnectionState: "not_connected",
 };
+
 const completeState: OnboardingState = {
   ...incompleteState,
   activeFeedCount: 1,
-  completedRequiredCount: 4,
-  currentUserPersonLinked: true,
+  completedRequiredCount: 2,
   isComplete: true,
-  peopleCount: 2,
-  steps: incompleteState.steps.map((step) =>
-    step.id === "xero" ? step : { ...step, status: "complete" }
-  ),
+  steps: incompleteState.steps
+    .filter((step) => step.id !== "xero")
+    .map((step) => ({ ...step, status: "complete" as const })),
+  xeroConnectionState: "connected",
 };

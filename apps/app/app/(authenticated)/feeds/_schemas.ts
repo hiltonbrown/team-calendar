@@ -44,39 +44,20 @@ export const FeedCommandActionSchema = z.object({
   organisationId: z.string().uuid(),
 });
 
+export const CreateOwnFeedActionSchema = z.object({
+  kind: z.enum(["personal", "team"]),
+  organisationId: z.string().uuid(),
+});
+
 export const RevokeTokenActionSchema = z.object({
   organisationId: z.string().uuid(),
   tokenId: z.string().uuid(),
 });
 
-export const FeedFilterSchema = z.object({
-  cursor: z.string().uuid().optional(),
-  privacyMode: z
-    .preprocess(arrayFromParam, z.array(z.enum(["named", "masked", "private"])))
-    .optional(),
-  search: z.string().trim().max(200).optional(),
-  status: z
-    .preprocess(
-      arrayFromParam,
-      z.array(z.enum(["active", "paused", "archived"]))
-    )
-    .default(["active", "paused"]),
-});
-
 export type CreateFeedActionInput = z.infer<typeof CreateFeedActionSchema>;
 export type UpdateFeedActionInput = z.infer<typeof UpdateFeedActionSchema>;
 export type FeedCommandActionInput = z.infer<typeof FeedCommandActionSchema>;
+export type CreateOwnFeedActionInput = z.infer<
+  typeof CreateOwnFeedActionSchema
+>;
 export type RevokeTokenActionInput = z.infer<typeof RevokeTokenActionSchema>;
-
-function arrayFromParam(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return value;
-}

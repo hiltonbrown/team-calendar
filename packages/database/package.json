@@ -42,6 +42,10 @@
       "types": "./queries/notifications.ts",
       "default": "./queries/notifications.ts"
     },
+    "./queries/onboarding": {
+      "types": "./queries/onboarding.ts",
+      "default": "./queries/onboarding.ts"
+    },
     "./queries/organisations": {
       "types": "./queries/organisations.ts",
       "default": "./queries/organisations.ts"

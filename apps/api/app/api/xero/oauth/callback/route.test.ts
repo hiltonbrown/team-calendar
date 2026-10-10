@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   dispatchInitialXeroSync: vi.fn(),
   isLocalApplicationPath: vi.fn(),
   isPreviewDeployment: vi.fn(),
+  readOAuthStateReturnTo: vi.fn(),
 }));
 
 vi.mock("@repo/jobs", () => ({
@@ -32,6 +33,7 @@ vi.mock("@repo/xero", () => ({
   completeXeroOAuth: mocks.completeXeroOAuth,
   isLocalApplicationPath: mocks.isLocalApplicationPath,
   isPreviewDeployment: mocks.isPreviewDeployment,
+  readOAuthStateReturnTo: mocks.readOAuthStateReturnTo,
 }));
 
 const { GET } = await import("./route");
@@ -97,7 +99,12 @@ describe("Xero OAuth callback route", () => {
     });
     const response = await GET(new Request(callbackUrl));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(307);
+    expect(
+      new URL(response.headers.get("location") ?? "").searchParams.get(
+        "xero_error"
+      )
+    ).toBe("expired");
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith({
       authenticatedClerkOrgId: "org_1",
       authenticatedUserId: "user_1",
@@ -160,7 +167,8 @@ describe("Xero OAuth callback route", () => {
     );
   });
 
-  it("returns the service error for a mismatched nonce", async () => {
+  it("returns a failed callback to the signed return path with a safe code", async () => {
+    mocks.readOAuthStateReturnTo.mockReturnValue("/onboarding?step=xero");
     mocks.completeXeroOAuth.mockResolvedValue({
       error: {
         code: "invalid_state",
@@ -175,9 +183,63 @@ describe("Xero OAuth callback route", () => {
       })
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/onboarding");
+    expect(location.searchParams.get("step")).toBe("xero");
+    expect(location.searchParams.get("xero_error")).toBe("expired");
+    expect(response.headers.get("location")).not.toContain("invalid");
+    expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith(
       expect.objectContaining({ nonce: "mismatched-nonce" })
+    );
+  });
+
+  it.each([
+    ["tenant_not_found", "organisation"],
+    ["invalid_country", "organisation"],
+    ["network_error", "unavailable"],
+    ["connection_changed", "changed"],
+    ["client_credentials_invalid", "failed"],
+  ])("maps %s to the %s error code", async (code, expected) => {
+    mocks.readOAuthStateReturnTo.mockReturnValue("/onboarding");
+    mocks.completeXeroOAuth.mockResolvedValue({
+      error: { code, message: "Provider detail that must not leak." },
+      ok: false,
+    });
+    const response = await GET(
+      new Request(callbackUrl, { headers: { cookie: "xero_oauth_nonce=n" } })
+    );
+    const location = response.headers.get("location") ?? "";
+    expect(new URL(location).searchParams.get("xero_error")).toBe(expected);
+    expect(location).not.toContain("Provider");
+  });
+
+  it("falls back to Xero settings when the state cannot be verified", async () => {
+    mocks.readOAuthStateReturnTo.mockReturnValue(null);
+    mocks.completeXeroOAuth.mockResolvedValue({
+      error: { code: "invalid_state", message: "Invalid." },
+      ok: false,
+    });
+    const response = await GET(
+      new Request(callbackUrl, { headers: { cookie: "xero_oauth_nonce=n" } })
+    );
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/settings/integrations/xero");
+    expect(location.searchParams.get("xero_error")).toBe("expired");
+  });
+
+  it("never follows an unsafe signed return path", async () => {
+    mocks.readOAuthStateReturnTo.mockReturnValue("https://evil.example/");
+    mocks.completeXeroOAuth.mockResolvedValue({
+      error: { code: "network_error", message: "Down." },
+      ok: false,
+    });
+    const response = await GET(
+      new Request(callbackUrl, { headers: { cookie: "xero_oauth_nonce=n" } })
+    );
+    expect(new URL(response.headers.get("location") ?? "").pathname).toBe(
+      "/settings/integrations/xero"
     );
   });
 
@@ -249,6 +311,21 @@ describe("Xero OAuth callback route", () => {
     expect(await response.text()).not.toMatch(CREDENTIAL_PATTERN);
   });
 
+  it("returns a provider error other than denial to the signed return path", async () => {
+    mocks.readOAuthStateReturnTo.mockReturnValue("/onboarding?step=xero");
+    const response = await GET(
+      new Request(
+        "https://api.example.com/api/xero/oauth/callback?error=server_error&state=state"
+      )
+    );
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/onboarding");
+    expect(location.searchParams.get("xero_error")).toBe("failed");
+    expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
+    expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+    expect(mocks.cancelXeroOAuth).not.toHaveBeenCalled();
+  });
   it("clears the nonce on terminal callback validation failure", async () => {
     const response = await GET(
       new Request("https://api.example.com/api/xero/oauth/callback?state=state")

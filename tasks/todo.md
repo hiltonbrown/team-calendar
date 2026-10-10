@@ -763,3 +763,62 @@ Core data probe: 69 passes, zero failures across two linked accounts (`/tmp/tc-a
 CI: `bun run check` passed (1,158 files). `bun run typecheck` passed all 19 tasks (five executed, 14 cached). `bun run test` passed 3,117 tests across all 18 tasks (changed app and availability suites executed, unchanged suites cached). `bun run test:integration` exited 1 before assertions because the configured Neon database is rejected by the local-only guard. No test guard was bypassed, external fixtures added or live integration success claimed. Browser rendering remains NOT VERIFIED because computer-use initialization fails on the Linux workspace URI; service/loader checks are not a browser UI walkthrough. No development server was started or stopped.
 
 Operational repair evidence: `/tmp/tc-screen-lifecycle-repair.sql`, `/tmp/tc-screen-lifecycle-repair.ts`, `/tmp/tc-screen-lifecycle-apply.log`. Remaining schema diff (`/tmp/tc-screen-preserved-legacy-diff.sql`) contains preserved legacy enum values/metadata and old constraints, with no missing current screen columns. Migration history remains untouched because the database records an out-of-repository lifecycle migration and the destructive repository migration cannot truthfully be marked applied. Do not blindly deploy that migration over this database; migration-history reconciliation is separate from the verified screen-loading fixes.
+
+## 2026-10-09 Calendar feeds page (plan `docs/superpowers/plans/2026-10-09-calendar-feeds.md`)
+
+Commits `0328ed2` to `51d5091` on `ccr-dc842a52-ry65ln` implement Tasks 1 to 7.
+
+- [x] Task 1: feed ownership, `createOwnFeed`, `getOwnFeedEligibility`, owner-aware update/pause/resume/archive/rotate, list and detail fields.
+- [x] Task 2: `recommendFeed` and `buildProviderLinks`.
+- [x] Task 3: `YourCalendar`, `FeedProviderButtons`, `OtherFeedsList`.
+- [x] Task 4: `/feeds` subscribe page and member-callable actions.
+- [x] Task 5: owner rights and feed settings form on the detail page; owners preview every privacy mode.
+- [x] Task 6: `/settings/feeds` oversight list, filters, pagination, counts.
+- [x] Task 7: docs and CI gates. Browser walkthrough NOT VERIFIED (see below).
+
+Deviations from the plan and spec:
+
+- Google Calendar and Outlook on the web publish no documented prefilled subscribe link, so those buttons copy the exact URL and open the provider's add-by-URL page. Apple and Outlook desktop use `webcal://`.
+- `createFeed` stays admin only; self-service goes only through `createOwnFeed`, which fixes the scope server-side.
+- Click and copy analytics events were not added: the app has no client capture pattern and client analytics is privacy-gated. `Personal Feed Created` is captured server-side.
+- The detail page had no edit UI; `FeedSettingsForm` was added for admins and owners.
+
+Product decision required: personal and team feeds count toward the plan feed limit. Basic allows two feeds, so on Basic the default all-staff feed plus one personal feed reaches the limit and later "Create my calendar feed" requests show the plan-limit error (pinned by an integration test).
+
+Verification (local disposable PostgreSQL 16 and a local Redis REST adapter in the session scratchpad):
+
+- `bun run check` passed (1,177 files); `bun run typecheck` passed; `bun run test` passed all 18 tasks with nothing cached.
+- `bun run test:integration`: database 52, availability 25, app 10, feeds 31 and jobs 84 (run directly after Turbo interrupted it) all passed. `@repo/xero` failed 51 of 102 with identical results on the base commit `970906b`, which this branch does not change; the failures are mostly `network_error` where provider responses are expected, so they are environmental, not caused by this work.
+- A mutation check (disabling the owner guard) failed the escalation integration test, confirming coverage.
+- Browser rendering NOT VERIFIED: this environment has no Clerk keys, so authenticated pages cannot load. Walk through `/feeds`, a feed detail page and `/settings/feeds` at desktop and mobile widths, light and dark, before release.
+
+## 2026-10-09 New user onboarding (plan `docs/superpowers/plans/2026-10-09-onboarding.md`)
+
+Commits `c13ffbe` to `c29a3fc` on `ccr-dc842a52-ry65ln` implement Tasks 1 to 10.
+
+- [x] Task 1: `onboarding_step` enum, organisation onboarding columns, person `welcome_completed_at`, scoped queries, new registered integration suite.
+- [x] Task 2: wizard rules, state loader and service; welcome service.
+- [x] Task 3: `x-pathname` from the proxy and the first-run gate in the authenticated layout.
+- [x] Task 4: shared brand components, `(setup)` layout, `StepIndicator`.
+- [x] Task 5: details and Xero steps; failed Xero callbacks return to the signed path with a safe `xero_error` code.
+- [x] Task 6: people and invite steps; manual person creation extracted to a shared helper.
+- [x] Task 7: wizard page and finish step.
+- [x] Task 8: member welcome.
+- [x] Task 9: post-wizard checklist; dashboard panel removed.
+- [x] Task 10: catalogue, verification. Browser walkthrough NOT VERIFIED (see below).
+
+Deviations from the plan and spec:
+
+- `xero_setup_skipped_at` is not cleared inside the Xero OAuth transaction. Instead an active Xero connection always overrides the skip flag when the wizard and checklist derive mode, which gives the same behaviour without touching the hardened OAuth code.
+- A failed people import does not block the People step (the plan only allowed a complete import), so a failure never traps the admin.
+- The timezone control is a plain select of nine Australian zones rather than a searchable select.
+- Analytics are captured server-side only (`Onboarding Step Completed`, `Onboarding Completed`, `Member Welcome Completed`).
+- The dashboard's unlinked-member view already explains that the account is not linked, so its copy was left unchanged.
+- The organisation used by the gate and wizard is the Clerk organisation's first Organisation, matching existing layout behaviour; multi-entity selection is still an open gap.
+
+Verification (local disposable PostgreSQL 16 with the new migration applied, and the local Redis REST adapter):
+
+- `bun run check` passed (1,217 files); `bun run typecheck` passed.
+- `bun run test`: 17 of 18 tasks passed in the Turbo run; `app#test` failed one existing test (`xero-client.test.tsx`, "keeps connection history and a retry available after destructive disconnect fails") that could not find a dialog button under parallel load. It passed three isolated reruns and a full `apps/app` rerun (139 files, 835 tests). This branch does not change that component; treat it as an intermittent, load-sensitive test to stabilise separately.
+- `bun run test:integration --continue`: database 58, app 10, availability 26, feeds 31, jobs 84 passed. `@repo/xero` failed 51 of 102, identical to the base commit `970906b` (environmental, mostly `network_error`).
+- Browser rendering NOT VERIFIED: no Clerk keys in this environment. Before release, walk the owner wizard with Xero (single and multiple payroll files), without Xero, an OAuth cancel, and the member welcome for linked and unlinked members, at desktop and mobile widths in light and dark.

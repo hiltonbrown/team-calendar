@@ -22,6 +22,8 @@ const identity = vi.hoisted(() => ({ verify: vi.fn() }));
 vi.mock("./identity", () => ({
   verifyXeroAccessTokenIdentity: identity.verify,
 }));
+// Tenant selection reads organisation settings, so grants carry that capability.
+const GRANTED_SCOPES = ["accounting.settings.read", "payroll.employees"];
 const allocation = allocateLiveTestFixture(
   "packages/xero/src/oauth/service.integration.test.ts"
 );
@@ -79,7 +81,7 @@ beforeEach(async () => {
     value: {
       authEventId: null,
       expiresAt: new Date(Date.now() + 1_800_000),
-      grantedScopes: ["payroll.employees"],
+      grantedScopes: GRANTED_SCOPES,
       xeroUserId: allocation.id("xero-user"),
     },
   });
@@ -132,7 +134,7 @@ async function grant(
           : allocation.id("xero-user", 1),
       ...tokens(),
       access_token_expires_at: expiresAt,
-      granted_scopes: ["payroll.employees"],
+      granted_scopes: GRANTED_SCOPES,
       last_refreshed_at: new Date(),
     },
   });
@@ -173,7 +175,7 @@ function tokenResponse() {
     access_token: "new-access-token",
     expires_in: 1800,
     refresh_token: "new-refresh-token",
-    scope: "payroll.employees",
+    scope: GRANTED_SCOPES.join(" "),
   });
 }
 function tokenText(
@@ -221,8 +223,12 @@ async function selection(
   });
 }
 function stubPayroll(externalId = fixture.externalId, country = "AU") {
-  const fetchSpy = vi.fn(async (url: string | URL | Request) =>
-    String(url).endsWith("/connections")
+  const fetchSpy = vi.fn((url: string | URL | Request) => {
+    // An expired stored grant refreshes before selection reads the file.
+    if (String(url).endsWith("/connect/token")) {
+      return Promise.resolve(tokenResponse());
+    }
+    const response = String(url).endsWith("/connections")
       ? Response.json([
           {
             id: fixture.remoteId,
@@ -233,8 +239,9 @@ function stubPayroll(externalId = fixture.externalId, country = "AU") {
         ])
       : Response.json({
           Organisations: [{ CountryCode: country, Name: "Payroll" }],
-        })
-  );
+        });
+    return Promise.resolve(response);
+  });
   vi.stubGlobal("fetch", fetchSpy);
   return fetchSpy;
 }
@@ -1148,7 +1155,7 @@ describe("canonical OAuth persistence", () => {
       value: {
         authEventId: null,
         expiresAt: new Date(Date.now() + 1_800_000),
-        grantedScopes: ["payroll.employees"],
+        grantedScopes: GRANTED_SCOPES,
         xeroUserId: replacement.xero_user_id,
       },
     });
@@ -1345,7 +1352,7 @@ describe("canonical OAuth persistence", () => {
         value: {
           authEventId: null,
           expiresAt: new Date(Date.now() + 1_800_000),
-          grantedScopes: ["payroll.employees"],
+          grantedScopes: GRANTED_SCOPES,
           xeroUserId: replacement.xero_user_id,
         },
       });

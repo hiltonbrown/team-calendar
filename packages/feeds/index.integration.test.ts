@@ -23,15 +23,20 @@ const {
   getCachedFeedBody,
   setCachedFeedBody,
   createFeed,
+  createOwnFeed,
   createInitialTokenWithClient,
   ensureDefaultCalendarFeed,
   getFeedDetail,
+  getFeedOversightCounts,
+  getOwnFeedEligibility,
+  listFeeds,
   pauseFeed,
   renderFeedForToken,
   revokeAllFeedTokens,
   revokeToken,
   rotateToken,
   signedFeedTokenId,
+  updateFeed,
 } = await import("./index");
 const { database } = await import("@repo/database");
 
@@ -1040,7 +1045,394 @@ describe("feed services", () => {
       value: { status: "revoked" },
     });
   });
+
+  test("creates one personal feed per person from organisation defaults", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Ava" });
+    await database.organisationSettings.create({
+      data: {
+        clerk_org_id: tenant.clerkOrgId,
+        default_feed_privacy_mode: "masked",
+        feeds_include_public_holidays_default: true,
+        organisation_id: tenant.organisationId,
+      },
+    });
+    const request = ownFeedRequest(employee.userId, "personal");
+
+    const [first, second] = await Promise.all([
+      createOwnFeed(request),
+      createOwnFeed(request),
+    ]);
+    expect(first.ok && second.ok).toBe(true);
+    if (!(first.ok && second.ok)) {
+      throw new Error("Own feed creation failed");
+    }
+    expect(first.value.feedId).toBe(second.value.feedId);
+    expect([first.value.created, second.value.created].sort()).toEqual([
+      false,
+      true,
+    ]);
+    const feed = await database.feed.findFirstOrThrow({
+      include: { scopes: true, tokens: true },
+      where: { ...tenantScope(), id: first.value.feedId },
+    });
+    expect(feed).toMatchObject({
+      created_by_user_id: employee.userId,
+      includes_public_holidays: true,
+      name: "Ava's calendar",
+      privacy_mode: "masked",
+    });
+    expect(feed.scopes.map((scope) => scope.scope_type)).toEqual(["self"]);
+    expect(
+      feed.tokens.filter((token) => token.status === "active")
+    ).toHaveLength(1);
+  });
+
+  test("lets an archived personal feed be replaced", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Ben" });
+    const first = await createOwnFeed(
+      ownFeedRequest(employee.userId, "personal")
+    );
+    if (!first.ok) {
+      throw new Error(first.error.message);
+    }
+    await expect(
+      archiveFeed({
+        ...ownerCommand(employee.userId),
+        feedId: first.value.feedId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+    const second = await createOwnFeed(
+      ownFeedRequest(employee.userId, "personal")
+    );
+    expect(second).toMatchObject({ ok: true, value: { created: true } });
+    expect(second.ok && second.value.feedId).not.toBe(first.value.feedId);
+  });
+
+  test("refuses own feeds without a linked person or direct reports", async () => {
+    await expect(
+      createOwnFeed(ownFeedRequest("user_unlinked", "personal"))
+    ).resolves.toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
+    const employee = await seedLinkedPerson({ firstName: "Cara" });
+    await expect(
+      createOwnFeed(ownFeedRequest(employee.userId, "team"))
+    ).resolves.toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    const inactive = await seedLinkedPerson({ firstName: "Gus" });
+    await database.person.update({
+      data: { is_active: false },
+      where: { id: inactive.id },
+    });
+    await expect(
+      createOwnFeed(ownFeedRequest(inactive.userId, "personal"))
+    ).resolves.toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
+  });
+
+  test("creates a team feed for a manager with direct reports", async () => {
+    const manager = await seedLinkedPerson({ firstName: "Dan" });
+    await seedLinkedPerson({ firstName: "Eve", managerPersonId: manager.id });
+    const eligibility = await getOwnFeedEligibility({
+      actingUserId: manager.userId,
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    expect(eligibility).toMatchObject({
+      ok: true,
+      value: {
+        hasDirectReports: true,
+        personalFeedId: null,
+        personId: manager.id,
+        teamFeedId: null,
+      },
+    });
+    const created = await createOwnFeed(ownFeedRequest(manager.userId, "team"));
+    expect(created).toMatchObject({ ok: true, value: { created: true } });
+    const feed = await database.feed.findFirstOrThrow({
+      include: { scopes: true },
+      where: { ...tenantScope(), id: created.ok ? created.value.feedId : "" },
+    });
+    expect(feed.name).toBe("Dan's team");
+    expect(feed.scopes.map((scope) => scope.scope_type)).toEqual([
+      "manager_team",
+    ]);
+  });
+
+  test("lets owners manage their own feed but not restore it or widen scope", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Fay" });
+    const created = await createOwnFeed(
+      ownFeedRequest(employee.userId, "personal")
+    );
+    if (!created.ok) {
+      throw new Error(created.error.message);
+    }
+    const command = {
+      ...ownerCommand(employee.userId),
+      feedId: created.value.feedId,
+    };
+
+    await expect(
+      updateFeed({
+        ...command,
+        patch: { includesPublicHolidays: true, privacyMode: "private" },
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      value: { isOwnedByActor: true, kind: "personal", privacyMode: "private" },
+    });
+    await expect(
+      updateFeed({
+        ...command,
+        patch: { scopes: [{ scopeType: "org", scopeValue: null }] },
+      })
+    ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    await expect(pauseFeed(command)).resolves.toMatchObject({ ok: true });
+    await expect(resumeFeed(command)).resolves.toMatchObject({ ok: true });
+    await expect(rotateToken(command)).resolves.toMatchObject({ ok: true });
+    await expect(archiveFeed(command)).resolves.toMatchObject({ ok: true });
+    await expect(restoreFeed(command)).resolves.toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+  });
+
+  test("refuses non-owners and admin-scoped feeds created by a demoted admin", async () => {
+    const owner = await seedLinkedPerson({ firstName: "Gus" });
+    const other = await seedLinkedPerson({ firstName: "Hal" });
+    const personal = await createOwnFeed(
+      ownFeedRequest(owner.userId, "personal")
+    );
+    if (!personal.ok) {
+      throw new Error(personal.error.message);
+    }
+    const demotedAdminFeed = await createFeed({
+      actingRole: "org:admin",
+      actingUserId: other.userId,
+      clerkOrgId: tenant.clerkOrgId,
+      name: "Everyone",
+      organisationId: tenant.organisationId,
+      privacyMode: "named",
+      scopes: [{ scopeType: "org", scopeValue: null }],
+    });
+    if (!demotedAdminFeed.ok) {
+      throw new Error(demotedAdminFeed.error.message);
+    }
+
+    for (const feedId of [
+      personal.value.feedId,
+      demotedAdminFeed.value.feedId,
+    ]) {
+      const command = { ...ownerCommand(other.userId), feedId };
+      await expect(
+        updateFeed({ ...command, patch: { name: "Mine now" } })
+      ).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      await expect(pauseFeed(command)).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      await expect(rotateToken(command)).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      await expect(archiveFeed(command)).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+    }
+    await expect(
+      createFeed({
+        actingRole: "org:viewer",
+        actingUserId: owner.userId,
+        clerkOrgId: tenant.clerkOrgId,
+        name: "Sneaky",
+        organisationId: tenant.organisationId,
+        privacyMode: "named",
+        scopes: [{ scopeType: "self", scopeValue: null }],
+      })
+    ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    await expect(
+      updateFeed({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: tenant.clerkOrgId,
+        feedId: personal.value.feedId,
+        organisationId: tenant.organisationId,
+        patch: { name: "Admin rename" },
+      })
+    ).resolves.toMatchObject({ ok: true, value: { isOwnedByActor: false } });
+  });
+
+  test("applies the plan feed limit to self-service feeds", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Kim" });
+    await createTestFeed();
+    await createTestFeed();
+    await expect(
+      createOwnFeed(ownFeedRequest(employee.userId, "personal"))
+    ).resolves.toEqual({
+      error: {
+        code: "validation_error",
+        message: "Your current plan has reached its active feed limit.",
+      },
+      ok: false,
+    });
+  });
+
+  test("counts live and personal feeds for administrators only", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Jo" });
+    await createOwnFeed(ownFeedRequest(employee.userId, "personal"));
+    const orgFeed = await createTestFeed();
+    const base = {
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    };
+    await expect(
+      getFeedOversightCounts({ ...base, actingRole: "org:admin" })
+    ).resolves.toEqual({ ok: true, value: { personal: 1, total: 2 } });
+    await archiveFeed({
+      ...base,
+      actingRole: "org:admin",
+      feedId: orgFeed.feedId,
+    });
+    await expect(
+      getFeedOversightCounts({ ...base, actingRole: "org:admin" })
+    ).resolves.toEqual({ ok: true, value: { personal: 1, total: 1 } });
+    await expect(
+      getFeedOversightCounts({ ...base, actingRole: "org:viewer" })
+    ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    await expect(
+      getFeedOversightCounts({
+        ...base,
+        actingRole: "org:admin",
+        clerkOrgId: otherTenant.clerkOrgId,
+        organisationId: otherTenant.organisationId,
+      })
+    ).resolves.toEqual({ ok: true, value: { personal: 0, total: 0 } });
+  });
+
+  test("lists ownership, creator, last fetch and type filter within the tenant", async () => {
+    const employee = await seedLinkedPerson({ firstName: "Ivy" });
+    const personal = await createOwnFeed(
+      ownFeedRequest(employee.userId, "personal")
+    );
+    const orgFeed = await createTestFeed();
+    if (!personal.ok) {
+      throw new Error(personal.error.message);
+    }
+    const fetchedAt = new Date("2026-09-01T00:00:00.000Z");
+    await database.feedToken.updateMany({
+      data: { last_used_at: fetchedAt },
+      where: { ...tenantScope(), feed_id: personal.value.feedId },
+    });
+
+    const all = await listFeeds({
+      actingRole: "org:admin",
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    expect(all.ok).toBe(true);
+    const items = all.ok ? all.value : [];
+    expect(
+      items.find((item) => item.id === personal.value.feedId)
+    ).toMatchObject({
+      createdByName: "Ivy Person",
+      createdByUserId: employee.userId,
+      isOwnedByActor: false,
+      kind: "personal",
+      lastFetchedAt: fetchedAt,
+    });
+    expect(items.find((item) => item.id === orgFeed.feedId)).toMatchObject({
+      createdByName: null,
+      kind: "organisation",
+      lastFetchedAt: null,
+    });
+
+    const personalOnly = await listFeeds({
+      actingRole: "org:admin",
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      filters: { status: ["active", "paused"], type: ["self"] },
+      organisationId: tenant.organisationId,
+    });
+    expect(
+      personalOnly.ok && personalOnly.value.map((item) => item.id)
+    ).toEqual([personal.value.feedId]);
+
+    const own = await listFeeds({
+      actingRole: "org:viewer",
+      actingUserId: employee.userId,
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    expect(
+      own.ok && own.value.find((item) => item.id === personal.value.feedId)
+    ).toMatchObject({ isOwnedByActor: true });
+
+    const otherTenantList = await listFeeds({
+      actingRole: "org:admin",
+      actingUserId: "user_admin",
+      clerkOrgId: otherTenant.clerkOrgId,
+      organisationId: otherTenant.organisationId,
+    });
+    expect(otherTenantList).toEqual({ ok: true, value: [] });
+  });
 });
+
+function tenantScope() {
+  return {
+    clerk_org_id: tenant.clerkOrgId,
+    organisation_id: tenant.organisationId,
+  };
+}
+
+function ownFeedRequest(userId: string, kind: "personal" | "team") {
+  return {
+    actingRole: "org:viewer",
+    actingUserId: userId,
+    clerkOrgId: tenant.clerkOrgId,
+    kind,
+    organisationId: tenant.organisationId,
+  };
+}
+
+function ownerCommand(userId: string) {
+  return {
+    actingRole: "org:viewer",
+    actingUserId: userId,
+    clerkOrgId: tenant.clerkOrgId,
+    organisationId: tenant.organisationId,
+  };
+}
+
+async function seedLinkedPerson(input: {
+  firstName: string;
+  managerPersonId?: string;
+}) {
+  const userId = `user_${input.firstName.toLowerCase()}_${crypto.randomUUID()}`;
+  const person = await database.person.create({
+    data: {
+      ...tenantScope(),
+      clerk_user_id: userId,
+      email: `${userId}@example.test`,
+      employment_type: "employee",
+      first_name: input.firstName,
+      last_name: "Person",
+      manager_person_id: input.managerPersonId ?? null,
+      source_system: "MANUAL",
+    },
+  });
+  return { id: person.id, userId };
+}
 
 async function seedRepresentationRecord() {
   const scope = {

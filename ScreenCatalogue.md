@@ -60,7 +60,9 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-01 | Sign in | `/sign-in` | Matches | Copy centralised into a shared `signInCopy` export; text and behaviour unchanged. |
 | S-31 | Sign up | `/sign-up` | Matches | Copy centralised into a shared `signUpCopy` export; text and behaviour unchanged. |
 | S-02 | Organisation selection | `/session-tasks/choose-organization` | Matches | Confirmed no `AuthFormFrame`/`embeddedAuthAppearance` is used here at all; resolves a prior open question. |
-| S-03 | Dashboard | `/` | Drifted | Undocumented onboarding checklist and Xero-connection-conditional card/banner logic added; `ViewerView` empty state improved; card radius is 16px (`rounded-xl`), not 16px-claimed-as-`rounded-2xl`. |
+| S-03 | Dashboard | `/` | Drifted | Onboarding panel removed 9 October 2026 (first run goes through S-32); Xero-connection-conditional card/banner logic; card radius is 16px (`rounded-xl`), not 16px-claimed-as-`rounded-2xl`. |
+| S-32 | Setup wizard | `/onboarding` | Matches | Added 9 October 2026: blocking five-step owner/admin setup ending on the team calendar. |
+| S-33 | Member welcome | `/welcome` | Matches | Added 9 October 2026: one-time three-step welcome for linked members. |
 | S-04 | Plans | `/plans` | Drifted | New `StatusOverview` summary-card row undocumented; pending-status colour and provenance-icon fixes both re-confirmed still correct. |
 | S-05 | New / edit plan | `/plans/new`, `/plans/[planId]/edit` | Drifted | Legacy-redirect query-param preservation now fully implemented; live balance-counter proposal remains open; undocumented empty-people-list message found. |
 | S-06 | Leave submission confirmation | `components/plans/submit-confirmation-modal.tsx` | Drifted | Retry-mode button literal is "Retry submission", not "Retry Xero sync"; everything else re-verified correct. |
@@ -70,15 +72,15 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-10 | Leave approvals | `/leave-approvals` | Drifted | "Sync approval state" is now fully wired, resolving the primary prior finding; failure-copy and badge-differentiation gaps remain open. |
 | S-11 | Public holidays | `/public-holidays` | Matches | Single operational home for review, source refresh and admin holiday management; responsive rows and explicit suppressed state. |
 | S-12 | Notifications | `/notifications` | Matches | All three prior gaps resolved: duplicate SSE connection fixed, reconnecting indicator added, bell badge uses the `destructive` token. |
-| S-13 | Feeds | `/feeds` | Drifted | Status-dot colours correctly resolved on this screen; new Search/Status/Privacy filter bar undocumented. |
-| S-14 | Feed detail | `/feeds/[feedId]` | Matches | Complete subscribe URL, token history, public-holiday inclusion, and semantic lifecycle status are rendered. |
+| S-13 | Feeds | `/feeds` | Matches | Rebuilt 9 October 2026 as the subscribe page for every role with personal and team feed self-service. |
+| S-14 | Feed detail | `/feeds/[feedId]` | Matches | Owners manage their own personal or team feed; feed settings form and shared provider buttons added 9 October 2026. |
 | S-15 | Leave reports | `/analytics/leave-reports` | Drifted | Date-range preset/custom-range UI now fully built, contradicting the prior "no filter UI" claim; CSV export silently ignores the selected range. |
 | S-16 | Out-of-office analytics | `/analytics/out-of-office` | Drifted | Same date-range UI addition as S-15; chart/variable-naming findings otherwise unchanged. |
 | S-17 | Settings: General | `/settings/general` | Matches | Country is truthful read-only context; the unreachable confirmation path is removed. |
 | S-18 | Settings: Leave approval | `/settings/leave-approval` | Matches | Auto-save controls are labelled and expose setting-scoped saving, saved and error receipts. |
 | S-19 | Settings: Integrations | `/settings/integrations` | Matches | No drift found. |
 | S-20 | Settings: Xero detail | `/settings/integrations/xero` | Matches | One recommended sync is promoted; manual and connection controls are disclosed progressively; disconnect is confirmed and pause/resume is reachable. |
-| S-21 | Settings: Feeds | `/settings/feeds` | Matches | Feed defaults have visible labels, descriptions and scoped auto-save receipts. |
+| S-21 | Settings: Feeds | `/settings/feeds` | Matches | Defaults plus feed oversight with last-fetch flags, filters and pagination (9 October 2026). |
 | S-22 | Settings: Billing | `/settings/billing` | Drifted | Amber-to-token migration confirmed complete and consistent; role-blindness of `getBillingSummary` vs. role-aware dashboard widget re-confirmed. |
 | S-23 | Settings: Holidays | `/settings/holidays` | Matches | Summary, per-location local day switches and launch into S-11. |
 | S-24 | Settings: Audit log | `/settings/audit-log` | Drifted | Pagination confirmed functional, contrary to the prior "non-functional" claim; no actor badges or field-level diff, unchanged. |
@@ -87,7 +89,7 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-27 | Settings: Members | `/settings/members` | Matches | No drift found. |
 | S-28 | Settings: Xero connect | `/settings/integrations/xero/connect` | Matches | Reconciled 7 October: connect/reconnect audit distinction, one persisted queued full initial import and request-timestamp completion check. Live import NOT VERIFIED. |
 | S-29 | Settings: Xero person matches | `/settings/integrations/xero/matches` | Matches | No drift; Clerk-ID field is placeholder+fallback rather than a literal pre-filled value, functionally equivalent. |
-| S-30 | Settings: Getting started | `/settings/getting-started` | Matches | No drift; derived-state logic, step set, and badge labels all verified exactly. |
+| S-30 | Settings: Getting started | `/settings/getting-started` | Matches | Reduced 9 October 2026 to post-wizard recommendations: holidays, feed, and Xero when manual-only or needing attention. |
 | E-01 | Empty state | Component | Matches | No drift. |
 | E-02 | Data fetch error | Component | Matches | No drift. |
 | E-03 | 404 | `apps/app/app/(authenticated)/not-found.tsx` | Matches | Confirmed only one `not-found.tsx` exists in the whole app; no global (unauthenticated) 404. |
@@ -155,6 +157,8 @@ Not re-investigated in this pass; no divergence signal surfaced incidentally. Ca
 | S-31 | Sign up | `/sign-up` | Unauthenticated | Unauthenticated | Matches | `apps/app/app/(unauthenticated)/(auth)/sign-up/[[...sign-up]]/page.tsx` |
 | S-02 | Organisation selection | `/session-tasks/choose-organization` | Unauthenticated (post sign-up Clerk task) | Authenticated, pre-organisation | Matches | `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx` |
 | S-03 | Dashboard | `/` | `requirePageRole("org:viewer")` | All | Drifted | `apps/app/app/(authenticated)/page.tsx:24` |
+| S-32 | Setup wizard | `/onboarding` | Owner/admin check in page; layout first-run gate | Owner, Admin | Matches | `apps/app/app/(setup)/onboarding/page.tsx` |
+| S-33 | Member welcome | `/welcome` | `loadWelcomeEligibility` in page; layout first-run gate | Manager, Viewer (linked) | Matches | `apps/app/app/(setup)/welcome/page.tsx` |
 | S-04 | Plans | `/plans` | `requirePageRole("org:viewer")` | All | Drifted | `apps/app/app/(authenticated)/plans/page.tsx:34` |
 | S-05 | New / edit plan | `/plans/new`, `/plans/[planId]/edit` (+ `@modal`) | No `requirePageRole`; implicit viewer via `currentUser()` + `requireActiveOrgPageContext` | All | Drifted | `apps/app/app/(authenticated)/plans/record-form-data.ts:24-161` |
 | S-06 | Leave submission confirmation | `components/plans/submit-confirmation-modal.tsx` | Inherits caller's guard | Employee (submit), any actor with a `xero_sync_failed` record (retry) | Drifted | `apps/app/components/plans/submit-confirmation-modal.tsx:182` |
@@ -262,17 +266,43 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ## Core screens
 
+### S-32: Setup wizard
+
+**Route:** `/onboarding` in the `(setup)` route group (split brand layout, no app sidebar). `?step=` revisits an earlier completed step; later steps cannot be reached.
+**Guard:** Signed-in owner or admin; members are redirected to `/`. The `(authenticated)` layout redirects owners and admins here while `organisations.onboarding_completed_at` is null, except on `/settings/integrations/xero/connect` and `/settings/integrations/xero/matches`. A completed organisation redirects to `/calendar`.
+**Evidence:** `apps/app/app/(setup)/onboarding/{page,_actions}.tsx`; `apps/app/app/(setup)/onboarding/steps/*.tsx`; `apps/app/lib/server/onboarding-gate.ts`; `packages/availability/src/onboarding/*`; `packages/database/src/queries/onboarding.ts`. Spec: `docs/superpowers/specs/2026-10-09-onboarding-design.md`.
+
+**Purpose:** Blocking first-run setup that ends on a populated team calendar.
+
+**User interactions, as-built:** Five steps with a step indicator and Back to earlier steps: (1) organisation name, Australia (fixed) and an Australian timezone, saved through the General settings action; (2) Connect Xero Payroll (OAuth returns to `/onboarding`; a failed or cancelled callback returns with a plain-language reason) or "Set up without Xero" behind a confirmation; (3) People: import progress polled every 3 seconds, up to ten possible duplicates resolved inline (more link to S-29), link yourself to a roster person or create your record, add people by hand in manual mode; a failed people import does not block; (4) Invite: roster with Manager default for people with direct reports and Viewer otherwise, per-row results, Skip for now; (5) Finish: per-stage import status, Open team calendar once leave is imported or failed, Open calendar now while it runs, immediate finish in manual mode. Every step's completion is validated on the server; a stale tab cannot skip ahead.
+
+**States:** Load error state; per-step inline errors that keep input; Xero return messages; import running, complete and failed.
+
+---
+
+### S-33: Member welcome
+
+**Route:** `/welcome` in the `(setup)` route group, `?step=identity|balances|calendar`.
+**Guard:** Signed-in member (manager or viewer) linked to a person whose `welcome_completed_at` is null; everyone else is redirected to `/`. The `(authenticated)` layout redirects eligible members here once.
+**Evidence:** `apps/app/app/(setup)/welcome/{page,_actions}.tsx`; `apps/app/app/(setup)/welcome/steps/*.tsx`; `packages/availability/src/onboarding/welcome-service.ts`.
+
+**Purpose:** One-time welcome for invited members.
+
+**User interactions, as-built:** (1) This is you: name, email, team and manager; (2) Your leave balances from Xero, with an explanation instead of zeros when none exist; (3) Add your calendar (optional): creates the member's personal feed on request (S-13 self-service) and shows provider actions and the full URL; when the plan's feed limit blocks creation, the organisation feed is shown instead. Done, Skip and "Skip to dashboard" all mark the welcome as seen.
+
+---
+
 ### S-03: Dashboard
 
 **Route:** `/` (root of the authenticated app). No `/dashboard` alias exists; `components/dashboard/` is a shared component library, not a second route. No modal behaviour.
 **Guard:** `requirePageRole("org:viewer")` (`page.tsx:24`). Access: all roles.
-**Evidence:** `apps/app/app/(authenticated)/page.tsx:1-56`; `dashboard-body.tsx:1-201`; `packages/availability/src/dashboard/dashboard-service.ts`; `apps/app/components/dashboard/{admin-view,manager-view,employee-view,viewer-view,admin-empty-view,dashboard-skeleton,dashboard-scaffold,quick-actions-card,dashboard-live-updates,xero-disconnected-banner,dashboard-card-shell}.tsx`; `apps/app/components/onboarding/{dismissible-onboarding-panel,onboarding-checklist}.tsx`; `apps/app/lib/server/load-onboarding-state.ts`.
+**Evidence:** `apps/app/app/(authenticated)/page.tsx:1-56`; `dashboard-body.tsx:1-201`; `packages/availability/src/dashboard/dashboard-service.ts`; `apps/app/components/dashboard/{admin-view,manager-view,employee-view,viewer-view,admin-empty-view,dashboard-skeleton,dashboard-scaffold,quick-actions-card,dashboard-live-updates,xero-disconnected-banner,dashboard-card-shell}.tsx`; `apps/app/app/(authenticated)/dashboard-body.test.tsx`.
 **Country context:** Public holiday callouts filtered by the acting person's or team's `location_id`/`region_code`, same underlying data as S-11.
 
 **Purpose:** Role-appropriate at-a-glance summary and entry point.
 
 **User interactions, as-built:** Each card exposes an optional "Review" CTA linking deeper into the app; `QuickActionsCard` hard-codes three shortcuts ("Create a new plan", "View my calendar", "Open notifications"); `DashboardLiveUpdates` subscribes to SSE and shows a toast with a "Refresh" action, no auto-refresh. **Two features new since the 16 August pass:**
-1. **Dismissible onboarding checklist.** `DashboardBody` renders `DismissibleOnboardingPanel` above the role view whenever the acting role is owner or admin, regardless of whether the admin has a linked person record. It shows an `OnboardingChecklist` (four required steps plus a conditional "Connect Xero" step) and a "Dismiss onboarding" button; dismissal is stored per `clerkOrgId:organisationId:userId` in `localStorage` and the panel self-hides once complete. This overlaps in purpose with S-30 and reads the same underlying `loadOnboardingState()`: worth confirming with product whether both surfaces are intended, or whether the dashboard panel should just deep-link to S-30 instead of duplicating it.
+1. **No onboarding surface (9 October 2026).** The dismissible onboarding panel was removed. Owners and admins finish the S-32 setup wizard before reaching the dashboard; recommended next steps live only on S-30. An admin without a linked person sees `AdminEmptyView`, which reads the Xero connection state directly.
 2. **Xero-connection-conditional card visibility and banner.** Each role view reads `hasActiveXeroConnection` and renders an `XeroDisconnectedBanner` when false, while conditionally hiding `SyncHealthCard`/`OrgPendingApprovalsCard` (admin), `ApprovalQueueCard` (manager), and `BalancesCard` (all roles) when Xero is not connected. The banner's `connectHref` differs by role.
 
 **Role variations:** Each of `resolveDashboardRole()`'s five roles (owner/admin/manager/employee/viewer) renders a distinct card set, now further conditioned on Xero connection status as above. `ViewerView` (no linked person record) is no longer a bare stub: it now includes a "What you can do" card with next-step guidance and two buttons ("Organisation settings", "View people").
@@ -513,50 +543,40 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ### S-13: Feeds
 
-**Route:** `/feeds` (list), `/feeds/new` (full page + `@modal` intercept).
-**Guard:** `requirePageRole("org:viewer")` on the list. No page-level guard on `/feeds/new`; admin/owner enforcement happens in `feeds/_actions.ts`'s `resolveAdminContext()` and again in `packages/feeds/src/feed-service.ts`'s `isAdminOrOwner`. Access: all roles (read); Admin/Owner (manage, action-layer enforced, not page-gated).
-**Evidence:** `apps/app/app/(authenticated)/feeds/page.tsx:34`; `feeds/_actions.ts:277-323`; `apps/app/components/feed/{feed-table,subscribe-instructions,feed-filter-bar}.tsx`; `packages/feeds/src/feed-service.ts:191-193`; `feeds/_schemas.ts:52-64`.
+**Route:** `/feeds` (subscribe page), `/feeds/new` (admin creation, full page + `@modal` intercept).
+**Guard:** `requirePageRole("org:viewer")` on the list. `/feeds/new` renders a permission-denied state for non-admins; creation is enforced in `feeds/_actions.ts` and `packages/feeds`. Access: all roles.
+**Evidence:** `apps/app/app/(authenticated)/feeds/page.tsx`; `feeds/own-feed-actions.tsx`; `apps/app/components/feed/{your-calendar,feed-provider-buttons,other-feeds-list}.tsx`; `apps/app/lib/feeds/{recommend-feed,provider-links}.ts`; `packages/feeds/src/feed-service.ts` (`createOwnFeed`, `getOwnFeedEligibility`).
 
-**Purpose:** List all ICS feeds with subscription URLs and setup instructions.
+**Purpose:** Subscribe page for every role. Spec: `docs/superpowers/specs/2026-10-09-calendar-feeds-design.md`.
 
-**User interactions, as-built:** "How to subscribe" is a single accordion with six client-specific items (Outlook desktop, Outlook web, Google Calendar, Apple Calendar macOS/iOS, Generic ICS), not per-client tabs. Every visible feed shows its complete, selectable subscribe URL with a direct Copy URL action. A `FeedFilterBar` with Search (name), Status (Active+paused/Active/Paused/Archived), and Privacy (All/Named/Masked/Private) selects, round-tripping through URL search params. Rotate and Archive are genuine `AlertDialog` confirmation modals, not inline banners.
+**User interactions, as-built:** A "Your calendar" block leads with one recommended feed (own personal feed, then own team feed, then the oldest organisation feed, then the first feed by name). It offers "Add to Apple Calendar" (webcal), "Add to Google Calendar" and "Add to Outlook" (copy the exact URL, then open the provider's add-by-URL page, because neither provider documents a prefilled subscribe link), an "Open in Outlook desktop" webcal link, the complete subscribe URL with Copy URL, and an "Other calendar apps" disclosure. "Create my calendar feed" appears for a linked person without a personal feed; "Create my team feed" appears for a person with active direct reports and no team feed. "Other feeds you can use" lists remaining active and paused feeds as compact rows with an Add popover; other people's personal and team feeds are not listed. No filters, row menus or New feed button.
 
-**Role variations:** `canManage` (admin/owner) unlocks Pause/Resume/Rotate/Archive and "New feed"; everyone else sees a read-only list scoped by `canViewFeed`.
+**Role variations:** Admins and owners see the same page plus a "Manage all feeds" link to S-21. Unlinked accounts see why they cannot create a feed.
 
-**Data displayed:** Per feed: name, description, status dot (Active = `bg-success`, Paused = `bg-warning-container`, Archived = muted: confirmed correctly resolved on this screen), privacy badge, scope summary, complete subscribe URL, plus the new filter row. Calendar feed URLs must never be masked, truncated, hashed, or replaced with a token hint.
+**Data displayed:** Feed name, scope summary, privacy description, complete subscribe URL, paused state. Calendar feed URLs are never masked, truncated, hashed, or replaced with a token hint.
 
-**States:** Empty: "No feeds yet"; "Create feed" CTA shown only to `canManage`.
-
-**Design requirements:** Feed cards and filter bar use `rounded-2xl` (16px) throughout.
-
-**`[v5 proposal]` interaction improvements:**
-- Feed status tone: **resolved** through the shared `FeedStatusDot` (`bg-success`/`bg-warning-container`) used by list and detail views.
-- ~~Copy-URL-with-no-token-cached message should suggest rotating.~~ **Done.**
+**States:** No feed: "No calendar feed is available yet." with create actions or "Ask an administrator to set one up." Load error: retryable message. Own feed paused: notice linking to its detail page. Plan feed limit reached: the create action shows the plan-limit message.
 
 ---
 
 ### S-14: Feed detail
 
 **Route:** `/feeds/[feedId]` (full page + `@modal` intercept, wide).
-**Guard:** No page-level `requirePageRole`. Visibility is scope-based via `canViewFeed`: admin/owner always see all feeds; a viewer/manager with no linked person record sees none; a linked person sees only feeds within scope; anyone outside scope gets a generic 404, not a permission-denied message.
-**Evidence:** `apps/app/app/(authenticated)/feeds/[feedId]/page.tsx`; `packages/feeds/src/scope/feed-scope.ts:271-310`; `apps/app/components/feed/{feed-detail,subscribe-url-field}.tsx`.
+**Guard:** No page-level `requirePageRole`. Visibility is scope-based via `canViewFeed`; anyone outside scope gets a generic 404.
+**Evidence:** `apps/app/app/(authenticated)/feeds/[feedId]/page.tsx`; `apps/app/components/feed/{feed-detail,feed-settings-form,feed-provider-buttons,subscribe-url-field}.tsx`; `packages/feeds/src/scope/feed-ownership.ts`.
 
-**Purpose:** Full feed configuration, token management, and preview.
+**Purpose:** Subscribe actions, feed settings, preview and lifecycle for one feed. The only place for pause, resume, rotate and archive.
 
-**User interactions, as-built:** "Rotate token" and "Archive feed" are confirmed genuine `AlertDialog` modals, not inline confirmation banners. The complete active subscribe URL is always visible and copyable to authorised viewers; rotation replaces it immediately. Preview tabs: admin/owner see Named/Masked/Private; everyone else sees only their own configured mode, server-enforced. `FeedDetail` shows a "Token history" panel listing each token's masked id suffix, status badge, and created date, sourced from `getFeedDetail`'s `tokenHistory` field.
+**User interactions, as-built:** "Add to your calendar" shows the shared provider buttons and the complete subscribe URL. "Feed settings" edits name, privacy mode and public-holiday inclusion. Rotate and Archive use `AlertDialog` confirmations; token history lists recent tokens.
 
-**Role variations:** `canManage` unlocks Rotate/Pause/Resume/Archive/Edit and all three preview modes; scoped viewers/managers get read-only detail plus their single privacy-mode preview.
+**Role variations:** `canManage` is admin/owner or the feed owner (a `self` or `manager_team` feed created by the acting user). Owners get settings, pause, resume, rotate, archive and all three preview modes. Restore and "Create subscribe URL" stay admin only. Other members get read-only detail and their configured preview mode.
 
-**Data displayed:** Feed name, scope, privacy mode, complete active subscribe URL, token creation and last-used dates, public-holiday inclusion, and token history. Token status enum remains `active | expired | revoked`, no "Expiring" state.
+**Data displayed:** Feed name, scope, privacy mode, complete active subscribe URL, token creation and last-used dates, public-holiday inclusion, token history.
 
-**States:** Preview empty: "No upcoming events. Your feed will update automatically when leave or availability is added."
-
-**Design requirements:** `rounded-2xl` modal shell, spec-correct. Lifecycle status uses the same shared semantic status component as the feed list.
+**States:** Paused: "This feed is paused and not updating subscribed calendars." Archived: no subscribe URL. Preview empty: "No upcoming events."
 
 **`[v5 proposal]` interaction improvements:**
 - 404-vs-permission-denied for out-of-scope feeds. **Still open.**
-- ~~Render token rotation history.~~ **Done.**
-- ~~Convert Rotate/Archive banners to genuine confirmation modals.~~ **Done.**
 
 ---
 
@@ -698,14 +718,13 @@ Automatic token refresh has no manual control. Normal disconnect completes synch
 
 **Route:** `/settings/feeds`.
 **Guard:** `requirePageRole("org:admin")` + layout gate. Access: Admin, Owner.
-**Evidence:** `apps/app/app/(authenticated)/settings/feeds/page.tsx:18-24`; `feeds-client.tsx`.
+**Evidence:** `apps/app/app/(authenticated)/settings/feeds/{page,feeds-client,feed-oversight-list,feed-oversight-filters,_schemas}.tsx`; `apps/app/lib/feeds/last-fetched.ts`; `packages/feeds/src/feed-service.ts` (`getFeedOversightCounts`).
 
-**Purpose:** Organisation-wide defaults for new feeds, plus a browse/launch list into `/feeds`. Does not itself create or configure individual feeds, contrary to its own in-code comment.
+**Purpose:** Admin home for feeds: organisation defaults and oversight of every feed.
 
-**User interactions, as-built:** "Default privacy mode for new feeds" and "Include public holidays in new feeds" are auto-saved with visible labels, descriptions and setting-scoped live receipts. The page also provides an "All feeds" read-only list with "Open" links and a "Create new feed" button linking to `/feeds/new`.
+**User interactions, as-built:** Auto-saved defaults for privacy mode and public holidays. "All feeds" states live and personal feed counts as text, links to New feed, and filters by search, status (default active and paused) and type (organisation, team, person, personal, manager team) through URL parameters. Rows show name (linking to S-14), type, created by, status and last fetched (relative, with the exact date in the title and for screen readers). Active feeds never fetched or not fetched in 30 days carry a labelled warning chip. Cursor pagination at 50 rows. No row menus; lifecycle actions are on S-14.
 
-**`[v5 proposal]` interaction improvements:**
-- The page's own in-code comment still claims it "creates and configures feeds", contradicting the shipped header copy. **Still open**, unresolved documentation-vs-code mismatch in the source itself.
+**Data displayed:** Last fetched is the latest `last_used_at` across the feed's active tokens. No subscriber counts are shown or implied.
 
 ---
 
@@ -849,9 +868,9 @@ Automatic token refresh has no manual control. Normal disconnect completes synch
 **Guard:** `requirePageRole("org:admin")` + layout gate. Access: Admin, Owner.
 **Evidence:** `apps/app/app/(authenticated)/settings/getting-started/page.tsx:21`; `apps/app/components/onboarding/onboarding-checklist.tsx:76-98`; `apps/app/lib/server/load-onboarding-state.ts:34-223`.
 
-**Purpose:** Derived-state onboarding checklist, shared with the dashboard widget (see S-03's new panel, which duplicates this surface's purpose).
+**Purpose:** The only checklist: recommended next steps after the S-32 setup wizard.
 
-**User interactions, as-built:** No manual "mark complete"; every step's status is derived live from database counts. Steps: Review organisation profile; Connect Xero (shown only while no connection exists, not counted toward the required-steps ratio); Add or sync people; Review public holidays; Review calendar feed. Status badges: Done/Next/Later/Optional.
+**User interactions, as-built:** No manual "mark complete"; every step's status is derived live from database counts. Steps: Review public holidays; Add the calendar to your calendar app; and Connect Xero Payroll (manual-only organisations) or Xero connection (when the connection needs attention), not counted toward the progress ratio. The wizard owns the organisation profile and people. Status badges: Done/Next/Later/Optional.
 
 ---
 
@@ -945,7 +964,7 @@ Numbered independently of the change table above for cross-reference clarity.
 
 9. **The design-tokens documentation itself contained two factual errors**, now corrected: no `secondary-container` token exists in the codebase, and `#5E4F99` (previously attributed to `accent`) actually belongs to the unrelated `editorial-accent` token. **Recommended rule:** when documenting design tokens, cite the actual CSS custom property name, not an inferred pairing.
 
-10. **The dashboard's new onboarding checklist may duplicate S-30.** Both read the same `loadOnboardingState()` derived state and serve the same purpose. **Recommended rule:** confirm with product whether both surfaces are intentional, or whether the dashboard panel should link out to S-30 instead of rendering its own copy.
+10. ~~**The dashboard's new onboarding checklist may duplicate S-30.**~~ **Resolved 9 October 2026:** the dashboard panel was removed; S-30 is the only checklist and the S-32 wizard owns first-run setup.
 
 ---
 
@@ -955,7 +974,7 @@ Numbered independently of the change table above for cross-reference clarity.
 
 2. **Is a user-facing `/support` screen in scope?** `apps/api` has a working endpoint with no `apps/app` caller. If in scope, its intended audience and placement need a product decision before a screen entry can be written.
 
-3. **Should the dashboard's new onboarding checklist and S-30 both exist, or should one defer to the other?** New question raised by this pass; both currently render independently from the same derived state.
+3. ~~**Should the dashboard's new onboarding checklist and S-30 both exist, or should one defer to the other?**~~ **Decided 9 October 2026:** S-30 only; the dashboard panel was removed (see S-32 and the onboarding spec).
 
 4. **What should `E-05` show for an aggregate failure (e.g. `sync-client.tsx`'s tenant-level card, or `person-profile-content.tsx`'s multi-record view) now that the component supports a single `failedAction`?** The per-record call sites (`/plans`, `/leave-approvals`) are a straightforward wiring fix; the aggregate ones are not.
 

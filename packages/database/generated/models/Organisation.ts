@@ -48,6 +48,9 @@ export type OrganisationMinAggregateOutputType = {
   fiscal_year_start: number | null
   working_hours_per_day: runtime.Decimal | null
   reporting_unit: string | null
+  onboarding_step: $Enums.onboarding_step | null
+  onboarding_completed_at: Date | null
+  xero_setup_skipped_at: Date | null
   archived_at: Date | null
   created_at: Date | null
   updated_at: Date | null
@@ -65,6 +68,9 @@ export type OrganisationMaxAggregateOutputType = {
   fiscal_year_start: number | null
   working_hours_per_day: runtime.Decimal | null
   reporting_unit: string | null
+  onboarding_step: $Enums.onboarding_step | null
+  onboarding_completed_at: Date | null
+  xero_setup_skipped_at: Date | null
   archived_at: Date | null
   created_at: Date | null
   updated_at: Date | null
@@ -82,6 +88,9 @@ export type OrganisationCountAggregateOutputType = {
   fiscal_year_start: number
   working_hours_per_day: number
   reporting_unit: number
+  onboarding_step: number
+  onboarding_completed_at: number
+  xero_setup_skipped_at: number
   archived_at: number
   created_at: number
   updated_at: number
@@ -111,6 +120,9 @@ export type OrganisationMinAggregateInputType = {
   fiscal_year_start?: true
   working_hours_per_day?: true
   reporting_unit?: true
+  onboarding_step?: true
+  onboarding_completed_at?: true
+  xero_setup_skipped_at?: true
   archived_at?: true
   created_at?: true
   updated_at?: true
@@ -128,6 +140,9 @@ export type OrganisationMaxAggregateInputType = {
   fiscal_year_start?: true
   working_hours_per_day?: true
   reporting_unit?: true
+  onboarding_step?: true
+  onboarding_completed_at?: true
+  xero_setup_skipped_at?: true
   archived_at?: true
   created_at?: true
   updated_at?: true
@@ -145,6 +160,9 @@ export type OrganisationCountAggregateInputType = {
   fiscal_year_start?: true
   working_hours_per_day?: true
   reporting_unit?: true
+  onboarding_step?: true
+  onboarding_completed_at?: true
+  xero_setup_skipped_at?: true
   archived_at?: true
   created_at?: true
   updated_at?: true
@@ -249,6 +267,9 @@ export type OrganisationGroupByOutputType = {
   fiscal_year_start: number | null
   working_hours_per_day: runtime.Decimal | null
   reporting_unit: string | null
+  onboarding_step: $Enums.onboarding_step
+  onboarding_completed_at: Date | null
+  xero_setup_skipped_at: Date | null
   archived_at: Date | null
   created_at: Date
   updated_at: Date
@@ -289,6 +310,9 @@ export type OrganisationWhereInput = {
   fiscal_year_start?: Prisma.IntNullableFilter<"Organisation"> | number | null
   working_hours_per_day?: Prisma.DecimalNullableFilter<"Organisation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.StringNullableFilter<"Organisation"> | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFilter<"Organisation"> | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.DateTimeNullableFilter<"Organisation"> | Date | string | null
+  xero_setup_skipped_at?: Prisma.DateTimeNullableFilter<"Organisation"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"Organisation"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Organisation"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Organisation"> | Date | string
@@ -329,6 +353,9 @@ export type OrganisationOrderByWithRelationInput = {
   fiscal_year_start?: Prisma.SortOrderInput | Prisma.SortOrder
   working_hours_per_day?: Prisma.SortOrderInput | Prisma.SortOrder
   reporting_unit?: Prisma.SortOrderInput | Prisma.SortOrder
+  onboarding_step?: Prisma.SortOrder
+  onboarding_completed_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  xero_setup_skipped_at?: Prisma.SortOrderInput | Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -373,6 +400,9 @@ export type OrganisationWhereUniqueInput = Prisma.AtLeast<{
   fiscal_year_start?: Prisma.IntNullableFilter<"Organisation"> | number | null
   working_hours_per_day?: Prisma.DecimalNullableFilter<"Organisation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.StringNullableFilter<"Organisation"> | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFilter<"Organisation"> | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.DateTimeNullableFilter<"Organisation"> | Date | string | null
+  xero_setup_skipped_at?: Prisma.DateTimeNullableFilter<"Organisation"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"Organisation"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Organisation"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Organisation"> | Date | string
@@ -413,6 +443,9 @@ export type OrganisationOrderByWithAggregationInput = {
   fiscal_year_start?: Prisma.SortOrderInput | Prisma.SortOrder
   working_hours_per_day?: Prisma.SortOrderInput | Prisma.SortOrder
   reporting_unit?: Prisma.SortOrderInput | Prisma.SortOrder
+  onboarding_step?: Prisma.SortOrder
+  onboarding_completed_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  xero_setup_skipped_at?: Prisma.SortOrderInput | Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -438,6 +471,9 @@ export type OrganisationScalarWhereWithAggregatesInput = {
   fiscal_year_start?: Prisma.IntNullableWithAggregatesFilter<"Organisation"> | number | null
   working_hours_per_day?: Prisma.DecimalNullableWithAggregatesFilter<"Organisation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.StringNullableWithAggregatesFilter<"Organisation"> | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepWithAggregatesFilter<"Organisation"> | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.DateTimeNullableWithAggregatesFilter<"Organisation"> | Date | string | null
+  xero_setup_skipped_at?: Prisma.DateTimeNullableWithAggregatesFilter<"Organisation"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableWithAggregatesFilter<"Organisation"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"Organisation"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"Organisation"> | Date | string
@@ -455,6 +491,9 @@ export type OrganisationCreateInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -495,6 +534,9 @@ export type OrganisationUncheckedCreateInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -535,6 +577,9 @@ export type OrganisationUpdateInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -575,6 +620,9 @@ export type OrganisationUncheckedUpdateInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -615,6 +663,9 @@ export type OrganisationCreateManyInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -632,6 +683,9 @@ export type OrganisationUpdateManyMutationInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -649,6 +703,9 @@ export type OrganisationUncheckedUpdateManyInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -671,6 +728,9 @@ export type OrganisationCountOrderByAggregateInput = {
   fiscal_year_start?: Prisma.SortOrder
   working_hours_per_day?: Prisma.SortOrder
   reporting_unit?: Prisma.SortOrder
+  onboarding_step?: Prisma.SortOrder
+  onboarding_completed_at?: Prisma.SortOrder
+  xero_setup_skipped_at?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -693,6 +753,9 @@ export type OrganisationMaxOrderByAggregateInput = {
   fiscal_year_start?: Prisma.SortOrder
   working_hours_per_day?: Prisma.SortOrder
   reporting_unit?: Prisma.SortOrder
+  onboarding_step?: Prisma.SortOrder
+  onboarding_completed_at?: Prisma.SortOrder
+  xero_setup_skipped_at?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -710,6 +773,9 @@ export type OrganisationMinOrderByAggregateInput = {
   fiscal_year_start?: Prisma.SortOrder
   working_hours_per_day?: Prisma.SortOrder
   reporting_unit?: Prisma.SortOrder
+  onboarding_step?: Prisma.SortOrder
+  onboarding_completed_at?: Prisma.SortOrder
+  xero_setup_skipped_at?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -756,6 +822,10 @@ export type NullableDecimalFieldUpdateOperationsInput = {
   decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
   multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
   divide?: runtime.Decimal | runtime.DecimalJsLike | number | string
+}
+
+export type Enumonboarding_stepFieldUpdateOperationsInput = {
+  set?: $Enums.onboarding_step
 }
 
 export type NullableDateTimeFieldUpdateOperationsInput = {
@@ -1102,6 +1172,9 @@ export type OrganisationCreateWithoutOrganisation_settingsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1141,6 +1214,9 @@ export type OrganisationUncheckedCreateWithoutOrganisation_settingsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1196,6 +1272,9 @@ export type OrganisationUpdateWithoutOrganisation_settingsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1235,6 +1314,9 @@ export type OrganisationUncheckedUpdateWithoutOrganisation_settingsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1274,6 +1356,9 @@ export type OrganisationCreateWithoutTeamsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1313,6 +1398,9 @@ export type OrganisationUncheckedCreateWithoutTeamsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1368,6 +1456,9 @@ export type OrganisationUpdateWithoutTeamsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1407,6 +1498,9 @@ export type OrganisationUncheckedUpdateWithoutTeamsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1446,6 +1540,9 @@ export type OrganisationCreateWithoutLocationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1485,6 +1582,9 @@ export type OrganisationUncheckedCreateWithoutLocationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1540,6 +1640,9 @@ export type OrganisationUpdateWithoutLocationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1579,6 +1682,9 @@ export type OrganisationUncheckedUpdateWithoutLocationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1618,6 +1724,9 @@ export type OrganisationCreateWithoutPeopleInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1657,6 +1766,9 @@ export type OrganisationUncheckedCreateWithoutPeopleInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1712,6 +1824,9 @@ export type OrganisationUpdateWithoutPeopleInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1751,6 +1866,9 @@ export type OrganisationUncheckedUpdateWithoutPeopleInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1790,6 +1908,9 @@ export type OrganisationCreateWithoutAlternative_contactsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1829,6 +1950,9 @@ export type OrganisationUncheckedCreateWithoutAlternative_contactsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1884,6 +2008,9 @@ export type OrganisationUpdateWithoutAlternative_contactsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1923,6 +2050,9 @@ export type OrganisationUncheckedUpdateWithoutAlternative_contactsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1962,6 +2092,9 @@ export type OrganisationCreateWithoutXero_connectionInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2001,6 +2134,9 @@ export type OrganisationUncheckedCreateWithoutXero_connectionInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2056,6 +2192,9 @@ export type OrganisationUpdateWithoutXero_connectionInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2095,6 +2234,9 @@ export type OrganisationUncheckedUpdateWithoutXero_connectionInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2134,6 +2276,9 @@ export type OrganisationCreateWithoutXero_oauth_sessionsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2173,6 +2318,9 @@ export type OrganisationUncheckedCreateWithoutXero_oauth_sessionsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2228,6 +2376,9 @@ export type OrganisationUpdateWithoutXero_oauth_sessionsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2267,6 +2418,9 @@ export type OrganisationUncheckedUpdateWithoutXero_oauth_sessionsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2306,6 +2460,9 @@ export type OrganisationCreateWithoutXero_sync_cursorsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2345,6 +2502,9 @@ export type OrganisationUncheckedCreateWithoutXero_sync_cursorsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2400,6 +2560,9 @@ export type OrganisationUpdateWithoutXero_sync_cursorsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2439,6 +2602,9 @@ export type OrganisationUncheckedUpdateWithoutXero_sync_cursorsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2478,6 +2644,9 @@ export type OrganisationCreateWithoutAvailability_recordsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2517,6 +2686,9 @@ export type OrganisationUncheckedCreateWithoutAvailability_recordsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2572,6 +2744,9 @@ export type OrganisationUpdateWithoutAvailability_recordsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2611,6 +2786,9 @@ export type OrganisationUncheckedUpdateWithoutAvailability_recordsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2650,6 +2828,9 @@ export type OrganisationCreateWithoutOutbound_operationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2689,6 +2870,9 @@ export type OrganisationUncheckedCreateWithoutOutbound_operationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2744,6 +2928,9 @@ export type OrganisationUpdateWithoutOutbound_operationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2783,6 +2970,9 @@ export type OrganisationUncheckedUpdateWithoutOutbound_operationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2822,6 +3012,9 @@ export type OrganisationCreateWithoutAvailability_publicationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2861,6 +3054,9 @@ export type OrganisationUncheckedCreateWithoutAvailability_publicationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2916,6 +3112,9 @@ export type OrganisationUpdateWithoutAvailability_publicationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2955,6 +3154,9 @@ export type OrganisationUncheckedUpdateWithoutAvailability_publicationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2994,6 +3196,9 @@ export type OrganisationCreateWithoutLeave_balancesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3033,6 +3238,9 @@ export type OrganisationUncheckedCreateWithoutLeave_balancesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3088,6 +3296,9 @@ export type OrganisationUpdateWithoutLeave_balancesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3127,6 +3338,9 @@ export type OrganisationUncheckedUpdateWithoutLeave_balancesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3166,6 +3380,9 @@ export type OrganisationCreateWithoutXero_person_matchesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3205,6 +3422,9 @@ export type OrganisationUncheckedCreateWithoutXero_person_matchesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3260,6 +3480,9 @@ export type OrganisationUpdateWithoutXero_person_matchesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3299,6 +3522,9 @@ export type OrganisationUncheckedUpdateWithoutXero_person_matchesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3338,6 +3564,9 @@ export type OrganisationCreateWithoutPublic_holidaysInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3377,6 +3606,9 @@ export type OrganisationUncheckedCreateWithoutPublic_holidaysInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3432,6 +3664,9 @@ export type OrganisationUpdateWithoutPublic_holidaysInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3471,6 +3706,9 @@ export type OrganisationUncheckedUpdateWithoutPublic_holidaysInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3510,6 +3748,9 @@ export type OrganisationCreateWithoutPublic_holiday_preferencesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3549,6 +3790,9 @@ export type OrganisationUncheckedCreateWithoutPublic_holiday_preferencesInput = 
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3604,6 +3848,9 @@ export type OrganisationUpdateWithoutPublic_holiday_preferencesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3643,6 +3890,9 @@ export type OrganisationUncheckedUpdateWithoutPublic_holiday_preferencesInput = 
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3682,6 +3932,9 @@ export type OrganisationCreateWithoutFeedsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3721,6 +3974,9 @@ export type OrganisationUncheckedCreateWithoutFeedsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3776,6 +4032,9 @@ export type OrganisationUpdateWithoutFeedsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3815,6 +4074,9 @@ export type OrganisationUncheckedUpdateWithoutFeedsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3854,6 +4116,9 @@ export type OrganisationCreateWithoutFeed_tokensInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3893,6 +4158,9 @@ export type OrganisationUncheckedCreateWithoutFeed_tokensInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3948,6 +4216,9 @@ export type OrganisationUpdateWithoutFeed_tokensInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3987,6 +4258,9 @@ export type OrganisationUncheckedUpdateWithoutFeed_tokensInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4026,6 +4300,9 @@ export type OrganisationCreateWithoutNotificationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4065,6 +4342,9 @@ export type OrganisationUncheckedCreateWithoutNotificationsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4120,6 +4400,9 @@ export type OrganisationUpdateWithoutNotificationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4159,6 +4442,9 @@ export type OrganisationUncheckedUpdateWithoutNotificationsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4198,6 +4484,9 @@ export type OrganisationCreateWithoutNotification_preferencesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4237,6 +4526,9 @@ export type OrganisationUncheckedCreateWithoutNotification_preferencesInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4292,6 +4584,9 @@ export type OrganisationUpdateWithoutNotification_preferencesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4331,6 +4626,9 @@ export type OrganisationUncheckedUpdateWithoutNotification_preferencesInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4370,6 +4668,9 @@ export type OrganisationCreateWithoutNotification_email_queueInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4409,6 +4710,9 @@ export type OrganisationUncheckedCreateWithoutNotification_email_queueInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4464,6 +4768,9 @@ export type OrganisationUpdateWithoutNotification_email_queueInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4503,6 +4810,9 @@ export type OrganisationUncheckedUpdateWithoutNotification_email_queueInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4542,6 +4852,9 @@ export type OrganisationCreateWithoutSync_runsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4581,6 +4894,9 @@ export type OrganisationUncheckedCreateWithoutSync_runsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4636,6 +4952,9 @@ export type OrganisationUpdateWithoutSync_runsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4675,6 +4994,9 @@ export type OrganisationUncheckedUpdateWithoutSync_runsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4714,6 +5036,9 @@ export type OrganisationCreateWithoutFailed_recordsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4753,6 +5078,9 @@ export type OrganisationUncheckedCreateWithoutFailed_recordsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4808,6 +5136,9 @@ export type OrganisationUpdateWithoutFailed_recordsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4847,6 +5178,9 @@ export type OrganisationUncheckedUpdateWithoutFailed_recordsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4886,6 +5220,9 @@ export type OrganisationCreateWithoutAudit_eventsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4925,6 +5262,9 @@ export type OrganisationUncheckedCreateWithoutAudit_eventsInput = {
   fiscal_year_start?: number | null
   working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: string | null
+  onboarding_step?: $Enums.onboarding_step
+  onboarding_completed_at?: Date | string | null
+  xero_setup_skipped_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -4980,6 +5320,9 @@ export type OrganisationUpdateWithoutAudit_eventsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5019,6 +5362,9 @@ export type OrganisationUncheckedUpdateWithoutAudit_eventsInput = {
   fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  onboarding_step?: Prisma.Enumonboarding_stepFieldUpdateOperationsInput | $Enums.onboarding_step
+  onboarding_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_setup_skipped_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5269,6 +5615,9 @@ export type OrganisationSelect<ExtArgs extends runtime.Types.Extensions.Internal
   fiscal_year_start?: boolean
   working_hours_per_day?: boolean
   reporting_unit?: boolean
+  onboarding_step?: boolean
+  onboarding_completed_at?: boolean
+  xero_setup_skipped_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -5310,6 +5659,9 @@ export type OrganisationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   fiscal_year_start?: boolean
   working_hours_per_day?: boolean
   reporting_unit?: boolean
+  onboarding_step?: boolean
+  onboarding_completed_at?: boolean
+  xero_setup_skipped_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -5327,6 +5679,9 @@ export type OrganisationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   fiscal_year_start?: boolean
   working_hours_per_day?: boolean
   reporting_unit?: boolean
+  onboarding_step?: boolean
+  onboarding_completed_at?: boolean
+  xero_setup_skipped_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -5344,12 +5699,15 @@ export type OrganisationSelectScalar = {
   fiscal_year_start?: boolean
   working_hours_per_day?: boolean
   reporting_unit?: boolean
+  onboarding_step?: boolean
+  onboarding_completed_at?: boolean
+  xero_setup_skipped_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type OrganisationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "name" | "country_code" | "region_code" | "is_active" | "timezone" | "locale" | "fiscal_year_start" | "working_hours_per_day" | "reporting_unit" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["organisation"]>
+export type OrganisationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "name" | "country_code" | "region_code" | "is_active" | "timezone" | "locale" | "fiscal_year_start" | "working_hours_per_day" | "reporting_unit" | "onboarding_step" | "onboarding_completed_at" | "xero_setup_skipped_at" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["organisation"]>
 export type OrganisationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   teams?: boolean | Prisma.Organisation$teamsArgs<ExtArgs>
   locations?: boolean | Prisma.Organisation$locationsArgs<ExtArgs>
@@ -5418,6 +5776,15 @@ export type $OrganisationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     fiscal_year_start: number | null
     working_hours_per_day: runtime.Decimal | null
     reporting_unit: string | null
+    /**
+     * Furthest setup wizard step reached; see docs/superpowers/specs/2026-10-09-onboarding-design.md.
+     */
+    onboarding_step: $Enums.onboarding_step
+    onboarding_completed_at: Date | null
+    /**
+     * Set when an admin chooses "Set up without Xero"; cleared when Xero connects.
+     */
+    xero_setup_skipped_at: Date | null
     archived_at: Date | null
     created_at: Date
     updated_at: Date
@@ -5878,6 +6245,9 @@ export interface OrganisationFieldRefs {
   readonly fiscal_year_start: Prisma.FieldRef<"Organisation", 'Int'>
   readonly working_hours_per_day: Prisma.FieldRef<"Organisation", 'Decimal'>
   readonly reporting_unit: Prisma.FieldRef<"Organisation", 'String'>
+  readonly onboarding_step: Prisma.FieldRef<"Organisation", 'onboarding_step'>
+  readonly onboarding_completed_at: Prisma.FieldRef<"Organisation", 'DateTime'>
+  readonly xero_setup_skipped_at: Prisma.FieldRef<"Organisation", 'DateTime'>
   readonly archived_at: Prisma.FieldRef<"Organisation", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"Organisation", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"Organisation", 'DateTime'>

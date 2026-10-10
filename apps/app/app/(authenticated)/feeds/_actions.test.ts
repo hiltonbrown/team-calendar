@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
   archiveFeed: vi.fn(),
   auth: vi.fn(),
   createFeed: vi.fn(),
+  createOwnFeed: vi.fn(),
   currentUser: vi.fn(),
   database: {
     feed: {
@@ -15,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   issueToken: vi.fn(),
   log: {
     error: vi.fn(),
+    warn: vi.fn(),
   },
   pauseFeed: vi.fn(),
   restoreFeed: vi.fn(),
@@ -25,6 +29,9 @@ const mocks = vi.hoisted(() => ({
   updateFeed: vi.fn(),
 }));
 
+vi.mock("@repo/analytics/server", () => ({
+  analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
+}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -34,6 +41,7 @@ vi.mock("@repo/feeds", () => ({
   buildFeedSubscribeUrl: (token: string) =>
     `https://calendar.example/ical/${token}.ics`,
   createFeed: mocks.createFeed,
+  createOwnFeed: mocks.createOwnFeed,
   issueToken: mocks.issueToken,
   normaliseRole: (role: string | null | undefined) =>
     role?.replace("org:", "") ?? "viewer",
@@ -61,9 +69,12 @@ vi.mock("@repo/notifications", () => ({
 }));
 
 const {
+  archiveFeedAction,
   createFeedAction,
+  createOwnFeedAction,
   issueTokenAction,
   pauseFeedAction,
+  restoreFeedAction,
   rotateTokenAction,
   updateFeedAction,
 } = await import("./_actions");
@@ -287,6 +298,110 @@ describe("feed actions", () => {
 
       expect(result.ok).toBe(false);
       expect(mocks.dispatchNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("owner self-service", () => {
+    beforeEach(() => {
+      mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    });
+
+    it.each([
+      ["pause", () => pauseFeedAction({ feedId, organisationId }), "pauseFeed"],
+      [
+        "archive",
+        () => archiveFeedAction({ feedId, organisationId }),
+        "archiveFeed",
+      ],
+      [
+        "rotate",
+        () => rotateTokenAction({ feedId, organisationId }),
+        "rotateToken",
+      ],
+      [
+        "update",
+        () =>
+          updateFeedAction({
+            feedId,
+            organisationId,
+            patch: { privacyMode: "private" },
+          }),
+        "updateFeed",
+      ],
+    ] as const)(
+      "lets the feed service decide whether a member may %s",
+      async (_name, run, service) => {
+        mocks[service].mockResolvedValue({
+          error: { code: "not_authorised", message: "No" },
+          ok: false,
+        });
+        expect(await run()).toMatchObject({
+          error: { code: "not_authorised" },
+          ok: false,
+        });
+        expect(mocks[service]).toHaveBeenCalledWith(
+          expect.objectContaining({
+            actingRole: "viewer",
+            actingUserId: "user_1",
+          })
+        );
+      }
+    );
+
+    it("keeps restore and admin creation admin only", async () => {
+      expect(await restoreFeedAction({ feedId, organisationId })).toMatchObject(
+        { error: { code: "not_authorised" }, ok: false }
+      );
+      expect(mocks.restoreFeed).not.toHaveBeenCalled();
+      expect(
+        await createFeedAction({
+          includesPublicHolidays: false,
+          name: "Everyone",
+          organisationId,
+          privacyMode: "named",
+          scopes: [{ scopeType: "org", scopeValue: null }],
+        })
+      ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
+      expect(mocks.createFeed).not.toHaveBeenCalled();
+    });
+
+    it("rejects callers without an organisation role", async () => {
+      mocks.auth.mockResolvedValue({ orgRole: null });
+      expect(
+        await createOwnFeedAction({ kind: "personal", organisationId })
+      ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
+      expect(mocks.createOwnFeed).not.toHaveBeenCalled();
+    });
+
+    it("creates an own feed, records it once and revalidates", async () => {
+      mocks.createOwnFeed.mockResolvedValue({
+        ok: true,
+        value: { created: true, feedId },
+      });
+      expect(
+        await createOwnFeedAction({ kind: "team", organisationId })
+      ).toEqual({ ok: true, value: { created: true, feedId } });
+      expect(mocks.createOwnFeed).toHaveBeenCalledWith({
+        actingRole: "viewer",
+        actingUserId: "user_1",
+        clerkOrgId: "org_1",
+        kind: "team",
+        organisationId,
+      });
+      expect(mocks.analyticsCapture).toHaveBeenCalledWith({
+        distinctId: "user_1",
+        event: "Personal Feed Created",
+        properties: { kind: "team" },
+      });
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/feeds");
+
+      mocks.analyticsCapture.mockClear();
+      mocks.createOwnFeed.mockResolvedValue({
+        ok: true,
+        value: { created: false, feedId },
+      });
+      await createOwnFeedAction({ kind: "team", organisationId });
+      expect(mocks.analyticsCapture).not.toHaveBeenCalled();
     });
   });
 });

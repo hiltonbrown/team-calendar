@@ -110,6 +110,24 @@ export { computeWorkingDays } from "./src/duration/working-days";
 export * from "./src/holidays/holiday-preferences";
 export * from "./src/holidays/holiday-service";
 export * from "./src/holidays/resolve-public-holidays";
+export {
+  completeMemberWelcome,
+  loadWelcomeEligibility,
+  type WelcomeActor,
+} from "./src/onboarding/welcome-service";
+export type {
+  StageStatus,
+  WizardMode,
+  WizardSnapshot,
+} from "./src/onboarding/wizard-rules";
+export {
+  advanceWizard,
+  finishWizard,
+  isOnboardingAdmin,
+  loadWizardSnapshot,
+  type WizardActor,
+  type WizardError,
+} from "./src/onboarding/wizard-service";
 export * from "./src/people/alternative-contact-service";
 export {
   type AlternativeContactServiceError,
@@ -259,7 +277,6 @@ export * from "./src/team-coverage/coverage-map";
 export * from "./src/team-coverage/load-manager-coverage";
 export * from "./src/team-coverage/team-coverage-minimums";
 export * from "./src/xero-connection-state";
-
 export {
   acquireXeroWriteClaim,
   noUnresolvedSubmitOperationWhere,

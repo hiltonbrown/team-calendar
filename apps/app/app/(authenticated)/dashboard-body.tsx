@@ -12,9 +12,7 @@ import { AdminView } from "@/components/dashboard/admin-view";
 import { EmployeeView } from "@/components/dashboard/employee-view";
 import { ManagerView } from "@/components/dashboard/manager-view";
 import { ViewerView } from "@/components/dashboard/viewer-view";
-import { DismissibleOnboardingPanel } from "@/components/onboarding/dismissible-onboarding-panel";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
-import { loadOnboardingState } from "@/lib/server/load-onboarding-state";
 
 interface DashboardBodyProps {
   clerkOrgId: ClerkOrgId;
@@ -38,7 +36,7 @@ export async function DashboardBody({
   userId,
   weekAnchor,
 }: DashboardBodyProps) {
-  const [actingPerson, roleResult, onboarding] = await Promise.all([
+  const [actingPerson, roleResult] = await Promise.all([
     database.person.findFirst({
       select: { id: true },
       where: {
@@ -53,13 +51,10 @@ export async function DashboardBody({
       orgRole,
       userId,
     }),
-    loadOnboardingState({ clerkOrgId, organisationId, userId }),
   ]);
   if (!roleResult.ok) {
     return <FetchErrorState entityName="dashboard" />;
   }
-  const canManageOnboarding =
-    roleResult.value === "owner" || roleResult.value === "admin";
   const cache = createDashboardCache();
   const content = await renderDashboard({
     actingPersonId: actingPerson?.id ?? null,
@@ -72,20 +67,7 @@ export async function DashboardBody({
     userId,
     weekAnchor,
   });
-  return (
-    <>
-      {canManageOnboarding ? (
-        <DismissibleOnboardingPanel
-          clerkOrgId={clerkOrgId}
-          onboarding={onboarding}
-          organisationId={organisationId}
-          orgQueryValue={orgQueryValue}
-          userId={userId}
-        />
-      ) : null}
-      {content}
-    </>
-  );
+  return content;
 }
 interface RenderDashboardInput {
   actingPersonId: string | null;

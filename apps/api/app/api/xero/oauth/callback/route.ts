@@ -5,9 +5,53 @@ import {
   completeXeroOAuth,
   isLocalApplicationPath,
   isPreviewDeployment,
+  readOAuthStateReturnTo,
 } from "@repo/xero";
 import { captureXeroConnected } from "@repo/xero/activation";
 import { NextResponse } from "next/server";
+
+const XERO_SETTINGS_PATH = "/settings/integrations/xero";
+
+// Pages show plain-language copy for these codes; provider messages and
+// internal error codes never reach the browser.
+function safeErrorCode(code: string): string {
+  switch (code) {
+    case "invalid_state":
+    case "session_not_found":
+      return "expired";
+    case "invalid_country":
+    case "invalid_organisation_selection":
+    case "organisation_not_found":
+    case "tenant_binding_conflict":
+    case "tenant_not_found":
+    case "tenant_replacement_required":
+      return "organisation";
+    case "connection_changed":
+      return "changed";
+    case "network_error":
+      return "unavailable";
+    default:
+      return "failed";
+  }
+}
+
+// Send a failed callback back to the signed return path (or Xero settings
+// when the state cannot be verified) with a safe code only.
+function failureTarget(state: string, code: string, appBaseUrl: string): URL {
+  const signedReturnTo = readOAuthStateReturnTo(state);
+  const target = new URL(
+    signedReturnTo && isLocalApplicationPath(signedReturnTo)
+      ? signedReturnTo
+      : XERO_SETTINGS_PATH,
+    appBaseUrl
+  );
+  target.searchParams.set("xero_error", safeErrorCode(code));
+  return target;
+}
+
+function appBaseUrlFor(request: Request): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? request.url;
+}
 
 function clearNonce(response: NextResponse): NextResponse {
   response.cookies.delete({
@@ -31,7 +75,17 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code"),
     state = url.searchParams.get("state");
-  const cancelled = url.searchParams.get("error") === "access_denied";
+  const providerError = url.searchParams.get("error");
+  const cancelled = providerError === "access_denied";
+  // Any other provider error arrives without a code; return the person to
+  // where they started rather than to a bare JSON response.
+  if (state && providerError && !cancelled) {
+    return clearNonce(
+      NextResponse.redirect(
+        failureTarget(state, "failed", appBaseUrlFor(request))
+      )
+    );
+  }
   if (!(state && (code || cancelled))) {
     return clearNonce(
       NextResponse.json(
@@ -68,9 +122,10 @@ export async function GET(request: Request) {
   const result: Awaited<ReturnType<typeof completeXeroOAuth>> = cancelled
     ? await cancelXeroOAuth(callback)
     : await completeXeroOAuth({ ...callback, code: code ?? "" });
+  const appBaseUrl = appBaseUrlFor(request);
   if (!result.ok) {
     return clearNonce(
-      NextResponse.json({ error: result.error.message }, { status: 400 })
+      NextResponse.redirect(failureTarget(state, result.error.code, appBaseUrl))
     );
   }
   if ("connected" in result.value && result.value.connected) {
@@ -91,9 +146,8 @@ export async function GET(request: Request) {
       // A committed connection is usable; the scheduler recovers failed initial dispatch.
     }
   }
-  const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.url;
   const redirectTo = isLocalApplicationPath(result.value.redirectTo)
     ? result.value.redirectTo
-    : "/settings/integrations/xero";
+    : XERO_SETTINGS_PATH;
   return clearNonce(NextResponse.redirect(new URL(redirectTo, appBaseUrl)));
 }

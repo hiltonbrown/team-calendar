@@ -342,7 +342,30 @@ describe("xero settings integration server actions", () => {
         expect(url.searchParams.get("clerkOrgId")).toBe(clerkOrgId);
         expect(url.searchParams.get("organisationId")).toBe(organisationId);
         expect(url.searchParams.get("userId")).toBe(userId);
+        expect(url.searchParams.get("returnTo")).toBe(
+          "/settings/integrations/xero"
+        );
       }
+    });
+    it("connectXeroAction returns to the setup wizard when asked", async () => {
+      const result = await connectXeroAction({
+        organisationId,
+        returnTo: "/onboarding",
+      });
+      expect(
+        result.ok &&
+          new URL(result.value.redirectUrl).searchParams.get("returnTo")
+      ).toBe("/onboarding");
+    });
+    it("connectXeroAction rejects an unlisted return path", async () => {
+      const result = await connectXeroAction({
+        organisationId,
+        returnTo: "/settings/billing" as "/onboarding",
+      });
+      expect(result).toMatchObject({
+        error: { code: "validation_error" },
+        ok: false,
+      });
     });
     it("pauseTenantSyncAction and resumeTenantSyncAction update xeroConnection sync status", async () => {
       const resPause = await pauseTenantSyncAction({

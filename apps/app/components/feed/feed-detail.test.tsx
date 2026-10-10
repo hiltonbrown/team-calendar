@@ -30,11 +30,25 @@ vi.mock("@/app/(authenticated)/feeds/_actions", () => ({
   restoreFeedAction: (input: unknown) => mocks.restoreFeedAction(input),
   resumeFeedAction: (input: unknown) => mocks.resumeFeedAction(input),
   rotateTokenAction: (input: unknown) => mocks.rotateTokenAction(input),
+  updateFeedAction: vi.fn(),
 }));
 
+class ResizeObserverMock {
+  disconnect() {
+    // Radix measures controls; jsdom has no layout to observe.
+  }
+  observe() {
+    // No layout in jsdom.
+  }
+  unobserve() {
+    // No layout in jsdom.
+  }
+}
+globalThis.ResizeObserver = ResizeObserverMock;
+
 const currentUrl = "https://calendar.example/ical/tc1.current.signature.ics";
-const ACTIVE_FEED_NEEDED_PATTERN =
-  /An active feed is needed before you can add/;
+const SUBSCRIBE_URL = "Subscribe URL for All staff";
+const ADD_TO_APPLE = /Add to Apple Calendar: All staff/;
 const EMPTY_PREVIEW_PATTERN = /No upcoming events/;
 const SHOW_URL_PATTERN = /show url/i;
 const detail = {
@@ -74,6 +88,7 @@ describe("FeedDetail", () => {
       <FeedDetail
         canManage={false}
         detail={detail}
+        isAdmin={false}
         organisationId="00000000-0000-4000-8000-000000000001"
         previews={{ named: [] }}
       />
@@ -87,7 +102,7 @@ describe("FeedDetail", () => {
     expect(screen.queryByRole("button", { name: "Rotate token" })).toBeNull();
 
     const subscribeHeading = screen.getByRole("heading", {
-      name: "Put team availability on your calendar",
+      name: "Add to your calendar",
     });
     const previewHeading = screen.getByRole("heading", {
       name: "Preview and visibility",
@@ -114,6 +129,7 @@ describe("FeedDetail", () => {
       <FeedDetail
         canManage
         detail={detail}
+        isAdmin
         organisationId="00000000-0000-4000-8000-000000000001"
         previews={{ named: [] }}
       />
@@ -127,10 +143,9 @@ describe("FeedDetail", () => {
         feedId: detail.id,
         organisationId: "00000000-0000-4000-8000-000000000001",
       });
-      expect(screen.getByRole("textbox")).toHaveProperty(
-        "value",
-        replacementUrl
-      );
+      expect(
+        screen.getByRole("textbox", { name: SUBSCRIBE_URL })
+      ).toHaveProperty("value", replacementUrl);
       expect(screen.getByRole("status").textContent).toContain(
         "subscribe URL has been updated"
       );
@@ -153,6 +168,7 @@ describe("FeedDetail", () => {
           status: "paused",
           subscribeUrl: null,
         }}
+        isAdmin
         organisationId="00000000-0000-4000-8000-000000000001"
         previews={{ named: [] }}
       />
@@ -161,7 +177,9 @@ describe("FeedDetail", () => {
       screen.getByRole("button", { name: "Create subscribe URL" })
     );
     await waitFor(() =>
-      expect(screen.getByRole("textbox")).toHaveProperty("value", issuedUrl)
+      expect(
+        screen.getByRole("textbox", { name: SUBSCRIBE_URL })
+      ).toHaveProperty("value", issuedUrl)
     );
     expect(mocks.issueTokenAction).toHaveBeenCalledWith({
       feedId: detail.id,
@@ -183,6 +201,7 @@ describe("FeedDetail", () => {
       <FeedDetail
         canManage
         detail={detail}
+        isAdmin
         organisationId="00000000-0000-4000-8000-000000000001"
         previews={{ named: [] }}
       />
@@ -190,7 +209,7 @@ describe("FeedDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     fireEvent.click(screen.getByRole("button", { name: "Archive feed" }));
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: SUBSCRIBE_URL })).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy URL" })).toBeNull();
     expect(mocks.archiveFeedAction).toHaveBeenCalledWith({
       feedId: detail.id,
@@ -207,6 +226,7 @@ describe("FeedDetail", () => {
     });
     const props = {
       canManage: true,
+      isAdmin: true,
       organisationId: "00000000-0000-4000-8000-000000000001",
       previews: { named: [] },
     };
@@ -214,7 +234,9 @@ describe("FeedDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: "Rotate token" }));
     fireEvent.click(screen.getByRole("button", { name: "Rotate" }));
     await waitFor(() =>
-      expect(screen.getByRole("textbox")).toHaveProperty("value", rotatedUrl)
+      expect(
+        screen.getByRole("textbox", { name: SUBSCRIBE_URL })
+      ).toHaveProperty("value", rotatedUrl)
     );
     rerender(
       <FeedDetail
@@ -227,7 +249,7 @@ describe("FeedDetail", () => {
         }}
       />
     );
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: SUBSCRIBE_URL })).toBeNull();
     rerender(
       <FeedDetail
         {...props}
@@ -239,7 +261,7 @@ describe("FeedDetail", () => {
         }}
       />
     );
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: SUBSCRIBE_URL })).toBeNull();
     expect(
       screen.getByRole("button", { name: "Create subscribe URL" })
     ).toBeDefined();
@@ -251,7 +273,7 @@ describe("FeedDetail", () => {
         detail={{ ...detail, subscribeUrl: authoritativeUrl }}
       />
     );
-    expect(screen.getByRole("textbox")).toHaveProperty(
+    expect(screen.getByRole("textbox", { name: SUBSCRIBE_URL })).toHaveProperty(
       "value",
       authoritativeUrl
     );
@@ -273,6 +295,7 @@ describe("FeedDetail", () => {
     mocks.rotateTokenAction.mockReturnValueOnce(pendingRotation);
     const props = {
       canManage: true,
+      isAdmin: true,
       organisationId: "00000000-0000-4000-8000-000000000001",
       previews: { named: [] },
     };
@@ -302,7 +325,7 @@ describe("FeedDetail", () => {
       });
       await pendingRotation;
     });
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: SUBSCRIBE_URL })).toBeNull();
     expect(screen.queryByRole("button", { name: "Copy URL" })).toBeNull();
     rerender(
       <FeedDetail
@@ -315,13 +338,14 @@ describe("FeedDetail", () => {
         }}
       />
     );
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("textbox", { name: SUBSCRIBE_URL })).toBeNull();
   });
 
   it("distinguishes preview failure from empty success and retries by refreshing", () => {
     const props = {
       canManage: false,
       detail,
+      isAdmin: false,
       organisationId: "00000000-0000-4000-8000-000000000001",
       previews: { named: [] },
     };
@@ -348,14 +372,17 @@ describe("FeedDetail", () => {
       <FeedDetail
         canManage
         detail={{ ...detail, activeTokenHint: null, subscribeUrl: null }}
+        isAdmin
         organisationId="00000000-0000-4000-8000-000000000001"
         previews={{ named: [] }}
       />
     );
 
-    expect(screen.getByText("How to subscribe")).toBeDefined();
-    expect(screen.getByText(ACTIVE_FEED_NEEDED_PATTERN)).toBeDefined();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText("Add to your calendar")).toBeDefined();
+    expect(
+      screen.getByText("This feed has no active subscribe URL.")
+    ).toBeDefined();
+    expect(screen.queryByRole("textbox", { name: SUBSCRIBE_URL })).toBeNull();
   });
 
   it.each([
@@ -366,11 +393,75 @@ describe("FeedDetail", () => {
       <FeedDetail
         canManage
         detail={{ ...detail, privacyMode: mode }}
+        isAdmin
         organisationId="00000000-0000-4000-8000-000000000001"
         previews={{ [mode]: [] }}
       />
     );
 
-    expect(screen.getByText(copy)).toBeDefined();
+    expect(screen.getAllByText(copy).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Scope and privacy").closest("details")?.textContent
+    ).toContain(copy);
+  });
+
+  it("gives the owner of a personal feed management without restore or new URLs", () => {
+    render(
+      <FeedDetail
+        canManage
+        detail={{
+          ...detail,
+          scopes: [{ id: "scope-1", label: "Just you", scopeType: "self" }],
+        }}
+        isAdmin={false}
+        organisationId="00000000-0000-4000-8000-000000000001"
+        previews={{ named: [] }}
+      />
+    );
+    expect(screen.getByText("Feed settings")).toBeDefined();
+    expect(screen.getByLabelText("Feed name")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Rotate token" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Pause" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Archive" })).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: ADD_TO_APPLE }).getAttribute("href")
+    ).toBe("webcal://calendar.example/ical/tc1.current.signature.ics");
+  });
+
+  it("hides restore and URL creation from a non-admin owner", () => {
+    render(
+      <FeedDetail
+        canManage
+        detail={{
+          ...detail,
+          activeTokenHint: null,
+          status: "archived",
+          subscribeUrl: null,
+        }}
+        isAdmin={false}
+        organisationId="00000000-0000-4000-8000-000000000001"
+        previews={{ named: [] }}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Create subscribe URL" })
+    ).toBeNull();
+    expect(screen.queryByText("Feed settings")).toBeNull();
+  });
+
+  it("keeps a member who does not own the feed read-only", () => {
+    render(
+      <FeedDetail
+        canManage={false}
+        detail={detail}
+        isAdmin={false}
+        organisationId="00000000-0000-4000-8000-000000000001"
+        previews={{ named: [] }}
+      />
+    );
+    expect(screen.queryByText("Feed settings")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rotate token" })).toBeNull();
   });
 });

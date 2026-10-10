@@ -49,6 +49,7 @@ export type PersonMinAggregateOutputType = {
   default_contactability: $Enums.availability_contactability | null
   default_privacy_mode: $Enums.availability_privacy_mode | null
   include_in_feeds_by_default: boolean | null
+  welcome_completed_at: Date | null
   archived_at: Date | null
   created_at: Date | null
   updated_at: Date | null
@@ -79,6 +80,7 @@ export type PersonMaxAggregateOutputType = {
   default_contactability: $Enums.availability_contactability | null
   default_privacy_mode: $Enums.availability_privacy_mode | null
   include_in_feeds_by_default: boolean | null
+  welcome_completed_at: Date | null
   archived_at: Date | null
   created_at: Date | null
   updated_at: Date | null
@@ -109,6 +111,7 @@ export type PersonCountAggregateOutputType = {
   default_contactability: number
   default_privacy_mode: number
   include_in_feeds_by_default: number
+  welcome_completed_at: number
   archived_at: number
   created_at: number
   updated_at: number
@@ -141,6 +144,7 @@ export type PersonMinAggregateInputType = {
   default_contactability?: true
   default_privacy_mode?: true
   include_in_feeds_by_default?: true
+  welcome_completed_at?: true
   archived_at?: true
   created_at?: true
   updated_at?: true
@@ -171,6 +175,7 @@ export type PersonMaxAggregateInputType = {
   default_contactability?: true
   default_privacy_mode?: true
   include_in_feeds_by_default?: true
+  welcome_completed_at?: true
   archived_at?: true
   created_at?: true
   updated_at?: true
@@ -201,6 +206,7 @@ export type PersonCountAggregateInputType = {
   default_contactability?: true
   default_privacy_mode?: true
   include_in_feeds_by_default?: true
+  welcome_completed_at?: true
   archived_at?: true
   created_at?: true
   updated_at?: true
@@ -304,6 +310,7 @@ export type PersonGroupByOutputType = {
   default_contactability: $Enums.availability_contactability
   default_privacy_mode: $Enums.availability_privacy_mode
   include_in_feeds_by_default: boolean
+  welcome_completed_at: Date | null
   archived_at: Date | null
   created_at: Date
   updated_at: Date
@@ -355,6 +362,7 @@ export type PersonWhereInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFilter<"Person"> | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFilter<"Person"> | boolean
+  welcome_completed_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Person"> | Date | string
@@ -398,6 +406,7 @@ export type PersonOrderByWithRelationInput = {
   default_contactability?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
+  welcome_completed_at?: Prisma.SortOrderInput | Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -447,6 +456,7 @@ export type PersonWhereUniqueInput = Prisma.AtLeast<{
   default_contactability?: Prisma.Enumavailability_contactabilityFilter<"Person"> | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFilter<"Person"> | boolean
+  welcome_completed_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Person"> | Date | string
@@ -490,6 +500,7 @@ export type PersonOrderByWithAggregationInput = {
   default_contactability?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
+  welcome_completed_at?: Prisma.SortOrderInput | Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -526,6 +537,7 @@ export type PersonScalarWhereWithAggregatesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityWithAggregatesFilter<"Person"> | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeWithAggregatesFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolWithAggregatesFilter<"Person"> | boolean
+  welcome_completed_at?: Prisma.DateTimeNullableWithAggregatesFilter<"Person"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableWithAggregatesFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"Person"> | Date | string
@@ -552,6 +564,7 @@ export type PersonCreateInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -595,6 +608,7 @@ export type PersonUncheckedCreateInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -630,6 +644,7 @@ export type PersonUpdateInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -673,6 +688,7 @@ export type PersonUncheckedUpdateInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -712,6 +728,7 @@ export type PersonCreateManyInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -738,6 +755,7 @@ export type PersonUpdateManyMutationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -768,6 +786,7 @@ export type PersonUncheckedUpdateManyInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -829,6 +848,7 @@ export type PersonCountOrderByAggregateInput = {
   default_contactability?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
+  welcome_completed_at?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -859,6 +879,7 @@ export type PersonMaxOrderByAggregateInput = {
   default_contactability?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
+  welcome_completed_at?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -889,6 +910,7 @@ export type PersonMinOrderByAggregateInput = {
   default_contactability?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
+  welcome_completed_at?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -1240,6 +1262,7 @@ export type PersonCreateWithoutOrganisationInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1281,6 +1304,7 @@ export type PersonUncheckedCreateWithoutOrganisationInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1349,6 +1373,7 @@ export type PersonScalarWhereInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFilter<"Person"> | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFilter<"Person"> | boolean
+  welcome_completed_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   archived_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Person"> | Date | string
@@ -1375,6 +1400,7 @@ export type PersonCreateWithoutTeamInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1416,6 +1442,7 @@ export type PersonUncheckedCreateWithoutTeamInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1477,6 +1504,7 @@ export type PersonCreateWithoutLocationInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1518,6 +1546,7 @@ export type PersonUncheckedCreateWithoutLocationInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1579,6 +1608,7 @@ export type PersonCreateWithoutDirect_reportsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1621,6 +1651,7 @@ export type PersonUncheckedCreateWithoutDirect_reportsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1660,6 +1691,7 @@ export type PersonCreateWithoutManagerInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1701,6 +1733,7 @@ export type PersonUncheckedCreateWithoutManagerInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1757,6 +1790,7 @@ export type PersonUpdateWithoutDirect_reportsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1799,6 +1833,7 @@ export type PersonUncheckedUpdateWithoutDirect_reportsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1849,6 +1884,7 @@ export type PersonCreateWithoutAlternative_contactsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1891,6 +1927,7 @@ export type PersonUncheckedCreateWithoutAlternative_contactsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -1941,6 +1978,7 @@ export type PersonUpdateWithoutAlternative_contactsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1983,6 +2021,7 @@ export type PersonUncheckedUpdateWithoutAlternative_contactsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2017,6 +2056,7 @@ export type PersonCreateWithoutAvailability_recordsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2059,6 +2099,7 @@ export type PersonUncheckedCreateWithoutAvailability_recordsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2098,6 +2139,7 @@ export type PersonCreateWithoutApproved_recordsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2140,6 +2182,7 @@ export type PersonUncheckedCreateWithoutApproved_recordsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2190,6 +2233,7 @@ export type PersonUpdateWithoutAvailability_recordsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2232,6 +2276,7 @@ export type PersonUncheckedUpdateWithoutAvailability_recordsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2277,6 +2322,7 @@ export type PersonUpdateWithoutApproved_recordsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2319,6 +2365,7 @@ export type PersonUncheckedUpdateWithoutApproved_recordsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2353,6 +2400,7 @@ export type PersonCreateWithoutLeave_balancesInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2395,6 +2443,7 @@ export type PersonUncheckedCreateWithoutLeave_balancesInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2445,6 +2494,7 @@ export type PersonUpdateWithoutLeave_balancesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2487,6 +2537,7 @@ export type PersonUncheckedUpdateWithoutLeave_balancesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2521,6 +2572,7 @@ export type PersonCreateWithoutXero_match_sourcesInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2563,6 +2615,7 @@ export type PersonUncheckedCreateWithoutXero_match_sourcesInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2602,6 +2655,7 @@ export type PersonCreateWithoutXero_match_candidatesInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2644,6 +2698,7 @@ export type PersonUncheckedCreateWithoutXero_match_candidatesInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2683,6 +2738,7 @@ export type PersonCreateWithoutXero_match_resolutionsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2725,6 +2781,7 @@ export type PersonUncheckedCreateWithoutXero_match_resolutionsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -2775,6 +2832,7 @@ export type PersonUpdateWithoutXero_match_sourcesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2817,6 +2875,7 @@ export type PersonUncheckedUpdateWithoutXero_match_sourcesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2862,6 +2921,7 @@ export type PersonUpdateWithoutXero_match_candidatesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2904,6 +2964,7 @@ export type PersonUncheckedUpdateWithoutXero_match_candidatesInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2949,6 +3010,7 @@ export type PersonUpdateWithoutXero_match_resolutionsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2991,6 +3053,7 @@ export type PersonUncheckedUpdateWithoutXero_match_resolutionsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3025,6 +3088,7 @@ export type PersonCreateWithoutNotificationsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3067,6 +3131,7 @@ export type PersonUncheckedCreateWithoutNotificationsInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3117,6 +3182,7 @@ export type PersonUpdateWithoutNotificationsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3159,6 +3225,7 @@ export type PersonUncheckedUpdateWithoutNotificationsInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3196,6 +3263,7 @@ export type PersonCreateManyOrganisationInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3222,6 +3290,7 @@ export type PersonUpdateWithoutOrganisationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3263,6 +3332,7 @@ export type PersonUncheckedUpdateWithoutOrganisationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3301,6 +3371,7 @@ export type PersonUncheckedUpdateManyWithoutOrganisationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3330,6 +3401,7 @@ export type PersonCreateManyTeamInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3356,6 +3428,7 @@ export type PersonUpdateWithoutTeamInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3397,6 +3470,7 @@ export type PersonUncheckedUpdateWithoutTeamInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3435,6 +3509,7 @@ export type PersonUncheckedUpdateManyWithoutTeamInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3464,6 +3539,7 @@ export type PersonCreateManyLocationInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3490,6 +3566,7 @@ export type PersonUpdateWithoutLocationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3531,6 +3608,7 @@ export type PersonUncheckedUpdateWithoutLocationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3569,6 +3647,7 @@ export type PersonUncheckedUpdateManyWithoutLocationInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3598,6 +3677,7 @@ export type PersonCreateManyManagerInput = {
   default_contactability?: $Enums.availability_contactability
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: Date | string | null
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
@@ -3624,6 +3704,7 @@ export type PersonUpdateWithoutManagerInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3665,6 +3746,7 @@ export type PersonUncheckedUpdateWithoutManagerInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3703,6 +3785,7 @@ export type PersonUncheckedUpdateManyWithoutManagerInput = {
   default_contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  welcome_completed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3836,6 +3919,7 @@ export type PersonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   default_contactability?: boolean
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -3880,6 +3964,7 @@ export type PersonSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   default_contactability?: boolean
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -3914,6 +3999,7 @@ export type PersonSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   default_contactability?: boolean
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -3948,12 +4034,13 @@ export type PersonSelectScalar = {
   default_contactability?: boolean
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
+  welcome_completed_at?: boolean
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type PersonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "team_id" | "manager_person_id" | "location_id" | "person_type" | "source_system" | "source_person_key" | "first_name" | "last_name" | "email" | "xero_employee_id" | "employment_type" | "is_active" | "display_name" | "clerk_user_id" | "job_title" | "start_date" | "avatar_url" | "status_note" | "default_contactability" | "default_privacy_mode" | "include_in_feeds_by_default" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["person"]>
+export type PersonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "team_id" | "manager_person_id" | "location_id" | "person_type" | "source_system" | "source_person_key" | "first_name" | "last_name" | "email" | "xero_employee_id" | "employment_type" | "is_active" | "display_name" | "clerk_user_id" | "job_title" | "start_date" | "avatar_url" | "status_note" | "default_contactability" | "default_privacy_mode" | "include_in_feeds_by_default" | "welcome_completed_at" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["person"]>
 export type PersonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   team?: boolean | Prisma.Person$teamArgs<ExtArgs>
@@ -4025,6 +4112,7 @@ export type $PersonPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     default_contactability: $Enums.availability_contactability
     default_privacy_mode: $Enums.availability_privacy_mode
     include_in_feeds_by_default: boolean
+    welcome_completed_at: Date | null
     archived_at: Date | null
     created_at: Date
     updated_at: Date
@@ -4488,6 +4576,7 @@ export interface PersonFieldRefs {
   readonly default_contactability: Prisma.FieldRef<"Person", 'availability_contactability'>
   readonly default_privacy_mode: Prisma.FieldRef<"Person", 'availability_privacy_mode'>
   readonly include_in_feeds_by_default: Prisma.FieldRef<"Person", 'Boolean'>
+  readonly welcome_completed_at: Prisma.FieldRef<"Person", 'DateTime'>
   readonly archived_at: Prisma.FieldRef<"Person", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"Person", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"Person", 'DateTime'>

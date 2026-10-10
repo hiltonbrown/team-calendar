@@ -1,5 +1,6 @@
 "use server";
 
+import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
@@ -7,6 +8,7 @@ import {
   archiveFeed,
   buildFeedSubscribeUrl,
   createFeed,
+  createOwnFeed,
   type FeedServiceError,
   issueToken,
   normaliseRole,
@@ -26,6 +28,8 @@ import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
   type CreateFeedActionInput,
   CreateFeedActionSchema,
+  type CreateOwnFeedActionInput,
+  CreateOwnFeedActionSchema,
   type FeedCommandActionInput,
   FeedCommandActionSchema,
   type RevokeTokenActionInput,
@@ -83,7 +87,9 @@ export async function updateFeedAction(
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveAdminContext(parsed.data.organisationId);
+  // Owners may edit their own personal or team feed; the feed service
+  // enforces admin-or-owner for each change.
+  const context = await resolveMemberContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
@@ -104,25 +110,62 @@ export async function updateFeedAction(
 export async function pauseFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
-  return await command(input, pauseFeed);
+  return await command(input, pauseFeed, resolveMemberContext);
 }
 
 export async function resumeFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
-  return await command(input, resumeFeed);
+  return await command(input, resumeFeed, resolveMemberContext);
 }
 
 export async function archiveFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
-  return await command(input, archiveFeed);
+  return await command(input, archiveFeed, resolveMemberContext);
 }
 
 export async function restoreFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
-  return await command(input, restoreFeed);
+  return await command(input, restoreFeed, resolveAdminContext);
+}
+
+export async function createOwnFeedAction(
+  input: CreateOwnFeedActionInput
+): Promise<FeedActionResult<{ created: boolean; feedId: string }>> {
+  const parsed = CreateOwnFeedActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const context = await resolveMemberContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await createOwnFeed({
+    actingRole: context.value.role,
+    actingUserId: context.value.userId,
+    clerkOrgId: context.value.clerkOrgId,
+    kind: parsed.data.kind,
+    organisationId: context.value.organisationId,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  if (result.value.created) {
+    try {
+      analytics?.capture({
+        distinctId: context.value.userId,
+        event: "Personal Feed Created",
+        properties: { kind: parsed.data.kind },
+      });
+      await analytics?.flush();
+    } catch (error) {
+      log.warn("Personal feed analytics capture failed", { error });
+    }
+  }
+  revalidateFeedPaths(result.value.feedId, { includeSettings: true });
+  return { ok: true, value: result.value };
 }
 
 export async function issueTokenAction(
@@ -163,7 +206,7 @@ export async function rotateTokenAction(
   if (!parsed.success) {
     return validationError("Invalid feed");
   }
-  const context = await resolveAdminContext(parsed.data.organisationId);
+  const context = await resolveMemberContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
@@ -277,13 +320,14 @@ export async function revokeTokenAction(
 
 async function command(
   input: FeedCommandActionInput,
-  service: (input: unknown) => Promise<Result<unknown, FeedServiceError>>
+  service: (input: unknown) => Promise<Result<unknown, FeedServiceError>>,
+  resolveContext: typeof resolveAdminContext
 ): Promise<FeedActionResult<{ feedId: string }>> {
   const parsed = FeedCommandActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid feed");
   }
-  const context = await resolveAdminContext(parsed.data.organisationId);
+  const context = await resolveContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
@@ -301,29 +345,38 @@ async function command(
   return { ok: true, value: { feedId: parsed.data.feedId } };
 }
 
-async function resolveAdminContext(organisationId: string): Promise<
-  FeedActionResult<{
-    clerkOrgId: string;
-    organisationId: string;
-    role: string;
-    userId: string;
-  }>
-> {
+type ActorContext = FeedActionResult<{
+  clerkOrgId: string;
+  organisationId: string;
+  role: string;
+  userId: string;
+}>;
+
+function resolveAdminContext(organisationId: string): Promise<ActorContext> {
+  return resolveActorContext(organisationId, { requireAdmin: true });
+}
+
+// Any signed-in member of the organisation. Services decide what they may do.
+function resolveMemberContext(organisationId: string): Promise<ActorContext> {
+  return resolveActorContext(organisationId, { requireAdmin: false });
+}
+
+async function resolveActorContext(
+  organisationId: string,
+  options: { requireAdmin: boolean }
+): Promise<ActorContext> {
   const [{ orgRole }, user, context] = await Promise.all([
     auth(),
     currentUser(),
     getActiveOrgContext(organisationId),
   ]);
   const role = normaliseRole(orgRole);
-  if (
-    !(
-      user &&
-      (role === "admin" ||
-        role === "owner" ||
-        role === "org:admin" ||
-        role === "org:owner")
-    )
-  ) {
+  const isAdmin =
+    role === "admin" ||
+    role === "owner" ||
+    role === "org:admin" ||
+    role === "org:owner";
+  if (!(user && orgRole && (isAdmin || !options.requireAdmin))) {
     return {
       error: {
         code: "not_authorised",

@@ -7,7 +7,11 @@ import { TimeGreeting } from "./time-greeting";
 // The desktop welcome surface: brand mark, a time-aware greeting, and a living
 // availability motif that previews what the product is for. Hidden below lg,
 // where MobileBrand carries the identity instead.
-export const BrandPanel = () => (
+export const BrandPanel = ({
+  tagline = "Sign in to see who is in, who is out, and why.",
+}: {
+  tagline?: string;
+}) => (
   <aside className="auth-panel relative hidden overflow-hidden lg:flex lg:flex-col">
     <div className="relative z-10 flex h-full flex-col gap-10 p-10">
       <header className="flex items-center justify-between">
@@ -40,7 +44,7 @@ export const BrandPanel = () => (
             className="max-w-sm text-body-lg"
             style={{ color: "var(--auth-ink-soft)" }}
           >
-            Sign in to see who is in, who is out, and why.
+            {tagline}
           </p>
         </div>
         <AvailabilityGrid />

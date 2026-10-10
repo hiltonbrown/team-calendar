@@ -113,6 +113,9 @@ export const OrganisationScalarFieldEnum = {
   fiscal_year_start: 'fiscal_year_start',
   working_hours_per_day: 'working_hours_per_day',
   reporting_unit: 'reporting_unit',
+  onboarding_step: 'onboarding_step',
+  onboarding_completed_at: 'onboarding_completed_at',
+  xero_setup_skipped_at: 'xero_setup_skipped_at',
   archived_at: 'archived_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
@@ -194,6 +197,7 @@ export const PersonScalarFieldEnum = {
   default_contactability: 'default_contactability',
   default_privacy_mode: 'default_privacy_mode',
   include_in_feeds_by_default: 'include_in_feeds_by_default',
+  welcome_completed_at: 'welcome_completed_at',
   archived_at: 'archived_at',
   created_at: 'created_at',
   updated_at: 'updated_at'

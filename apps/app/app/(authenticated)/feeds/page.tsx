@@ -1,169 +1,161 @@
 import { auth, currentUser } from "@repo/auth/server";
-import { Button } from "@repo/design-system/components/ui/button";
-import { listFeeds, normaliseRole } from "@repo/feeds";
+import { getOwnFeedEligibility, listFeeds, normaliseRole } from "@repo/feeds";
+import { PauseIcon, UserRoundXIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FeedTable } from "@/components/feed/feed-table";
-import { SubscribeInstructions } from "@/components/feed/subscribe-instructions";
-import { EmptyState } from "@/components/states/empty-state";
-import { FetchErrorState } from "@/components/states/fetch-error-state";
+import type { ReactNode } from "react";
+import { OtherFeedsList } from "@/components/feed/other-feeds-list";
+import { YourCalendar } from "@/components/feed/your-calendar";
 import { requirePageRole } from "@/lib/auth/require-page-role";
+import { recommendFeed } from "@/lib/feeds/recommend-feed";
 import { withOrg } from "@/lib/navigation/org-url";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
-import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
-import { FeedFilterSchema } from "./_schemas";
-import { FeedFilterBar } from "./feed-filter-bar";
+import { OwnFeedActions } from "./own-feed-actions";
 
 export const metadata: Metadata = {
   description:
-    "Create and manage iCal calendar feeds for your team's leave and availability.",
-  title: "Feeds | Team Calendar",
+    "Add Team Calendar leave and availability to the calendar app you already use.",
+  title: "Calendar feeds | Team Calendar",
 };
 
 interface FeedPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-// S-13 Feeds is the member-view surface for calendar feeds: read access from
-// viewer upward, with management controls (new, pause, activate) gated behind
-// `canManage` for admins and owners. The admin-config counterpart that creates
-// and configures feeds is S-21 at `/settings/feeds` (admin and owner only).
-// This split is intentional per ScreenCatalogue v4.1; keep the two in sync.
+// S-13 Feeds is the subscribe page for every role: one recommended feed with
+// provider actions, then other feeds the person can use. Feed administration
+// lives on the feed detail page and S-21 `/settings/feeds`.
 const FeedPage = async ({ searchParams }: FeedPageProps) => {
   await requirePageRole("org:viewer");
-  const params = await searchParams;
-  const { orgRole } = await auth();
-  const user = await currentUser();
-  const { org, ...filterParams } = params;
+  const { org } = await searchParams;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(orgParam);
-  const filters = parseFilterParams(filterParams, FeedFilterSchema) ?? {
-    status: ["active", "paused"],
-  };
+  const [{ orgRole }, user, context] = await Promise.all([
+    auth(),
+    currentUser(),
+    requireActiveOrgPageContext(orgParam),
+  ]);
+  const { clerkOrgId, organisationId, orgQueryValue } = context;
   const role = normaliseRole(orgRole);
-  const canManage =
+  const isAdmin =
     role === "admin" ||
     role === "owner" ||
     role === "org:admin" ||
     role === "org:owner";
-  const hasActiveFilters =
-    Boolean(filters.search) ||
-    Boolean(filters.privacyMode?.length) ||
-    filters.status.join(",") !== "active,paused";
 
-  const unauthorisedResult = {
-    error: {
-      code: "not_authorised" as const,
-      message: "You must be signed in to view feeds.",
-    },
-    ok: false as const,
-  };
-  const [feedsResult, subscriptionFeedsResult] = user
+  const [feedsResult, eligibilityResult] = user
     ? await Promise.all([
         listFeeds({
           actingRole: role,
           actingUserId: user.id,
           clerkOrgId,
-          filters,
+          filters: { status: ["active", "paused"] },
           organisationId,
-          pagination: { cursor: filters.cursor, pageSize: 50 },
+          pagination: { pageSize: 100 },
         }),
-        listFeeds({
-          actingRole: role,
+        getOwnFeedEligibility({
           actingUserId: user.id,
           clerkOrgId,
-          filters: { status: ["active"] },
           organisationId,
-          pagination: { pageSize: 50 },
         }),
       ])
-    : [unauthorisedResult, unauthorisedResult];
-  let content = <FetchErrorState entityName="feeds" />;
-  if (feedsResult.ok && feedsResult.value.length === 0) {
-    content = (
-      <EmptyState
-        actionSlot={
-          canManage && !hasActiveFilters ? (
-            <Button asChild>
-              <Link href={withOrg("/feeds/new", orgQueryValue)}>
-                Create feed
-              </Link>
-            </Button>
-          ) : null
-        }
-        description={
-          hasActiveFilters
-            ? "Clear or change the current filters to see other calendar feeds."
-            : "New organisations normally start with a default all-staff feed. No feed is currently available for this organisation."
-        }
-        title={
-          hasActiveFilters ? "No feeds match these filters" : "No feeds yet"
-        }
-      />
+    : [null, null];
+
+  const hasLoadError = !feedsResult?.ok;
+  const { others, ownPausedFeed, recommended } = recommendFeed(
+    feedsResult?.ok ? feedsResult.value : []
+  );
+  const eligibility = eligibilityResult?.ok ? eligibilityResult.value : null;
+  const canCreatePersonal = Boolean(
+    eligibility?.personId && !eligibility.personalFeedId
+  );
+  const canCreateTeam = Boolean(
+    eligibility?.personId &&
+      eligibility.hasDirectReports &&
+      !eligibility.teamFeedId
+  );
+
+  const notices: ReactNode[] = [];
+  if (eligibility && !eligibility.personId) {
+    notices.push(
+      <Notice icon={<UserRoundXIcon />} key="unlinked">
+        Your account is not linked to a person yet, so you cannot create your
+        own calendar feed. Ask an administrator to link it.
+      </Notice>
     );
-  } else if (feedsResult.ok) {
-    content = (
-      <FeedTable
-        canManage={canManage}
-        feeds={feedsResult.value}
-        organisationId={organisationId}
-        orgQueryValue={orgQueryValue}
-      />
+  }
+  if (ownPausedFeed) {
+    notices.push(
+      <Notice icon={<PauseIcon />} key="paused">
+        {ownPausedFeed.name} is paused and not updating.{" "}
+        <Link
+          className="font-medium text-foreground underline underline-offset-4 hover:decoration-2"
+          href={withOrg(`/feeds/${ownPausedFeed.id}`, orgQueryValue)}
+        >
+          Open feed
+        </Link>
+      </Notice>
+    );
+  }
+  if (!(hasLoadError || recommended || canCreatePersonal || canCreateTeam)) {
+    notices.push(
+      <Notice key="ask-admin">Ask an administrator to set one up.</Notice>
     );
   }
 
   return (
     <>
       <Header organisationId={organisationId} page="Feeds" />
-      <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
-        <section className="flex flex-col justify-between gap-4 rounded-2xl bg-muted p-6 lg:flex-row lg:items-end">
+      <div className="flex flex-1 flex-col gap-8 p-6 pt-0">
+        <section className="flex flex-col justify-between gap-3 rounded-xl bg-surface-container-low p-6 sm:flex-row sm:items-end">
           <div>
             <h1 className="font-semibold text-foreground text-headline-md">
-              Feeds
+              Calendar feeds
             </h1>
             <p className="mt-2 max-w-2xl text-body-sm text-muted-foreground">
-              Publish approved availability to subscribed calendars. Each feed
-              has a subscribe URL you can view and copy whenever you need it.
+              Add Team Calendar to the calendar app you already use. Feeds
+              update automatically.
             </p>
           </div>
-          {canManage ? (
-            <Button asChild>
-              <Link href={withOrg("/feeds/new", orgQueryValue)}>New feed</Link>
-            </Button>
+          {isAdmin ? (
+            <Link
+              className="font-medium text-foreground text-label-lg underline underline-offset-4 hover:decoration-2"
+              href={withOrg("/settings/feeds", orgQueryValue)}
+            >
+              Manage all feeds
+            </Link>
           ) : null}
         </section>
 
-        <SubscribeInstructions
-          feeds={
-            subscriptionFeedsResult.ok
-              ? subscriptionFeedsResult.value.flatMap((feed) =>
-                  feed.subscribeUrl
-                    ? [
-                        {
-                          id: feed.id,
-                          name: feed.name,
-                          subscribeUrl: feed.subscribeUrl,
-                        },
-                      ]
-                    : []
-                )
-              : []
-          }
-          hasLoadError={!subscriptionFeedsResult.ok}
-        />
-
-        <FeedFilterBar
-          privacyMode={filters.privacyMode ?? []}
-          search={filters.search ?? ""}
-          status={filters.status}
-        />
-
-        {content}
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+          <YourCalendar
+            actions={
+              hasLoadError || !(canCreatePersonal || canCreateTeam) ? null : (
+                <OwnFeedActions
+                  canCreatePersonal={canCreatePersonal}
+                  canCreateTeam={canCreateTeam}
+                  organisationId={organisationId}
+                />
+              )
+            }
+            feed={recommended}
+            hasLoadError={hasLoadError}
+            notice={notices.length > 0 ? notices : null}
+          />
+          <OtherFeedsList feeds={others} orgQueryValue={orgQueryValue} />
+        </div>
       </div>
     </>
   );
 };
+
+function Notice({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+  return (
+    <p className="flex items-start gap-2 text-body-sm text-muted-foreground [&>svg]:mt-0.5 [&>svg]:size-4 [&>svg]:shrink-0">
+      {icon}
+      <span>{children}</span>
+    </p>
+  );
+}
 
 export default FeedPage;

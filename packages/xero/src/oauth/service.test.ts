@@ -77,6 +77,7 @@ const {
   isLocalApplicationPath,
   isPreviewDeployment,
   purgeClosedXeroOAuthSessions,
+  readOAuthStateReturnTo,
 } = await import("./service");
 const { resolveXeroAccess } = await import("./authorisation");
 const ORIGINAL_ENV = { ...process.env };
@@ -335,6 +336,31 @@ describe("buildXeroOAuthStartUrl", () => {
         "/settings/integrations/xero"
       );
     }
+  });
+
+  it("reads the return path only from a correctly signed state", async () => {
+    const result = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      organisationId: "payroll_1",
+      returnTo: "/onboarding",
+      userId: "user_1",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const state =
+      new URL(result.value.redirectUrl).searchParams.get("state") ?? "";
+    expect(readOAuthStateReturnTo(state)).toBe("/onboarding");
+    const [encoded, signature] = state.split(".");
+    const forged = `${Buffer.from(
+      JSON.stringify({
+        ...JSON.parse(Buffer.from(encoded ?? "", "base64url").toString()),
+        returnTo: "/settings/billing",
+      })
+    ).toString("base64url")}.${signature}`;
+    expect(readOAuthStateReturnTo(forged)).toBeNull();
+    expect(readOAuthStateReturnTo("not-a-state")).toBeNull();
   });
 
   it("preserves a valid local return path with a query and fragment", async () => {

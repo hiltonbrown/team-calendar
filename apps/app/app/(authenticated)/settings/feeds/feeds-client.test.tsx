@@ -46,14 +46,7 @@ describe("FeedsClient", () => {
       ok: true,
       value: { updated: true },
     });
-    render(
-      <FeedsClient
-        feeds={[]}
-        organisationId={organisationId}
-        orgQueryValue={organisationId}
-        settings={settings}
-      />
-    );
+    render(<FeedsClient organisationId={organisationId} settings={settings} />);
 
     expect(screen.getByRole("radio", { name: "Named" })).toBeDefined();
     expect(screen.getByRole("radio", { name: "Masked" })).toBeDefined();
@@ -83,14 +76,7 @@ describe("FeedsClient", () => {
       error: { code: "unknown_error", message: "Source unavailable" },
       ok: false,
     });
-    render(
-      <FeedsClient
-        feeds={[]}
-        organisationId={organisationId}
-        orgQueryValue={organisationId}
-        settings={settings}
-      />
-    );
+    render(<FeedsClient organisationId={organisationId} settings={settings} />);
 
     fireEvent.click(
       screen.getByRole("switch", {

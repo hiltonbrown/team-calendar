@@ -83,6 +83,13 @@ export type DecimalNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedDecimalNullableFilter<$PrismaModel> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
+export type Enumonboarding_stepFilter<$PrismaModel = never> = {
+  equals?: $Enums.onboarding_step | Prisma.Enumonboarding_stepFieldRefInput<$PrismaModel>
+  in?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  notIn?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumonboarding_stepFilter<$PrismaModel> | $Enums.onboarding_step
+}
+
 export type DateTimeNullableFilter<$PrismaModel = never> = {
   equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
   in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -199,6 +206,16 @@ export type DecimalNullableWithAggregatesFilter<$PrismaModel = never> = {
   _sum?: Prisma.NestedDecimalNullableFilter<$PrismaModel>
   _min?: Prisma.NestedDecimalNullableFilter<$PrismaModel>
   _max?: Prisma.NestedDecimalNullableFilter<$PrismaModel>
+}
+
+export type Enumonboarding_stepWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.onboarding_step | Prisma.Enumonboarding_stepFieldRefInput<$PrismaModel>
+  in?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  notIn?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumonboarding_stepWithAggregatesFilter<$PrismaModel> | $Enums.onboarding_step
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumonboarding_stepFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumonboarding_stepFilter<$PrismaModel>
 }
 
 export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -1090,6 +1107,13 @@ export type NestedDecimalNullableFilter<$PrismaModel = never> = {
   not?: Prisma.NestedDecimalNullableFilter<$PrismaModel> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
 }
 
+export type NestedEnumonboarding_stepFilter<$PrismaModel = never> = {
+  equals?: $Enums.onboarding_step | Prisma.Enumonboarding_stepFieldRefInput<$PrismaModel>
+  in?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  notIn?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumonboarding_stepFilter<$PrismaModel> | $Enums.onboarding_step
+}
+
 export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
   equals?: Date | string | Prisma.DateTimeFieldRefInput<$PrismaModel> | null
   in?: Date[] | string[] | Prisma.ListDateTimeFieldRefInput<$PrismaModel> | null
@@ -1220,6 +1244,16 @@ export type NestedDecimalNullableWithAggregatesFilter<$PrismaModel = never> = {
   _sum?: Prisma.NestedDecimalNullableFilter<$PrismaModel>
   _min?: Prisma.NestedDecimalNullableFilter<$PrismaModel>
   _max?: Prisma.NestedDecimalNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumonboarding_stepWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.onboarding_step | Prisma.Enumonboarding_stepFieldRefInput<$PrismaModel>
+  in?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  notIn?: $Enums.onboarding_step[] | Prisma.ListEnumonboarding_stepFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumonboarding_stepWithAggregatesFilter<$PrismaModel> | $Enums.onboarding_step
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumonboarding_stepFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumonboarding_stepFilter<$PrismaModel>
 }
 
 export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {

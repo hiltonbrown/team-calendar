@@ -1,11 +1,11 @@
 "use server";
 
-import { auth, withinLimit } from "@repo/auth/server";
+import { auth } from "@repo/auth/server";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, lockPlanLimitMutations } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { createManualPerson } from "@/lib/server/create-manual-person";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const CreatePersonSchema = z.object({
@@ -48,46 +48,17 @@ export async function createManualPersonAction(input: {
   }
 
   const { clerkOrgId, organisationId } = contextResult.value;
-
-  try {
-    const result = await database.$transaction(async (tx) => {
-      await lockPlanLimitMutations(tx, clerkOrgId);
-      const entitlement = await withinLimit(
-        clerkOrgId,
-        organisationId,
-        "seats",
-        tx
-      );
-      if (!entitlement.ok) {
-        return unknownError(entitlement.error.message);
-      }
-      if (!entitlement.value.allowed) {
-        return validationError(
-          "Your current plan has reached its active people limit."
-        );
-      }
-
-      await tx.person.create({
-        data: {
-          clerk_org_id: clerkOrgId as ClerkOrgId,
-          email: parsed.data.email.toLowerCase(),
-          employment_type: parsed.data.employmentType,
-          first_name: parsed.data.firstName,
-          job_title: parsed.data.jobTitle ?? null,
-          last_name: parsed.data.lastName,
-          organisation_id: organisationId as OrganisationId,
-          source_system: "MANUAL",
-        },
-        select: { id: true },
-      });
-      return creationAllowed();
-    });
-
-    if (!result.ok) {
-      return result;
-    }
-  } catch {
-    return unknownError("Failed to create person. Please try again.");
+  const created = await createManualPerson({
+    clerkOrgId: clerkOrgId as ClerkOrgId,
+    email: parsed.data.email,
+    employmentType: parsed.data.employmentType,
+    firstName: parsed.data.firstName,
+    jobTitle: parsed.data.jobTitle,
+    lastName: parsed.data.lastName,
+    organisationId: organisationId as OrganisationId,
+  });
+  if (!created.ok) {
+    return { error: created.error, ok: false };
   }
 
   revalidatePath("/people");
@@ -104,10 +75,6 @@ function notAuthorised(): ActionResult<never> {
   };
 }
 
-function unknownError(message: string): ActionResult<never> {
-  return { error: { code: "unknown_error", message }, ok: false };
-}
-
 function validationError(message?: string): ActionResult<never> {
   return {
     error: {
@@ -116,8 +83,4 @@ function validationError(message?: string): ActionResult<never> {
     },
     ok: false,
   };
-}
-
-function creationAllowed(): { ok: true } {
-  return { ok: true };
 }
