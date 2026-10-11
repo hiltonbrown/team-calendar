@@ -12,6 +12,7 @@ const fixture = allocateLiveTestFixture(
   "packages/feeds/index.integration.test.ts"
 );
 const {
+  createSignedFeedToken,
   materialiseAvailabilityPublication,
   archiveFeed,
   restoreFeed,
@@ -159,6 +160,144 @@ describe("feed services", () => {
       })
     ).resolves.toBe(0);
     await database.$disconnect();
+  });
+
+  test("renders owned companies in one account feed with distinct Xero identities and no private data", async () => {
+    const secondOrganisationId = fixture.tenants[2]?.organisationId;
+    if (!secondOrganisationId) {
+      throw new Error("Second company fixture missing");
+    }
+    await createTenant({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: secondOrganisationId,
+    });
+    const first = await seedRepresentationRecord();
+    const second = await seedRepresentationRecord({
+      clerk_org_id: tenant.clerkOrgId,
+      organisation_id: secondOrganisationId,
+    });
+    const foreign = await seedRepresentationRecord({
+      clerk_org_id: otherTenant.clerkOrgId,
+      organisation_id: otherTenant.organisationId,
+    });
+    const { deriveAvailabilityUidKey } = await import(
+      "../availability/src/sync/availability-uid"
+    );
+    for (const record of [first, second, foreign]) {
+      await database.availabilityRecord.update({
+        data: {
+          derived_uid_key: deriveAvailabilityUidKey({
+            clerkOrgId: record.scope.clerk_org_id,
+            endsAt: record.startsAt,
+            organisationId: record.scope.organisation_id,
+            personId: record.personId,
+            recordType: "wfh",
+            sourceType: "xero_leave",
+            stableSourceKey: "identical-xero-leave",
+            startsAt: record.startsAt,
+          }),
+          notes_internal: "private payroll note",
+          source_payload_json: { Salary: "private salary" },
+          source_remote_id: "identical-xero-leave",
+          source_type: "xero_leave",
+          title: null,
+        },
+        where: { id: record.recordId },
+      });
+    }
+    const created = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    if (!(created.ok && created.value.token)) {
+      throw new Error("Account default creation failed");
+    }
+    const rendered = await renderFeedForToken(created.value.token.plaintext);
+    if (!rendered.ok) {
+      throw new Error(rendered.error.message);
+    }
+    expect(rendered.value.status).toBe("active");
+    expect(rendered.value.body.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    const uidLines = rendered.value.body.match(/^UID:.+$/gm) ?? [];
+    expect(new Set(uidLines).size).toBe(2);
+    expect(rendered.value.body).not.toContain("private payroll note");
+    expect(rendered.value.body).not.toContain("private salary");
+    const ledger = await database.feedEventPublication.findMany({
+      where: { feed_id: created.value.feedId },
+    });
+    expect(ledger.map((row) => row.source_key).sort()).toEqual(
+      [
+        `availability:${first.recordId}`,
+        `availability:${second.recordId}`,
+      ].sort()
+    );
+    await expect(
+      revokeToken({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: tenant.clerkOrgId,
+        organisationId: null,
+        tokenId: created.value.token.tokenId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      renderFeedForToken(created.value.token.plaintext)
+    ).resolves.toMatchObject({
+      ok: true,
+      value: { body: "", status: "revoked" },
+    });
+  });
+
+  test("does not mistake a personal account feed for the marked default feed", async () => {
+    const person = await seedLinkedPerson({ firstName: "Default" });
+    const personal = await createOwnFeed(
+      ownFeedRequest(person.userId, "personal")
+    );
+    if (!personal.ok) {
+      throw new Error(personal.error.message);
+    }
+    const created = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    if (!created.ok) {
+      throw new Error(created.error.message);
+    }
+    expect(created.value.created).toBe(true);
+    expect(created.value.feedId).not.toBe(personal.value.feedId);
+  });
+
+  test("replaces account feed scopes and revokes its active token when archived from a company", async () => {
+    const created = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    if (!(created.ok && created.value.token)) {
+      throw new Error("Default feed missing");
+    }
+    const command = {
+      actingRole: "org:admin",
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      feedId: created.value.feedId,
+      organisationId: tenant.organisationId,
+    };
+    await expect(
+      updateFeed({
+        ...command,
+        patch: { scopes: [{ scopeType: "org", scopeValue: null }] },
+      })
+    ).resolves.toMatchObject({ ok: true });
+    const scopes = await database.feedScope.findMany({
+      where: { feed_id: created.value.feedId },
+    });
+    expect(scopes).toHaveLength(1);
+    expect(scopes[0]?.organisation_id).toBeNull();
+    await expect(archiveFeed(command)).resolves.toMatchObject({ ok: true });
+    const token = await database.feedToken.findUniqueOrThrow({
+      where: { id: created.value.token.tokenId },
+    });
+    expect(token.status).toBe("revoked");
   });
 
   test("keeps current event bytes stable and versions missed canonical edits per feed", async () => {
@@ -636,7 +775,7 @@ describe("feed services", () => {
       clerk_org_id: tenant.clerkOrgId,
       includes_public_holidays: false,
       name: "All staff",
-      organisation_id: tenant.organisationId,
+      organisation_id: null,
       privacy_mode: "named",
       slug: "all-staff",
       status: "active",
@@ -648,7 +787,7 @@ describe("feed services", () => {
     expect(scopes).toHaveLength(1);
     expect(scopes[0]).toMatchObject({
       clerk_org_id: tenant.clerkOrgId,
-      organisation_id: tenant.organisationId,
+      organisation_id: null,
       scope_type: "org",
       scope_value: null,
     });
@@ -659,7 +798,7 @@ describe("feed services", () => {
     expect(tokens).toHaveLength(1);
     expect(tokens[0]).toMatchObject({
       clerk_org_id: tenant.clerkOrgId,
-      organisation_id: tenant.organisationId,
+      organisation_id: null,
       status: "active",
     });
     expect(tokens[0]?.token_hash).not.toBe(result.value.token?.plaintext);
@@ -688,7 +827,7 @@ describe("feed services", () => {
       database.feed.count({
         where: {
           clerk_org_id: tenant.clerkOrgId,
-          organisation_id: tenant.organisationId,
+          organisation_id: null,
         },
       })
     ).resolves.toBe(1);
@@ -696,7 +835,7 @@ describe("feed services", () => {
       database.feedScope.count({
         where: {
           clerk_org_id: tenant.clerkOrgId,
-          organisation_id: tenant.organisationId,
+          organisation_id: null,
         },
       })
     ).resolves.toBe(1);
@@ -704,7 +843,7 @@ describe("feed services", () => {
       database.feedToken.count({
         where: {
           clerk_org_id: tenant.clerkOrgId,
-          organisation_id: tenant.organisationId,
+          organisation_id: null,
         },
       })
     ).resolves.toBe(1);
@@ -730,7 +869,7 @@ describe("feed services", () => {
       database.feed.count({
         where: {
           clerk_org_id: tenant.clerkOrgId,
-          organisation_id: tenant.organisationId,
+          organisation_id: null,
         },
       })
     ).resolves.toBe(1);
@@ -817,7 +956,7 @@ describe("feed services", () => {
     ).resolves.toBe(2);
   }, 20_000);
 
-  test("suffixes default feed slugs across organisations in one Clerk org", async () => {
+  test("keeps one account default feed and exactly the existing token when another company is added", async () => {
     const secondOrganisationId = fixture.tenants[2]?.organisationId as string;
     await createTenant({
       clerkOrgId: tenant.clerkOrgId,
@@ -844,10 +983,22 @@ describe("feed services", () => {
       select: { organisation_id: true, slug: true },
       where: { clerk_org_id: tenant.clerkOrgId },
     });
-    expect(feeds).toEqual([
-      { organisation_id: tenant.organisationId, slug: "all-staff" },
-      { organisation_id: secondOrganisationId, slug: "all-staff-2" },
-    ]);
+    expect(feeds).toEqual([{ organisation_id: null, slug: "all-staff" }]);
+    expect(second.value).toEqual({
+      created: false,
+      feedId: first.value.feedId,
+    });
+    const tokens = await database.feedToken.findMany({
+      where: { feed_id: first.value.feedId },
+    });
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]?.organisation_id).toBeNull();
+    expect(first.value.token?.plaintext).toBe(
+      createSignedFeedToken({
+        tokenHash: tokens[0].token_hash,
+        tokenId: tokens[0].id,
+      })
+    );
   });
 
   test("does not recreate a default feed after an admin archived one", async () => {
@@ -864,6 +1015,16 @@ describe("feed services", () => {
       select: { id: true },
     });
 
+    await database.auditEvent.create({
+      data: {
+        action: "feeds.created",
+        clerk_org_id: tenant.clerkOrgId,
+        organisation_id: tenant.organisationId,
+        payload: { defaultFeed: true },
+        resource_id: archived.id,
+        resource_type: "feed",
+      },
+    });
     const result = await ensureDefaultCalendarFeed({
       clerkOrgId: tenant.clerkOrgId,
       organisationId: tenant.organisationId,
@@ -1080,7 +1241,7 @@ describe("feed services", () => {
     ]);
     const feed = await database.feed.findFirstOrThrow({
       include: { scopes: true, tokens: true },
-      where: { ...tenantScope(), id: first.value.feedId },
+      where: { clerk_org_id: tenant.clerkOrgId, id: first.value.feedId },
     });
     expect(feed).toMatchObject({
       created_by_user_id: employee.userId,
@@ -1142,6 +1303,74 @@ describe("feed services", () => {
     });
   });
 
+  test("creates one manager feed covering linked manager people and reports in two companies", async () => {
+    const companyB = fixture.tenants[2]?.organisationId;
+    if (!companyB) {
+      throw new Error("Second company missing");
+    }
+    await createTenant({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: companyB,
+    });
+    const managerA = await seedLinkedPerson({ firstName: "Multi" });
+    const managerB = await database.person.create({
+      data: {
+        clerk_org_id: tenant.clerkOrgId,
+        clerk_user_id: managerA.userId,
+        email: "manager-b@example.test",
+        employment_type: "employee",
+        first_name: "Multi",
+        last_name: "Manager",
+        organisation_id: companyB,
+        source_system: "MANUAL",
+      },
+    });
+    const reportA = await seedRepresentationRecord();
+    const reportB = await seedRepresentationRecord({
+      clerk_org_id: tenant.clerkOrgId,
+      organisation_id: companyB,
+    });
+    await database.person.update({
+      data: { manager_person_id: managerA.id },
+      where: { id: reportA.personId },
+    });
+    await database.person.update({
+      data: { manager_person_id: managerB.id },
+      where: { id: reportB.personId },
+    });
+    const created = await createOwnFeed(
+      ownFeedRequest(managerA.userId, "team")
+    );
+    if (!created.ok) {
+      throw new Error(created.error.message);
+    }
+    const feed = await database.feed.findUniqueOrThrow({
+      include: { tokens: true },
+      where: { id: created.value.feedId },
+    });
+    expect(feed.organisation_id).toBeNull();
+    const token = feed.tokens.find((row) => row.status === "active");
+    if (!token) {
+      throw new Error("Team token missing");
+    }
+    const rendered = await renderFeedForToken(
+      createSignedFeedToken({ tokenHash: token.token_hash, tokenId: token.id })
+    );
+    if (!rendered.ok) {
+      throw new Error(rendered.error.message);
+    }
+    expect(rendered.value.body.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    await expect(
+      createOwnFeed({
+        ...ownFeedRequest(managerA.userId, "team"),
+        organisationId: companyB,
+      })
+    ).resolves.toEqual({
+      ok: true,
+      value: { created: false, feedId: feed.id },
+    });
+  });
+
   test("creates a team feed for a manager with direct reports", async () => {
     const manager = await seedLinkedPerson({ firstName: "Dan" });
     await seedLinkedPerson({ firstName: "Eve", managerPersonId: manager.id });
@@ -1163,7 +1392,10 @@ describe("feed services", () => {
     expect(created).toMatchObject({ ok: true, value: { created: true } });
     const feed = await database.feed.findFirstOrThrow({
       include: { scopes: true },
-      where: { ...tenantScope(), id: created.ok ? created.value.feedId : "" },
+      where: {
+        clerk_org_id: tenant.clerkOrgId,
+        id: created.ok ? created.value.feedId : "",
+      },
     });
     expect(feed.name).toBe("Dan's team");
     expect(feed.scopes.map((scope) => scope.scope_type)).toEqual([
@@ -1338,7 +1570,10 @@ describe("feed services", () => {
     const fetchedAt = new Date("2026-09-01T00:00:00.000Z");
     await database.feedToken.updateMany({
       data: { last_used_at: fetchedAt },
-      where: { ...tenantScope(), feed_id: personal.value.feedId },
+      where: {
+        clerk_org_id: tenant.clerkOrgId,
+        feed_id: personal.value.feedId,
+      },
     });
 
     const all = await listFeeds({
@@ -1441,11 +1676,12 @@ async function seedLinkedPerson(input: {
   return { id: person.id, userId };
 }
 
-async function seedRepresentationRecord() {
-  const scope = {
+async function seedRepresentationRecord(
+  scope = {
     clerk_org_id: tenant.clerkOrgId,
     organisation_id: tenant.organisationId,
-  };
+  }
+) {
   const startsAt = new Date();
   startsAt.setUTCHours(0, 0, 0, 0);
   startsAt.setUTCDate(startsAt.getUTCDate() + 2);
@@ -1567,6 +1803,9 @@ async function cleanTestData() {
     feedIds: feeds.map((feed) => feed.id),
   });
 
+  await database.notification.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
   await database.clerkOrgSubscription.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });

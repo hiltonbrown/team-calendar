@@ -8,7 +8,11 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { Result } from "@repo/core";
-import { tenantDatabase, tenantTransaction } from "@repo/database";
+import {
+  resolveAccountCompanies,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { z } from "zod";
 import { invalidateFeedCache } from "../cache/feed-cache";
@@ -57,7 +61,7 @@ const BaseTokenInputSchema = z.object({
   actingUserId: z.string().min(1),
   clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().nullable(),
 });
 
 const InitialTokenInputSchema = BaseTokenInputSchema;
@@ -68,7 +72,7 @@ const RevokeTokenInputSchema = z.object({
   actingRole: z.string().min(1),
   actingUserId: z.string().min(1),
   clerkOrgId: z.string().min(1),
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().nullable(),
   tokenId: z.string().uuid(),
 });
 
@@ -147,7 +151,7 @@ export async function createInitialTokenWithClient(
   input: InitialTokenInput
 ): Promise<Result<TokenDisclosure, TokenServiceError>> {
   const feed = await tx.feed.findFirst({
-    select: { id: true },
+    select: { id: true, organisation_id: true },
     where: scopedFeed(input),
   });
   if (!feed) {
@@ -180,7 +184,7 @@ export async function createInitialTokenWithClient(
     clerkOrgId: input.clerkOrgId,
     feedId: input.feedId,
     hint,
-    organisationId: input.organisationId,
+    organisationId: feed.organisation_id,
     rotatedFromTokenId: null,
     tokenHash,
     tokenId,
@@ -219,7 +223,7 @@ export async function issueToken(
     return await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       await lockFeedForTokenChange(tx, parsed.data);
       const feed = await tx.feed.findFirst({
-        select: { id: true },
+        select: { id: true, organisation_id: true },
         where: {
           ...scopedFeed(parsed.data),
           archived_at: null,
@@ -237,7 +241,7 @@ export async function issueToken(
         clerkOrgId: parsed.data.clerkOrgId,
         feedId: parsed.data.feedId,
         hint,
-        organisationId: parsed.data.organisationId,
+        organisationId: feed.organisation_id,
         rotatedFromTokenId: null,
         tokenHash,
         tokenId,
@@ -278,6 +282,7 @@ export async function rotateToken(
           select: {
             created_by_user_id: true,
             id: true,
+            organisation_id: true,
             scopes: { select: { scope_type: true } },
           },
           where: {
@@ -313,7 +318,14 @@ export async function rotateToken(
           where: {
             clerk_org_id: parsed.data.clerkOrgId,
             feed_id: parsed.data.feedId,
-            organisation_id: parsed.data.organisationId,
+            ...(parsed.data.organisationId === null
+              ? { organisation_id: null }
+              : {
+                  OR: [
+                    { organisation_id: parsed.data.organisationId },
+                    { organisation_id: null },
+                  ],
+                }),
             status: "active",
           },
         });
@@ -333,7 +345,14 @@ export async function rotateToken(
           where: {
             clerk_org_id: parsed.data.clerkOrgId,
             feed_id: parsed.data.feedId,
-            organisation_id: parsed.data.organisationId,
+            ...(parsed.data.organisationId === null
+              ? { organisation_id: null }
+              : {
+                  OR: [
+                    { organisation_id: parsed.data.organisationId },
+                    { organisation_id: null },
+                  ],
+                }),
             status: "active",
           },
         });
@@ -346,7 +365,7 @@ export async function rotateToken(
           clerkOrgId: parsed.data.clerkOrgId,
           feedId: parsed.data.feedId,
           hint,
-          organisationId: parsed.data.organisationId,
+          organisationId: feed.organisation_id,
           rotatedFromTokenId: previousToken.id,
           tokenHash,
           tokenId,
@@ -396,7 +415,7 @@ async function lockFeedForTokenChange(
     SELECT "id" FROM "feeds"
     WHERE "id" = ${input.feedId}::uuid
       AND "clerk_org_id" = ${input.clerkOrgId}
-      AND "organisation_id" = ${input.organisationId}::uuid
+      AND ("organisation_id" IS NOT DISTINCT FROM ${input.organisationId}::uuid OR "organisation_id" IS NULL)
     FOR UPDATE
   `;
 }
@@ -407,7 +426,7 @@ async function insertActiveToken(
     clerkOrgId: string;
     feedId: string;
     hint: string;
-    organisationId: string;
+    organisationId: string | null;
     rotatedFromTokenId: string | null;
     tokenHash: string;
     tokenId: string;
@@ -475,7 +494,14 @@ export async function revokeToken(
           where: {
             clerk_org_id: parsed.data.clerkOrgId,
             id: parsed.data.tokenId,
-            organisation_id: parsed.data.organisationId,
+            ...(parsed.data.organisationId === null
+              ? { organisation_id: null }
+              : {
+                  OR: [
+                    { organisation_id: parsed.data.organisationId },
+                    { organisation_id: null },
+                  ],
+                }),
           },
         });
         if (!token) {
@@ -517,7 +543,7 @@ export async function revokeToken(
 
 export async function revokeAllFeedTokens(input: {
   clerkOrgId: string;
-  organisationId: string;
+  organisationId: string | null;
 }): Promise<Result<{ revokedCount: number }, TokenServiceError>> {
   try {
     const result = await tenantDatabase(input.clerkOrgId).feedToken.updateMany({
@@ -558,19 +584,29 @@ function tokenNotFound(): Result<never, TokenServiceError> {
   };
 }
 
-function auditToken(
+async function auditToken(
   tx: Prisma.TransactionClient,
-  input: { actingUserId: string; clerkOrgId: string; organisationId: string },
+  input: {
+    actingUserId: string;
+    clerkOrgId: string;
+    organisationId: string | null;
+  },
   action: string,
   tokenId: string,
   payload: Record<string, string | number | boolean | null>
 ) {
+  const organisationId =
+    input.organisationId ??
+    (await resolveAccountCompanies(input.clerkOrgId, tx))[0]?.id;
+  if (!organisationId) {
+    throw new Error("Feed audit requires an active owned company.");
+  }
   return tx.auditEvent.create({
     data: {
       action,
       actor_user_id: input.actingUserId,
       clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
+      organisation_id: organisationId,
       payload,
       resource_id: tokenId,
       resource_type: "feed_token",

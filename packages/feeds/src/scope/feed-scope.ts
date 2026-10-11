@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { resolveAccountCompanies, tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type { feed_scope_rule_type } from "@repo/database/generated/enums";
 import { z } from "zod";
@@ -46,6 +46,7 @@ export interface ScopedFeedPerson {
   } | null;
   locationId: string | null;
   managerPersonId: string | null;
+  organisationId: string;
   team: { id: string; name: string } | null;
   teamId: string | null;
 }
@@ -91,7 +92,7 @@ export const FeedScopesSchema = z.array(FeedScopeSchema).min(1);
 
 export async function validateScopes(input: {
   clerkOrgId: string;
-  organisationId: string;
+  organisationId: string | null;
   scopes: FeedScopeInput[];
 }): Promise<Result<FeedScopeInput[], FeedScopeError>> {
   const parsed = FeedScopesSchema.safeParse(input.scopes);
@@ -111,7 +112,7 @@ export async function validateScopes(input: {
           where: {
             clerk_org_id: input.clerkOrgId,
             id: scopeValue,
-            organisation_id: input.organisationId,
+            organisation_id: await companyWhere(input),
           },
         });
         if (!team) {
@@ -129,7 +130,7 @@ export async function validateScopes(input: {
             archived_at: null,
             clerk_org_id: input.clerkOrgId,
             id: scopeValue,
-            organisation_id: input.organisationId,
+            organisation_id: await companyWhere(input),
           },
         });
         if (!person) {
@@ -148,22 +149,38 @@ export async function resolvePeopleForFeed(input: {
   client?: Prisma.TransactionClient;
   clerkOrgId: string;
   createdByUserId?: string | null;
-  organisationId: string;
+  organisationId: string | null;
   preloaded?: FeedScopeData;
+  companyIds?: string[];
   scopes: FeedScopeInput[];
 }): Promise<Result<ScopedFeedPerson[], FeedScopeError>> {
   try {
-    const people =
+    const companyIds =
+      input.organisationId === null
+        ? (input.companyIds ??
+          (await resolveAccountCompanies(input.clerkOrgId, input.client)).map(
+            (company) => company.id
+          ))
+        : [input.organisationId];
+    const candidates =
       input.preloaded?.people.filter((person) => person.is_active) ??
       (await (input.client ?? tenantDatabase(input.clerkOrgId)).person.findMany(
         {
           orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
           select: personSelect,
-          where: peopleWhereForFeedScope(input),
+          where: peopleWhereForFeedScope(input, companyIds),
         }
       ));
 
-    const dynamicPerson = resolveDynamicPersonId({
+    const people =
+      input.organisationId === null
+        ? candidates.filter(
+            (person) =>
+              person.clerk_org_id === input.clerkOrgId &&
+              companyIds.includes(person.organisation_id)
+          )
+        : candidates;
+    const dynamicPeople = resolveDynamicPersonIds({
       actingPersonId: input.actingPersonId ?? null,
       clerkOrgId: input.clerkOrgId,
       createdByUserId: input.createdByUserId ?? null,
@@ -173,7 +190,7 @@ export async function resolvePeopleForFeed(input: {
 
     const selected = new Map<string, ScopedFeedPerson>();
     for (const scope of input.scopes) {
-      const scopedPeople = peopleForScope(scope, people, dynamicPerson);
+      const scopedPeople = peopleForScope(scope, people, dynamicPeople);
       for (const person of scopedPeople) {
         selected.set(person.id, toScopedPerson(person));
       }
@@ -194,7 +211,7 @@ export async function resolvePeopleForFeed(input: {
 
 export async function loadFeedScopeData(input: {
   clerkOrgId: string;
-  organisationId: string;
+  organisationId: string | null;
 }): Promise<Result<FeedScopeData, FeedScopeError>> {
   try {
     const [people, teams] = await Promise.all([
@@ -204,14 +221,14 @@ export async function loadFeedScopeData(input: {
         where: {
           archived_at: null,
           clerk_org_id: input.clerkOrgId,
-          organisation_id: input.organisationId,
+          organisation_id: await companyWhere(input),
         },
       }),
       tenantDatabase(input.clerkOrgId).team.findMany({
         select: { id: true, name: true },
         where: {
           clerk_org_id: input.clerkOrgId,
-          organisation_id: input.organisationId,
+          organisation_id: await companyWhere(input),
         },
       }),
     ]);
@@ -224,7 +241,7 @@ export async function loadFeedScopeData(input: {
 
 export async function resolveScopeRows(input: {
   clerkOrgId: string;
-  organisationId: string;
+  organisationId: string | null;
   preloaded?: FeedScopeData;
   scopes: Array<{
     id: string;
@@ -240,7 +257,7 @@ export async function resolveScopeRows(input: {
             select: { id: true, name: true },
             where: {
               clerk_org_id: input.clerkOrgId,
-              organisation_id: input.organisationId,
+              organisation_id: await companyWhere(input),
             },
           }),
           tenantDatabase(input.clerkOrgId).person.findMany({
@@ -248,7 +265,7 @@ export async function resolveScopeRows(input: {
             where: {
               archived_at: null,
               clerk_org_id: input.clerkOrgId,
-              organisation_id: input.organisationId,
+              organisation_id: await companyWhere(input),
             },
           }),
         ]);
@@ -279,7 +296,7 @@ export async function canViewFeed(input: {
   actingPersonId?: string | null;
   clerkOrgId: string;
   createdByUserId?: string | null;
-  organisationId: string;
+  organisationId: string | null;
   preloaded?: FeedScopeData;
   role: FeedRole;
   scopes: FeedScopeInput[];
@@ -375,7 +392,7 @@ export function normaliseRole(role: string | null | undefined): FeedRole {
 
 export async function findActingPersonId(input: {
   clerkOrgId: string;
-  organisationId: string;
+  organisationId: string | null;
   userId: string;
 }): Promise<string | null> {
   const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
@@ -384,7 +401,7 @@ export async function findActingPersonId(input: {
       archived_at: null,
       clerk_org_id: input.clerkOrgId,
       clerk_user_id: input.userId,
-      organisation_id: input.organisationId,
+      organisation_id: await companyWhere(input),
     },
   });
   return person?.id ?? null;
@@ -392,7 +409,7 @@ export async function findActingPersonId(input: {
 
 export function createScopeRows(input: {
   clerkOrgId: string;
-  organisationId: string;
+  organisationId: string | null;
   scopes: FeedScopeInput[];
 }) {
   return input.scopes.map((scope) => ({
@@ -419,16 +436,19 @@ function dedupeScopes(scopes: FeedScopeInput[]): FeedScopeInput[] {
   return result;
 }
 
-function peopleWhereForFeedScope(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  scopes: FeedScopeInput[];
-}): Prisma.PersonWhereInput {
+function peopleWhereForFeedScope(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+    scopes: FeedScopeInput[];
+  },
+  companyIds: string[]
+): Prisma.PersonWhereInput {
   const where: Prisma.PersonWhereInput = {
     archived_at: null,
     clerk_org_id: input.clerkOrgId,
     is_active: true,
-    organisation_id: input.organisationId,
+    organisation_id: input.organisationId ?? { in: companyIds },
   };
   const scopes = dedupeScopes(input.scopes);
 
@@ -470,28 +490,28 @@ function peopleWhereForFeedScope(input: {
   };
 }
 
-function resolveDynamicPersonId(input: {
+function resolveDynamicPersonIds(input: {
   actingPersonId: string | null;
   clerkOrgId: string;
   createdByUserId: string | null;
-  organisationId: string;
+  organisationId: string | null;
   people: PersonRow[];
-}): string | null {
-  if (input.createdByUserId) {
-    const person = input.people.find(
-      (candidate) => candidate.clerk_user_id === input.createdByUserId
-    );
-    if (person) {
-      return person.id;
-    }
+}): Set<string> {
+  const linked = input.createdByUserId
+    ? input.people
+        .filter((person) => person.clerk_user_id === input.createdByUserId)
+        .map((person) => person.id)
+    : [];
+  if (linked.length > 0) {
+    return new Set(linked);
   }
-  return input.actingPersonId;
+  return new Set(input.actingPersonId ? [input.actingPersonId] : []);
 }
 
 function peopleForScope(
   scope: FeedScopeInput,
   people: PersonRow[],
-  dynamicPersonId: string | null
+  dynamicPersonIds: Set<string>
 ): PersonRow[] {
   if (scope.scopeType === "org") {
     return people;
@@ -503,15 +523,18 @@ function peopleForScope(
     return people.filter((person) => person.id === scope.scopeValue);
   }
   if (scope.scopeType === "self") {
-    return people.filter((person) => person.id === dynamicPersonId);
+    return people.filter((person) => dynamicPersonIds.has(person.id));
   }
-  if (!dynamicPersonId) {
+  if (dynamicPersonIds.size === 0) {
     return [];
   }
   return people.filter(
     (person) =>
-      person.id === dynamicPersonId ||
-      person.manager_person_id === dynamicPersonId
+      dynamicPersonIds.has(person.id) ||
+      Boolean(
+        person.manager_person_id &&
+          dynamicPersonIds.has(person.manager_person_id)
+      )
   );
 }
 
@@ -560,6 +583,7 @@ function toScopedPerson(person: PersonRow): ScopedFeedPerson {
       : null,
     locationId: person.location_id,
     managerPersonId: person.manager_person_id,
+    organisationId: person.organisation_id,
     team: person.team,
     teamId: person.team_id,
   };
@@ -617,6 +641,7 @@ function unknownError(message: string): Result<never, FeedScopeError> {
 }
 
 const personSelect = {
+  clerk_org_id: true,
   clerk_user_id: true,
   display_name: true,
   first_name: true,
@@ -634,6 +659,7 @@ const personSelect = {
   },
   location_id: true,
   manager_person_id: true,
+  organisation_id: true,
   team: {
     select: {
       id: true,
@@ -644,3 +670,14 @@ const personSelect = {
 } satisfies Prisma.PersonSelect;
 
 type PersonRow = Prisma.PersonGetPayload<{ select: typeof personSelect }>;
+
+async function companyWhere(input: {
+  clerkOrgId: string;
+  organisationId: string | null;
+}) {
+  if (input.organisationId !== null) {
+    return input.organisationId;
+  }
+  const companies = await resolveAccountCompanies(input.clerkOrgId);
+  return { in: companies.map((company) => company.id) };
+}

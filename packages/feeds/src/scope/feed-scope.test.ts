@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  companies: vi.fn(async () => [
+    { id: "company-a", name: "A" },
+    { id: "company-b", name: "B" },
+  ]),
   personFindMany: vi.fn(),
 }));
 
@@ -12,6 +16,7 @@ vi.mock("@repo/database", () => {
     },
   };
   return {
+    resolveAccountCompanies: mocks.companies,
     tenantDatabase: vi.fn(() => client),
     tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
   };
@@ -433,5 +438,78 @@ describe("resolveScopeRows", () => {
       ],
     });
     expect(mocks.personFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("account feed scopes", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const accountPeople = [
+    {
+      ...activePeople[0],
+      clerk_org_id: "org_1",
+      clerk_user_id: "manager",
+      id: "manager-a",
+      organisation_id: "company-a",
+    },
+    {
+      ...activePeople[0],
+      clerk_org_id: "org_1",
+      clerk_user_id: "manager",
+      id: "manager-b",
+      organisation_id: "company-b",
+    },
+    {
+      ...activePeople[2],
+      clerk_org_id: "org_1",
+      id: "report-a",
+      manager_person_id: "manager-a",
+      organisation_id: "company-a",
+    },
+    {
+      ...activePeople[2],
+      clerk_org_id: "org_1",
+      id: "report-b",
+      manager_person_id: "manager-b",
+      organisation_id: "company-b",
+    },
+    {
+      ...activePeople[0],
+      clerk_org_id: "org_other",
+      clerk_user_id: "manager",
+      id: "foreign-manager",
+      organisation_id: "company-other",
+    },
+  ];
+  it("resolves self in every owned company and excludes another account", async () => {
+    mocks.personFindMany.mockResolvedValue(accountPeople);
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      createdByUserId: "manager",
+      organisationId: null,
+      scopes: [{ scopeType: "self" }],
+    });
+    expect(result.ok && result.value.map((person) => person.id).sort()).toEqual(
+      ["manager-a", "manager-b"]
+    );
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          clerk_org_id: "org_1",
+          organisation_id: { in: ["company-a", "company-b"] },
+        }),
+      })
+    );
+  });
+  it("includes a manager's reports in both companies", async () => {
+    mocks.personFindMany.mockResolvedValue(accountPeople);
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      createdByUserId: "manager",
+      organisationId: null,
+      scopes: [{ scopeType: "manager_team" }],
+    });
+    expect(result.ok && result.value.map((person) => person.id).sort()).toEqual(
+      ["manager-a", "manager-b", "report-a", "report-b"]
+    );
   });
 });

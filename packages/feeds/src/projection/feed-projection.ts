@@ -10,7 +10,11 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { loadHolidayResolutionData, tenantTransaction } from "@repo/database";
+import {
+  loadHolidayResolutionData,
+  resolveAccountCompanies,
+  tenantTransaction,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_contactability,
@@ -41,6 +45,7 @@ export interface PreviewEvent {
   publishedSequence: number;
   publishedUid: string;
   recordType: availability_record_type | "public_holiday";
+  sourceCompanyId?: string;
   sourceRecordId: string;
   startsAt: Date;
   summary: string;
@@ -53,7 +58,7 @@ export interface FeedProjectionContext {
   client?: Prisma.TransactionClient;
   feedId: string;
   horizonDays: number;
-  organisationId: string;
+  organisationId: string | null;
   privacyMode?: availability_privacy_mode;
 }
 
@@ -89,11 +94,26 @@ export async function projectFeedEvents(
       };
     }
 
+    const ownedCompanies = await resolveAccountCompanies(
+      input.clerkOrgId,
+      client
+    );
+    const companyIds = companyIdsForFeed(
+      ownedCompanies.map((company) => company.id),
+      input.organisationId
+    );
+    if (!companyIds) {
+      return {
+        error: { code: "feed_not_found", message: "Active company not found." },
+        ok: false,
+      };
+    }
     const privacyMode = input.privacyMode ?? feed.privacy_mode;
     const peopleResult = await resolvePeopleForFeed({
       actingPersonId: input.actingPersonId ?? null,
       clerkOrgId: input.clerkOrgId,
       client: input.client,
+      companyIds,
       createdByUserId: feed.created_by_user_id,
       organisationId: input.organisationId,
       scopes: feed.scopes.map((scope) => ({
@@ -107,9 +127,7 @@ export async function projectFeedEvents(
 
     const people = peopleResult.value;
     const personIds = people.map((person) => person.id);
-    const personLocations = new Map(
-      people.map((person) => [person.id, person.location])
-    );
+
     const horizonStart = new Date();
     horizonStart.setUTCHours(0, 0, 0, 0);
     const horizonEnd = new Date(horizonStart);
@@ -127,7 +145,7 @@ export async function projectFeedEvents(
               clerk_org_id: input.clerkOrgId,
               ends_at: { gte: horizonStart },
               include_in_feed: true,
-              organisation_id: input.organisationId,
+              organisation_id: input.organisationId ?? { in: companyIds },
               person_id: { in: personIds },
               publish_status: "eligible",
               source_type: { in: [...FEED_SOURCE_TYPES] },
@@ -144,18 +162,32 @@ export async function projectFeedEvents(
     );
 
     if (feed.includes_public_holidays) {
-      events.push(
-        ...(await projectPublicHolidays({
-          clerkOrgId: input.clerkOrgId,
-          client: input.client,
-          horizonEnd,
-          horizonStart,
-          lastRenderedAt: feed.last_rendered_at,
-          organisationId: input.organisationId,
-          personLocations,
-          privacyMode,
-        }))
-      );
+      for (const organisationId of companyIds) {
+        const companyPeople =
+          input.organisationId === null
+            ? people.filter(
+                (person) => person.organisationId === organisationId
+              )
+            : people;
+        if (companyPeople.length === 0) {
+          continue;
+        }
+        events.push(
+          ...(await projectPublicHolidays({
+            accountFeed: input.organisationId === null,
+            clerkOrgId: input.clerkOrgId,
+            client,
+            horizonEnd,
+            horizonStart,
+            lastRenderedAt: feed.last_rendered_at,
+            organisationId,
+            personLocations: new Map(
+              companyPeople.map((person) => [person.id, person.location])
+            ),
+            privacyMode,
+          }))
+        );
+      }
     }
 
     return {
@@ -256,6 +288,7 @@ function projectAvailabilityRecord(
       record.publication?.published_sequence ?? record.derived_sequence,
     publishedUid: record.publication?.published_uid ?? record.derived_uid_key,
     recordType: record.record_type,
+    sourceCompanyId: record.organisation_id,
     sourceRecordId: record.id,
     startsAt: record.starts_at,
     summary: projectSummaryLine({
@@ -276,6 +309,7 @@ async function projectPublicHolidays(input: {
   organisationId: string;
   personLocations: Map<string, { id: string } | null>;
   privacyMode: availability_privacy_mode;
+  accountFeed?: boolean;
 }): Promise<PreviewEvent[]> {
   const data = await loadHolidayResolutionData(
     {
@@ -352,6 +386,7 @@ async function projectPublicHolidays(input: {
       publishedUid,
       recordType: "public_holiday",
       sourceRecordId,
+      ...(input.accountFeed ? { sourceCompanyId: input.organisationId } : {}),
       startsAt,
       summary: title,
     });
@@ -403,6 +438,7 @@ const recordSelect = {
   derived_uid_key: true,
   ends_at: true,
   id: true,
+  organisation_id: true,
   person: {
     select: {
       display_name: true,
@@ -432,3 +468,13 @@ const recordSelect = {
 type RecordRow = Prisma.AvailabilityRecordGetPayload<{
   select: typeof recordSelect;
 }>;
+
+function companyIdsForFeed(
+  ownedCompanyIds: string[],
+  organisationId: string | null
+): string[] | null {
+  if (organisationId === null) {
+    return ownedCompanyIds;
+  }
+  return ownedCompanyIds.includes(organisationId) ? [organisationId] : null;
+}

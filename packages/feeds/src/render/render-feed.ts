@@ -3,7 +3,11 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { Result } from "@repo/core";
 import type { Prisma } from "@repo/database";
-import { systemDatabase, tenantDatabase } from "@repo/database";
+import {
+  resolveAccountCompanies,
+  systemDatabase,
+  tenantDatabase,
+} from "@repo/database";
 import type { availability_privacy_mode } from "@repo/database/generated/enums";
 import { log } from "@repo/observability/log";
 import ical, { ICalEventClass, ICalEventTransparency } from "ical-generator";
@@ -74,7 +78,7 @@ export async function renderFeedBody(input: {
   clerkOrgId: string;
   feedId: string;
   feedName: string;
-  organisationId: string;
+  organisationId: string | null;
   privacyMode: availability_privacy_mode;
 }): Promise<Result<FeedBody, FeedRenderError>> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -354,6 +358,13 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
 }> {
   try {
     const occurredAt = new Date();
+    const auditOrganisationId =
+      token.organisation_id ??
+      (await resolveAccountCompanies(token.clerk_org_id))[0]?.id;
+    if (!auditOrganisationId) {
+      await markTokenUsed(token, occurredAt);
+      return null;
+    }
     await Promise.all([
       markTokenUsed(token, occurredAt),
       tenantDatabase(token.clerk_org_id).auditEvent.createMany({
@@ -366,7 +377,7 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
             token.organisation_id,
             "first_feed_accessed"
           ),
-          organisation_id: token.organisation_id,
+          organisation_id: auditOrganisationId,
           resource_type: "activation_milestone",
         },
         skipDuplicates: true,
@@ -383,14 +394,14 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
           token.organisation_id,
           "first_feed_accessed"
         ),
-        organisation_id: token.organisation_id,
+        organisation_id: auditOrganisationId,
       },
     });
     return first?.created_at
       ? {
           clerkOrgId: token.clerk_org_id,
           occurredAt: first.created_at,
-          organisationId: token.organisation_id,
+          organisationId: auditOrganisationId,
         }
       : null;
   } catch (error) {
@@ -423,7 +434,7 @@ function markTokenUsed(
 
 function activationMilestoneId(
   clerkOrgId: string,
-  organisationId: string,
+  organisationId: string | null,
   milestone: string
 ): string {
   const hex = createHash("sha256")

@@ -27,6 +27,9 @@ const mocks = vi.hoisted(() => {
 
   return {
     availabilityRecordFindMany: vi.fn(() => Promise.resolve([record])),
+    companies: vi.fn(async () => [
+      { id: "40000000-0000-4000-8000-000000000001", name: "Primary" },
+    ]),
     feedFindFirst: vi.fn(() =>
       Promise.resolve({
         created_by_user_id: "user_1",
@@ -67,6 +70,7 @@ vi.mock("@repo/database", () => {
   };
   return {
     loadHolidayResolutionData: mocks.loadHolidayResolutionData,
+    resolveAccountCompanies: mocks.companies,
     tenantDatabase: vi.fn(() => client),
     tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
   };
@@ -921,4 +925,57 @@ describe("projectFeedEvents", () => {
       expect(labelForRecordType("travelling", null)).toBe("Travelling");
     });
   });
+});
+
+it("projects an account feed with an owned company filter and separate record identities", async () => {
+  vi.clearAllMocks();
+  mocks.companies.mockResolvedValueOnce([
+    { id: "company-a", name: "A" },
+    { id: "company-b", name: "B" },
+  ]);
+  mocks.availabilityRecordFindMany.mockResolvedValueOnce([
+    {
+      ...mocks.record,
+      derived_uid_key: "company-a-same-xero@ical.teamcalendar.online",
+      id: "record-a",
+      organisation_id: "company-a",
+      publication: null,
+    },
+    {
+      ...mocks.record,
+      derived_uid_key: "company-b-same-xero@ical.teamcalendar.online",
+      id: "record-b",
+      organisation_id: "company-b",
+      publication: null,
+    },
+  ]);
+  const result = await projectFeedEvents({
+    ...baseInput,
+    organisationId: null,
+  });
+  expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        clerk_org_id: baseInput.clerkOrgId,
+        organisation_id: { in: ["company-a", "company-b"] },
+      }),
+    })
+  );
+  expect(
+    result.ok && result.value.map((event) => event.publishedUid).sort()
+  ).toEqual([
+    "company-a-same-xero@ical.teamcalendar.online",
+    "company-b-same-xero@ical.teamcalendar.online",
+  ]);
+});
+
+it("refuses a company feed after its company leaves the active owned set, including manual records", async () => {
+  vi.clearAllMocks();
+  mocks.companies.mockResolvedValueOnce([]);
+  const result = await projectFeedEvents(baseInput);
+  expect(result).toMatchObject({
+    error: { code: "feed_not_found" },
+    ok: false,
+  });
+  expect(mocks.availabilityRecordFindMany).not.toHaveBeenCalled();
 });

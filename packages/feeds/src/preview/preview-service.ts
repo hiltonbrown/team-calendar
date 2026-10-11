@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { tenantTransaction } from "@repo/database";
+import { resolveAccountCompanies, tenantTransaction } from "@repo/database";
 import { z } from "zod";
 import {
   type PreviewEvent,
@@ -13,6 +13,7 @@ import {
   isAdminOrOwner,
   normaliseRole,
 } from "../scope/feed-scope";
+import { scopedFeed } from "../scope/scoped-feed";
 
 export type PreviewServiceError =
   | { code: "feed_not_found"; message: string }
@@ -28,7 +29,7 @@ const PreviewFeedSchema = z.object({
   clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   horizonDays: z.number().int().min(1).max(90).default(30),
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().nullable(),
   privacyMode: z.enum(["named", "masked", "private"]).optional(),
 });
 
@@ -46,6 +47,7 @@ export async function previewFeed(
       const feed = await client.feed.findFirst({
         select: {
           created_by_user_id: true,
+          organisation_id: true,
           privacy_mode: true,
           scopes: {
             select: {
@@ -54,11 +56,7 @@ export async function previewFeed(
             },
           },
         },
-        where: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          id: parsed.data.feedId,
-          organisation_id: parsed.data.organisationId,
-        },
+        where: scopedFeed(parsed.data),
       });
       if (!feed) {
         return feedNotFound();
@@ -71,7 +69,11 @@ export async function previewFeed(
           clerk_org_id: parsed.data.clerkOrgId,
           clerk_user_id: parsed.data.actingUserId,
           is_active: true,
-          organisation_id: parsed.data.organisationId,
+          organisation_id: parsed.data.organisationId ?? {
+            in: (
+              await resolveAccountCompanies(parsed.data.clerkOrgId, client)
+            ).map((company) => company.id),
+          },
         },
       });
       const actingPersonId = actingPerson?.id ?? null;
@@ -96,7 +98,7 @@ export async function previewFeed(
         clerkOrgId: parsed.data.clerkOrgId,
         client,
         createdByUserId: feed.created_by_user_id,
-        organisationId: parsed.data.organisationId,
+        organisationId: feed.organisation_id,
         role,
         scopes: feed.scopes.map((scope) => ({
           scopeType: scope.scope_type,
@@ -117,7 +119,7 @@ export async function previewFeed(
         client,
         feedId: parsed.data.feedId,
         horizonDays: parsed.data.horizonDays,
-        organisationId: parsed.data.organisationId,
+        organisationId: feed.organisation_id,
         privacyMode: requestedPrivacy,
       });
       if (!result.ok) {

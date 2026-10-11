@@ -237,6 +237,7 @@ function buildFeed(input: {
     includes_public_holidays: false,
     last_rendered_at: null,
     name: `Feed ${input.id}`,
+    organisation_id: baseInput.organisationId,
     privacy_mode: "named",
     scopes: input.scopes,
     status: "active",

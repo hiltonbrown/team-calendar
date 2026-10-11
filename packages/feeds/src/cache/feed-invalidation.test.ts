@@ -44,18 +44,21 @@ function feedFixtures() {
     {
       created_by_user_id: null,
       id: "feed-a",
+      organisation_id: ORGANISATION_ID,
       privacy_mode: "named",
       scopes: [{ scope_type: "person", scope_value: PERSON_IN_SCOPE }],
     },
     {
       created_by_user_id: null,
       id: "feed-b",
+      organisation_id: ORGANISATION_ID,
       privacy_mode: "masked",
       scopes: [{ scope_type: "person", scope_value: "p-other" }],
     },
     {
       created_by_user_id: null,
       id: "feed-c",
+      organisation_id: ORGANISATION_ID,
       privacy_mode: "private",
       scopes: [{ scope_type: "person", scope_value: PERSON_IN_SCOPE }],
     },
@@ -143,7 +146,7 @@ describe("feed cache invalidation", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: CLERK_ORG_ID,
-          organisation_id: ORGANISATION_ID,
+          OR: [{ organisation_id: ORGANISATION_ID }, { organisation_id: null }],
           status: "active",
         }),
       })
@@ -188,8 +191,8 @@ describe("feed cache invalidation", () => {
     });
 
     expect(feeds).toEqual([
-      { id: "feed-a", privacyMode: "named" },
-      { id: "feed-c", privacyMode: "private" },
+      { id: "feed-a", organisationId: ORGANISATION_ID, privacyMode: "named" },
+      { id: "feed-c", organisationId: ORGANISATION_ID, privacyMode: "private" },
     ]);
     expect(mocks.resolvePeopleForFeed).toHaveBeenCalledTimes(3);
     for (const call of mocks.resolvePeopleForFeed.mock.calls) {
@@ -210,9 +213,9 @@ describe("feed cache invalidation", () => {
     });
 
     expect(feeds).toEqual([
-      { id: "feed-a", privacyMode: "named" },
-      { id: "feed-b", privacyMode: "masked" },
-      { id: "feed-c", privacyMode: "private" },
+      { id: "feed-a", organisationId: ORGANISATION_ID, privacyMode: "named" },
+      { id: "feed-b", organisationId: ORGANISATION_ID, privacyMode: "masked" },
+      { id: "feed-c", organisationId: ORGANISATION_ID, privacyMode: "private" },
     ]);
   });
 
@@ -244,4 +247,35 @@ describe("feed cache invalidation", () => {
       privacyModes: ["named", "masked", "private"],
     });
   });
+});
+
+it("invalidates every account feed when a company record changes, including departed people", async () => {
+  mocks.feedFindMany.mockResolvedValue([
+    {
+      created_by_user_id: null,
+      id: "account-feed",
+      organisation_id: null,
+      privacy_mode: "named",
+      scopes: [],
+    },
+  ]);
+  mocks.loadFeedScopeData.mockResolvedValue({
+    ok: true,
+    value: { people: [], teams: [] },
+  });
+  mocks.resolvePeopleForFeed.mockResolvedValue({ ok: true, value: [] });
+  const result = await invalidateFeedCachesForPerson({
+    clerkOrgId: CLERK_ORG_ID,
+    organisationId: ORGANISATION_ID,
+    personId: PERSON_OUT_OF_SCOPE,
+  });
+  expect(result).toEqual({ ok: true, value: { feedIds: ["account-feed"] } });
+  expect(mocks.feedFindMany).toHaveBeenCalledWith(
+    expect.objectContaining({
+      where: expect.objectContaining({
+        clerk_org_id: CLERK_ORG_ID,
+        OR: [{ organisation_id: ORGANISATION_ID }, { organisation_id: null }],
+      }),
+    })
+  );
 });

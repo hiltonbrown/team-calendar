@@ -18,6 +18,10 @@ vi.mock("@repo/database", () => {
     person: { findFirst: mocks.personFindFirst },
   };
   return {
+    scopedTo: (input: { clerkOrgId: string; organisationId: string }) => ({
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: input.organisationId,
+    }),
     tenantDatabase: vi.fn(() => client),
     tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
   };
@@ -54,6 +58,7 @@ const baseInput = {
 
 const mockFeedRecord = {
   created_by_user_id: validUserId,
+  organisation_id: validOrgId,
   privacy_mode: "named",
   scopes: [{ scope_type: "org", scope_value: null }],
 };
@@ -181,7 +186,7 @@ describe("previewFeed", () => {
         where: {
           clerk_org_id: validClerkOrgId,
           id: validFeedId,
-          organisation_id: validOrgId,
+          OR: [{ organisation_id: validOrgId }, { organisation_id: null }],
         },
       })
     );
