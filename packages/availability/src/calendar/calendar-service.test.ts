@@ -12,6 +12,7 @@ const ids = {
   team: "00000000-0000-4000-8000-000000000100",
 };
 const mocks = vi.hoisted(() => ({
+  accountCompanies: vi.fn(),
   availabilityFindFirst: vi.fn(),
   availabilityFindMany: vi.fn(),
   getSettings: vi.fn(),
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
+  resolveAccountCompanies: mocks.accountCompanies,
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
   tenantDatabase: vi.fn((accountId: string) => {
@@ -99,6 +101,14 @@ describe("calendar-service", () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.accountCompanies.mockResolvedValue([
+      {
+        country_code: "AU",
+        id: ids.org,
+        name: "Operations",
+        timezone: "Australia/Brisbane",
+      },
+    ]);
     mocks.organisationFindFirst.mockResolvedValue({
       timezone: "Australia/Brisbane",
     });
@@ -135,6 +145,171 @@ describe("calendar-service", () => {
       ok: true,
       value: [resolvedHoliday({ date: "2026-04-15", name: "Queensland Day" })],
     });
+  });
+
+  it("returns an empty calendar without provisioning a company on a read", async () => {
+    mocks.accountCompanies.mockResolvedValue([]);
+    const result = await getCalendarRange({
+      ...baseInput,
+      organisationId: undefined,
+      role: "owner",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { companies: [], people: [], totalPeopleInScope: 0 },
+    });
+    expect(mocks.personFindMany).not.toHaveBeenCalled();
+    expect(mocks.getSettings).not.toHaveBeenCalled();
+  });
+  it("shows both companies to a viewer without credentials and masks peer leave", async () => {
+    const otherPerson = {
+      ...person(ids.otherOrg, "Second", "Person", null),
+      clerk_user_id: null,
+      organisation_id: ids.otherOrg,
+    };
+    mocks.accountCompanies.mockResolvedValue([
+      company(ids.org, "First"),
+      company(ids.otherOrg, "Second"),
+    ]);
+    mocks.personFindMany.mockResolvedValue([people[1], otherPerson]);
+    mocks.availabilityFindMany.mockImplementation(({ where }) =>
+      Promise.resolve(
+        [
+          { ...record("company-one", ids.person), privacy_mode: "private" },
+          {
+            ...record("company-two", ids.otherOrg),
+            person: otherPerson,
+            privacy_mode: "private",
+          },
+        ].filter((item) => where.person_id.in.includes(item.person_id))
+      )
+    );
+    const result = await getCalendarRange({
+      ...baseInput,
+      actingPersonId: null,
+      organisationId: undefined,
+      role: "viewer",
+      scope: { type: "all_teams" },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.people.map((item) => item.companyName)).toEqual([
+      "First",
+      "Second",
+    ]);
+    const events = result.value.days.flatMap((day) => day.events);
+    expect(new Set(events.map((event) => event.id))).toEqual(
+      new Set(["company-one", "company-two"])
+    );
+    expect(
+      events.every(
+        (event) =>
+          event.recordType === "private" && event.notesInternal === null
+      )
+    ).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          clerk_org_id: ids.clerkOrg,
+          organisation_id: { in: [ids.org, ids.otherOrg] },
+        }),
+      })
+    );
+  });
+  it("rejects unknown company filters before reading people or records", async () => {
+    const result = await getCalendarRange({
+      ...baseInput,
+      companyIds: [ids.otherOrg],
+    });
+    expect(result).toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
+    expect(mocks.personFindMany).not.toHaveBeenCalled();
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+  });
+  it("resolves the manager separately in each company and applies each company's settings", async () => {
+    const secondManager = {
+      ...person(ids.otherOrg, "Other", "Manager", null),
+      clerk_user_id: "user_1",
+      organisation_id: ids.otherOrg,
+    };
+    const secondReport = {
+      ...person(
+        "00000000-0000-4000-8000-000000000014",
+        "Other",
+        "Report",
+        secondManager.id
+      ),
+      clerk_user_id: null,
+      organisation_id: ids.otherOrg,
+    };
+    mocks.accountCompanies.mockResolvedValue([
+      company(ids.org, "First"),
+      company(ids.otherOrg, "Second"),
+    ]);
+    mocks.personFindMany.mockResolvedValue([
+      ...people,
+      secondManager,
+      secondReport,
+    ]);
+    mocks.getSettings.mockImplementation(({ organisationId }) =>
+      Promise.resolve({
+        ok: true,
+        value: {
+          managerVisibilityScope: "direct_reports_only",
+          showPendingOnCalendar: organisationId === ids.org,
+        },
+      })
+    );
+    mocks.availabilityFindMany.mockImplementation(({ where }) =>
+      Promise.resolve(
+        [
+          {
+            ...record("second-own", secondManager.id),
+            person: secondManager,
+            privacy_mode: "private",
+          },
+        ].filter((item) => where.person_id.in.includes(item.person_id))
+      )
+    );
+    const result = await getCalendarRange({
+      ...baseInput,
+      organisationId: undefined,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.people.map((item) => item.id)).toEqual([
+      ids.manager,
+      ids.person,
+      secondManager.id,
+      secondReport.id,
+    ]);
+    expect(result.value.days.flatMap((day) => day.events)[0]).toMatchObject({
+      companyId: ids.otherOrg,
+      displayName: "Other Manager",
+      notesInternal: "Private note",
+      recordType: "annual_leave",
+    });
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organisation_id: { in: [ids.otherOrg] },
+        }),
+      })
+    );
+    const firstWhere = mocks.availabilityFindMany.mock.calls.find(([query]) =>
+      query.where.organisation_id.in.includes(ids.org)
+    )?.[0].where;
+    const secondWhere = mocks.availabilityFindMany.mock.calls.find(([query]) =>
+      query.where.organisation_id.in.includes(ids.otherOrg)
+    )?.[0].where;
+    expect(firstWhere?.OR[0].approval_status.in).toContain("submitted");
+    expect(secondWhere?.OR[0].approval_status.in).not.toContain("submitted");
   });
   it("returns direct reports plus self for my_team and uses Monday week range", async () => {
     const result = await getCalendarRange(baseInput);
@@ -304,7 +479,12 @@ describe("calendar-service", () => {
       })
     );
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining(scope) })
+      expect.objectContaining({
+        where: expect.objectContaining({
+          ...scope,
+          organisation_id: { in: [ids.org] },
+        }),
+      })
     );
     expect(mocks.availabilityFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining(scope) })
@@ -349,9 +529,9 @@ describe("calendar-service", () => {
   ])(
     "projects overlap on a DST boundary day %s",
     async (anchor, start, end, hours) => {
-      mocks.organisationFindFirst.mockResolvedValue({
-        timezone: "Australia/Sydney",
-      });
+      mocks.accountCompanies.mockResolvedValue([
+        { ...company(ids.org, "Operations"), timezone: "Australia/Sydney" },
+      ]);
       mocks.availabilityFindMany.mockResolvedValue([
         {
           ...record("inside", ids.person),
@@ -616,6 +796,7 @@ function person(
   return {
     archived_at: null,
     avatar_url: null,
+    clerk_user_id: id === ids.manager ? "user_1" : `user_${id}`,
     email: `${firstName.toLowerCase()}@example.com`,
     employment_type: "employee",
     first_name: firstName,
@@ -631,6 +812,7 @@ function person(
     },
     location_id: "00000000-0000-4000-8000-000000000200",
     manager_person_id: managerPersonId,
+    organisation_id: ids.org,
     person_type: "employee",
     team: { id: ids.team, name: "Operations" },
     team_id: ids.team,
@@ -697,4 +879,8 @@ function resolvedHoliday(
     startsAt: null,
     ...overrides,
   };
+}
+
+function company(id: string, name: string) {
+  return { country_code: "AU", id, name, timezone: "Australia/Brisbane" };
 }

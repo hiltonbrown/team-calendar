@@ -367,10 +367,10 @@ describe("manual availability services", () => {
   });
 });
 describe("current user person identity", () => {
-  test("provisions one default feed when ensuring an organisation", async () => {
+  test("provisions one account-wide default feed when ensuring an organisation", async () => {
     await cleanTestData();
     await createProvisioningOrganisation();
-    const context = await ensureOrganisationForClerk({
+    await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
       name: "Default feed provisioning",
@@ -384,7 +384,7 @@ describe("current user person identity", () => {
       where: {
         archived_at: null,
         clerk_org_id: provisioningClerkOrgId,
-        organisation_id: context.organisationId,
+        organisation_id: null,
       },
     });
     expect(feeds).toHaveLength(1);
@@ -398,7 +398,7 @@ describe("current user person identity", () => {
         where: {
           clerk_org_id: provisioningClerkOrgId,
           feed_id: feeds[0]?.id,
-          organisation_id: context.organisationId,
+          organisation_id: null,
         },
       })
     ).resolves.toEqual([
@@ -409,7 +409,7 @@ describe("current user person identity", () => {
         where: {
           clerk_org_id: provisioningClerkOrgId,
           feed_id: feeds[0]?.id,
-          organisation_id: context.organisationId,
+          organisation_id: null,
           status: "active",
         },
       })
@@ -423,7 +423,7 @@ describe("current user person identity", () => {
       database.feed.count({
         where: {
           clerk_org_id: provisioningClerkOrgId,
-          organisation_id: context.organisationId,
+          organisation_id: null,
         },
       })
     ).resolves.toBe(1);
