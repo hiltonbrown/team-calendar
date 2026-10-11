@@ -79,6 +79,14 @@ export async function disconnectXeroOAuthConnection(input: {
           value: { connectionId: previous.id, state: "disconnected" },
         };
       }
+      const current = await getScopedXeroConnection(input);
+      if (
+        current.ok &&
+        current.value.status !== "disconnected" &&
+        !canReachXero(current.value)
+      ) {
+        return removeUnreachableCompany(input);
+      }
     }
     const initial = await getScopedXeroConnection(input);
     if (
@@ -429,10 +437,6 @@ async function archiveCompanyState(
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
   };
-  const records = await tx.availabilityRecord.findMany({
-    select: { id: true },
-    where: scope,
-  });
   await tx.organisation.updateMany({
     data: { archived_at: now, is_active: false },
     where: {
@@ -475,21 +479,21 @@ async function archiveCompanyState(
     },
   });
   await tx.availabilityPublication.deleteMany({ where: scope });
-  await tx.feedEventPublication.updateMany({
-    data: { present: false },
-    where: {
-      clerk_org_id: input.clerkOrgId,
-      OR: [
-        { organisation_id: input.organisationId },
-        { source_key: { startsWith: `holiday:${input.organisationId}:` } },
-        {
-          source_key: {
-            in: records.map((record) => `availability:${record.id}`),
-          },
-        },
-      ],
-    },
-  });
+  // A subquery keeps the statement bounded for companies with many records.
+  await tx.$executeRaw`
+    UPDATE feed_event_publications
+    SET present = false, updated_at = ${now}
+    WHERE clerk_org_id = ${input.clerkOrgId}
+      AND (
+        organisation_id = ${input.organisationId}::uuid
+        OR starts_with(source_key, ${`holiday:${input.organisationId}:`})
+        OR source_key IN (
+          SELECT 'availability:' || record.id::text
+          FROM availability_records record
+          WHERE record.clerk_org_id = ${input.clerkOrgId}
+            AND record.organisation_id = ${input.organisationId}::uuid
+        )
+      )`;
   await tx.feed.updateMany({
     data: {
       last_etag: null,
@@ -505,6 +509,114 @@ async function archiveCompanyState(
     },
   });
 }
+function canReachXero(connection: {
+  authorisation: { status: string } | null;
+  status: string;
+}): boolean {
+  return (
+    connection.status === "active" &&
+    connection.authorisation?.status === "active"
+  );
+}
+
+// The grant or connection can no longer reach Xero, so no remote DELETE is
+// possible. The owner's confirmation releases the company locally and the audit
+// event records that remote deletion was not confirmed.
+async function removeUnreachableCompany(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  connectionId: string;
+  performedByUserId?: string | null;
+}): Promise<Result<XeroDisconnectResult, DisconnectError>> {
+  const result = await tenantTransaction(input.clerkOrgId, async (tx) => {
+    await lockScopedXeroConnection(tx, input);
+    const scope = {
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: input.organisationId,
+    };
+    const released = await tx.xeroConnection.findFirst({
+      select: { id: true },
+      where: { ...scope, id: input.connectionId, released_at: { not: null } },
+    });
+    if (released) {
+      return {
+        ok: true as const,
+        value: { connectionId: released.id, state: "disconnected" as const },
+      };
+    }
+    const scoped = await getScopedXeroConnection(input, tx);
+    if (
+      !scoped.ok ||
+      scoped.value.status === "disconnected" ||
+      canReachXero(scoped.value)
+    ) {
+      return failure(
+        "connection_changed",
+        "The Xero connection changed. Try again."
+      );
+    }
+    const writing = await tx.availabilityRecord.findFirst({
+      select: { id: true },
+      where: {
+        ...scope,
+        xero_write_claimed_at: {
+          gte: new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
+        },
+      },
+    });
+    if (writing) {
+      return failure(
+        "write_in_progress",
+        "Finish the current Xero payroll write before removing this company."
+      );
+    }
+    const connection = scoped.value;
+    const now = new Date();
+    await tx.xeroSyncCursor.deleteMany({
+      where: { ...scope, xero_connection_id: connection.id },
+    });
+    await tx.xeroConnection.updateMany({
+      data: {
+        balance_next_person_id: null,
+        disconnected_at: now,
+        disconnected_by_user_id: input.performedByUserId,
+        initial_sync_completed_at: null,
+        initial_sync_requested_at: null,
+        last_disconnected_at: now,
+        leave_next_person_id: null,
+        released_at: now,
+        remote_connection_id: null,
+        status: "disconnected",
+        sync_paused_at: now,
+        xero_authorisation_id: null,
+      },
+      where: { ...scope, id: connection.id, released_at: null },
+    });
+    await archiveCompanyState(tx, input, now);
+    await tx.auditEvent.create({
+      data: {
+        ...scope,
+        action: "company_removed",
+        actor_user_id: input.performedByUserId,
+        metadata: {
+          previous_status: connection.status,
+          remote_delete: "unreachable",
+        },
+        resource_id: connection.id,
+        resource_type: "xero_connection",
+      },
+    });
+    return {
+      ok: true as const,
+      value: { connectionId: connection.id, state: "disconnected" as const },
+    };
+  });
+  if (result.ok) {
+    await invalidateAccountFeedCaches({ clerkOrgId: input.clerkOrgId });
+  }
+  return result;
+}
+
 async function removePreviouslyDisconnectedCompany(input: {
   clerkOrgId: string;
   organisationId: string;

@@ -45,6 +45,13 @@ export const tenantDatabase = (clerkOrgId: string): TenantDatabase => {
   }) as unknown as TenantDatabase;
 };
 
+// Account-wide reads (calendar, feed projection) span every company and can
+// outlast Prisma's 5s interactive default on serverless Postgres.
+export const TENANT_READ_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 30_000,
+} as const;
+
 export const tenantTransaction = <T>(
   clerkOrgId: string,
   fn: (tx: Prisma.TransactionClient) => Promise<T>,

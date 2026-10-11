@@ -224,6 +224,83 @@ describe("canonical disconnect isolation", () => {
     ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
+  it.each(["connection", "grant"] as const)(
+    "removes a company whose %s needs reconnecting without a provider request",
+    async (unusable) => {
+      const binding = await database.xeroConnection.findUniqueOrThrow({
+        where: { id: tenantA.connectionId },
+      });
+      if (unusable === "connection") {
+        await database.xeroConnection.update({
+          data: { status: "reconnect_required" },
+          where: { id: tenantA.connectionId },
+        });
+      } else {
+        await database.xeroAuthorisation.update({
+          data: { status: "reconnect_required" },
+          where: { id: binding.xero_authorisation_id ?? "" },
+        });
+      }
+      const { removeXeroCompany } = await import("./disconnect");
+      expect(
+        await removeXeroCompany({
+          clerkOrgId: tenantA.clerkOrgId,
+          connectionId: tenantA.connectionId,
+          organisationId: tenantA.organisationId,
+          role: "owner",
+        })
+      ).toMatchObject({ ok: true, value: { state: "removed" } });
+      expect(
+        await database.xeroConnection.findUnique({
+          where: { id: tenantA.connectionId },
+        })
+      ).toMatchObject({
+        released_at: expect.any(Date),
+        remote_connection_id: null,
+        status: "disconnected",
+        xero_authorisation_id: null,
+      });
+      expect(
+        await database.organisation.findUnique({
+          where: { id: tenantA.organisationId },
+        })
+      ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
+      expect(
+        await database.auditEvent.findFirst({
+          where: {
+            action: "company_removed",
+            clerk_org_id: tenantA.clerkOrgId,
+            resource_id: tenantA.connectionId,
+          },
+        })
+      ).toMatchObject({ metadata: { remote_delete: "unreachable" } });
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    }
+  );
+  it("does not remove an unreachable company during an active record write claim", async () => {
+    await database.xeroConnection.update({
+      data: { status: "reconnect_required" },
+      where: { id: tenantA.connectionId },
+    });
+    await database.availabilityRecord.update({
+      data: { xero_write_claimed_at: new Date() },
+      where: { id: tenantA.availabilityRecordId },
+    });
+    const { removeXeroCompany } = await import("./disconnect");
+    expect(
+      await removeXeroCompany({
+        clerkOrgId: tenantA.clerkOrgId,
+        connectionId: tenantA.connectionId,
+        organisationId: tenantA.organisationId,
+        role: "owner",
+      })
+    ).toMatchObject({ error: { code: "write_in_progress" }, ok: false });
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: tenantA.connectionId },
+      })
+    ).toMatchObject({ released_at: null, status: "reconnect_required" });
+  });
   it("does not release a disconnected binding without confirmed disconnect audit evidence", async () => {
     await database.xeroConnection.update({
       data: {

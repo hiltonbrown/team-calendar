@@ -13,6 +13,7 @@ import {
 import {
   loadHolidayResolutionData,
   resolveAccountCompanies,
+  TENANT_READ_TRANSACTION_OPTIONS,
   tenantTransaction,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
@@ -73,8 +74,10 @@ export async function projectFeedEvents(
 ): Promise<Result<PreviewEvent[], FeedProjectionError>> {
   try {
     if (!input.client) {
-      return await tenantTransaction(input.clerkOrgId, (tx) =>
-        projectFeedEvents({ ...input, client: tx })
+      return await tenantTransaction(
+        input.clerkOrgId,
+        (tx) => projectFeedEvents({ ...input, client: tx }),
+        TENANT_READ_TRANSACTION_OPTIONS
       );
     }
     const { client } = input;

@@ -71,6 +71,7 @@ vi.mock("@repo/database", () => {
   return {
     loadHolidayResolutionData: mocks.loadHolidayResolutionData,
     resolveAccountCompanies: mocks.companies,
+    TENANT_READ_TRANSACTION_OPTIONS: { maxWait: 10_000, timeout: 30_000 },
     tenantDatabase: vi.fn(() => client),
     tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
   };

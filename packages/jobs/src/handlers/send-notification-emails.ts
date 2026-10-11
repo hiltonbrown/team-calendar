@@ -25,14 +25,20 @@ export async function drainNotificationEmailQueue(): Promise<{
     where: { status: "queued" },
   });
   const summary = { failed: 0, processed: 0, sent: 0 };
+  const accountFailures = new Set<string>();
+  // One account's failure must not hold back every later account's email.
   for (const account of accounts) {
     const result = await sendQueuedNotificationEmails(account.clerk_org_id);
     if (!result.ok) {
-      throw new Error(result.error.message);
+      accountFailures.add(result.error.message);
+      continue;
     }
     summary.failed += result.value.failed;
     summary.processed += result.value.processed;
     summary.sent += result.value.sent;
+  }
+  if (accountFailures.size > 0) {
+    throw new Error([...accountFailures].join(" "));
   }
   return summary;
 }

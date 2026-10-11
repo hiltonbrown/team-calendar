@@ -970,7 +970,7 @@ describe("release list-query evidence", () => {
   test("keeps plan query count constant at 1, 50, and 200 rows", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
-    const tenantClient = await import("../database/src/tenant-client");
+    const tenantClient = await import("@repo/database");
     const createTenantClient = tenantClient.tenantDatabase;
     let tenantQueryCount = 0;
     vi.spyOn(tenantClient, "tenantDatabase").mockImplementation((accountId) =>

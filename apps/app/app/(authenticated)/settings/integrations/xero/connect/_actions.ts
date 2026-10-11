@@ -16,7 +16,23 @@ const CompleteTenantSelectionSchema = z.object({
   organisationId: z.string().uuid().optional(),
   sessionId: z.string().uuid(),
   tenantIds: z.array(z.string().min(1)).min(1).max(100),
+  timezone: z
+    .string()
+    .trim()
+    .min(1)
+    .max(128)
+    .refine(isIanaTimezone, "Your browser time zone could not be read."),
 });
+function isIanaTimezone(value: string): boolean {
+  try {
+    return Boolean(
+      new Intl.DateTimeFormat("en-AU", { timeZone: value }).resolvedOptions()
+        .timeZone
+    );
+  } catch {
+    return false;
+  }
+}
 interface ActionError {
   code: "not_authorised" | "unknown_error" | "validation_error";
   message: string;
@@ -28,6 +44,7 @@ export async function completeTenantSelectionAction(input: {
   organisationId?: string;
   sessionId: string;
   tenantIds: string[];
+  timezone: string;
 }): Promise<
   Result<{ redirectTo: string; outcomes: SelectionOutcome[] }, ActionError>
 > {
@@ -91,6 +108,7 @@ export async function completeTenantSelectionAction(input: {
     organisationId: session.organisation_id,
     sessionId: parsed.data.sessionId,
     tenantIds: [...new Set(parsed.data.tenantIds)],
+    timezone: parsed.data.timezone,
     userId: user.id,
   });
   if (!result.ok) {

@@ -49,12 +49,12 @@ describe("live fixture registry", () => {
           clerkOrgIds,
           globalKeys: [
             ...Array.from(
-              { length: 7 },
+              { length: 8 },
               (_, index) =>
                 `plan_id:22222222-2222-4222-8222-${index.toString().padStart(12, "0")}`
             ),
             ...Array.from(
-              { length: 7 },
+              { length: 8 },
               (_, index) => `plan_key:release_plan_${index}`
             ),
             ...Array.from(
@@ -239,8 +239,8 @@ describe("live fixture registry", () => {
         owned: {
           clerkOrgIds,
           globalKeys: [
-            ...Array.from({ length: 7 }, (_, index) => `plan_id:plan-${index}`),
-            ...Array.from({ length: 7 }, (_, index) => `plan_key:key-${index}`),
+            ...Array.from({ length: 8 }, (_, index) => `plan_id:plan-${index}`),
+            ...Array.from({ length: 8 }, (_, index) => `plan_key:key-${index}`),
             ...Array.from(
               { length: 5 },
               (_, index) => `stripe_event:event-${index}`

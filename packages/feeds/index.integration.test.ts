@@ -1,7 +1,15 @@
+import { createHash } from "node:crypto";
 import { executeRedisRestCommand } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
+
+// Mirrors deriveAvailabilityUidKey in @repo/availability, which depends on this
+// package and so cannot be imported here.
+async function availabilityUidKey(parts: string[]): Promise<string> {
+  const { icsUidSuffix } = await import("@repo/seo/branding");
+  return `${createHash("sha256").update(parts.join("|")).digest("hex")}${icsUidSuffix}`;
+}
 
 // getFeedDetail builds the full subscribe URL from the API origin and
 // requires it to be configured. Provide one for the integration environment.
@@ -180,22 +188,19 @@ describe("feed services", () => {
       clerk_org_id: otherTenant.clerkOrgId,
       organisation_id: otherTenant.organisationId,
     });
-    const { deriveAvailabilityUidKey } = await import(
-      "../availability/src/sync/availability-uid"
-    );
     for (const record of [first, second, foreign]) {
       await database.availabilityRecord.update({
         data: {
-          derived_uid_key: deriveAvailabilityUidKey({
-            clerkOrgId: record.scope.clerk_org_id,
-            endsAt: record.startsAt,
-            organisationId: record.scope.organisation_id,
-            personId: record.personId,
-            recordType: "wfh",
-            sourceType: "xero_leave",
-            stableSourceKey: "identical-xero-leave",
-            startsAt: record.startsAt,
-          }),
+          derived_uid_key: await availabilityUidKey([
+            record.scope.clerk_org_id,
+            record.scope.organisation_id,
+            record.personId,
+            "xero_leave",
+            "identical-xero-leave",
+            record.startsAt.toISOString(),
+            record.startsAt.toISOString(),
+            "wfh",
+          ]),
           notes_internal: "private payroll note",
           source_payload_json: { Salary: "private salary" },
           source_remote_id: "identical-xero-leave",

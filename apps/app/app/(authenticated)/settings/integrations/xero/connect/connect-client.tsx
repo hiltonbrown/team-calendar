@@ -66,6 +66,8 @@ export function XeroConnectClient({
         organisationId: presetOrganisationId ?? undefined,
         sessionId,
         tenantIds: selectedTenantIds,
+        // New companies start in the connecting user's time zone; owners can change it in Settings.
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
       if (!result.ok) {
         toast.error(result.error.message);

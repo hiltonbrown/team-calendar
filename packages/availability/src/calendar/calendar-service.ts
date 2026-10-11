@@ -6,6 +6,7 @@ import { recordFallsOnDay, recordQueryWindow } from "@repo/core";
 import {
   resolveAccountCompanies,
   scopedTo,
+  TENANT_READ_TRANSACTION_OPTIONS,
   tenantDatabase,
   tenantTransaction,
 } from "@repo/database";
@@ -259,70 +260,77 @@ export async function getCalendarRange(
     return validationError(parsed.error);
   }
   try {
-    return await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
-      const companies = (
-        await resolveAccountCompanies(parsed.data.clerkOrgId, tx)
-      ).map((company) => ({ ...company, timezone: company.timezone ?? "UTC" }));
-      const selection = selectCalendarCompanies(parsed.data, companies);
-      if (!selection.ok) {
-        return selection;
-      }
-      const selected = selection.value;
-      const allPeople = selected.length
-        ? await tx.person.findMany({
-            orderBy: [
-              { last_name: "asc" },
-              { first_name: "asc" },
-              { id: "asc" },
-            ],
-            select: personSelect,
-            where: {
-              archived_at: null,
-              clerk_org_id: parsed.data.clerkOrgId,
-              is_active: true,
-              organisation_id: { in: selected.map((company) => company.id) },
-            },
-          })
-        : [];
-      const accountWide = !parsed.data.organisationId;
-      if (accountWide && !companyMatchesScope(parsed.data.scope, allPeople)) {
-        return invalidScope();
-      }
-      const ranges: CalendarRange[] = [];
-      for (const company of selected) {
-        const companyPeople = allPeople.filter(
-          (person) => person.organisation_id === company.id
-        );
-        if (
-          accountWide &&
-          !companyMatchesScope(parsed.data.scope, companyPeople)
-        ) {
-          continue;
+    return await tenantTransaction(
+      parsed.data.clerkOrgId,
+      async (tx) => {
+        const companies = (
+          await resolveAccountCompanies(parsed.data.clerkOrgId, tx)
+        ).map((company) => ({
+          ...company,
+          timezone: company.timezone ?? "UTC",
+        }));
+        const selection = selectCalendarCompanies(parsed.data, companies);
+        if (!selection.ok) {
+          return selection;
         }
-        const companyInput = resolveCompanyInput(
-          parsed.data,
-          company.id,
-          companyPeople
-        );
-        if (!companyInput) {
-          continue;
+        const selected = selection.value;
+        const allPeople = selected.length
+          ? await tx.person.findMany({
+              orderBy: [
+                { last_name: "asc" },
+                { first_name: "asc" },
+                { id: "asc" },
+              ],
+              select: personSelect,
+              where: {
+                archived_at: null,
+                clerk_org_id: parsed.data.clerkOrgId,
+                is_active: true,
+                organisation_id: { in: selected.map((company) => company.id) },
+              },
+            })
+          : [];
+        const accountWide = !parsed.data.organisationId;
+        if (accountWide && !companyMatchesScope(parsed.data.scope, allPeople)) {
+          return invalidScope();
         }
-        const result = await loadCompanyCalendarRange(
-          { data: companyInput },
-          tx,
-          company,
-          companyPeople
-        );
-        if (!result.ok) {
-          return result;
+        const ranges: CalendarRange[] = [];
+        for (const company of selected) {
+          const companyPeople = allPeople.filter(
+            (person) => person.organisation_id === company.id
+          );
+          if (
+            accountWide &&
+            !companyMatchesScope(parsed.data.scope, companyPeople)
+          ) {
+            continue;
+          }
+          const companyInput = resolveCompanyInput(
+            parsed.data,
+            company.id,
+            companyPeople
+          );
+          if (!companyInput) {
+            continue;
+          }
+          const result = await loadCompanyCalendarRange(
+            { data: companyInput },
+            tx,
+            company,
+            companyPeople
+          );
+          if (!result.ok) {
+            return result;
+          }
+          ranges.push(result.value);
         }
-        ranges.push(result.value);
-      }
-      return {
-        ok: true,
-        value: mergeCompanyCalendars(parsed.data, companies, ranges),
-      };
-    });
+        return {
+          ok: true,
+          value: mergeCompanyCalendars(parsed.data, selected, ranges),
+        };
+      },
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
   } catch {
     return unknownError("Failed to load calendar.");
   }
