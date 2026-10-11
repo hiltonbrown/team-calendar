@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, database } from "@repo/database";
+import { type Database, tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type { notification_type } from "@repo/database/generated/enums";
 import { z } from "zod";
@@ -107,7 +107,7 @@ const unreadCountCache = new Map<
 
 export async function listForUser(
   input: z.input<typeof ListSchema>,
-  client: NotificationServiceDatabase = database
+  providedClient?: NotificationServiceDatabase
 ): Promise<
   Result<
     {
@@ -122,6 +122,7 @@ export async function listForUser(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
 
   const filters = normaliseFilters(parsed.data.filters);
   if (!filters.ok) {
@@ -180,7 +181,7 @@ export async function listForUser(
 
 export async function markAsRead(
   input: z.input<typeof MarkReadSchema>,
-  client: NotificationServiceDatabase = database
+  providedClient?: NotificationServiceDatabase
 ): Promise<
   Result<
     { notification: NotificationListItem; unreadCount: number },
@@ -191,6 +192,7 @@ export async function markAsRead(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
 
   try {
     const existing = await client.notification.findFirst({
@@ -254,7 +256,7 @@ export async function markAsRead(
 
 export async function markAllAsRead(
   input: z.input<typeof ScopedUserSchema>,
-  client: NotificationServiceDatabase = database
+  providedClient?: NotificationServiceDatabase
 ): Promise<
   Result<{ markedCount: number; unreadCount: 0 }, NotificationServiceError>
 > {
@@ -262,6 +264,7 @@ export async function markAllAsRead(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
 
   try {
     const result = await client.notification.updateMany({
@@ -289,12 +292,13 @@ export async function markAllAsRead(
 
 export async function getUnreadCount(
   input: z.input<typeof ScopedUserSchema>,
-  client: NotificationServiceDatabase = database
+  providedClient?: NotificationServiceDatabase
 ): Promise<Result<number, NotificationServiceError>> {
   const parsed = ScopedUserSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
 
   const key = cacheKey(parsed.data);
   const cached = unreadCountCache.get(key);
@@ -313,12 +317,13 @@ export async function getUnreadCount(
 
 export async function listRecentUnread(
   input: z.input<typeof RecentUnreadSchema>,
-  client: NotificationServiceDatabase = database
+  providedClient?: NotificationServiceDatabase
 ): Promise<Result<NotificationListItem[], NotificationServiceError>> {
   const parsed = RecentUnreadSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
   const limit = parsed.data.limit ?? 3;
 
   try {

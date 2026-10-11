@@ -1,3 +1,6 @@
+vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
+const mocks = vi.hoisted(() => ({ tenantDatabase: vi.fn() }));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type NotificationSseRecipientDatabase,
@@ -45,6 +48,7 @@ describe("notification SSE broker", () => {
       },
     };
     setNotificationSseStreamClientForTests(streamClient);
+    mocks.tenantDatabase.mockReturnValue(recipients);
   });
 
   afterEach(() => {
@@ -77,6 +81,18 @@ describe("notification SSE broker", () => {
         "0-0"
       )
     ).resolves.toEqual([]);
+  });
+
+  it("resolves default recipients through the account-bound client", async () => {
+    vi.mocked(recipients.person.findMany).mockResolvedValue([
+      { clerk_user_id: "user-a" },
+    ] as never);
+    await publishOrganisationNotificationEvent(
+      { clerkOrgId: "clerk-org-a", organisationId: "org-a" },
+      event
+    );
+    expect(mocks.tenantDatabase).toHaveBeenCalledWith("clerk-org-a");
+    expect(streamClient.append).toHaveBeenCalledWith("sse:user-a:org-a", event);
   });
 
   it("fans organisation events out only to active members of that organisation", async () => {

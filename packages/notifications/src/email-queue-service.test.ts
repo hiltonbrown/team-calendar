@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ database: {} }));
+vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
 vi.mock("@repo/email", () => ({ sendNotificationEmail: mocks.send }));
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   findMany: vi.fn(),
   send: vi.fn(),
+  tenantDatabase: vi.fn(),
   update: vi.fn(),
 }));
 
@@ -40,6 +41,7 @@ const queuedEmail = (overrides: Record<string, unknown> = {}) => ({
 describe("email-queue-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.tenantDatabase.mockReturnValue(client);
     vi.stubEnv("RESEND_FROM", "notifications@teamcalendar.test");
     vi.stubEnv("RESEND_TOKEN", "re_test_token");
     mocks.create.mockResolvedValue({
@@ -63,7 +65,7 @@ describe("email-queue-service", () => {
     async (name, value) => {
       vi.stubEnv(name, value);
 
-      const result = await sendQueuedNotificationEmails(client);
+      const result = await sendQueuedNotificationEmails("org_1", client);
 
       expect(result).toEqual({
         error: {
@@ -85,13 +87,13 @@ describe("email-queue-service", () => {
     ]);
     vi.stubEnv("RESEND_TOKEN", "");
 
-    const unavailable = await sendQueuedNotificationEmails(client);
+    const unavailable = await sendQueuedNotificationEmails("org_1", client);
 
     expect(unavailable.ok).toBe(false);
     expect(mocks.findMany).not.toHaveBeenCalled();
 
     vi.stubEnv("RESEND_TOKEN", "re_restored_token");
-    const recovered = await sendQueuedNotificationEmails(client);
+    const recovered = await sendQueuedNotificationEmails("org_1", client);
 
     expect(recovered).toEqual({
       ok: true,
@@ -136,10 +138,24 @@ describe("email-queue-service", () => {
     );
   });
 
+  it("drains only the account-bound queue by default", async () => {
+    const result = await sendQueuedNotificationEmails("org_1");
+    expect(result).toEqual({
+      ok: true,
+      value: { failed: 0, processed: 0, sent: 0 },
+    });
+    expect(mocks.tenantDatabase).toHaveBeenCalledWith("org_1");
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { clerk_org_id: "org_1", status: "queued" },
+      })
+    );
+  });
+
   it("marks a successfully sent row as sent", async () => {
     mocks.findMany.mockResolvedValue([queuedEmail()]);
 
-    const result = await sendQueuedNotificationEmails(client);
+    const result = await sendQueuedNotificationEmails("org_1", client);
 
     expect(result).toEqual({
       ok: true,
@@ -165,7 +181,7 @@ describe("email-queue-service", () => {
     mocks.findMany.mockResolvedValue([queuedEmail({ attempts: 3 })]);
     mocks.send.mockResolvedValue({ error: "Provider unavailable", ok: false });
 
-    await sendQueuedNotificationEmails(client);
+    await sendQueuedNotificationEmails("org_1", client);
 
     expect(mocks.update).toHaveBeenCalledWith({
       data: {
@@ -173,7 +189,10 @@ describe("email-queue-service", () => {
         last_error: "Provider unavailable",
         status: "queued",
       },
-      where: { id: "00000000-0000-4000-8000-000000000201" },
+      where: {
+        clerk_org_id: "org_1",
+        id: "00000000-0000-4000-8000-000000000201",
+      },
     });
   });
 
@@ -181,7 +200,7 @@ describe("email-queue-service", () => {
     mocks.findMany.mockResolvedValue([queuedEmail({ attempts: 4 })]);
     mocks.send.mockResolvedValue({ error: "Provider unavailable", ok: false });
 
-    await sendQueuedNotificationEmails(client);
+    await sendQueuedNotificationEmails("org_1", client);
 
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -199,7 +218,7 @@ describe("email-queue-service", () => {
       .mockResolvedValueOnce({ error: "Provider unavailable", ok: false })
       .mockResolvedValueOnce({ ok: true, value: { id: "email_2" } });
 
-    const result = await sendQueuedNotificationEmails(client);
+    const result = await sendQueuedNotificationEmails("org_1", client);
 
     expect(result).toEqual({
       ok: true,

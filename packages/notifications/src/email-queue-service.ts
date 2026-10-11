@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, database } from "@repo/database";
+import { type Database, tenantDatabase } from "@repo/database";
 import { notification_type as notificationTypes } from "@repo/database/generated/enums";
 import { sendNotificationEmail } from "@repo/email";
 import { log } from "@repo/observability/log";
@@ -44,7 +44,7 @@ const QueueSchema = z.object({
 
 export async function enqueueNotificationEmail(
   input: z.input<typeof QueueSchema>,
-  client: EmailQueueDatabase = database
+  providedClient?: EmailQueueDatabase
 ): Promise<
   Result<{ queued: boolean; queueId: string }, EmailQueueServiceError>
 > {
@@ -52,6 +52,7 @@ export async function enqueueNotificationEmail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
   if (!isNotificationType(parsed.data.notificationType)) {
     return validationErrorMessage("Invalid notification type.");
   }
@@ -85,7 +86,8 @@ export async function enqueueNotificationEmail(
 }
 
 export async function sendQueuedNotificationEmails(
-  client: EmailQueueDrainDatabase = database
+  clerkOrgId: string,
+  client: EmailQueueDrainDatabase = tenantDatabase(clerkOrgId)
 ): Promise<
   Result<SendQueuedNotificationEmailsSummary, EmailQueueServiceError>
 > {
@@ -103,7 +105,7 @@ export async function sendQueuedNotificationEmails(
     const rows = await client.notificationEmailQueue.findMany({
       orderBy: { queued_at: "asc" },
       take: 50,
-      where: { status: "queued" },
+      where: { clerk_org_id: clerkOrgId, status: "queued" },
     });
     const summary = { failed: 0, processed: rows.length, sent: 0 };
 
@@ -125,14 +127,20 @@ export async function sendQueuedNotificationEmails(
               sent_at: new Date(),
               status: "sent",
             },
-            where: { id: row.id },
+            where: { clerk_org_id: clerkOrgId, id: row.id },
           });
           summary.sent += 1;
           continue;
         }
 
         summary.failed += 1;
-        await updateFailedEmail(row.id, row.attempts, result.error, client);
+        await updateFailedEmail(
+          clerkOrgId,
+          row.id,
+          row.attempts,
+          result.error,
+          client
+        );
       } catch (error) {
         summary.failed += 1;
         const message =
@@ -143,7 +151,13 @@ export async function sendQueuedNotificationEmails(
           error,
           queueId: row.id,
         });
-        await updateFailedEmail(row.id, row.attempts, message, client);
+        await updateFailedEmail(
+          clerkOrgId,
+          row.id,
+          row.attempts,
+          message,
+          client
+        );
       }
     }
 
@@ -165,6 +179,7 @@ function hasConfiguredEmailTransport(): boolean {
 }
 
 async function updateFailedEmail(
+  clerkOrgId: string,
   id: string,
   attempts: number,
   error: string,
@@ -177,7 +192,7 @@ async function updateFailedEmail(
       last_error: error,
       status: nextAttempts >= 5 ? "failed" : "queued",
     },
-    where: { id },
+    where: { clerk_org_id: clerkOrgId, id },
   });
 }
 

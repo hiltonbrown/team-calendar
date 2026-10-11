@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ database: {} }));
+vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
 
 const mocks = vi.hoisted(() => ({
   count: vi.fn(),
   findFirst: vi.fn(),
   findMany: vi.fn(),
   personFindMany: vi.fn(),
+  tenantDatabase: vi.fn(),
   updateMany: vi.fn(),
 }));
 
@@ -54,6 +55,7 @@ const row = {
 describe("notification-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.tenantDatabase.mockReturnValue(client);
     mocks.count.mockResolvedValue(1);
     mocks.findMany.mockResolvedValue([row]);
     mocks.personFindMany.mockResolvedValue([
@@ -64,6 +66,15 @@ describe("notification-service", () => {
       },
     ]);
     mocks.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it("loads notifications through the account-bound default client", async () => {
+    const result = await listForUser(input);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { notifications: [expect.objectContaining({ id: row.id })] },
+    });
+    expect(mocks.tenantDatabase).toHaveBeenCalledWith(input.clerkOrgId);
   });
 
   it("lists notifications scoped to user and organisation", async () => {
