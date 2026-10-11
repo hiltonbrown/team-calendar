@@ -58,6 +58,16 @@ const getAuditExportLabel = (plan: CataloguePlan) => {
   return "Contact Us";
 };
 
+const connectionLimitLabel = (plan: CataloguePlan) => {
+  if (plan.limits.payroll_entities === -1) {
+    return "Unlimited";
+  }
+  if (plan.limits.payroll_entities === 1) {
+    return "Single";
+  }
+  return `Up to ${plan.limits.payroll_entities}`;
+};
+
 const rows = [
   {
     label: "Staff",
@@ -66,8 +76,7 @@ const rows = [
   },
   {
     label: "Xero connections",
-    value: (plan: CataloguePlan) =>
-      plan.limits.payroll_entities === -1 ? "Multiple" : "Single",
+    value: connectionLimitLabel,
   },
   {
     label: "Calendar feed",

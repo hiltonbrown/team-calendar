@@ -8,7 +8,7 @@ const paidFaqs = [
   },
   {
     answer:
-      "Starter and Premium each include one Xero Payroll connection. Enterprise support for multiple connections is coming soon.",
+      "Starter includes one Xero Payroll connection, Premium includes up to five, and Enterprise includes unlimited connections. Each company shares your account calendar and feeds.",
     question: "What if we run more than one Xero file?",
   },
   {
