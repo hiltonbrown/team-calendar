@@ -1,0 +1,167 @@
+{
+  "projectId": "af77da94-e904-464c-9462-4f8b3cb0b2b0",
+  "shape": "package",
+  "pkg": "@repo/design-system",
+  "globalName": "TeamCalendar",
+  "buildCmd": "bun .design-sync/build-dist.mjs",
+  "entry": "./packages/design-system/dist/entry.ts",
+  "srcDir": "../components",
+  "tsconfig": "./tsconfig.bundle.json",
+  "cssEntry": "./styles.css",
+  "docsDir": "./docs",
+  "guidelinesGlob": [
+    "../../../DESIGN.md"
+  ],
+  "extraEntries": [
+    "./extras.ts"
+  ],
+  "overrides": {
+    "Dialog": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "AlertDialog": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "Sheet": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "Drawer": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "HoverCard": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "ContextMenu": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "Menubar": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "NavigationMenu": {
+      "cardMode": "single",
+      "viewport": "760x560"
+    },
+    "Sidebar": {
+      "cardMode": "single",
+      "viewport": "1100x680"
+    },
+    "TeamTimeline": {
+      "cardMode": "column",
+      "viewport": "1240x760"
+    },
+    "Table": {
+      "cardMode": "column"
+    },
+    "ChartContainer": {
+      "cardMode": "column"
+    },
+    "ResizablePanelGroup": {
+      "cardMode": "column"
+    },
+    "Carousel": {
+      "cardMode": "column"
+    },
+    "Toaster": {
+      "cardMode": "single",
+      "primaryStory": "Variants"
+    },
+    "Checkbox": {
+      "cardMode": "column"
+    },
+    "Command": {
+      "cardMode": "column"
+    },
+    "Field": {
+      "cardMode": "column"
+    },
+    "Form": {
+      "cardMode": "column"
+    },
+    "Input": {
+      "cardMode": "column"
+    },
+    "InputGroup": {
+      "cardMode": "column"
+    },
+    "Label": {
+      "cardMode": "column"
+    },
+    "RadioGroup": {
+      "cardMode": "column"
+    },
+    "Slider": {
+      "cardMode": "column"
+    },
+    "Switch": {
+      "cardMode": "column"
+    },
+    "Textarea": {
+      "cardMode": "column"
+    },
+    "Accordion": {
+      "cardMode": "column"
+    },
+    "AspectRatio": {
+      "cardMode": "column"
+    },
+    "Card": {
+      "cardMode": "column"
+    },
+    "Collapsible": {
+      "cardMode": "column"
+    },
+    "ScrollArea": {
+      "cardMode": "column"
+    },
+    "Separator": {
+      "cardMode": "column"
+    },
+    "Pagination": {
+      "cardMode": "column"
+    },
+    "Tabs": {
+      "cardMode": "column"
+    },
+    "ThemeProvider": {
+      "cardMode": "column"
+    },
+    "ToggleGroup": {
+      "cardMode": "column"
+    },
+    "Item": {
+      "cardMode": "column"
+    },
+    "Alert": {
+      "cardMode": "column"
+    },
+    "Empty": {
+      "cardMode": "column"
+    },
+    "Progress": {
+      "cardMode": "column"
+    },
+    "Skeleton": {
+      "cardMode": "column"
+    }
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

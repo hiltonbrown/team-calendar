@@ -190,3 +190,9 @@ Keep one-off task evidence in that task's review, not here.
 - The marketing homepage team timeline (`DemoTeamCalendar`, `.tl-*` in
   `apps/web/app/styles/home.css`) is the reference pattern for availability on
   every role dashboard. Reuse it rather than inventing a new day strip.
+- "Commit and push" means commit and push the work in hand. Do not edit repo
+  config (biome.jsonc, CI, tooling) to make it pass a check unless asked. First
+  confirm the check actually covers those files (`bun run check` only lints
+  apps, packages, scripts and tooling).
+- When the user says "commit and push" while on main, commit and push to main.
+  Only create a branch if they ask for one.
