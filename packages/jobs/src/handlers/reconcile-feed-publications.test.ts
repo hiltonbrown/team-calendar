@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
       Array<{
         id: string;
         privacyMode: string;
+        organisationId: string | null;
       }>
     >([])
   ),
@@ -103,7 +104,30 @@ describe("reconcileFeedPublications", () => {
       { id: RECORD_B, person_id: PERSON_ID },
     ]);
     mocks.feedIdsForPeople.mockResolvedValue([
-      { id: "20000000-0000-4000-8000-000000000001", privacyMode: "named" },
+      {
+        id: "20000000-0000-4000-8000-000000000001",
+        organisationId: ORGANISATION_ID,
+        privacyMode: "named",
+      },
+    ]);
+  });
+  it("queues account feed rebuilds using the feed's null company scope", async () => {
+    mocks.feedIdsForPeople.mockResolvedValue([
+      {
+        id: "20000000-0000-4000-8000-000000000001",
+        organisationId: null,
+        privacyMode: "named",
+      },
+    ]);
+    mocks.materialiseAvailabilityPublication.mockResolvedValue(
+      materialised(true)
+    );
+    const result = await reconcileFeedPublications(input());
+    expect(result.ok).toBe(true);
+    expect(mocks.inngestSend).toHaveBeenCalledWith([
+      expect.objectContaining({
+        data: expect.objectContaining({ organisationId: null }),
+      }),
     ]);
   });
   it("materialises every record with both scope keys and no per-record invalidation", async () => {

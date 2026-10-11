@@ -17,7 +17,7 @@ export const RebuildFeedCacheInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   connectionId: z.uuid().optional(),
   feedId: z.string().uuid(),
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().nullable(),
   reason: z.string().min(1).optional(),
 });
 export type RebuildFeedCacheInput = z.infer<typeof RebuildFeedCacheInputSchema>;

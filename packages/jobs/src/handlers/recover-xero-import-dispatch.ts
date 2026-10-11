@@ -32,6 +32,7 @@ export async function recoverXeroImportDispatch(
           is_active: true,
         },
         payroll_region: "AU",
+        released_at: null,
         status: "active",
         sync_paused_at: null,
       },

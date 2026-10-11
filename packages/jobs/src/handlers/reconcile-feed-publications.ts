@@ -139,7 +139,7 @@ async function reconcileFeedPublicationsInternal(
           data: {
             clerkOrgId: context.clerkOrgId,
             feedId: feed.id,
-            organisationId: context.organisationId,
+            organisationId: feed.organisationId,
             reason: "publication_reconciled",
           },
           name: "rebuild-feed-cache" as const,

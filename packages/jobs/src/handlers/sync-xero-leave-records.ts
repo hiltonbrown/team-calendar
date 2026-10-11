@@ -41,6 +41,7 @@ import {
 } from "./sync-run-lifecycle";
 import {
   afterXeroBindingCommit,
+  isCurrentXeroSyncBinding,
   rejectRetryableSyncResult,
   resolveSyncTenant,
   syncFailureReason,
@@ -163,10 +164,15 @@ function requiresSnapshotRetry(outcome: ProcessLeaveRecordOutcome): boolean {
       outcome.reason === "stale_local_snapshot")
   );
 }
-type SyncStatus = "cancelled" | "failed" | "partial_success" | "succeeded";
+type SyncStatus =
+  | "ignored"
+  | "cancelled"
+  | "failed"
+  | "partial_success"
+  | "succeeded";
 type SyncXeroLeaveRecordsResult = Result<
   Counts & {
-    runId: string;
+    runId: string | null;
     status: SyncStatus;
   },
   SyncXeroLeaveRecordsError
@@ -218,6 +224,9 @@ async function syncXeroLeaveRecordsInternal(
   const startedAt = new Date();
   let runId: string | null = null;
   try {
+    if (!(await isCurrentXeroSyncBinding(context))) {
+      return { ok: true, value: emptyResult(null, "ignored") };
+    }
     const runAcquisition = await acquireSyncRun(
       context,
       "leave_records",
@@ -1569,8 +1578,8 @@ function emptyCounts(): Counts {
   };
 }
 function emptyResult(
-  runId: string,
-  status: "cancelled" | "failed" | "partial_success" | "succeeded"
+  runId: string | null,
+  status: "ignored" | "cancelled" | "failed" | "partial_success" | "succeeded"
 ) {
   return {
     ...emptyCounts(),

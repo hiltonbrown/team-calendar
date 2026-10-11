@@ -24,6 +24,7 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
 import {
+  isCurrentXeroSyncBinding,
   rejectRetryableSyncResult,
   resolveSyncTenant,
   syncFailureReason,
@@ -164,8 +165,13 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
       failed: number;
       matched: number;
       partial: boolean;
-      runId: string;
-      status: "cancelled" | "failed" | "partial_success" | "succeeded";
+      runId: string | null;
+      status:
+        | "ignored"
+        | "cancelled"
+        | "failed"
+        | "partial_success"
+        | "succeeded";
       withdrawn: number;
     },
     ReconcileApprovalStateError
@@ -179,6 +185,9 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
   const startedAt = new Date();
   let runId: string | null = null;
   try {
+    if (!(await isCurrentXeroSyncBinding(context))) {
+      return { ok: true, value: emptyResult(null, "ignored") };
+    }
     const existingRun = await tenantDatabase(
       context.clerkOrgId
     ).syncRun.findFirst({
@@ -875,8 +884,8 @@ function notificationBody(
   return `${name}'s leave request was withdrawn in Xero Payroll.`;
 }
 function emptyResult(
-  runId: string,
-  status: "cancelled" | "failed" | "partial_success" | "succeeded"
+  runId: string | null,
+  status: "ignored" | "cancelled" | "failed" | "partial_success" | "succeeded"
 ) {
   return {
     approved: 0,

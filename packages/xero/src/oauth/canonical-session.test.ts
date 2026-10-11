@@ -38,6 +38,15 @@ vi.mock("@repo/database", () => {
   };
 });
 vi.mock("@repo/availability", () => ({}));
+vi.mock("@repo/database/queries/xero-ownership", () => ({
+  listXeroTenantOwnership: vi.fn(async () => new Map()),
+}));
+vi.mock("@repo/database/queries/payroll-entitlements", () => ({
+  checkPayrollEntityEntitlement: vi.fn(async () => ({
+    ok: true,
+    value: { allowed: true, current: 0, limit: 5 },
+  })),
+}));
 vi.mock("@repo/feeds", () => ({}));
 vi.mock("@repo/observability/log", () => ({ log: { error: vi.fn() } }));
 vi.mock("../../keys", () => ({
@@ -84,6 +93,7 @@ describe("canonical OAuth sessions", () => {
         {
           connectionId: "remote-link",
           isCurrentConsent: true,
+          state: "available",
           tenantId: "external-file",
           tenantName: "Payroll",
         },

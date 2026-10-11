@@ -73,7 +73,11 @@ vi.mock("@repo/database", async (importOriginal) => {
 
 import { systemDatabase as database, type Person } from "@repo/database";
 import { getRegisteredSyncEventName } from "../events";
+import { initialXeroSync } from "./initial-xero-sync";
+import { reconcileXeroApprovalState } from "./reconcile-xero-approval-state";
 import { acquireSyncRun } from "./sync-run-lifecycle";
+import { syncXeroLeaveBalances } from "./sync-xero-leave-balances";
+import { syncXeroLeaveRecords } from "./sync-xero-leave-records";
 import { syncXeroPeople } from "./sync-xero-people";
 
 // Mock fetchEmployeesForRegion and toPlainLanguageMessage from @repo/xero
@@ -166,6 +170,7 @@ describe("local persistence integration", () => {
     await database.failedRecord.deleteMany({ where: scope });
     await database.syncRun.deleteMany({ where: scope });
     await database.xeroPersonMatch.deleteMany({ where: scope });
+    await database.availabilityRecord.deleteMany({ where: scope });
     await database.person.deleteMany({ where: scope });
     await database.xeroSyncCursor.deleteMany({ where: scope });
     await database.xeroConnection.deleteMany({ where: scope });
@@ -185,6 +190,180 @@ describe("local persistence integration", () => {
     await database.$disconnect();
   });
   describe("sync-xero-people handler", () => {
+    it.each([
+      ["people", syncXeroPeople],
+      ["leave balances", syncXeroLeaveBalances],
+      ["leave records", syncXeroLeaveRecords],
+      ["approval state", reconcileXeroApprovalState],
+      ["initial import", initialXeroSync],
+    ])(
+      "%s ignores a forged account/company pair before creating any run or provider request",
+      async (_name, sync) => {
+        await setupTenant(tenantA);
+        await setupTenant(tenantB);
+        const before = await database.xeroConnection.findMany({
+          orderBy: { id: "asc" },
+          where: { clerk_org_id: { in: [...testClerkOrgIds] } },
+        });
+        const providerRequests = vi.spyOn(globalThis, "fetch");
+        const result = await sync({
+          ...tenantB,
+          clerkOrgId: tenantA.clerkOrgId,
+        });
+        expect(result).toMatchObject({
+          ok: true,
+          value: { status: "ignored" },
+        });
+        expect(mockFetchEmployeesForRegion).not.toHaveBeenCalled();
+        expect(providerRequests).not.toHaveBeenCalled();
+        providerRequests.mockRestore();
+        expect(
+          await database.syncRun.count({
+            where: { clerk_org_id: { in: [...testClerkOrgIds] } },
+          })
+        ).toBe(0);
+        expect(
+          await database.person.count({
+            where: { clerk_org_id: { in: [...testClerkOrgIds] } },
+          })
+        ).toBe(0);
+        expect(
+          await database.xeroConnection.findMany({
+            orderBy: { id: "asc" },
+            where: { clerk_org_id: { in: [...testClerkOrgIds] } },
+          })
+        ).toEqual(before);
+      }
+    );
+    it("ignores a released connection before creating a run", async () => {
+      await setupTenant(tenantA);
+      await database.xeroConnection.update({
+        data: { released_at: new Date() },
+        where: { id: tenantA.connectionId },
+      });
+      const result = await syncXeroPeople(tenantA);
+      expect(result).toMatchObject({
+        ok: true,
+        value: { runId: null, status: "ignored" },
+      });
+      expect(mockFetchEmployeesForRegion).not.toHaveBeenCalled();
+      expect(
+        await database.syncRun.count({
+          where: { clerk_org_id: tenantA.clerkOrgId },
+        })
+      ).toBe(0);
+    });
+    it("a failed company sync preserves its sibling's records and progress, and the sibling completes", async () => {
+      await setupTenant(tenantA);
+      const sibling = { ...tenantB, clerkOrgId: tenantA.clerkOrgId };
+      await setupTenant(sibling);
+      const watermark = new Date("2026-01-01T00:00:00Z");
+      await database.xeroSyncCursor.create({
+        data: {
+          clerk_org_id: sibling.clerkOrgId,
+          entity_type: "people",
+          modified_since: watermark,
+          organisation_id: sibling.organisationId,
+          xero_connection_id: sibling.connectionId,
+        },
+      });
+      await database.xeroConnection.update({
+        data: {
+          last_full_people_sync_at: watermark,
+          last_people_sync_at: watermark,
+        },
+        where: { id: sibling.connectionId },
+      });
+      const person = await database.person.create({
+        data: {
+          clerk_org_id: sibling.clerkOrgId,
+          email: "sibling@example.test",
+          employment_type: "employee",
+          first_name: "Sibling",
+          last_name: "Employee",
+          organisation_id: sibling.organisationId,
+          source_person_key: fixture.id("sibling-employee", 0),
+          source_system: "XERO",
+          xero_employee_id: fixture.id("sibling-employee", 0),
+        },
+      });
+      const connectionBefore = await database.xeroConnection.findUniqueOrThrow({
+        where: { id: sibling.connectionId },
+      });
+      const record = await database.availabilityRecord.create({
+        data: {
+          approval_status: "approved",
+          clerk_org_id: sibling.clerkOrgId,
+          contactability: "unavailable",
+          derived_uid_key: fixture.id("sibling-leave-uid", 0),
+          ends_at: new Date("2026-10-02T00:00:00Z"),
+          organisation_id: sibling.organisationId,
+          person_id: person.id,
+          privacy_mode: "named",
+          record_type: "annual_leave",
+          source_remote_id: fixture.id("sibling-leave", 0),
+          source_type: "xero_leave",
+          starts_at: new Date("2026-10-01T00:00:00Z"),
+        },
+      });
+      mockFetchEmployeesForRegion.mockResolvedValueOnce({
+        error: {
+          code: "validation_error",
+          message: "Malformed provider response",
+        },
+        ok: false,
+      });
+      expect(await syncXeroPeople(tenantA)).toMatchObject({
+        ok: true,
+        value: { status: "failed" },
+      });
+      expect(
+        await database.person.findUnique({ where: { id: person.id } })
+      ).toEqual(person);
+      expect(
+        await database.availabilityRecord.findUnique({
+          where: { id: record.id },
+        })
+      ).toEqual(record);
+      expect(
+        await database.xeroConnection.findUnique({
+          where: { id: sibling.connectionId },
+        })
+      ).toEqual(connectionBefore);
+      expect(
+        await database.xeroSyncCursor.findFirst({
+          where: { xero_connection_id: sibling.connectionId },
+        })
+      ).toMatchObject({ modified_since: watermark });
+      mockFetchEmployeesForRegion.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          complete: true,
+          employees: [],
+          failures: [],
+          rawItemCount: 0,
+          rawResponse: {},
+          seenEmployeeIds: [],
+        },
+      });
+      expect(
+        await syncXeroPeople({ ...sibling, mode: "incremental" })
+      ).toMatchObject({ ok: true, value: { status: "succeeded" } });
+      expect(
+        await database.person.findUnique({ where: { id: person.id } })
+      ).toEqual(person);
+      const cursor = await database.xeroSyncCursor.findFirstOrThrow({
+        where: { xero_connection_id: sibling.connectionId },
+      });
+      expect(cursor.modified_since?.getTime()).toBeGreaterThan(
+        watermark.getTime()
+      );
+      expect(
+        await database.availabilityRecord.findUnique({
+          where: { id: record.id },
+        })
+      ).toEqual(record);
+    });
     it("admits one concurrent same-connection run and preserves duplicate delivery", async () => {
       await setupTenant(tenantA);
       const context = {

@@ -28,6 +28,7 @@ import {
   XeroSyncRunFencedError,
 } from "./sync-run-lifecycle";
 import {
+  isCurrentXeroSyncBinding,
   rejectRetryableSyncResult,
   resolveSyncTenant,
   syncFailureReason,
@@ -74,10 +75,15 @@ interface Counts {
   skipped: number;
   upserted: number;
 }
-type SyncStatus = "cancelled" | "failed" | "partial_success" | "succeeded";
+type SyncStatus =
+  | "ignored"
+  | "cancelled"
+  | "failed"
+  | "partial_success"
+  | "succeeded";
 type SyncXeroLeaveBalancesResult = Result<
   Counts & {
-    runId: string;
+    runId: string | null;
     status: SyncStatus;
     hasMore?: boolean;
   },
@@ -137,6 +143,9 @@ async function syncXeroLeaveBalancesInternal(
   const startedAt = new Date();
   let runId: string | null = null;
   try {
+    if (!(await isCurrentXeroSyncBinding(context))) {
+      return { ok: true, value: emptyResult(null, "ignored") };
+    }
     const runAcquisition = await acquireSyncRun(
       context,
       "leave_balances",
@@ -695,7 +704,7 @@ function emptyCounts(): Counts {
     upserted: 0,
   };
 }
-function emptyResult(runId: string, status: SyncStatus) {
+function emptyResult(runId: string | null, status: SyncStatus) {
   return {
     ...emptyCounts(),
     runId,

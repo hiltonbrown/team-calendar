@@ -103,9 +103,9 @@ describe("sync run lifecycle guards", () => {
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
   });
   it("finalises a created run as failed when work throws after creation", async () => {
-    mocks.xeroConnectionFindFirst.mockRejectedValue(
-      new Error("database hiccup")
-    );
+    mocks.xeroConnectionFindFirst
+      .mockResolvedValueOnce({ id: XERO_CONNECTION_ID })
+      .mockRejectedValue(new Error("database hiccup"));
     const result = await syncXeroLeaveRecords(input());
     expect(result).toEqual({
       error: {

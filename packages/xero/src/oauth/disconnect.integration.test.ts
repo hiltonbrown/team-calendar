@@ -173,6 +173,201 @@ function providerPort(
   };
 }
 describe("canonical disconnect isolation", () => {
+  it.each([403, 500])(
+    "keeps a removed company's ownership on uncertain remote response %s",
+    async (status) => {
+      const { removeXeroCompany } = await import("./disconnect");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(null, { status }))
+      );
+      expect(
+        await removeXeroCompany({
+          clerkOrgId: tenantA.clerkOrgId,
+          connectionId: tenantA.connectionId,
+          organisationId: tenantA.organisationId,
+          role: "owner",
+        })
+      ).toMatchObject({ ok: false });
+      expect(
+        await database.xeroConnection.findUnique({
+          where: { id: tenantA.connectionId },
+        })
+      ).toMatchObject({ released_at: null, status: "active" });
+      expect(
+        await database.organisation.findUnique({
+          where: { id: tenantA.organisationId },
+        })
+      ).toMatchObject({ archived_at: null, is_active: true });
+    }
+  );
+  it("removes a previously confirmed soft disconnect without another provider request", async () => {
+    expect(await disconnect()).toMatchObject({ ok: true });
+    const { removeXeroCompany } = await import("./disconnect");
+    expect(
+      await removeXeroCompany({
+        clerkOrgId: tenantA.clerkOrgId,
+        connectionId: tenantA.connectionId,
+        organisationId: tenantA.organisationId,
+        role: "owner",
+      })
+    ).toMatchObject({ ok: true, value: { state: "removed" } });
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: tenantA.connectionId },
+      })
+    ).toMatchObject({ released_at: expect.any(Date), status: "disconnected" });
+    expect(
+      await database.organisation.findUnique({
+        where: { id: tenantA.organisationId },
+      })
+    ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+  it("does not release a disconnected binding without confirmed disconnect audit evidence", async () => {
+    await database.xeroConnection.update({
+      data: {
+        disconnected_at: new Date(),
+        remote_connection_id: null,
+        status: "disconnected",
+        xero_authorisation_id: null,
+      },
+      where: { id: tenantA.connectionId },
+    });
+    const { removeXeroCompany } = await import("./disconnect");
+    expect(
+      await removeXeroCompany({
+        clerkOrgId: tenantA.clerkOrgId,
+        connectionId: tenantA.connectionId,
+        organisationId: tenantA.organisationId,
+        role: "owner",
+      })
+    ).toMatchObject({ ok: false });
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: tenantA.connectionId },
+      })
+    ).toMatchObject({ released_at: null });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+  it("removes once, archives Xero state, preserves a live Add grant and sibling connection", async () => {
+    const { removeXeroCompany } = await import("./disconnect");
+    await database.xeroOAuthSession.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        expires_at: new Date(Date.now() + 60_000),
+        id: tenantA.sessionId,
+        organisation_id: null,
+        return_to: "/settings",
+        status: "selecting",
+        xero_authorisation_id: tenantA.authorisationId,
+      },
+    });
+    const companyFeed = await database.feed.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        name: "Manual company calendar",
+        organisation_id: tenantA.organisationId,
+        slug: `remove-${tenantA.connectionId}`,
+      },
+    });
+    const companyToken = await database.feedToken.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        feed_id: companyFeed.id,
+        organisation_id: tenantA.organisationId,
+        token_hash: `synthetic-${companyFeed.id}`,
+        token_hint: "synthetic",
+      },
+    });
+    const accountFeed = await database.feed.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        name: "Account",
+        organisation_id: null,
+        slug: `account-${tenantA.connectionId}`,
+      },
+    });
+    const holidayPublication = await database.feedEventPublication.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        feed_id: accountFeed.id,
+        organisation_id: null,
+        published_at: new Date(),
+        published_uid: `synthetic-${accountFeed.id}`,
+        representation_hash: "synthetic",
+        source_key: `holiday:${tenantA.organisationId}:synthetic-holiday`,
+      },
+    });
+    const sibling = await database.xeroConnection.findUniqueOrThrow({
+      where: { id: tenantB.connectionId },
+    });
+    const input = {
+      clerkOrgId: tenantA.clerkOrgId,
+      connectionId: tenantA.connectionId,
+      organisationId: tenantA.organisationId,
+      role: "owner" as const,
+    };
+    expect(await removeXeroCompany(input)).toMatchObject({
+      ok: true,
+      value: { state: "removed" },
+    });
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: tenantA.connectionId },
+      })
+    ).toMatchObject({ released_at: expect.any(Date), status: "disconnected" });
+    expect(
+      await database.organisation.findUnique({
+        where: { id: tenantA.organisationId },
+      })
+    ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
+    expect(
+      await database.person.findUnique({ where: { id: tenantA.xeroPersonId } })
+    ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
+    expect(
+      await database.availabilityRecord.findUnique({
+        where: { id: tenantA.availabilityRecordId },
+      })
+    ).toMatchObject({
+      archived_at: expect.any(Date),
+      publish_status: "archived",
+    });
+    expect(
+      await database.xeroAuthorisation.findUnique({
+        where: { id: tenantA.authorisationId },
+      })
+    ).not.toBeNull();
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: tenantB.connectionId },
+      })
+    ).toEqual(sibling);
+    expect(
+      await database.feed.findUnique({ where: { id: companyFeed.id } })
+    ).toMatchObject({ archived_at: expect.any(Date), status: "archived" });
+    expect(
+      await database.feedToken.findUnique({ where: { id: companyToken.id } })
+    ).toMatchObject({ revoked_at: expect.any(Date), status: "revoked" });
+    expect(
+      await database.feed.findUnique({ where: { id: accountFeed.id } })
+    ).toMatchObject({ archived_at: null, status: "active" });
+    expect(
+      await database.feedEventPublication.findUnique({
+        where: { id: holidayPublication.id },
+      })
+    ).toMatchObject({ present: false });
+    expect(await removeXeroCompany(input)).toMatchObject({ ok: true });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+    expect(
+      await database.auditEvent.count({
+        where: { action: "company_removed", clerk_org_id: tenantA.clerkOrgId },
+      })
+    ).toBe(1);
+    expect(
+      await database.syncRun.findUnique({ where: { id: tenantA.syncRunId } })
+    ).not.toBeNull();
+  });
   it("keeps the closing session reference for a normal scheduler retry after prune failure", async () => {
     await database.xeroOAuthSession.create({
       data: {

@@ -26,6 +26,7 @@ import {
   XeroSyncRunFencedError,
 } from "./sync-run-lifecycle";
 import {
+  isCurrentXeroSyncBinding,
   rejectRetryableSyncResult,
   resolveSyncTenant,
   syncFailureReason,
@@ -98,8 +99,13 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       upserted: number;
       skipped: number;
       failed: number;
-      runId: string;
-      status: "cancelled" | "failed" | "partial_success" | "succeeded";
+      runId: string | null;
+      status:
+        | "ignored"
+        | "cancelled"
+        | "failed"
+        | "partial_success"
+        | "succeeded";
     },
     SyncXeroPeopleError
   >
@@ -117,6 +123,9 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
   const startedAt = new Date();
   let runId: string | null = null;
   try {
+    if (!(await isCurrentXeroSyncBinding(context))) {
+      return { ok: true, value: emptyResult(null, "ignored") };
+    }
     const runAcquisition = await acquireSyncRun(context, "people", startedAt);
     if (runAcquisition.kind === "terminal") {
       const term = runAcquisition.run;
@@ -630,8 +639,8 @@ function emptyCounts() {
   };
 }
 function emptyResult(
-  runId: string,
-  status: "cancelled" | "failed" | "partial_success" | "succeeded"
+  runId: string | null,
+  status: "ignored" | "cancelled" | "failed" | "partial_success" | "succeeded"
 ) {
   return {
     failed: 0,

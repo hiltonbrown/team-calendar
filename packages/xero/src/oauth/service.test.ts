@@ -88,6 +88,16 @@ vi.mock("./identity", () => ({
 vi.mock("@repo/observability/log", () => ({ log: loggerMock }));
 vi.mock("@repo/feeds", () => feedMock);
 vi.mock("@repo/availability", () => availabilityMock);
+vi.mock("@repo/database/queries/xero-ownership", () => ({
+  claimXeroTenant: vi.fn(async () => ({ status: "unowned" })),
+  listXeroTenantOwnership: vi.fn(async () => new Map()),
+}));
+vi.mock("@repo/database/queries/payroll-entitlements", () => ({
+  checkPayrollEntityEntitlement: vi.fn(async () => ({
+    ok: true,
+    value: { allowed: true, current: 0, limit: 5 },
+  })),
+}));
 const {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
@@ -210,11 +220,8 @@ describe("isPreviewDeployment", () => {
 });
 
 describe("buildXeroOAuthStartUrl", () => {
-  it.each([
-    { clerkOrgId: "org_1", userId: "user_1" },
-    { clerkOrgId: "org_1", organisationId: "payroll_1" },
-  ])(
-    "requires the Organisation and initiating user before consent: %j",
+  it.each([{ clerkOrgId: "org_1", organisationId: "payroll_1" }])(
+    "requires the initiating user before consent: %j",
     async (input) => {
       expect(await buildXeroOAuthStartUrl(input)).toMatchObject({
         error: { code: "invalid_state" },

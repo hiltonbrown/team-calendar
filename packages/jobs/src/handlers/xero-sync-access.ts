@@ -68,6 +68,7 @@ export async function withXeroBinding<T>(
           clerk_org_id: scope.clerkOrgId,
           id: scope.connectionId,
           organisation_id: scope.organisationId,
+          released_at: null,
           status: "active",
           sync_paused_at: null,
           ...(scope.expectedXeroTenantId
@@ -121,6 +122,7 @@ export async function resolveSyncTenant(
       clerk_org_id: scope.clerkOrgId,
       id: scope.connectionId,
       organisation_id: scope.organisationId,
+      released_at: null,
     },
   });
   if (!loaded || loaded.sync_paused_at) {
@@ -170,6 +172,21 @@ export async function resolveSyncTenant(
       ),
     },
   };
+}
+/** Reject stale or forged events before creating a run or touching credentials. */
+export async function isCurrentXeroSyncBinding(scope: XeroSyncScope) {
+  const connection = await tenantDatabase(
+    scope.clerkOrgId
+  ).xeroConnection.findFirst({
+    select: { id: true },
+    where: {
+      clerk_org_id: scope.clerkOrgId,
+      id: scope.connectionId,
+      organisation_id: scope.organisationId,
+      released_at: null,
+    },
+  });
+  return connection !== null;
 }
 export function syncFailureReason(error: XeroWriteError): string {
   if (error.recoveryReason) {

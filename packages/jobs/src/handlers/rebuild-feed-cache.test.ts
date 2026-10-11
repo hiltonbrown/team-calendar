@@ -112,6 +112,17 @@ describe("rebuildFeedCache", () => {
       updated_at: new Date("2026-05-01T00:00:00.000Z"),
     });
   });
+  it("rebuilds account-wide feeds with null company scope", async () => {
+    const result = await rebuildFeedCache(input({ organisationId: null }));
+    expect(result.ok).toBe(true);
+    expect(mocks.renderFeedBody).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: CLERK_ORG_ID,
+        feedId: FEED_ID,
+        organisationId: null,
+      })
+    );
+  });
   it("scopes the feed lookup by both clerk org and organisation", async () => {
     await rebuildFeedCache(input());
     expect(mocks.feedFindFirst).toHaveBeenCalledWith(

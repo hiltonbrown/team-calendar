@@ -118,6 +118,25 @@ describe("Xero sync connection lock", () => {
     ).rejects.toBeInstanceOf(XeroBindingChangedError);
     expect(mocks.writes).not.toHaveBeenCalled();
   });
+  it("excludes released bindings from provider access and persistence", async () => {
+    mocks.resolve.mockResolvedValue({
+      ok: true,
+      value: { connectionId: scope.connectionId },
+    });
+    mocks.find.mockImplementation(async ({ where }) =>
+      where.released_at === null ? null : { id: scope.connectionId }
+    );
+    await expect(
+      resolveSyncTenant(scope, "payroll.employees.read")
+    ).rejects.toBeInstanceOf(XeroBindingChangedError);
+    await expect(
+      withXeroBinding(scope, (tx) =>
+        tx.person.updateMany({ data: { is_active: false } })
+      )
+    ).rejects.toBeInstanceOf(XeroBindingChangedError);
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.writes).not.toHaveBeenCalled();
+  });
   it("rejects mismatched scope nesting rather than reusing a sibling transaction", async () => {
     await expect(
       withXeroBinding(scope, async () =>
