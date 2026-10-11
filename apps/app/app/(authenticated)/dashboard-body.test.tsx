@@ -14,11 +14,13 @@ vi.mock("@repo/availability", () => ({
   resolveDashboardRole: mocks.resolveDashboardRole,
 }));
 vi.mock("@repo/database", () => ({
-  database: { person: { findFirst: mocks.personFindFirst } },
   scopedQuery: (clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   }),
+  tenantDatabase: vi.fn(() => ({
+    person: { findFirst: mocks.personFindFirst },
+  })),
 }));
 vi.mock("@/components/dashboard/admin-empty-view", () => ({
   AdminEmptyView: () => <div>Admin empty view</div>,

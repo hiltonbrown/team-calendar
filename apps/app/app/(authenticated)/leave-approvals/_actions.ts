@@ -16,7 +16,7 @@ import {
   revertApprovalAttempt,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
@@ -71,7 +71,9 @@ export async function approveAction(input: {
     }
     if (result.value.approvedAt) {
       try {
-        const first = await database.availabilityRecord.findFirst({
+        const first = await tenantDatabase(
+          context.value.clerkOrgId
+        ).availabilityRecord.findFirst({
           orderBy: { approved_at: "asc" },
           select: { approved_at: true },
           where: {
@@ -324,7 +326,9 @@ async function resolveActionContext(
   if (!context.ok) {
     return notAuthorised(context.error.message);
   }
-  const actingPerson = await database.person.findFirst({
+  const actingPerson = await tenantDatabase(
+    context.value.clerkOrgId
+  ).person.findFirst({
     select: { id: true },
     where: {
       archived_at: null,

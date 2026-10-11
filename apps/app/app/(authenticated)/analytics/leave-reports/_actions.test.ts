@@ -22,7 +22,7 @@ vi.mock("@repo/availability", () => ({
   resolveDateRange: mocks.resolveDateRange,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
+  tenantDatabase: vi.fn(() => mocks.database),
 }));
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,

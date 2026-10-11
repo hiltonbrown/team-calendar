@@ -10,7 +10,7 @@ import {
   type OrganisationId,
   xeroRecoveryMessage,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
@@ -50,40 +50,43 @@ async function loadCalendarResources(
   role: CalendarRole,
   scope: CalendarScope
 ) {
-  const [organisation, teams, locations, xeroConnection] = await Promise.all([
-    database.organisation.findFirst({
-      select: { name: true, timezone: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-    database.team.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.location.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.xeroConnection.findFirst({
-      select: {
-        last_leave_records_sync_at: true,
-        last_sync_error_message: true,
-        leave_records_stale_since: true,
-        sync_paused_at: true,
-        tenant_name: true,
-      },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        organisation_id: organisationId,
-      },
-    }),
-  ]);
+  const [organisation, teams, locations, xeroConnection] =
+    await tenantTransaction(clerkOrgId, (tx) =>
+      Promise.all([
+        tx.organisation.findFirst({
+          select: { name: true, timezone: true },
+          where: {
+            archived_at: null,
+            clerk_org_id: clerkOrgId,
+            id: organisationId,
+          },
+        }),
+        tx.team.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+          where: scopedQuery(clerkOrgId, organisationId),
+        }),
+        tx.location.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+          where: scopedQuery(clerkOrgId, organisationId),
+        }),
+        tx.xeroConnection.findFirst({
+          select: {
+            last_leave_records_sync_at: true,
+            last_sync_error_message: true,
+            leave_records_stale_since: true,
+            sync_paused_at: true,
+            tenant_name: true,
+          },
+          where: {
+            archived_at: null,
+            clerk_org_id: clerkOrgId,
+            organisation_id: organisationId,
+          },
+        }),
+      ])
+    );
   const timezone = organisation?.timezone ?? "UTC";
   const anchorDate = parsedFilters.anchor
     ? new Date(`${parsedFilters.anchor}T12:00:00.000Z`)
@@ -131,7 +134,7 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
     redirect("/");
   }
   const role = calendarRole(orgRole);
-  const currentPerson = await database.person.findFirst({
+  const currentPerson = await tenantDatabase(clerkOrgId).person.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(clerkOrgId, organisationId),

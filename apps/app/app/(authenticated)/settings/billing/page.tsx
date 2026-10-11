@@ -2,11 +2,11 @@ import { requireRole } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import { getBillingSummary } from "@repo/availability";
 import {
-  database,
   getActivationDashboardSummary,
   getSubscriptionForOrg,
   getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg,
+  tenantDatabase,
 } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -64,7 +64,7 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
       getActivationDashboardSummary({ clerkOrgId, organisationId }),
     ]);
 
-  await database.auditEvent.create({
+  await tenantDatabase(clerkOrgId).auditEvent.create({
     data: {
       action: "billing.viewed",
       actor_display:

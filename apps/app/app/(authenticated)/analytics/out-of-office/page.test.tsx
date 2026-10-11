@@ -19,7 +19,9 @@ vi.mock("@repo/availability", () => ({
   aggregateOutOfOffice: mocks.aggregateOutOfOffice,
   resolveDateRange: mocks.resolveDateRange,
 }));
-vi.mock("@repo/database", () => ({ database: mocks.database }));
+vi.mock("@repo/database", () => ({
+  tenantDatabase: vi.fn(() => mocks.database),
+}));
 vi.mock("@/lib/auth/require-page-role", () => ({
   PermissionDeniedError: class PermissionDeniedError extends Error {},
   requirePageRole: mocks.requirePageRole,

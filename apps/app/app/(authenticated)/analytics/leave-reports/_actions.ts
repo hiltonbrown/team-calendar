@@ -9,7 +9,7 @@ import {
   resolveDateRange,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
@@ -67,7 +67,9 @@ export async function exportLeaveReportsCsvAction(input: {
   }
 
   try {
-    const organisation = await database.organisation.findFirst({
+    const organisation = await tenantDatabase(
+      context.value.clerkOrgId
+    ).organisation.findFirst({
       select: { timezone: true },
       where: {
         archived_at: null,

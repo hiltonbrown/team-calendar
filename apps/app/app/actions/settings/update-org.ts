@@ -1,7 +1,7 @@
 "use server";
 
 import { auth, clerkClient } from "@repo/auth/server";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
@@ -59,7 +59,7 @@ export const updateOrg = async (
       return { error: contextResult.error.message, ok: false };
     }
 
-    const updateResult = await database.organisation.updateMany({
+    const updateResult = await tenantDatabase(orgId).organisation.updateMany({
       data: {
         fiscal_year_start: fiscalYearStart,
         locale,

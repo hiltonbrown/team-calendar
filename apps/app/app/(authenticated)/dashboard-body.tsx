@@ -6,7 +6,7 @@ import {
   resolveDashboardRole,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { AdminEmptyView } from "@/components/dashboard/admin-empty-view";
 import { AdminView } from "@/components/dashboard/admin-view";
 import { EmployeeView } from "@/components/dashboard/employee-view";
@@ -37,7 +37,7 @@ export async function DashboardBody({
   weekAnchor,
 }: DashboardBodyProps) {
   const [actingPerson, roleResult] = await Promise.all([
-    database.person.findFirst({
+    tenantDatabase(clerkOrgId).person.findFirst({
       select: { id: true },
       where: {
         ...scopedQuery(clerkOrgId, organisationId),

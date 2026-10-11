@@ -26,10 +26,10 @@ vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     availabilityRecord: { findFirst: mocks.availabilityFindFirst },
     organisation: { findFirst: mocks.organisationFindFirst },
-  },
+  })),
 }));
 vi.mock("@repo/xero", () => ({
   XeroWriteAdapter: {},

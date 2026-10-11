@@ -24,7 +24,10 @@ vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
+  tenantDatabase: vi.fn(() => mocks.database),
+  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+    mocks.database.$transaction(operation)
+  ),
 }));
 vi.mock("@repo/next-config/keys", () => ({
   keys: mocks.coreKeys,

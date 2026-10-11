@@ -29,14 +29,22 @@ vi.mock("@repo/availability", () => ({
   getCalendarRange: mocks.getCalendarRange,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn(() => ({
     location: { findMany: mocks.locationFindMany },
     organisation: { findFirst: mocks.organisationFindFirst },
     person: { findFirst: mocks.personFindFirst },
     team: { findMany: mocks.teamFindMany },
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-  },
-  scopedQuery: mocks.scopedQuery,
+  })),
+  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+    operation({
+      location: { findMany: mocks.locationFindMany },
+      organisation: { findFirst: mocks.organisationFindFirst },
+      team: { findMany: mocks.teamFindMany },
+      xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
+    })
+  ),
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,

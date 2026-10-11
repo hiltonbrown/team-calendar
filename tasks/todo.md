@@ -829,3 +829,25 @@ Verification (local disposable PostgreSQL 16 with the new migration applied, and
 - `bun run test`: 17 of 18 tasks passed in the Turbo run; `app#test` failed one existing test (`xero-client.test.tsx`, "keeps connection history and a retry available after destructive disconnect fails") that could not find a dialog button under parallel load. It passed three isolated reruns and a full `apps/app` rerun (139 files, 835 tests). This branch does not change that component; treat it as an intermittent, load-sensitive test to stabilise separately.
 - `bun run test:integration --continue`: database 58, app 10, availability 26, feeds 31, jobs 84 passed. `@repo/xero` failed 51 of 102, identical to the base commit `970906b` (environmental, mostly `network_error`).
 - Browser rendering NOT VERIFIED: no Clerk keys in this environment. Before release, walk the owner wizard with Xero (single and multiple payroll files), without Xero, an OAuth cancel, and the member welcome for linked and unlinked members, at desktop and mobile widths in light and dark.
+
+## Xero multi-company accounts (2026-10-10 plan)
+
+- [x] Task 1: RLS roles, grants and policies
+- [x] Task 2: Tenant and system clients
+- [x] Task 3: Migrate all tenant call sites
+- [ ] Task 4: Plan limits and pricing
+- [ ] Task 5: Ownership release and conflict checks
+- [ ] Task 6: Company creation through tenant selection
+- [ ] Task 7: Reauthorisation and administrator replacement
+- [ ] Task 8: Disconnect and Remove company
+- [ ] Task 9: Consolidated calendar
+- [ ] Task 10: Account-wide feeds
+- [ ] Task 11: Jobs isolation
+- [ ] Task 12: Integration permissions
+- [ ] Task 13: Multi-company UI
+- [ ] Task 14: Documentation
+- [ ] Task 15: Verification and PR
+
+### Review
+
+Implementation in progress. Verification evidence will be recorded here.

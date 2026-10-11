@@ -1,7 +1,7 @@
 import "server-only";
 
 import { COUNTRIES, REGIONS } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 
@@ -27,7 +27,7 @@ export async function loadNewHolidayFormData(orgParam?: string) {
   await requirePageRole("org:admin");
   const { clerkOrgId, organisationId } =
     await requireActiveOrgPageContext(orgParam);
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
     select: { country_code: true },
     where: { clerk_org_id: clerkOrgId, id: organisationId },
   });

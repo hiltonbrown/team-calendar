@@ -47,11 +47,11 @@ vi.mock("@repo/database/queries/xero-connection-state", () => ({
   getXeroConnectionState: mocks.getXeroConnectionState,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     auditEvent: { create: mocks.auditEventCreate },
     xeroConnection: { findFirst: mocks.xeroConnectionFindFirst },
     xeroOAuthSession: { findFirst: mocks.sessionFind },
-  },
+  })),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,

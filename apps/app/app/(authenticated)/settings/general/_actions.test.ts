@@ -21,7 +21,9 @@ vi.mock("@repo/auth/server", () => ({
   clerkClient: mocks.clerkClient,
   currentUser: mocks.currentUser,
 }));
-vi.mock("@repo/database", () => ({ database: mocks.database }));
+vi.mock("@repo/database", () => ({
+  tenantDatabase: vi.fn(() => mocks.database),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("@/lib/server/get-active-org-context", () => ({

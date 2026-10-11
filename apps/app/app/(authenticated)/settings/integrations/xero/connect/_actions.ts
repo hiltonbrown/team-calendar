@@ -1,7 +1,7 @@
 "use server";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import { completeXeroTenantSelection } from "@repo/xero";
 import { captureXeroConnected } from "@repo/xero/activation";
@@ -47,7 +47,7 @@ export async function completeTenantSelectionAction(input: {
   ) {
     return notAuthorised();
   }
-  const session = await database.xeroOAuthSession.findFirst({
+  const session = await tenantDatabase(orgId).xeroOAuthSession.findFirst({
     select: { organisation_id: true },
     where: {
       clerk_org_id: orgId,
@@ -62,7 +62,7 @@ export async function completeTenantSelectionAction(input: {
     }>
   > => {
     const existingConnection = organisationId
-      ? await database.xeroConnection.findFirst({
+      ? await tenantDatabase(orgId).xeroConnection.findFirst({
           select: { id: true },
           where: {
             clerk_org_id: orgId,
@@ -87,7 +87,7 @@ export async function completeTenantSelectionAction(input: {
       };
     }
     try {
-      await database.auditEvent.create({
+      await tenantDatabase(orgId).auditEvent.create({
         data: {
           action: existingConnection
             ? "xero.connection_reconnected"

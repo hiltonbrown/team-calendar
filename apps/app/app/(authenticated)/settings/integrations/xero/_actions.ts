@@ -1,7 +1,7 @@
 "use server";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase, tenantTransaction } from "@repo/database";
 import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
@@ -90,7 +90,9 @@ export async function disconnectXeroAction(input: {
   if (!context.ok) {
     return context;
   }
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(
+    context.value.clerkOrgId
+  ).organisation.findFirst({
     select: { name: true },
     where: {
       clerk_org_id: context.value.clerkOrgId,
@@ -100,7 +102,9 @@ export async function disconnectXeroAction(input: {
   if (!organisation || organisation.name !== parsed.data.confirmationText) {
     return validationError("Type the organisation name to confirm disconnect.");
   }
-  const connection = await database.xeroConnection.findFirst({
+  const connection = await tenantDatabase(
+    context.value.clerkOrgId
+  ).xeroConnection.findFirst({
     select: { id: true },
     where: {
       clerk_org_id: context.value.clerkOrgId,
@@ -178,33 +182,36 @@ async function updateTenantPauseState(
     return context;
   }
   return await (async () => {
-    const updated = await database.$transaction(async (tx) => {
-      const result = await tx.xeroConnection.updateMany({
-        data: { sync_paused_at: paused ? new Date() : null },
-        where: {
-          clerk_org_id: context.value.clerkOrgId,
-          id: parsed.data.connectionId,
-          organisation_id: context.value.organisationId,
-        },
-      });
-      if (result.count === 0) {
-        return false;
+    const updated = await tenantTransaction(
+      context.value.clerkOrgId,
+      async (tx) => {
+        const result = await tx.xeroConnection.updateMany({
+          data: { sync_paused_at: paused ? new Date() : null },
+          where: {
+            clerk_org_id: context.value.clerkOrgId,
+            id: parsed.data.connectionId,
+            organisation_id: context.value.organisationId,
+          },
+        });
+        if (result.count === 0) {
+          return false;
+        }
+        await tx.auditEvent.create({
+          data: {
+            ...auditBase(context.value),
+            action: paused
+              ? "xero.tenant_sync_paused"
+              : "xero.tenant_sync_resumed",
+            entity_id: parsed.data.connectionId,
+            entity_type: "xero_tenant",
+            metadata: {},
+            resource_id: parsed.data.connectionId,
+            resource_type: "xero_tenant",
+          },
+        });
+        return true;
       }
-      await tx.auditEvent.create({
-        data: {
-          ...auditBase(context.value),
-          action: paused
-            ? "xero.tenant_sync_paused"
-            : "xero.tenant_sync_resumed",
-          entity_id: parsed.data.connectionId,
-          entity_type: "xero_tenant",
-          metadata: {},
-          resource_id: parsed.data.connectionId,
-          resource_type: "xero_tenant",
-        },
-      });
-      return true;
-    });
+    );
     if (!updated) {
       return validationError("Xero tenant was not found in this organisation.");
     }

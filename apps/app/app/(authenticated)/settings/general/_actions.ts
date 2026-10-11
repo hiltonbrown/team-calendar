@@ -2,7 +2,7 @@
 
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
 import { normaliseRegionCode, type Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
@@ -55,7 +55,7 @@ export async function updateAccountNameAction(input: {
       name: parsed.data.name,
     });
 
-    await database.auditEvent.create({
+    await tenantDatabase(context.value.clerkOrgId).auditEvent.create({
       data: {
         action: "account.name_changed",
         actor_display: context.value.actorDisplay,
@@ -109,7 +109,9 @@ export async function updateOrganisationAction(input: {
   }
 
   try {
-    const organisation = await database.organisation.findFirst({
+    const organisation = await tenantDatabase(
+      context.value.clerkOrgId
+    ).organisation.findFirst({
       select: {
         country_code: true,
         name: true,
@@ -157,7 +159,9 @@ export async function updateOrganisationAction(input: {
       }
     }
 
-    const updated = await database.organisation.update({
+    const updated = await tenantDatabase(
+      context.value.clerkOrgId
+    ).organisation.update({
       data: {
         country_code: countryCode,
         name: parsed.data.name ?? organisation.name,
@@ -173,7 +177,7 @@ export async function updateOrganisationAction(input: {
       where: { id: context.value.organisationId },
     });
 
-    await database.auditEvent.create({
+    await tenantDatabase(context.value.clerkOrgId).auditEvent.create({
       data: {
         action: "organisation.updated",
         actor_display: context.value.actorDisplay,

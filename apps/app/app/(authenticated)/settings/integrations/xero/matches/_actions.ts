@@ -6,7 +6,7 @@ import {
   mergeCandidateIntoXeroPerson,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -110,7 +110,7 @@ async function resolveCallerContext(
 }
 
 function loadMatch(context: OrgContextValue, matchId: string) {
-  return database.xeroPersonMatch.findFirst({
+  return tenantDatabase(context.clerkOrgId).xeroPersonMatch.findFirst({
     include: {
       candidate_person: {
         select: {
@@ -161,7 +161,7 @@ async function resolveClerkUserId(args: {
   }
 
   if (resolvedClerkUserId) {
-    const alreadyLinked = await database.person.findFirst({
+    const alreadyLinked = await tenantDatabase(orgId).person.findFirst({
       select: { id: true },
       where: {
         clerk_org_id: orgId,

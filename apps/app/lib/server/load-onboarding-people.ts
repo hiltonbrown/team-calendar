@@ -1,6 +1,6 @@
 import "server-only";
 
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import {
   toXeroPersonMatchView,
   type XeroPersonMatchView,
@@ -38,12 +38,12 @@ export async function loadOnboardingPeople(input: {
   };
   const [peopleCount, actingPerson, matches, unlinked, managers] =
     await Promise.all([
-      database.person.count({ where: scope }),
-      database.person.findFirst({
+      tenantDatabase(input.clerkOrgId).person.count({ where: scope }),
+      tenantDatabase(input.clerkOrgId).person.findFirst({
         select: { first_name: true, id: true, last_name: true },
         where: { ...scope, clerk_user_id: input.userId },
       }),
-      database.xeroPersonMatch.findMany({
+      tenantDatabase(input.clerkOrgId).xeroPersonMatch.findMany({
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: xeroPersonMatchSelect,
         // One extra row tells the step to link to the full matches page.
@@ -54,13 +54,13 @@ export async function loadOnboardingPeople(input: {
           status: "pending",
         },
       }),
-      database.person.findMany({
+      tenantDatabase(input.clerkOrgId).person.findMany({
         orderBy: [{ first_name: "asc" }, { last_name: "asc" }],
         select: { email: true, first_name: true, id: true, last_name: true },
         take: ROSTER_LIMIT,
         where: { ...scope, clerk_user_id: null, is_active: true },
       }),
-      database.person.findMany({
+      tenantDatabase(input.clerkOrgId).person.findMany({
         distinct: ["manager_person_id"],
         select: { manager_person_id: true },
         where: { ...scope, is_active: true, manager_person_id: { not: null } },
