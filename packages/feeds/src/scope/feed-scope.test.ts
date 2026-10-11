@@ -5,13 +5,17 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     person: {
       findMany: mocks.personFindMany,
     },
-  },
-}));
+  };
+  return {
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 
 const { canViewFeed, resolvePeopleForFeed, resolveScopeRows } = await import(
   "./feed-scope"

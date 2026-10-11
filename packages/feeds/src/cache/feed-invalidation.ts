@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { loadFeedScopeData, resolvePeopleForFeed } from "../scope/feed-scope";
 import {
@@ -29,7 +29,7 @@ export async function feedIdsForPeople(input: {
   const preloaded = preloadedResult.ok ? preloadedResult.value : undefined;
 
   const wanted = new Set(input.personIds);
-  const feeds = await database.feed.findMany({
+  const feeds = await tenantDatabase(input.clerkOrgId).feed.findMany({
     select: feedScopeSelect,
     where: {
       archived_at: null,

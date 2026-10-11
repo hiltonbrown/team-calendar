@@ -22,8 +22,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     $queryRaw: mocks.queryRaw,
     $transaction: mocks.transaction,
     auditEvent: {
@@ -39,9 +39,15 @@ vi.mock("@repo/database", () => ({
       update: mocks.feedTokenUpdate,
       updateMany: mocks.feedTokenUpdateMany,
     },
-  },
-  scopedTo: mocks.scopedTo,
-}));
+  };
+  return {
+    scopedTo: mocks.scopedTo,
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback, options) =>
+      client.$transaction(callback, options)
+    ),
+  };
+});
 vi.mock("../cache/feed-cache", () => ({
   invalidateFeedCache: mocks.invalidateFeedCache,
 }));

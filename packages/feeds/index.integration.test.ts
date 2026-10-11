@@ -38,7 +38,10 @@ const {
   signedFeedTokenId,
   updateFeed,
 } = await import("./index");
-const { database } = await import("@repo/database");
+// The owner client is restricted to fixture setup and assertions; services use the app role.
+const { systemDatabase: database, tenantTransaction } = await import(
+  "@repo/database"
+);
 
 const { url: fixtureKvUrl, token: fixtureKvToken } = z
   .object({ token: z.string().min(1), url: z.string().url() })
@@ -506,8 +509,12 @@ describe("feed services", () => {
     };
 
     const results = await Promise.all([
-      database.$transaction((tx) => createInitialTokenWithClient(tx, input)),
-      database.$transaction((tx) => createInitialTokenWithClient(tx, input)),
+      tenantTransaction(input.clerkOrgId, (tx) =>
+        createInitialTokenWithClient(tx, input)
+      ),
+      tenantTransaction(input.clerkOrgId, (tx) =>
+        createInitialTokenWithClient(tx, input)
+      ),
     ]);
 
     const failures = results.filter((result) => !result.ok);

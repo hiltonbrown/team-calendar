@@ -10,7 +10,7 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { database, loadHolidayResolutionData } from "@repo/database";
+import { loadHolidayResolutionData, tenantTransaction } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_contactability,
@@ -67,7 +67,12 @@ export async function projectFeedEvents(
   input: FeedProjectionContext
 ): Promise<Result<PreviewEvent[], FeedProjectionError>> {
   try {
-    const client = input.client ?? database;
+    if (!input.client) {
+      return await tenantTransaction(input.clerkOrgId, (tx) =>
+        projectFeedEvents({ ...input, client: tx })
+      );
+    }
+    const { client } = input;
     const feed = await client.feed.findFirst({
       select: feedProjectionSelect,
       where: {
@@ -264,7 +269,7 @@ function projectAvailabilityRecord(
 
 async function projectPublicHolidays(input: {
   lastRenderedAt: Date | null;
-  client?: Prisma.TransactionClient;
+  client: Prisma.TransactionClient;
   clerkOrgId: string;
   horizonEnd: Date;
   horizonStart: Date;
@@ -279,7 +284,7 @@ async function projectPublicHolidays(input: {
       organisationId: input.organisationId as OrganisationId,
       to: toDateOnly(input.horizonEnd),
     },
-    input.client ?? database
+    input.client
   );
   if (!data) {
     return [];

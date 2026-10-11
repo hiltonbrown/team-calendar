@@ -11,12 +11,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     feed: { findMany: mocks.feedFindMany },
     person: { findMany: mocks.personFindMany },
-  },
-}));
+  };
+  return {
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 vi.mock("../scope/feed-scope", () => ({
   loadFeedScopeData: mocks.loadFeedScopeData,
   resolvePeopleForFeed: mocks.resolvePeopleForFeed,
@@ -116,6 +120,16 @@ describe("feed cache invalidation", () => {
 
     expect(result).toEqual({ ok: true, value: { feedIds: [] } });
     expect(mocks.invalidateFeedCache).not.toHaveBeenCalled();
+  });
+
+  it("binds feed invalidation reads to the caller account", async () => {
+    const { tenantDatabase } = await import("@repo/database");
+    await feedIdsForPeople({
+      clerkOrgId: CLERK_ORG_ID,
+      organisationId: ORGANISATION_ID,
+      personIds: [PERSON_IN_SCOPE],
+    });
+    expect(tenantDatabase).toHaveBeenCalledWith(CLERK_ORG_ID);
   });
 
   it("scopes the feed lookup by both clerk org and organisation", async () => {

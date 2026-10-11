@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type { feed_scope_rule_type } from "@repo/database/generated/enums";
 import { z } from "zod";
@@ -106,7 +106,7 @@ export async function validateScopes(input: {
         if (!scopeValue) {
           return invalidScope();
         }
-        const team = await database.team.findFirst({
+        const team = await tenantDatabase(input.clerkOrgId).team.findFirst({
           select: { id: true },
           where: {
             clerk_org_id: input.clerkOrgId,
@@ -123,7 +123,7 @@ export async function validateScopes(input: {
         if (!scopeValue) {
           return invalidScope();
         }
-        const person = await database.person.findFirst({
+        const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
           select: { id: true },
           where: {
             archived_at: null,
@@ -155,11 +155,13 @@ export async function resolvePeopleForFeed(input: {
   try {
     const people =
       input.preloaded?.people.filter((person) => person.is_active) ??
-      (await (input.client ?? database).person.findMany({
-        orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
-        select: personSelect,
-        where: peopleWhereForFeedScope(input),
-      }));
+      (await (input.client ?? tenantDatabase(input.clerkOrgId)).person.findMany(
+        {
+          orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
+          select: personSelect,
+          where: peopleWhereForFeedScope(input),
+        }
+      ));
 
     const dynamicPerson = resolveDynamicPersonId({
       actingPersonId: input.actingPersonId ?? null,
@@ -196,7 +198,7 @@ export async function loadFeedScopeData(input: {
 }): Promise<Result<FeedScopeData, FeedScopeError>> {
   try {
     const [people, teams] = await Promise.all([
-      database.person.findMany({
+      tenantDatabase(input.clerkOrgId).person.findMany({
         orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
         select: personSelect,
         where: {
@@ -205,7 +207,7 @@ export async function loadFeedScopeData(input: {
           organisation_id: input.organisationId,
         },
       }),
-      database.team.findMany({
+      tenantDatabase(input.clerkOrgId).team.findMany({
         select: { id: true, name: true },
         where: {
           clerk_org_id: input.clerkOrgId,
@@ -234,14 +236,14 @@ export async function resolveScopeRows(input: {
     const [teams, people] = input.preloaded
       ? [input.preloaded.teams, input.preloaded.people]
       : await Promise.all([
-          database.team.findMany({
+          tenantDatabase(input.clerkOrgId).team.findMany({
             select: { id: true, name: true },
             where: {
               clerk_org_id: input.clerkOrgId,
               organisation_id: input.organisationId,
             },
           }),
-          database.person.findMany({
+          tenantDatabase(input.clerkOrgId).person.findMany({
             select: { first_name: true, id: true, last_name: true },
             where: {
               archived_at: null,
@@ -273,6 +275,7 @@ export async function resolveScopeRows(input: {
 }
 
 export async function canViewFeed(input: {
+  client?: Prisma.TransactionClient;
   actingPersonId?: string | null;
   clerkOrgId: string;
   createdByUserId?: string | null;
@@ -375,7 +378,7 @@ export async function findActingPersonId(input: {
   organisationId: string;
   userId: string;
 }): Promise<string | null> {
-  const person = await database.person.findFirst({
+  const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
     select: { id: true },
     where: {
       archived_at: null,

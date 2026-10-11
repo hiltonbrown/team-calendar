@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantTransaction } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import {
   type PreviewEvent,
@@ -33,7 +33,8 @@ export async function establishFeedRepresentation(
 ): Promise<Result<FeedRepresentation, RepresentationError>> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await database.$transaction(
+      return await tenantTransaction(
+        input.clerkOrgId,
         async (tx) => reconcileRepresentation(tx, input),
         {
           isolationLevel: "Serializable",

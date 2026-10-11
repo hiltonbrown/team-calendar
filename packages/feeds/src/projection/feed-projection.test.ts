@@ -60,13 +60,17 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     availabilityRecord: { findMany: mocks.availabilityRecordFindMany },
     feed: { findFirst: mocks.feedFindFirst },
-  },
-  loadHolidayResolutionData: mocks.loadHolidayResolutionData,
-}));
+  };
+  return {
+    loadHolidayResolutionData: mocks.loadHolidayResolutionData,
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 vi.mock(
   "../../../core/src/public-holidays/reference/reference-holidays",
   async (importOriginal) => ({

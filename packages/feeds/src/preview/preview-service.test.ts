@@ -10,14 +10,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     feed: {
       findFirst: mocks.feedFindFirst,
     },
     person: { findFirst: mocks.personFindFirst },
-  },
-}));
+  };
+  return {
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 
 vi.mock("../scope/feed-scope", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../scope/feed-scope")>();
@@ -153,6 +157,16 @@ describe("previewFeed", () => {
     const result = await previewFeed(baseInput);
 
     expect(result).toEqual({ ok: true, value: [sampleEvent] });
+    const { tenantTransaction } = await import("@repo/database");
+    expect(tenantTransaction).toHaveBeenCalledExactlyOnceWith(
+      baseInput.clerkOrgId,
+      expect.any(Function)
+    );
+    const visibilityClient = mocks.canViewFeed.mock.calls[0]?.[0].client;
+    expect(visibilityClient).toBeDefined();
+    expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
+      expect.objectContaining({ client: visibilityClient })
+    );
   });
 
   it("tenant scoping: carries clerk_org_id and organisation_id in database query", async () => {

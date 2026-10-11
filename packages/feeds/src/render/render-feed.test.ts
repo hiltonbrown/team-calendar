@@ -12,13 +12,18 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     auditEvent: { createMany: mocks.audit, findUnique: mocks.auditFind },
     feed: { updateMany: mocks.update },
     feedToken: { findUnique: mocks.token, updateMany: mocks.used },
-  },
-}));
+  };
+  return {
+    systemDatabase: client,
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 vi.mock("@repo/observability/log", () => ({ log: { warn: mocks.warn } }));
 vi.mock("../publication/feed-representation", () => ({
   establishFeedRepresentation: mocks.establish,
