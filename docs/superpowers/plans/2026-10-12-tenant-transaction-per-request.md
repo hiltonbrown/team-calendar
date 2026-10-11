@@ -402,4 +402,4 @@ Each slice converts every entry point in one area so the detector from Task 1.3 
 ## 12. Open questions for the owner
 
 1. Request timeout preset: is 15 s acceptable for server actions and page loaders, given Vercel function limits on the `app` project?
-2. Should a failed `afterTenantCommit` effect (for example an Inngest send) be retried inline once, or only logged and left to the scheduled reconcilers?
+2. Should a failed `afterTenantCommit` effect (a fire-and-forget effect such as a KV invalidation or notification fan-out) be retried inline once, or only logged and left to the scheduled reconcilers?
