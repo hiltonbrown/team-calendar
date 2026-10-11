@@ -1,5 +1,5 @@
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { availability_record_type } from "@repo/database/generated/enums";
 import type { XeroAccessContext } from "../write/types";
 import type { ResolutionError } from "./resolve-employee";
@@ -9,7 +9,9 @@ export async function resolveXeroLeaveTypeId(input: {
   xeroConnection: XeroAccessContext;
 }): Promise<Result<string, ResolutionError>> {
   try {
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      input.xeroConnection.clerk_org_id
+    ).person.findFirst({
       select: { id: true },
       where: {
         archived_at: null,
@@ -27,7 +29,9 @@ export async function resolveXeroLeaveTypeId(input: {
         ok: false,
       };
     }
-    const balance = await database.leaveBalance.findFirst({
+    const balance = await tenantDatabase(
+      input.xeroConnection.clerk_org_id
+    ).leaveBalance.findFirst({
       orderBy: { updated_at: "desc" },
       select: {
         leave_type_xero_id: true,
@@ -37,7 +41,7 @@ export async function resolveXeroLeaveTypeId(input: {
         organisation_id: input.xeroConnection.organisation_id,
         person_id: input.personId,
         record_type: input.recordType,
-        xero_tenant_id: input.xeroConnection.id,
+        xero_connection_id: input.xeroConnection.id,
       },
     });
     if (!balance) {

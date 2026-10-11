@@ -1,4 +1,4 @@
-import { database } from "@repo/database";
+import { systemDatabase as database } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -29,22 +29,41 @@ vi.mock("@repo/availability", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
   normaliseInboundLeaveRecord: mocks.normaliseInboundLeaveRecord,
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    $executeRaw: vi.fn(async () => 1),
-    $queryRaw: vi.fn(async () => []),
-    $transaction: vi.fn(async (callback) => callback(database)),
-    syncRun: {
-      create: mocks.syncRunCreate,
-      findFirst: mocks.syncRunFindFirst,
-      updateMany: mocks.syncRunUpdateMany,
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback) => callback(database)),
+      syncRun: {
+        create: mocks.syncRunCreate,
+        findFirst: mocks.syncRunFindFirst,
+        updateMany: mocks.syncRunUpdateMany,
+      },
+      xeroConnection: {
+        findFirst: mocks.xeroConnectionFindFirst,
+      },
     },
-    xeroConnection: {
-      findFirst: mocks.xeroConnectionFindFirst,
-    },
-  },
-  scopedTo: mocks.scopedTo,
-}));
+    scopedTo: mocks.scopedTo,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/notifications", () => ({
   publishOrganisationNotificationEvent:
     mocks.publishOrganisationNotificationEvent,

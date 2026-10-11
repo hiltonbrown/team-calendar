@@ -21,11 +21,30 @@ vi.mock("../client", () => ({
     send: mocks.inngestSend,
   },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    availabilityRecord: { findMany: mocks.availabilityRecordFindMany },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      availabilityRecord: { findMany: mocks.availabilityRecordFindMany },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/feeds", () => ({
   feedIdsForPeople: mocks.feedIdsForPeople,
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,

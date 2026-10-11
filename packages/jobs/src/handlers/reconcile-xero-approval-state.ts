@@ -2,7 +2,11 @@ import "server-only";
 import { clerkClient } from "@repo/auth/server";
 import { unclaimedOrExpiredXeroWriteWhere } from "@repo/availability";
 import { type Result, xeroRecoveryMessage } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type { availability_approval_status } from "@repo/database/generated/enums";
 import {
@@ -175,7 +179,9 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
   const startedAt = new Date();
   let runId: string | null = null;
   try {
-    const existingRun = await database.syncRun.findFirst({
+    const existingRun = await tenantDatabase(
+      context.clerkOrgId
+    ).syncRun.findFirst({
       select: { id: true },
       where: {
         ...scoped(context),
@@ -186,26 +192,28 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
       },
     });
     if (existingRun) {
-      const cancelled = await database.syncRun.create({
-        data: {
-          ...scoped(context),
-          completed_at: new Date(),
-          error_summary: "Another reconciliation run is already in progress",
-          run_type: "approval_state_reconciliation",
-          started_at: startedAt,
-          status: "cancelled",
-          trigger_type: context.triggerType,
-          triggered_by_user_id: context.triggeredByUserId ?? null,
-          xero_connection_id: context.connectionId,
-        },
-        select: { id: true },
-      });
+      const cancelled = await tenantDatabase(context.clerkOrgId).syncRun.create(
+        {
+          data: {
+            ...scoped(context),
+            completed_at: new Date(),
+            error_summary: "Another reconciliation run is already in progress",
+            run_type: "approval_state_reconciliation",
+            started_at: startedAt,
+            status: "cancelled",
+            trigger_type: context.triggerType,
+            triggered_by_user_id: context.triggeredByUserId ?? null,
+            xero_connection_id: context.connectionId,
+          },
+          select: { id: true },
+        }
+      );
       return {
         ok: true,
         value: emptyResult(cancelled.id, "cancelled"),
       };
     }
-    const run = await database.syncRun.create({
+    const run = await tenantDatabase(context.clerkOrgId).syncRun.create({
       data: {
         ...scoped(context),
         run_type: "approval_state_reconciliation",
@@ -235,7 +243,9 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
     const windowStart = new Date(
       Date.now() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
     );
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      context.clerkOrgId
+    ).availabilityRecord.findMany({
       include: {
         person: {
           select: {
@@ -274,7 +284,9 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
       withdrawn: 0,
     };
     for (let index = 0; index < records.length; index += BATCH_SIZE) {
-      const runState = await database.syncRun.findFirst({
+      const runState = await tenantDatabase(
+        context.clerkOrgId
+      ).syncRun.findFirst({
         select: { cancel_requested_at: true },
         where: { ...scoped(context), id: run.id },
       });
@@ -701,7 +713,7 @@ async function recordFailure(
     errorMessage =
       "The Xero leave application no longer exists. The Team Calendar record has been archived.";
   }
-  await database.failedRecord.create({
+  await tenantDatabase(context.clerkOrgId).failedRecord.create({
     data: {
       ...scoped(context),
       entity_type: "leave_records",
@@ -773,7 +785,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await persist(database);
+    await tenantTransaction(context.clerkOrgId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }

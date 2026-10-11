@@ -82,10 +82,29 @@ const databaseMock = {
     updateMany: mocks.xeroSyncCursorUpdateMany,
   },
 };
-vi.mock("@repo/database", () => ({
-  database: databaseMock,
-  scopedTo: mocks.scopedTo,
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: databaseMock,
+    scopedTo: mocks.scopedTo,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/feeds", () => ({
   feedIdsForPeople: mocks.feedIdsForPeople,
 }));

@@ -11,7 +11,26 @@ const db = vi.hoisted(() => ({
     update: vi.fn(),
   },
 }));
-vi.mock("@repo/database", () => ({ database: db, withXeroGrantLock: db.lock }));
+vi.mock("@repo/database", () => {
+  const exports = { database: db, withXeroGrantLock: db.lock };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 const originalEnv = { ...process.env };
 beforeEach(() => {
   vi.resetAllMocks();

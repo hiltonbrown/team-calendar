@@ -1,5 +1,9 @@
 import "server-only";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { log } from "@repo/observability/log";
 export const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
@@ -101,12 +105,14 @@ function toAcquireResult(existing: {
 }
 async function findExistingRun(
   context: AcquireSyncRunInput,
-  client: Prisma.TransactionClient = database
+  client?: Prisma.TransactionClient
 ): Promise<AcquireRunResult | null> {
   if (!context.runId) {
     return null;
   }
-  const existing = await client.syncRun.findFirst({
+  const existing = await (
+    client ?? tenantDatabase(context.clerkOrgId)
+  ).syncRun.findFirst({
     select: {
       id: true,
       records_failed: true,
@@ -210,7 +216,8 @@ export async function acquireSyncRun(
   startedAt: Date
 ): Promise<AcquireRunResult> {
   try {
-    return await database.$transaction(
+    return await tenantTransaction(
+      context.clerkOrgId,
       async (tx) => {
         await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
         // Share the existing connection lock with batch persistence and teardown;
@@ -282,7 +289,7 @@ export async function assertRunActive(
   runId: string,
   tx?: Prisma.TransactionClient
 ): Promise<void> {
-  const client = tx ?? database;
+  const client = tx ?? tenantDatabase(context.clerkOrgId);
   const runState = await client.syncRun.findFirst({
     select: { cancel_requested_at: true, status: true },
     where: { ...scoped(context), id: runId },
@@ -298,7 +305,7 @@ export async function isRunCancelled(
   },
   runId: string
 ): Promise<boolean> {
-  const runState = await database.syncRun.findFirst({
+  const runState = await tenantDatabase(context.clerkOrgId).syncRun.findFirst({
     select: { cancel_requested_at: true },
     where: { ...scoped(context), id: runId },
   });

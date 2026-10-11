@@ -1,7 +1,7 @@
 import "server-only";
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "@repo/database";
+import { systemDatabase, tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { dispatchInitialXeroSync } from "../events";
 export interface RecoverXeroImportDispatchOptions {
@@ -16,7 +16,7 @@ export async function recoverXeroImportDispatch(
   _options: RecoverXeroImportDispatchOptions = {}
 ): Promise<Result<RecoverXeroImportDispatchResult>> {
   try {
-    const tenants = await database.xeroConnection.findMany({
+    const tenants = await systemDatabase.xeroConnection.findMany({
       select: {
         clerk_org_id: true,
         id: true,
@@ -39,7 +39,9 @@ export async function recoverXeroImportDispatch(
     let dispatched = 0;
     let skipped = 0;
     for (const tenant of tenants) {
-      const activeRun = await database.syncRun.findFirst({
+      const activeRun = await tenantDatabase(
+        tenant.clerk_org_id
+      ).syncRun.findFirst({
         where: {
           clerk_org_id: tenant.clerk_org_id,
           organisation_id: tenant.organisation_id,

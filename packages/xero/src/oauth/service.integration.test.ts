@@ -52,7 +52,7 @@ const ownedGrants = [
   allocation.id("authorisation", 1),
 ];
 const originalEnv = { ...process.env };
-let database: typeof import("@repo/database")["database"];
+let database: typeof import("@repo/database")["systemDatabase"];
 let crypto: typeof import("../crypto/tokens");
 let canonical: typeof import("./authorisation");
 let service: typeof import("./service");
@@ -65,7 +65,7 @@ beforeAll(async () => {
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString(
     "base64"
   );
-  ({ database } = await import("@repo/database"));
+  ({ systemDatabase: database } = await import("@repo/database"));
   crypto = await import("../crypto/tokens");
   service = await import("./service");
   canonical = await import("./authorisation");

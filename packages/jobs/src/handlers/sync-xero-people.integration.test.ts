@@ -27,66 +27,51 @@ vi.mock("@repo/database", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/database")>();
   return {
     ...original,
-    database: new Proxy(original.database, {
-      get(target, property, receiver) {
-        if (property !== "$transaction") {
-          return Reflect.get(target, property, receiver);
-        }
-        return (
-          operation: (
-            tx: import("@repo/database").Prisma.TransactionClient
-          ) => Promise<unknown>,
-          options?: { maxWait?: number; timeout?: number }
-        ) =>
-          target.$transaction(
-            async (tx) =>
-              operation(
-                new Proxy(tx, {
-                  get(transaction, delegateName, transactionReceiver) {
-                    if (delegateName !== "person") {
-                      return Reflect.get(
-                        transaction,
-                        delegateName,
-                        transactionReceiver
-                      );
+    tenantTransaction: (clerkOrgId, operation, options) =>
+      original.tenantTransaction(
+        clerkOrgId,
+        async (tx) =>
+          operation(
+            new Proxy(tx, {
+              get(transaction, delegateName, transactionReceiver) {
+                if (delegateName !== "person") {
+                  return Reflect.get(
+                    transaction,
+                    delegateName,
+                    transactionReceiver
+                  );
+                }
+                return new Proxy(transaction.person, {
+                  get(delegate, method, delegateReceiver) {
+                    if (method === "updateMany") {
+                      return async (
+                        args: import("@repo/database").Prisma.PersonUpdateManyArgs
+                      ) => {
+                        const result = await delegate.updateMany(args);
+                        await afterPersonUpdateMany(args, transaction);
+                        return result;
+                      };
                     }
-                    return new Proxy(transaction.person, {
-                      get(delegate, method, delegateReceiver) {
-                        if (method === "updateMany") {
-                          return async (
-                            args: import("@repo/database").Prisma.PersonUpdateManyArgs
-                          ) => {
-                            const result = await delegate.updateMany(args);
-                            await afterPersonUpdateMany(args, transaction);
-                            return result;
-                          };
-                        }
-                        if (method !== "upsert") {
-                          return Reflect.get(
-                            delegate,
-                            method,
-                            delegateReceiver
-                          );
-                        }
-                        return async (
-                          args: import("@repo/database").Prisma.PersonUpsertArgs
-                        ) => {
-                          await beforePersonUpsert(args);
-                          return delegate.upsert(args);
-                        };
-                      },
-                    });
+                    if (method !== "upsert") {
+                      return Reflect.get(delegate, method, delegateReceiver);
+                    }
+                    return async (
+                      args: import("@repo/database").Prisma.PersonUpsertArgs
+                    ) => {
+                      await beforePersonUpsert(args);
+                      return delegate.upsert(args);
+                    };
                   },
-                })
-              ),
-            options
-          );
-      },
-    }),
+                });
+              },
+            })
+          ),
+        options
+      ),
   };
 });
 
-import { database, type Person } from "@repo/database";
+import { systemDatabase as database, type Person } from "@repo/database";
 import { getRegisteredSyncEventName } from "../events";
 import { acquireSyncRun } from "./sync-run-lifecycle";
 import { syncXeroPeople } from "./sync-xero-people";

@@ -1,7 +1,11 @@
 import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import {
+  getScopedXeroConnection,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import {
   classifyXeroFailure,
@@ -53,14 +57,14 @@ export async function withXeroBinding<T>(
     return operation(current.tx);
   }
   const afterCommit: Array<() => Promise<void>> = [];
-  const result = await database.$transaction(
+  const result = await tenantTransaction(
+    scope.clerkOrgId,
     async (tx) => {
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
       await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${scope.connectionId}::uuid AND clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
       const connection = await tx.xeroConnection.findFirst({
-        select: { id: true },
+        select: { id: true, xero_authorisation_id: true },
         where: {
-          authorisation: { status: "active" },
           clerk_org_id: scope.clerkOrgId,
           id: scope.connectionId,
           organisation_id: scope.organisationId,
@@ -74,7 +78,14 @@ export async function withXeroBinding<T>(
             : {}),
         },
       });
-      if (!connection) {
+      const scopedConnection = await getScopedXeroConnection(scope, tx);
+      if (
+        !(connection && scopedConnection.ok) ||
+        scopedConnection.value.id !== connection.id ||
+        scopedConnection.value.xero_authorisation_id !==
+          connection.xero_authorisation_id ||
+        scopedConnection.value.authorisation?.status !== "active"
+      ) {
         throw new XeroBindingChangedError();
       }
       const committedResult = await bindingTransactions.run(
@@ -94,7 +105,9 @@ export async function resolveSyncTenant(
   scope: XeroSyncScope,
   capability: string | readonly string[]
 ) {
-  const loaded = await database.xeroConnection.findFirst({
+  const loaded = await tenantDatabase(
+    scope.clerkOrgId
+  ).xeroConnection.findFirst({
     select: {
       approval_state_stale_since: true,
       id: true,

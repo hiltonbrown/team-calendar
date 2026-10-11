@@ -23,6 +23,17 @@ vi.mock("@repo/database", () => {
         operation(tx)
       ),
     },
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    tenantDatabase: vi.fn(() => tx),
+    tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+      mocks.transaction(operation)
+    ),
   };
 });
 vi.mock("@repo/xero", async () => ({

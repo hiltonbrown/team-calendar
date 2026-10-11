@@ -30,11 +30,33 @@ vi.mock("../client", () => ({
     send: vi.fn(),
   },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    feed: { findFirst: mocks.feedFindFirst, updateMany: mocks.feedUpdateMany },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      feed: {
+        findFirst: mocks.feedFindFirst,
+        updateMany: mocks.feedUpdateMany,
+      },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/feeds", () => ({
   feedCacheKey: mocks.feedCacheKey,
   invalidateFeedCache: mocks.invalidateFeedCache,

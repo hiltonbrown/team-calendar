@@ -36,11 +36,30 @@ const feedMock = vi.hoisted(() => ({ ensureDefaultCalendarFeed: vi.fn() }));
 const availabilityMock = vi.hoisted(() => ({}));
 const lockMock = vi.hoisted(() => ({ grant: vi.fn() }));
 const identityMock = vi.hoisted(() => ({ verify: vi.fn() }));
-vi.mock("@repo/database", () => ({
-  database: dbMock,
-  lockXeroAuthorisation: vi.fn(),
-  withXeroGrantLock: lockMock.grant,
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: dbMock,
+    lockXeroAuthorisation: vi.fn(),
+    withXeroGrantLock: lockMock.grant,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/database/queries/xero-connections", () => ({
   getScopedXeroConnection: async (input: {
     clerkOrgId: string;

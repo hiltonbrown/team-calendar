@@ -1,5 +1,5 @@
 import type { Result } from "@repo/core";
-import { database, withXeroGrantLock } from "@repo/database";
+import { systemDatabase, withXeroGrantLock } from "@repo/database";
 import {
   activeXeroKeyVersion,
   resolveXeroEncryptionKey,
@@ -23,7 +23,7 @@ export async function reencryptXeroTokens(input: {
     const where = input.only
       ? { id: { in: input.only.authorisationIds ?? [] } }
       : {};
-    const versions = await database.xeroAuthorisation.findMany({
+    const versions = await systemDatabase.xeroAuthorisation.findMany({
       distinct: "token_key_version",
       select: { token_key_version: true },
       where,
@@ -38,7 +38,7 @@ export async function reencryptXeroTokens(input: {
     const counts = { failed: 0, rewritten: 0, skipped: 0 };
     let cursor: string | undefined;
     for (;;) {
-      const grants = await database.xeroAuthorisation.findMany({
+      const grants = await systemDatabase.xeroAuthorisation.findMany({
         orderBy: { id: "asc" },
         take: input.batchSize,
         where: {

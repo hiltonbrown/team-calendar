@@ -52,7 +52,7 @@ function allocateTenant(index: number) {
 const tenantA = allocateTenant(0),
   tenantB = allocateTenant(1);
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
-let database: typeof import("@repo/database")["database"];
+let database: typeof import("@repo/database")["systemDatabase"];
 let disconnectXeroOAuthConnection: typeof import("./disconnect")["disconnectXeroOAuthConnection"];
 let encryptXeroToken: typeof import("../crypto/tokens")["encryptXeroToken"];
 let decryptXeroToken: typeof import("../crypto/tokens")["decryptXeroToken"];
@@ -63,7 +63,7 @@ beforeAll(async () => {
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString(
     "base64"
   );
-  ({ database } = await import("@repo/database"));
+  ({ systemDatabase: database } = await import("@repo/database"));
   ({ disconnectXeroOAuthConnection } = await import("./disconnect"));
   ({ encryptXeroToken, decryptXeroToken } = await import("../crypto/tokens"));
 });

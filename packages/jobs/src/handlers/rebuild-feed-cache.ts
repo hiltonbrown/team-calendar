@@ -1,6 +1,6 @@
 import "server-only";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import {
   feedCacheKey,
   invalidateFeedCache,
@@ -69,7 +69,7 @@ async function rebuildFeedCacheInternal(
   }
   const context = parsed.data;
   try {
-    const feed = await database.feed.findFirst({
+    const feed = await tenantDatabase(context.clerkOrgId).feed.findFirst({
       select: {
         id: true,
         name: true,
@@ -126,7 +126,7 @@ async function rebuildFeedCacheInternal(
     if (!cached.ok) {
       return { error: cached.error, ok: false };
     }
-    await database.feed.updateMany({
+    await tenantDatabase(context.clerkOrgId).feed.updateMany({
       data: { last_etag: rendered.value.etag, last_rendered_at: new Date() },
       where: {
         clerk_org_id: context.clerkOrgId,

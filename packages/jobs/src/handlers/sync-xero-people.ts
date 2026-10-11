@@ -1,7 +1,11 @@
 import "server-only";
 import { reconcileXeroPerson } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { advanceXeroSyncCursor } from "@repo/database/queries/xero-sync-cursors";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
@@ -193,7 +197,9 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       .filter((id) => id.length > 0);
     await recordMappingFailures(context, run.id, failures, counts);
     for (let index = 0; index < employees.length; index += BATCH_SIZE) {
-      const runState = await database.syncRun.findFirst({
+      const runState = await tenantDatabase(
+        context.clerkOrgId
+      ).syncRun.findFirst({
         select: { cancel_requested_at: true },
         where: { ...scoped(context), id: run.id },
       });
@@ -213,7 +219,9 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
         await sleep(150);
       }
     }
-    const postBatchRunState = await database.syncRun.findFirst({
+    const postBatchRunState = await tenantDatabase(
+      context.clerkOrgId
+    ).syncRun.findFirst({
       select: { cancel_requested_at: true },
       where: { ...scoped(context), id: run.id },
     });
@@ -471,7 +479,7 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await database.failedRecord.create({
+  await tenantDatabase(context.clerkOrgId).failedRecord.create({
     data: {
       clerk_org_id: context.clerkOrgId,
       entity_type: "people",
@@ -524,7 +532,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await persist(database);
+    await tenantTransaction(context.clerkOrgId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }

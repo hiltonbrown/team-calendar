@@ -7,7 +7,11 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import type { Result } from "@repo/core";
-import { database, withXeroGrantLock } from "@repo/database";
+import {
+  systemDatabase,
+  tenantDatabase,
+  withXeroGrantLock,
+} from "@repo/database";
 import type {
   XeroAuthorisation,
   XeroOAuthSession,
@@ -137,7 +141,9 @@ async function resolveOrganisationForTenantSelection(input: {
     };
   }
 
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(
+    input.clerkOrgId
+  ).organisation.findFirst({
     select: {
       country_code: true,
       id: true,
@@ -480,7 +486,7 @@ async function loadPendingSession(input: {
   sessionId: string;
   userId: string;
 }): Promise<Result<XeroOAuthSession, XeroOAuthError>> {
-  const session = await database.xeroOAuthSession.findFirst({
+  const session = await systemDatabase.xeroOAuthSession.findFirst({
     where: {
       clerk_org_id: input.clerkOrgId,
       created_by_user_id: input.userId,
@@ -521,7 +527,9 @@ export async function getPendingXeroOAuthSession(input: {
     return session;
   }
 
-  const organisations = await database.organisation.findMany({
+  const organisations = await tenantDatabase(
+    input.clerkOrgId
+  ).organisation.findMany({
     orderBy: [{ created_at: "asc" }, { name: "asc" }],
     select: {
       country_code: true,
@@ -574,7 +582,7 @@ export async function buildXeroOAuthStartUrl(input: {
   }
   if (
     input.organisationId &&
-    !(await database.organisation.findFirst({
+    !(await tenantDatabase(input.clerkOrgId).organisation.findFirst({
       where: {
         archived_at: null,
         clerk_org_id: input.clerkOrgId,
@@ -591,7 +599,7 @@ export async function buildXeroOAuthStartUrl(input: {
     };
   }
   const nonce = randomBytes(32).toString("base64url");
-  const session = await database.xeroOAuthSession.create({
+  const session = await systemDatabase.xeroOAuthSession.create({
     data: {
       clerk_org_id: input.clerkOrgId,
       created_by_user_id: input.userId ?? null,
@@ -615,7 +623,7 @@ export async function buildXeroOAuthStartUrl(input: {
     },
     secret
   );
-  await database.xeroOAuthSession.updateMany({
+  await systemDatabase.xeroOAuthSession.updateMany({
     data: { state_hash: createHash("sha256").update(state).digest("hex") },
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -804,7 +812,7 @@ export async function completeXeroOAuth(input: {
     id: signed.sessionId,
     organisation_id: signed.organisationId,
   };
-  const claimed = await database.xeroOAuthSession.updateMany({
+  const claimed = await systemDatabase.xeroOAuthSession.updateMany({
     data: { callback_claimed_at: new Date(), status: "exchanging" },
     where: {
       ...scope,
@@ -950,7 +958,7 @@ export async function cancelXeroOAuth(input: {
   ) {
     return invalidState();
   }
-  const cancelled = await database.xeroOAuthSession.updateMany({
+  const cancelled = await systemDatabase.xeroOAuthSession.updateMany({
     data: {
       available_tenants_json: Prisma.DbNull,
       nonce_hash: null,
@@ -991,7 +999,7 @@ async function closeOAuthSession(
   },
   status: "cancelled" | "completed"
 ) {
-  await database.xeroOAuthSession.updateMany({
+  await systemDatabase.xeroOAuthSession.updateMany({
     data: {
       available_tenants_json: Prisma.DbNull,
       nonce_hash: null,
@@ -1123,7 +1131,7 @@ export async function completeXeroTenantSelection(input: {
   async function selectionAccess(): Promise<
     Result<{ grant: XeroAuthorisation; accessToken: string }, XeroOAuthError>
   > {
-    let grant = await database.xeroAuthorisation.findUnique({
+    let grant = await systemDatabase.xeroAuthorisation.findUnique({
       where: { id: session.xero_authorisation_id ?? "" },
     });
     if (!grant) {
@@ -1164,7 +1172,7 @@ export async function completeXeroTenantSelection(input: {
     ) {
       return invalidState();
     }
-    grant = await database.xeroAuthorisation.findUnique({
+    grant = await systemDatabase.xeroAuthorisation.findUnique({
       where: { id: grant.id },
     });
     if (
@@ -1194,7 +1202,7 @@ export async function completeXeroTenantSelection(input: {
     }
     return { ok: true, value: { accessToken, grant } };
   }
-  const selectedGrant = await database.xeroAuthorisation.findUnique({
+  const selectedGrant = await systemDatabase.xeroAuthorisation.findUnique({
     where: { id: session.xero_authorisation_id ?? "" },
   });
   if (!selectedGrant) {
@@ -1212,7 +1220,7 @@ export async function completeXeroTenantSelection(input: {
   const targetOrganisationId =
     session.organisation_id ?? input.organisationId ?? null;
   const connectionSnapshot = targetOrganisationId
-    ? await database.xeroConnection.findFirst({
+    ? await tenantDatabase(input.clerkOrgId).xeroConnection.findFirst({
         select: {
           id: true,
           remote_connection_id: true,
@@ -1288,7 +1296,7 @@ export async function completeXeroTenantSelection(input: {
     return organisation;
   }
   try {
-    const connection = await database.$transaction(async (tx) => {
+    const connection = await systemDatabase.$transaction(async (tx) => {
       const claimed = await tx.xeroOAuthSession.updateMany({
         data: {
           available_tenants_json: Prisma.DbNull,
@@ -1416,7 +1424,7 @@ export async function purgeClosedXeroOAuthSessions(
       { status: { in: ["cancelled", "completed"] } },
     ],
   };
-  const sessions = await database.xeroOAuthSession.findMany({
+  const sessions = await systemDatabase.xeroOAuthSession.findMany({
     select: {
       authorisation: {
         select: { id: true, provider_app_id: true, xero_user_id: true },
@@ -1451,7 +1459,7 @@ export async function purgeClosedXeroOAuthSessions(
       }
     );
   }
-  await database.xeroOAuthSession.deleteMany({
+  await systemDatabase.xeroOAuthSession.deleteMany({
     where: { ...closed, xero_authorisation_id: null },
   });
 }

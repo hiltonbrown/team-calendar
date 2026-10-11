@@ -6,7 +6,11 @@ import {
   unclaimedOrExpiredXeroWriteWhere,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import {
   type availability_privacy_mode,
   Prisma,
@@ -294,7 +298,9 @@ async function syncXeroLeaveRecordsInternal(
         });
       }
       for (let index = 0; index < fetched.length; index += BATCH_SIZE) {
-        const runState = await database.syncRun.findFirst({
+        const runState = await tenantDatabase(
+          context.clerkOrgId
+        ).syncRun.findFirst({
           select: { cancel_requested_at: true },
           where: { ...scoped(context), id: run.id },
         });
@@ -486,7 +492,9 @@ async function syncXeroLeaveRecordsInternal(
       let initialCursorValue: string | null = null;
       let nextCursorValue: string | null = null;
       if (isTargetedPerson) {
-        peopleToProcess = await database.person.findMany({
+        peopleToProcess = await tenantDatabase(
+          context.clerkOrgId
+        ).person.findMany({
           select: {
             default_privacy_mode: true,
             id: true,
@@ -501,7 +509,9 @@ async function syncXeroLeaveRecordsInternal(
           },
         });
       } else {
-        cursorRecord = await database.xeroConnection.findFirst({
+        cursorRecord = await tenantDatabase(
+          context.clerkOrgId
+        ).xeroConnection.findFirst({
           select: {
             id: true,
             leave_next_person_id: true,
@@ -513,7 +523,9 @@ async function syncXeroLeaveRecordsInternal(
           },
         });
         initialCursorValue = cursorRecord?.leave_next_person_id ?? null;
-        const candidatePeople = await database.person.findMany({
+        const candidatePeople = await tenantDatabase(
+          context.clerkOrgId
+        ).person.findMany({
           orderBy: { id: "asc" },
           select: {
             default_privacy_mode: true,
@@ -541,7 +553,9 @@ async function syncXeroLeaveRecordsInternal(
         if (!person) {
           continue;
         }
-        const runState = await database.syncRun.findFirst({
+        const runState = await tenantDatabase(
+          context.clerkOrgId
+        ).syncRun.findFirst({
           select: { cancel_requested_at: true },
           where: { ...scoped(context), id: run.id },
         });
@@ -837,7 +851,7 @@ async function loadPeopleByEmployeeId(
   context: SyncXeroLeaveRecordsInput,
   employeeIds: string[]
 ) {
-  const people = await database.person.findMany({
+  const people = await tenantDatabase(context.clerkOrgId).person.findMany({
     select: {
       default_privacy_mode: true,
       id: true,
@@ -862,7 +876,9 @@ async function loadExistingRecordsBySourceRemoteId(
   context: SyncXeroLeaveRecordsInput,
   sourceRemoteIds: string[]
 ) {
-  const records = await database.availabilityRecord.findMany({
+  const records = await tenantDatabase(
+    context.clerkOrgId
+  ).availabilityRecord.findMany({
     select: {
       approval_status: true,
       derived_sequence: true,
@@ -1440,7 +1456,7 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await database.failedRecord.create({
+  await tenantDatabase(context.clerkOrgId).failedRecord.create({
     data: {
       ...scoped(context),
       entity_type: "leave_records",
@@ -1493,7 +1509,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await persist(database);
+    await tenantTransaction(context.clerkOrgId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }

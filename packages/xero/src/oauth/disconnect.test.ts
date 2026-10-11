@@ -20,11 +20,30 @@ const mocks = vi.hoisted(() => ({
   syncRun: vi.fn(),
   xeroPersonMatch: vi.fn(),
 }));
-vi.mock("@repo/database", () => ({
-  database: {},
-  lockScopedXeroConnection: mocks.scopedLock,
-  withXeroGrantLock: mocks.lock,
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {},
+    lockScopedXeroConnection: mocks.scopedLock,
+    withXeroGrantLock: mocks.lock,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/database/queries/xero-connections", () => ({
   getScopedXeroConnection: mocks.scoped,
 }));
