@@ -1,3 +1,7 @@
+vi.mock("@repo/auth/helpers", () => ({
+  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+}));
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const CREDENTIAL_PATTERN =

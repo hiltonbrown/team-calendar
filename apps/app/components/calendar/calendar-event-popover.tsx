@@ -26,7 +26,6 @@ interface CalendarEventPopoverProps {
 export function CalendarEventPopover({
   children,
   event,
-  orgQueryValue,
   timezone = "UTC",
 }: CalendarEventPopoverProps) {
   const recordTypeLabel =
@@ -51,6 +50,9 @@ export function CalendarEventPopover({
         </div>
 
         <dl className="mt-4 grid gap-3 text-label-lg">
+          {event.companyName ? (
+            <Detail label="Company" value={event.companyName} />
+          ) : null}
           <Detail label="Status" value={statusLabel(event.approvalStatus)} />
           <Detail label="Source" value={calendarEventSourceLabel(event)} />
           <Detail
@@ -79,7 +81,7 @@ export function CalendarEventPopover({
         <div className="mt-4 flex justify-end">
           {event.isEditableByActor ? (
             <Button asChild size="sm" variant="secondary">
-              <Link href={withOrg(`/plans/${event.id}/edit`, orgQueryValue)}>
+              <Link href={withOrg(`/plans/${event.id}/edit`, event.companyId)}>
                 View plan
               </Link>
             </Button>

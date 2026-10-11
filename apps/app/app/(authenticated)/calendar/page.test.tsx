@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   personFindFirst: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
+  resolveAccountCompanies: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
@@ -21,6 +22,9 @@ const XERO_NOT_CONNECTED_COPY = /Xero is not connected/;
 const LEAVE_SYNCED_REGEX = /Leave synced/;
 const UNLINKED_PERSON_COPY =
   /Your account is not linked to a person in this organisation/;
+vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: vi.fn(async () => "org_1"),
+}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -29,6 +33,7 @@ vi.mock("@repo/availability", () => ({
   getCalendarRange: mocks.getCalendarRange,
 }));
 vi.mock("@repo/database", () => ({
+  resolveAccountCompanies: mocks.resolveAccountCompanies,
   scopedQuery: mocks.scopedQuery,
   tenantDatabase: vi.fn(() => ({
     location: { findMany: mocks.locationFindMany },
@@ -89,6 +94,13 @@ describe("CalendarPage", () => {
   afterEach(() => cleanup());
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resolveAccountCompanies.mockResolvedValue([
+      {
+        id: "00000000-0000-4000-8000-000000000001",
+        name: "Acme",
+        timezone: "Australia/Brisbane",
+      },
+    ]);
     mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
@@ -109,6 +121,28 @@ describe("CalendarPage", () => {
       ok: true,
       value: calendarRange(),
     });
+  });
+  it("loads all account companies without selecting the oldest by default", async () => {
+    render(await Page({ searchParams: Promise.resolve({}) }));
+    expect(mocks.getCalendarRange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actingUserId: "user_1",
+        clerkOrgId: "org_1",
+        companyIds: undefined,
+      })
+    );
+    expect(mocks.getCalendarRange.mock.calls[0]?.[0]).not.toHaveProperty(
+      "organisationId"
+    );
+  });
+  it("passes the validated company filter to the account calendar", async () => {
+    const companyId = "00000000-0000-4000-8000-000000000001";
+    render(
+      await Page({ searchParams: Promise.resolve({ companyIds: companyId }) })
+    );
+    expect(mocks.getCalendarRange).toHaveBeenCalledWith(
+      expect.objectContaining({ companyIds: [companyId] })
+    );
   });
   it("uses viewer default scope my_self", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));

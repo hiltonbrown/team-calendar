@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@repo/auth/helpers";
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
 import {
   ignorePersonMatch,
@@ -40,6 +41,13 @@ export async function resolveXeroPersonMatchAction(input: {
   organisationId: string;
   resolution: "ignore" | "match";
 }): Promise<ActionResult<{ resolved: true }>> {
+  const [admin, owner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  if (!(admin || owner)) {
+    return notAuthorised();
+  }
   const parsed = ResolveMatchSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);

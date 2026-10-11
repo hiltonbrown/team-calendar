@@ -91,6 +91,55 @@ describe("manual sync dispatch route", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
+  it.each(["org:admin", "org:owner"])(
+    "allows %s to dispatch scoped sync",
+    async (orgRole) => {
+      mocks.requireRole.mockImplementation((role: string) =>
+        Promise.resolve(role === orgRole)
+      );
+      expect((await POST(request(input))).status).toBe(202);
+      expect(mocks.dispatchManualSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actingRole: orgRole === "org:owner" ? "owner" : "admin",
+          clerkOrgId: "org_123",
+          organisationId: input.organisationId,
+        })
+      );
+    }
+  );
+  it.each(["org:manager", "org:viewer"])(
+    "refuses %s before reading a malformed body",
+    async (orgRole) => {
+      mocks.requireRole.mockImplementation((role: string) =>
+        Promise.resolve(role === orgRole)
+      );
+      const malformed = request({});
+      const parseBody = vi.spyOn(malformed, "json");
+      expect((await POST(malformed)).status).toBe(403);
+      expect(parseBody).not.toHaveBeenCalled();
+      expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
+    }
+  );
+  it("does not read a run when the scoped connection was released before execution", async () => {
+    mocks.dispatchManualSync.mockResolvedValue({
+      error: { code: "dispatch_failed", message: "Queue unavailable" },
+      ok: false,
+    });
+    mocks.syncXeroPeople.mockResolvedValue({
+      ok: true,
+      value: {
+        failed: 0,
+        fetched: 0,
+        runId: null,
+        skipped: 0,
+        status: "ignored",
+        upserted: 0,
+      },
+    });
+    const response = await POST(request(input));
+    expect(response.status).toBe(500);
+    expect(mocks.syncRunFindFirst).not.toHaveBeenCalled();
+  });
   it("rejects unauthenticated callers", async () => {
     mocks.requireOrg.mockRejectedValueOnce(new Error("No organisation"));
     const response = await POST(request(input));

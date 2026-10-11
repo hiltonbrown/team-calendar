@@ -20,6 +20,7 @@ describe("CalendarEventPopover", () => {
     expect(await screen.findByText("Ari Report")).toBeDefined();
     expect(screen.getByText("Annual leave")).toBeDefined();
     expect(screen.getByText("Source")).toBeDefined();
+    expect(screen.getByText("Acme Restaurants")).toBeDefined();
     expect(screen.getByText("Team Calendar leave")).toBeDefined();
     expect(screen.getByText("Note")).toBeDefined();
     expect(screen.getByRole("link", { name: "View plan" })).toBeDefined();
@@ -75,6 +76,8 @@ function event() {
     allDay: true,
     approvalStatus: "approved",
     avatarUrl: null,
+    companyId: "00000000-0000-4000-8000-000000000001",
+    companyName: "Acme Restaurants",
     contactabilityStatus: "contactable",
     displayName: "Ari Report",
     endsAt: new Date("2026-04-16T00:00:00.000Z"),

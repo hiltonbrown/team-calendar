@@ -1,10 +1,12 @@
 "use server";
+import { requireRole } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { tenantDatabase, tenantTransaction } from "@repo/database";
 import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
+  removeXeroCompany,
   type XeroDisconnectResult,
 } from "@repo/xero";
 import { revalidatePath } from "next/cache";
@@ -13,7 +15,7 @@ import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ConnectSchema = z.object({
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().optional(),
   // Only known in-app destinations; the OAuth service also rejects
   // non-local paths.
   returnTo: z
@@ -26,7 +28,10 @@ const ConnectionSchema = z.object({
 });
 const DisconnectSchema = ConnectionSchema.extend({
   confirmationText: z.string().trim().min(1),
-  mode: z.enum(["destructive", "soft"]),
+  mode: z.literal("soft", {
+    error:
+      "Use the owner-only Remove company action to archive and release a company.",
+  }),
 });
 const TenantSchema = z.object({
   connectionId: z.string().uuid(),
@@ -47,18 +52,23 @@ type ActionError =
     };
 type ActionResult<T> = Result<T, ActionError>;
 export async function connectXeroAction(input: {
-  organisationId: string;
+  organisationId?: string;
   returnTo?: "/onboarding" | "/settings/integrations/xero";
 }): Promise<
   ActionResult<{
     redirectUrl: string;
   }>
 > {
+  if (!(await canManageXero())) {
+    return notAuthorised();
+  }
   const parsed = ConnectSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveAdminContext(parsed.data.organisationId);
+  const context = parsed.data.organisationId
+    ? await resolveAdminContext(parsed.data.organisationId)
+    : await resolveAccountContext();
   if (!context.ok) {
     return context;
   }
@@ -66,7 +76,12 @@ export async function connectXeroAction(input: {
   const baseUrl = env.NEXT_PUBLIC_API_URL ?? env.NEXT_PUBLIC_APP_URL;
   const redirectUrl = new URL("/api/xero/oauth/start", baseUrl);
   redirectUrl.searchParams.set("clerkOrgId", context.value.clerkOrgId);
-  redirectUrl.searchParams.set("organisationId", context.value.organisationId);
+  if (context.value.organisationId) {
+    redirectUrl.searchParams.set(
+      "organisationId",
+      context.value.organisationId
+    );
+  }
   redirectUrl.searchParams.set("returnTo", parsed.data.returnTo);
   redirectUrl.searchParams.set("userId", context.value.actingUserId);
   return { ok: true, value: { redirectUrl: redirectUrl.toString() } };
@@ -82,6 +97,9 @@ export async function disconnectXeroAction(input: {
     result: XeroDisconnectResult;
   }>
 > {
+  if (!(await canManageXero())) {
+    return notAuthorised();
+  }
   const parsed = DisconnectSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -121,7 +139,7 @@ export async function disconnectXeroAction(input: {
     const result = await disconnectXeroOAuthConnection({
       clerkOrgId: context.value.clerkOrgId,
       connectionId: parsed.data.connectionId,
-      destructive: parsed.data.mode === "destructive",
+      destructive: false,
       organisationId: context.value.organisationId,
       performedByUserId: context.value.actingUserId,
     });
@@ -173,6 +191,9 @@ async function updateTenantPauseState(
     paused: true;
   }>
 > {
+  if (!(await canManageXero())) {
+    return notAuthorised();
+  }
   const parsed = TenantSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -219,7 +240,83 @@ async function updateTenantPauseState(
     return { ok: true, value: { paused: true } };
   })();
 }
-async function resolveAdminContext(organisationId: string): Promise<
+async function canManageXero(): Promise<boolean> {
+  const [admin, owner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  return admin || owner;
+}
+async function resolveAccountContext(): Promise<
+  ActionResult<{
+    clerkOrgId: string;
+    actingUserId: string;
+    organisationId: null;
+  }>
+> {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  if (
+    !(orgId && user) ||
+    (orgRole !== "org:admin" && orgRole !== "org:owner")
+  ) {
+    return notAuthorised();
+  }
+  return {
+    ok: true,
+    value: { actingUserId: user.id, clerkOrgId: orgId, organisationId: null },
+  };
+}
+export async function removeCompanyAction(input: {
+  organisationId: string;
+  connectionId: string;
+  confirmationText: string;
+}): Promise<ActionResult<{ removed: true }>> {
+  if (!(await requireRole("org:owner"))) {
+    return notAuthorised();
+  }
+  const parsed = DisconnectSchema.omit({ mode: true }).safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const context = await resolveAdminContext(parsed.data.organisationId, true);
+  if (!context.ok) {
+    return context;
+  }
+  const company = await tenantDatabase(
+    context.value.clerkOrgId
+  ).organisation.findFirst({
+    select: { name: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: context.value.clerkOrgId,
+      id: context.value.organisationId,
+    },
+  });
+  if (!company || company.name !== parsed.data.confirmationText) {
+    return validationError("Type the company name to confirm removal.");
+  }
+  const result = await removeXeroCompany({
+    clerkOrgId: context.value.clerkOrgId,
+    connectionId: parsed.data.connectionId,
+    organisationId: context.value.organisationId,
+    performedByUserId: context.value.actingUserId,
+    role: "owner",
+  });
+  if (!result.ok) {
+    return unknownError(
+      "The company could not be removed. Its connection and ownership remain available to retry."
+    );
+  }
+  revalidate();
+  revalidatePath("/calendar");
+  revalidatePath("/feeds");
+  revalidatePath("/people");
+  return { ok: true, value: { removed: true } };
+}
+async function resolveAdminContext(
+  organisationId: string,
+  ownerOnly = false
+): Promise<
   ActionResult<{
     actingUserId: string;
     actorDisplay: string;
@@ -237,7 +334,7 @@ async function resolveAdminContext(organisationId: string): Promise<
   ]);
   if (
     !(
-      (orgRole === "org:admin" || orgRole === "org:owner") &&
+      (orgRole === "org:owner" || (!ownerOnly && orgRole === "org:admin")) &&
       user &&
       context.ok
     )

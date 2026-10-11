@@ -40,11 +40,12 @@ export default async function XeroConnectPage({
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Select the tenant and payroll organisation before Team Calendar finalises the shared Xero connection."
+        description="Select the Xero payroll files to add or reconnect in this account."
         title="Connect Xero"
       />
       <XeroConnectClient
         organisations={pending.value.organisations}
+        payrollEntityAllowance={pending.value.payrollEntityAllowance}
         presetOrganisationId={pending.value.presetOrganisationId}
         sessionId={pending.value.sessionId}
         tenants={pending.value.tenants}

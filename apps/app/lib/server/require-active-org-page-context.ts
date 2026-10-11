@@ -2,9 +2,8 @@ import "server-only";
 
 import { requireOrg } from "@repo/auth/helpers";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { listOrganisationsByClerkOrg } from "@repo/database/queries/organisations";
+import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { notFound } from "next/navigation";
-import { ensureDefaultOrganisation } from "./ensure-default-organisation";
 import { getActiveOrgContext } from "./get-active-org-context";
 
 export interface ActiveOrgPageContext {
@@ -40,16 +39,13 @@ export async function requireActiveOrgPageContext(
     notFound();
   }
 
-  const orgResult = await listOrganisationsByClerkOrg(clerkOrgId);
-
-  if (!orgResult.ok) {
+  let companies: Awaited<ReturnType<typeof resolveAccountCompanies>>;
+  try {
+    companies = await resolveAccountCompanies(clerkOrgId);
+  } catch {
     notFound();
   }
-
-  const [existingOrganisation] = orgResult.value;
-  const organisationId =
-    existingOrganisation?.id ??
-    (await ensureDefaultOrganisation(clerkOrgId)).organisationId;
+  const organisationId = companies[0]?.id;
 
   if (!organisationId) {
     notFound();
@@ -57,7 +53,8 @@ export async function requireActiveOrgPageContext(
 
   return {
     clerkOrgId,
-    organisationId,
+    // The canonical resolver returns owned organisation UUIDs.
+    organisationId: organisationId as OrganisationId,
     orgQueryValue: null,
     orgSource: "clerk_cookie",
   };

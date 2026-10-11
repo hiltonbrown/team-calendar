@@ -20,6 +20,22 @@ describe("CalendarTimeline", () => {
       })
     ).toBeDefined();
   });
+  it("identifies the source company and scopes person links", () => {
+    render(<CalendarTimeline data={calendarRange()} orgQueryValue={null} />);
+    expect(screen.getAllByText("Acme Restaurants").length).toBeGreaterThan(0);
+    const personLinks = screen
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href")?.startsWith("/people/"));
+    expect(personLinks.length).toBeGreaterThan(0);
+    for (const link of personLinks) {
+      expect(
+        new URL(
+          link.getAttribute("href") ?? "",
+          "https://example.com"
+        ).searchParams.get("org")
+      ).toBe("00000000-0000-4000-8000-000000000003");
+    }
+  });
   it("preserves scope and category on desktop and mobile day links", () => {
     render(
       <CalendarTimeline
@@ -212,6 +228,13 @@ function calendarRange(
         : [],
   }));
   return {
+    companies: [
+      {
+        id: "00000000-0000-4000-8000-000000000003",
+        name: "Acme Restaurants",
+        timezone: "Australia/Brisbane",
+      },
+    ],
     days,
     people,
     range: {
@@ -229,6 +252,8 @@ function calendarRange(
 function person(overrides: { displayName: string; id: string }) {
   return {
     avatarUrl: null,
+    companyId: "00000000-0000-4000-8000-000000000003",
+    companyName: "Acme Restaurants",
     displayName: overrides.displayName,
     firstName: overrides.displayName.split(" ")[0] ?? overrides.displayName,
     id: overrides.id,
@@ -253,6 +278,8 @@ function event(overrides: {
     allDay: true,
     approvalStatus: "approved",
     avatarUrl: null,
+    companyId: "00000000-0000-4000-8000-000000000003",
+    companyName: "Acme Restaurants",
     contactabilityStatus: "contactable",
     displayName: overrides.displayName,
     endsAt: new Date("2026-04-16T00:00:00.000Z"),
