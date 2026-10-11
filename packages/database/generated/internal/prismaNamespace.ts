@@ -3018,6 +3018,7 @@ export const XeroConnectionScalarFieldEnum = {
   sync_paused_at: 'sync_paused_at',
   last_connected_at: 'last_connected_at',
   last_disconnected_at: 'last_disconnected_at',
+  released_at: 'released_at',
   disconnected_at: 'disconnected_at',
   disconnected_by_user_id: 'disconnected_by_user_id',
   last_error_code: 'last_error_code',

@@ -26,6 +26,7 @@ export async function getXeroConnectionState(
       where: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
+        released_at: null,
       },
     });
     const authorisation = connection?.xero_authorisation_id

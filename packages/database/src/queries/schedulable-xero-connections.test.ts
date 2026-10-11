@@ -22,6 +22,7 @@ test("scheduler only selects completed initial imports for active unpaused AU co
     initial_sync_completed_at: { not: null },
     organisation: { archived_at: null, is_active: true },
     payroll_region: "AU",
+    released_at: null,
     status: "active",
     sync_paused_at: null,
   });

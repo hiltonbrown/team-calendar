@@ -29,6 +29,7 @@ describe("canonical scoped connections", () => {
         clerk_org_id: "account",
         id: "connection",
         organisation_id: "payroll",
+        released_at: null,
       },
     });
     expect(result).toEqual({
@@ -74,6 +75,7 @@ describe("provider disconnect compare-and-set", () => {
         id: "connection",
         last_connected_at: captured.lastConnectedAt,
         organisation_id: "payroll",
+        released_at: null,
         remote_connection_id: "remote",
         status: "active",
         xero_authorisation_id: "grant",

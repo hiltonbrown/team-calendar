@@ -46,6 +46,7 @@ test.each([
     expect(findFirst.mock.calls[0]?.[0].where).toEqual({
       clerk_org_id: "account",
       organisation_id: "payroll",
+      released_at: null,
     });
   }
 );

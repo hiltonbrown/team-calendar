@@ -109,6 +109,18 @@
     "./system": {
       "types": "./src/system-client.ts",
       "default": "./src/system-client.ts"
+    },
+    "./queries/account-companies": {
+      "types": "./queries/account-companies.ts",
+      "default": "./queries/account-companies.ts"
+    },
+    "./queries/xero-ownership": {
+      "types": "./queries/xero-ownership.ts",
+      "default": "./queries/xero-ownership.ts"
+    },
+    "./queries/payroll-entitlements": {
+      "types": "./queries/payroll-entitlements.ts",
+      "default": "./queries/payroll-entitlements.ts"
     }
   },
   "main": "./index.ts",

@@ -52,6 +52,7 @@ export async function lockActiveScopedXeroConnection(
     where: {
       ...xeroScope(scope),
       disconnected_at: null,
+      released_at: null,
       status: "active",
     },
   });

@@ -72,6 +72,7 @@ export async function ensureXeroInitialSyncRequested(
     const where = {
       ...xeroScope(input),
       id: input.connectionId,
+      released_at: null,
       status: "active" as const,
       sync_paused_at: null,
     };
@@ -120,6 +121,7 @@ export async function completeXeroInitialSync(
       id: input.connectionId,
       initial_sync_completed_at: null,
       initial_sync_requested_at: new Date(input.requestedAt),
+      released_at: null,
       status: "active",
       sync_paused_at: null,
     },
@@ -134,6 +136,7 @@ export async function completeXeroInitialSync(
       id: input.connectionId,
       initial_sync_completed_at: { not: null },
       initial_sync_requested_at: new Date(input.requestedAt),
+      released_at: null,
       status: "active",
     },
   });

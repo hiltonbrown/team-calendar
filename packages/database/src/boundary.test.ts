@@ -153,6 +153,7 @@ const SYSTEM_IMPORT_ALLOWLIST = new Set([
   "packages/database/src/xero-locks.ts",
   "packages/database/src/queries/xero-authorisation.ts",
   "packages/database/src/queries/xero-connections.ts",
+  "packages/database/src/queries/xero-ownership.ts",
   "packages/database/src/queries/xero-connection-state.ts",
   "packages/database/src/queries/schedulable-xero-connections.ts",
   "packages/database/src/queries/billing.ts",

@@ -198,7 +198,7 @@ export type FeedTokenGroupByArgs<ExtArgs extends runtime.Types.Extensions.Intern
 export type FeedTokenGroupByOutputType = {
   id: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id: string | null
   feed_id: string
   token_hash: string
   token_hint: string
@@ -235,7 +235,7 @@ export type FeedTokenWhereInput = {
   NOT?: Prisma.FeedTokenWhereInput | Prisma.FeedTokenWhereInput[]
   id?: Prisma.UuidFilter<"FeedToken"> | string
   clerk_org_id?: Prisma.StringFilter<"FeedToken"> | string
-  organisation_id?: Prisma.UuidFilter<"FeedToken"> | string
+  organisation_id?: Prisma.UuidNullableFilter<"FeedToken"> | string | null
   feed_id?: Prisma.UuidFilter<"FeedToken"> | string
   token_hash?: Prisma.StringFilter<"FeedToken"> | string
   token_hint?: Prisma.StringFilter<"FeedToken"> | string
@@ -246,7 +246,7 @@ export type FeedTokenWhereInput = {
   last_used_at?: Prisma.DateTimeNullableFilter<"FeedToken"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"FeedToken"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"FeedToken"> | Date | string
-  organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
+  organisation?: Prisma.XOR<Prisma.OrganisationNullableScalarRelationFilter, Prisma.OrganisationWhereInput> | null
   feed?: Prisma.XOR<Prisma.FeedScalarRelationFilter, Prisma.FeedWhereInput>
   rotated_from_token?: Prisma.XOR<Prisma.FeedTokenNullableScalarRelationFilter, Prisma.FeedTokenWhereInput> | null
   rotated_tokens?: Prisma.FeedTokenListRelationFilter
@@ -255,7 +255,7 @@ export type FeedTokenWhereInput = {
 export type FeedTokenOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
-  organisation_id?: Prisma.SortOrder
+  organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   token_hash?: Prisma.SortOrder
   token_hint?: Prisma.SortOrder
@@ -280,7 +280,7 @@ export type FeedTokenWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.FeedTokenWhereInput[]
   NOT?: Prisma.FeedTokenWhereInput | Prisma.FeedTokenWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"FeedToken"> | string
-  organisation_id?: Prisma.UuidFilter<"FeedToken"> | string
+  organisation_id?: Prisma.UuidNullableFilter<"FeedToken"> | string | null
   token_hint?: Prisma.StringFilter<"FeedToken"> | string
   status?: Prisma.Enumfeed_token_statusFilter<"FeedToken"> | $Enums.feed_token_status
   expires_at?: Prisma.DateTimeNullableFilter<"FeedToken"> | Date | string | null
@@ -289,7 +289,7 @@ export type FeedTokenWhereUniqueInput = Prisma.AtLeast<{
   last_used_at?: Prisma.DateTimeNullableFilter<"FeedToken"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"FeedToken"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"FeedToken"> | Date | string
-  organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
+  organisation?: Prisma.XOR<Prisma.OrganisationNullableScalarRelationFilter, Prisma.OrganisationWhereInput> | null
   feed?: Prisma.XOR<Prisma.FeedScalarRelationFilter, Prisma.FeedWhereInput>
   rotated_from_token?: Prisma.XOR<Prisma.FeedTokenNullableScalarRelationFilter, Prisma.FeedTokenWhereInput> | null
   rotated_tokens?: Prisma.FeedTokenListRelationFilter
@@ -298,7 +298,7 @@ export type FeedTokenWhereUniqueInput = Prisma.AtLeast<{
 export type FeedTokenOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
-  organisation_id?: Prisma.SortOrder
+  organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   token_hash?: Prisma.SortOrder
   token_hint?: Prisma.SortOrder
@@ -320,7 +320,7 @@ export type FeedTokenScalarWhereWithAggregatesInput = {
   NOT?: Prisma.FeedTokenScalarWhereWithAggregatesInput | Prisma.FeedTokenScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"FeedToken"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"FeedToken"> | string
-  organisation_id?: Prisma.UuidWithAggregatesFilter<"FeedToken"> | string
+  organisation_id?: Prisma.UuidNullableWithAggregatesFilter<"FeedToken"> | string | null
   feed_id?: Prisma.UuidWithAggregatesFilter<"FeedToken"> | string
   token_hash?: Prisma.StringWithAggregatesFilter<"FeedToken"> | string
   token_hint?: Prisma.StringWithAggregatesFilter<"FeedToken"> | string
@@ -344,7 +344,7 @@ export type FeedTokenCreateInput = {
   last_used_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
   feed: Prisma.FeedCreateNestedOneWithoutTokensInput
   rotated_from_token?: Prisma.FeedTokenCreateNestedOneWithoutRotated_tokensInput
   rotated_tokens?: Prisma.FeedTokenCreateNestedManyWithoutRotated_from_tokenInput
@@ -353,7 +353,7 @@ export type FeedTokenCreateInput = {
 export type FeedTokenUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   feed_id: string
   token_hash: string
   token_hint: string
@@ -378,7 +378,7 @@ export type FeedTokenUpdateInput = {
   last_used_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeed_tokensNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeed_tokensNestedInput
   feed?: Prisma.FeedUpdateOneRequiredWithoutTokensNestedInput
   rotated_from_token?: Prisma.FeedTokenUpdateOneWithoutRotated_tokensNestedInput
   rotated_tokens?: Prisma.FeedTokenUpdateManyWithoutRotated_from_tokenNestedInput
@@ -387,7 +387,7 @@ export type FeedTokenUpdateInput = {
 export type FeedTokenUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
@@ -404,7 +404,7 @@ export type FeedTokenUncheckedUpdateInput = {
 export type FeedTokenCreateManyInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   feed_id: string
   token_hash: string
   token_hint: string
@@ -433,7 +433,7 @@ export type FeedTokenUpdateManyMutationInput = {
 export type FeedTokenUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
@@ -719,7 +719,7 @@ export type FeedTokenScalarWhereInput = {
   NOT?: Prisma.FeedTokenScalarWhereInput | Prisma.FeedTokenScalarWhereInput[]
   id?: Prisma.UuidFilter<"FeedToken"> | string
   clerk_org_id?: Prisma.StringFilter<"FeedToken"> | string
-  organisation_id?: Prisma.UuidFilter<"FeedToken"> | string
+  organisation_id?: Prisma.UuidNullableFilter<"FeedToken"> | string | null
   feed_id?: Prisma.UuidFilter<"FeedToken"> | string
   token_hash?: Prisma.StringFilter<"FeedToken"> | string
   token_hint?: Prisma.StringFilter<"FeedToken"> | string
@@ -743,7 +743,7 @@ export type FeedTokenCreateWithoutFeedInput = {
   last_used_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
   rotated_from_token?: Prisma.FeedTokenCreateNestedOneWithoutRotated_tokensInput
   rotated_tokens?: Prisma.FeedTokenCreateNestedManyWithoutRotated_from_tokenInput
 }
@@ -751,7 +751,7 @@ export type FeedTokenCreateWithoutFeedInput = {
 export type FeedTokenUncheckedCreateWithoutFeedInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   token_hash: string
   token_hint: string
   status?: $Enums.feed_token_status
@@ -801,7 +801,7 @@ export type FeedTokenCreateWithoutRotated_tokensInput = {
   last_used_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
   feed: Prisma.FeedCreateNestedOneWithoutTokensInput
   rotated_from_token?: Prisma.FeedTokenCreateNestedOneWithoutRotated_tokensInput
 }
@@ -809,7 +809,7 @@ export type FeedTokenCreateWithoutRotated_tokensInput = {
 export type FeedTokenUncheckedCreateWithoutRotated_tokensInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   feed_id: string
   token_hash: string
   token_hint: string
@@ -838,7 +838,7 @@ export type FeedTokenCreateWithoutRotated_from_tokenInput = {
   last_used_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeed_tokensInput
   feed: Prisma.FeedCreateNestedOneWithoutTokensInput
   rotated_tokens?: Prisma.FeedTokenCreateNestedManyWithoutRotated_from_tokenInput
 }
@@ -846,7 +846,7 @@ export type FeedTokenCreateWithoutRotated_from_tokenInput = {
 export type FeedTokenUncheckedCreateWithoutRotated_from_tokenInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   feed_id: string
   token_hash: string
   token_hint: string
@@ -891,7 +891,7 @@ export type FeedTokenUpdateWithoutRotated_tokensInput = {
   last_used_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeed_tokensNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeed_tokensNestedInput
   feed?: Prisma.FeedUpdateOneRequiredWithoutTokensNestedInput
   rotated_from_token?: Prisma.FeedTokenUpdateOneWithoutRotated_tokensNestedInput
 }
@@ -899,7 +899,7 @@ export type FeedTokenUpdateWithoutRotated_tokensInput = {
 export type FeedTokenUncheckedUpdateWithoutRotated_tokensInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
@@ -993,7 +993,7 @@ export type FeedTokenUncheckedUpdateManyWithoutOrganisationInput = {
 export type FeedTokenCreateManyFeedInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   token_hash: string
   token_hint: string
   status?: $Enums.feed_token_status
@@ -1016,7 +1016,7 @@ export type FeedTokenUpdateWithoutFeedInput = {
   last_used_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeed_tokensNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeed_tokensNestedInput
   rotated_from_token?: Prisma.FeedTokenUpdateOneWithoutRotated_tokensNestedInput
   rotated_tokens?: Prisma.FeedTokenUpdateManyWithoutRotated_from_tokenNestedInput
 }
@@ -1024,7 +1024,7 @@ export type FeedTokenUpdateWithoutFeedInput = {
 export type FeedTokenUncheckedUpdateWithoutFeedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumfeed_token_statusFieldUpdateOperationsInput | $Enums.feed_token_status
@@ -1040,7 +1040,7 @@ export type FeedTokenUncheckedUpdateWithoutFeedInput = {
 export type FeedTokenUncheckedUpdateManyWithoutFeedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumfeed_token_statusFieldUpdateOperationsInput | $Enums.feed_token_status
@@ -1055,7 +1055,7 @@ export type FeedTokenUncheckedUpdateManyWithoutFeedInput = {
 export type FeedTokenCreateManyRotated_from_tokenInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   feed_id: string
   token_hash: string
   token_hint: string
@@ -1078,7 +1078,7 @@ export type FeedTokenUpdateWithoutRotated_from_tokenInput = {
   last_used_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeed_tokensNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeed_tokensNestedInput
   feed?: Prisma.FeedUpdateOneRequiredWithoutTokensNestedInput
   rotated_tokens?: Prisma.FeedTokenUpdateManyWithoutRotated_from_tokenNestedInput
 }
@@ -1086,7 +1086,7 @@ export type FeedTokenUpdateWithoutRotated_from_tokenInput = {
 export type FeedTokenUncheckedUpdateWithoutRotated_from_tokenInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1102,7 +1102,7 @@ export type FeedTokenUncheckedUpdateWithoutRotated_from_tokenInput = {
 export type FeedTokenUncheckedUpdateManyWithoutRotated_from_tokenInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   token_hash?: Prisma.StringFieldUpdateOperationsInput | string
   token_hint?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1159,7 +1159,7 @@ export type FeedTokenSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   last_used_at?: boolean
   created_at?: boolean
   updated_at?: boolean
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.FeedToken$organisationArgs<ExtArgs>
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
   rotated_from_token?: boolean | Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>
   rotated_tokens?: boolean | Prisma.FeedToken$rotated_tokensArgs<ExtArgs>
@@ -1180,7 +1180,7 @@ export type FeedTokenSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   last_used_at?: boolean
   created_at?: boolean
   updated_at?: boolean
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.FeedToken$organisationArgs<ExtArgs>
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
   rotated_from_token?: boolean | Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>
 }, ExtArgs["result"]["feedToken"]>
@@ -1199,7 +1199,7 @@ export type FeedTokenSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   last_used_at?: boolean
   created_at?: boolean
   updated_at?: boolean
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.FeedToken$organisationArgs<ExtArgs>
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
   rotated_from_token?: boolean | Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>
 }, ExtArgs["result"]["feedToken"]>
@@ -1222,19 +1222,19 @@ export type FeedTokenSelectScalar = {
 
 export type FeedTokenOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "feed_id" | "token_hash" | "token_hint" | "status" | "expires_at" | "revoked_at" | "rotated_from_token_id" | "last_used_at" | "created_at" | "updated_at", ExtArgs["result"]["feedToken"]>
 export type FeedTokenInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.FeedToken$organisationArgs<ExtArgs>
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
   rotated_from_token?: boolean | Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>
   rotated_tokens?: boolean | Prisma.FeedToken$rotated_tokensArgs<ExtArgs>
   _count?: boolean | Prisma.FeedTokenCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FeedTokenIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.FeedToken$organisationArgs<ExtArgs>
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
   rotated_from_token?: boolean | Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>
 }
 export type FeedTokenIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.FeedToken$organisationArgs<ExtArgs>
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
   rotated_from_token?: boolean | Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>
 }
@@ -1242,7 +1242,7 @@ export type FeedTokenIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
 export type $FeedTokenPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "FeedToken"
   objects: {
-    organisation: Prisma.$OrganisationPayload<ExtArgs>
+    organisation: Prisma.$OrganisationPayload<ExtArgs> | null
     feed: Prisma.$FeedPayload<ExtArgs>
     rotated_from_token: Prisma.$FeedTokenPayload<ExtArgs> | null
     rotated_tokens: Prisma.$FeedTokenPayload<ExtArgs>[]
@@ -1250,7 +1250,7 @@ export type $FeedTokenPayload<ExtArgs extends runtime.Types.Extensions.InternalA
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
-    organisation_id: string
+    organisation_id: string | null
     feed_id: string
     token_hash: string
     token_hint: string
@@ -1655,7 +1655,7 @@ readonly fields: FeedTokenFieldRefs;
  */
 export interface Prisma__FeedTokenClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  organisation<T extends Prisma.FeedToken$organisationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FeedToken$organisationArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   feed<T extends Prisma.FeedDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FeedDefaultArgs<ExtArgs>>): Prisma.Prisma__FeedClient<runtime.Types.Result.GetResult<Prisma.$FeedPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   rotated_from_token<T extends Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FeedToken$rotated_from_tokenArgs<ExtArgs>>): Prisma.Prisma__FeedTokenClient<runtime.Types.Result.GetResult<Prisma.$FeedTokenPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   rotated_tokens<T extends Prisma.FeedToken$rotated_tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FeedToken$rotated_tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FeedTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2099,6 +2099,25 @@ export type FeedTokenDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Limit how many FeedTokens to delete.
    */
   limit?: number
+}
+
+/**
+ * FeedToken.organisation
+ */
+export type FeedToken$organisationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Organisation
+   */
+  select?: Prisma.OrganisationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Organisation
+   */
+  omit?: Prisma.OrganisationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrganisationInclude<ExtArgs> | null
+  where?: Prisma.OrganisationWhereInput
 }
 
 /**

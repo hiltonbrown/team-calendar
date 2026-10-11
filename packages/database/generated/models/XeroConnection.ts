@@ -39,6 +39,7 @@ export type XeroConnectionMinAggregateOutputType = {
   sync_paused_at: Date | null
   last_connected_at: Date | null
   last_disconnected_at: Date | null
+  released_at: Date | null
   disconnected_at: Date | null
   disconnected_by_user_id: string | null
   last_error_code: string | null
@@ -80,6 +81,7 @@ export type XeroConnectionMaxAggregateOutputType = {
   sync_paused_at: Date | null
   last_connected_at: Date | null
   last_disconnected_at: Date | null
+  released_at: Date | null
   disconnected_at: Date | null
   disconnected_by_user_id: string | null
   last_error_code: string | null
@@ -121,6 +123,7 @@ export type XeroConnectionCountAggregateOutputType = {
   sync_paused_at: number
   last_connected_at: number
   last_disconnected_at: number
+  released_at: number
   disconnected_at: number
   disconnected_by_user_id: number
   last_error_code: number
@@ -164,6 +167,7 @@ export type XeroConnectionMinAggregateInputType = {
   sync_paused_at?: true
   last_connected_at?: true
   last_disconnected_at?: true
+  released_at?: true
   disconnected_at?: true
   disconnected_by_user_id?: true
   last_error_code?: true
@@ -205,6 +209,7 @@ export type XeroConnectionMaxAggregateInputType = {
   sync_paused_at?: true
   last_connected_at?: true
   last_disconnected_at?: true
+  released_at?: true
   disconnected_at?: true
   disconnected_by_user_id?: true
   last_error_code?: true
@@ -246,6 +251,7 @@ export type XeroConnectionCountAggregateInputType = {
   sync_paused_at?: true
   last_connected_at?: true
   last_disconnected_at?: true
+  released_at?: true
   disconnected_at?: true
   disconnected_by_user_id?: true
   last_error_code?: true
@@ -360,6 +366,7 @@ export type XeroConnectionGroupByOutputType = {
   sync_paused_at: Date | null
   last_connected_at: Date | null
   last_disconnected_at: Date | null
+  released_at: Date | null
   disconnected_at: Date | null
   disconnected_by_user_id: string | null
   last_error_code: string | null
@@ -422,6 +429,7 @@ export type XeroConnectionWhereInput = {
   sync_paused_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  released_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
   last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
@@ -468,6 +476,7 @@ export type XeroConnectionOrderByWithRelationInput = {
   sync_paused_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_connected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  released_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   last_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -519,6 +528,7 @@ export type XeroConnectionWhereUniqueInput = Prisma.AtLeast<{
   sync_paused_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  released_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
   last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
@@ -565,6 +575,7 @@ export type XeroConnectionOrderByWithAggregationInput = {
   sync_paused_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_connected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  released_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_at?: Prisma.SortOrderInput | Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   last_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -612,6 +623,7 @@ export type XeroConnectionScalarWhereWithAggregatesInput = {
   sync_paused_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
+  released_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
   last_error_code?: Prisma.StringNullableWithAggregatesFilter<"XeroConnection"> | string | null
@@ -650,6 +662,7 @@ export type XeroConnectionCreateInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -696,6 +709,7 @@ export type XeroConnectionUncheckedCreateInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -737,6 +751,7 @@ export type XeroConnectionUpdateInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -783,6 +798,7 @@ export type XeroConnectionUncheckedUpdateInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -827,6 +843,7 @@ export type XeroConnectionCreateManyInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -865,6 +882,7 @@ export type XeroConnectionUpdateManyMutationInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -906,6 +924,7 @@ export type XeroConnectionUncheckedUpdateManyInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -973,6 +992,7 @@ export type XeroConnectionCountOrderByAggregateInput = {
   sync_paused_at?: Prisma.SortOrder
   last_connected_at?: Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrder
+  released_at?: Prisma.SortOrder
   disconnected_at?: Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrder
   last_error_code?: Prisma.SortOrder
@@ -1014,6 +1034,7 @@ export type XeroConnectionMaxOrderByAggregateInput = {
   sync_paused_at?: Prisma.SortOrder
   last_connected_at?: Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrder
+  released_at?: Prisma.SortOrder
   disconnected_at?: Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrder
   last_error_code?: Prisma.SortOrder
@@ -1055,6 +1076,7 @@ export type XeroConnectionMinOrderByAggregateInput = {
   sync_paused_at?: Prisma.SortOrder
   last_connected_at?: Prisma.SortOrder
   last_disconnected_at?: Prisma.SortOrder
+  released_at?: Prisma.SortOrder
   disconnected_at?: Prisma.SortOrder
   disconnected_by_user_id?: Prisma.SortOrder
   last_error_code?: Prisma.SortOrder
@@ -1226,6 +1248,7 @@ export type XeroConnectionCreateWithoutOrganisationInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1269,6 +1292,7 @@ export type XeroConnectionUncheckedCreateWithoutOrganisationInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1326,6 +1350,7 @@ export type XeroConnectionUpdateWithoutOrganisationInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1369,6 +1394,7 @@ export type XeroConnectionUncheckedUpdateWithoutOrganisationInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1410,6 +1436,7 @@ export type XeroConnectionCreateWithoutAuthorisationInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1454,6 +1481,7 @@ export type XeroConnectionUncheckedCreateWithoutAuthorisationInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1527,6 +1555,7 @@ export type XeroConnectionScalarWhereInput = {
   sync_paused_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_connected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
+  released_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   disconnected_by_user_id?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
   last_error_code?: Prisma.StringNullableFilter<"XeroConnection"> | string | null
@@ -1565,6 +1594,7 @@ export type XeroConnectionCreateWithoutSync_cursorsInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1610,6 +1640,7 @@ export type XeroConnectionUncheckedCreateWithoutSync_cursorsInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1666,6 +1697,7 @@ export type XeroConnectionUpdateWithoutSync_cursorsInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1711,6 +1743,7 @@ export type XeroConnectionUncheckedUpdateWithoutSync_cursorsInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1751,6 +1784,7 @@ export type XeroConnectionCreateWithoutLeave_balancesInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1796,6 +1830,7 @@ export type XeroConnectionUncheckedCreateWithoutLeave_balancesInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1852,6 +1887,7 @@ export type XeroConnectionUpdateWithoutLeave_balancesInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1897,6 +1933,7 @@ export type XeroConnectionUncheckedUpdateWithoutLeave_balancesInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1937,6 +1974,7 @@ export type XeroConnectionCreateWithoutSync_runsInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -1982,6 +2020,7 @@ export type XeroConnectionUncheckedCreateWithoutSync_runsInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -2038,6 +2077,7 @@ export type XeroConnectionUpdateWithoutSync_runsInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2083,6 +2123,7 @@ export type XeroConnectionUncheckedUpdateWithoutSync_runsInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2125,6 +2166,7 @@ export type XeroConnectionCreateManyAuthorisationInput = {
   sync_paused_at?: Date | string | null
   last_connected_at?: Date | string | null
   last_disconnected_at?: Date | string | null
+  released_at?: Date | string | null
   disconnected_at?: Date | string | null
   disconnected_by_user_id?: string | null
   last_error_code?: string | null
@@ -2163,6 +2205,7 @@ export type XeroConnectionUpdateWithoutAuthorisationInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2207,6 +2250,7 @@ export type XeroConnectionUncheckedUpdateWithoutAuthorisationInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2250,6 +2294,7 @@ export type XeroConnectionUncheckedUpdateManyWithoutAuthorisationInput = {
   sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_connected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  released_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   disconnected_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   last_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2340,6 +2385,7 @@ export type XeroConnectionSelect<ExtArgs extends runtime.Types.Extensions.Intern
   sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
+  released_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
   last_error_code?: boolean
@@ -2387,6 +2433,7 @@ export type XeroConnectionSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
+  released_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
   last_error_code?: boolean
@@ -2430,6 +2477,7 @@ export type XeroConnectionSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
+  released_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
   last_error_code?: boolean
@@ -2473,6 +2521,7 @@ export type XeroConnectionSelectScalar = {
   sync_paused_at?: boolean
   last_connected_at?: boolean
   last_disconnected_at?: boolean
+  released_at?: boolean
   disconnected_at?: boolean
   disconnected_by_user_id?: boolean
   last_error_code?: boolean
@@ -2499,7 +2548,7 @@ export type XeroConnectionSelectScalar = {
   updated_at?: boolean
 }
 
-export type XeroConnectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_authorisation_id" | "xero_tenant_id" | "remote_connection_id" | "tenant_name" | "tenant_type" | "auth_event_id" | "payroll_region" | "status" | "sync_paused_at" | "last_connected_at" | "last_disconnected_at" | "disconnected_at" | "disconnected_by_user_id" | "last_error_code" | "last_error_message" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "initial_sync_requested_at" | "initial_sync_completed_at" | "last_full_people_sync_at" | "last_full_leave_records_sync_at" | "balance_next_person_id" | "balance_sweep_failed" | "leave_next_person_id" | "leave_sweep_failed" | "created_at" | "updated_at", ExtArgs["result"]["xeroConnection"]>
+export type XeroConnectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_authorisation_id" | "xero_tenant_id" | "remote_connection_id" | "tenant_name" | "tenant_type" | "auth_event_id" | "payroll_region" | "status" | "sync_paused_at" | "last_connected_at" | "last_disconnected_at" | "released_at" | "disconnected_at" | "disconnected_by_user_id" | "last_error_code" | "last_error_message" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "initial_sync_requested_at" | "initial_sync_completed_at" | "last_full_people_sync_at" | "last_full_leave_records_sync_at" | "balance_next_person_id" | "balance_sweep_failed" | "leave_next_person_id" | "leave_sweep_failed" | "created_at" | "updated_at", ExtArgs["result"]["xeroConnection"]>
 export type XeroConnectionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
@@ -2541,6 +2590,7 @@ export type $XeroConnectionPayload<ExtArgs extends runtime.Types.Extensions.Inte
     sync_paused_at: Date | null
     last_connected_at: Date | null
     last_disconnected_at: Date | null
+    released_at: Date | null
     disconnected_at: Date | null
     disconnected_by_user_id: string | null
     last_error_code: string | null
@@ -3007,6 +3057,7 @@ export interface XeroConnectionFieldRefs {
   readonly sync_paused_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly last_connected_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly last_disconnected_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
+  readonly released_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly disconnected_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly disconnected_by_user_id: Prisma.FieldRef<"XeroConnection", 'String'>
   readonly last_error_code: Prisma.FieldRef<"XeroConnection", 'String'>

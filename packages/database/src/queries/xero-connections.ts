@@ -36,6 +36,7 @@ export async function getScopedXeroConnection(
   const connection = await tx.xeroConnection.findFirst({
     where: {
       ...xeroScope(input),
+      released_at: null,
       ...(input.connectionId ? { id: input.connectionId } : {}),
     },
   });
@@ -74,7 +75,7 @@ export async function markScopedXeroConnectionReconnectRequired(
 ): Promise<boolean> {
   const connection = await tx.xeroConnection.findFirst({
     select: { id: true },
-    where: { ...xeroScope(input), id: input.connectionId },
+    where: { ...xeroScope(input), id: input.connectionId, released_at: null },
   });
   if (!connection) {
     return false;
@@ -96,6 +97,7 @@ export async function markScopedXeroConnectionReconnectRequired(
       disconnected_at: null,
       id: input.connectionId,
       last_connected_at: input.lastConnectedAt,
+      released_at: null,
       remote_connection_id: input.remoteConnectionId,
       status: "active",
       xero_authorisation_id: input.authorisationId,
@@ -116,6 +118,7 @@ export async function getScopedXeroAuthorisationMetadata(
     select: { xero_authorisation_id: true },
     where: {
       ...xeroScope(input),
+      released_at: null,
       ...(input.connectionId ? { id: input.connectionId } : {}),
     },
   });

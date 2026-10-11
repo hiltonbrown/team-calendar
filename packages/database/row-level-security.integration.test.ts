@@ -43,6 +43,51 @@ test("restricted role has no elevated memberships or table ownership", async () 
   ).rejects.toThrow("non-owner");
 });
 
+test("preflight rejects inherited table ownership that bypasses RLS", async () => {
+  const suffix = randomUUID().replaceAll("-", "");
+  const ownerRole = `rls_owner_${suffix}`;
+  const tableName = `rls_role_${suffix}`;
+  const appRole = new URL(appUrl).username.replaceAll('"', '""');
+  // Identifiers use generated hexadecimal names or a quoted URL role name.
+  // Only this disposable table belongs to the temporary inherited role.
+  try {
+    await systemDatabase.$executeRawUnsafe(
+      `CREATE ROLE "${ownerRole}" NOLOGIN`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `CREATE TABLE "${tableName}" (clerk_org_id text NOT NULL)`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `INSERT INTO "${tableName}" VALUES ('other-account')`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `ALTER TABLE "${tableName}" ENABLE ROW LEVEL SECURITY`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `ALTER TABLE "${tableName}" OWNER TO "${ownerRole}"`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `GRANT "${ownerRole}" TO "${appRole}"`
+    );
+    expect(
+      await unscoped.$queryRawUnsafe(`SELECT * FROM "${tableName}"`)
+    ).toEqual([{ clerk_org_id: "other-account" }]);
+    await expect(assertRestrictedDatabaseRole(appUrl)).rejects.toThrow(
+      "non-owner"
+    );
+  } finally {
+    await systemDatabase.$executeRawUnsafe(
+      `REVOKE "${ownerRole}" FROM "${appRole}"`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `DROP TABLE IF EXISTS "${tableName}"`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `DROP ROLE IF EXISTS "${ownerRole}"`
+    );
+  }
+});
+
 test("tenant reads omit another account even without application filters", async () => {
   const rows = await tenantDatabase(accountA).organisation.findMany();
   expect(rows.map((row) => row.id)).toEqual([companyA]);

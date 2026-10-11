@@ -6,9 +6,11 @@ export {
   type OrganisationSettingsUpdateInput,
   updateForOrganisation as updateOrganisationSettings,
 } from "./src/organisation-settings/repository";
+export * from "./src/queries/account-companies";
 export * from "./src/queries/activation-dashboard";
 export * from "./src/queries/billing";
 export * from "./src/queries/outbound-operations";
+export * from "./src/queries/payroll-entitlements";
 export * from "./src/queries/public-holiday-resolution";
 export * from "./src/queries/schedulable-xero-connections";
 export * from "./src/queries/xero-authorisation";
@@ -17,6 +19,7 @@ export {
   getScopedXeroConnection,
   markScopedXeroConnectionReconnectRequired,
 } from "./src/queries/xero-connections";
+export * from "./src/queries/xero-ownership";
 export * from "./src/seed/plan-sync";
 export * from "./src/seed/plans";
 export type { Database } from "./src/system-client";
