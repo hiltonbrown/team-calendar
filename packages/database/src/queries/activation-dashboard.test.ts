@@ -1,8 +1,12 @@
+vi.mock("./billing", () => ({
+  getUnresolvedStripeEventsForOrg: async () => [{}, {}],
+}));
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ queryRaw: vi.fn() }));
-vi.mock("../client", () => ({
-  database: { $queryRaw: mocks.queryRaw },
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({ $queryRaw: mocks.queryRaw }),
 }));
 
 const { getActivationDashboardSummary } = await import(

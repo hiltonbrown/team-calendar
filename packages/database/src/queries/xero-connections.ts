@@ -1,7 +1,8 @@
 import "server-only";
 import type { Result } from "@repo/core";
 import type { Prisma } from "../../generated/client";
-import { database } from "../client";
+import { systemDatabase } from "../system-client";
+import { tenantDatabase } from "../tenant-client";
 export interface XeroScope {
   clerkOrgId: string;
   organisationId: string;
@@ -16,7 +17,9 @@ export async function getScopedXeroConnection(
   input: XeroScope & {
     connectionId?: string;
   },
-  tx: Prisma.TransactionClient = database
+  tx: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
+    input.clerkOrgId
+  )
 ): Promise<
   Result<
     Prisma.XeroConnectionGetPayload<{
@@ -31,7 +34,6 @@ export async function getScopedXeroConnection(
   >
 > {
   const connection = await tx.xeroConnection.findFirst({
-    include: { authorisation: true },
     where: {
       ...xeroScope(input),
       ...(input.connectionId ? { id: input.connectionId } : {}),
@@ -43,7 +45,12 @@ export async function getScopedXeroConnection(
       ok: false,
     };
   }
-  return { ok: true, value: connection };
+  const authorisation = connection.xero_authorisation_id
+    ? await systemDatabase.xeroAuthorisation.findUnique({
+        where: { id: connection.xero_authorisation_id },
+      })
+    : null;
+  return { ok: true, value: { ...connection, authorisation } };
 }
 
 export interface XeroProviderConnectionCapture {
@@ -61,9 +68,20 @@ export async function markScopedXeroConnectionReconnectRequired(
       connectionId: string;
       xeroTenantId: string;
     },
-  tx: Prisma.TransactionClient = database
+  tx: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
+    input.clerkOrgId
+  )
 ): Promise<boolean> {
-  const changed = await tx.xeroConnection.updateMany({
+  const connection = await tx.xeroConnection.findFirst({
+    select: { id: true },
+    where: { ...xeroScope(input), id: input.connectionId },
+  });
+  if (!connection) {
+    return false;
+  }
+  // This credential-lifecycle mutation must compare the grant timestamp in the
+  // same SQL statement; a separate grant read permits a concurrent rotation.
+  const changed = await systemDatabase.xeroConnection.updateMany({
     data: {
       last_error_code: "reauthorisation_required",
       last_error_message: "Reconnect Xero to continue.",
@@ -85,4 +103,27 @@ export async function markScopedXeroConnectionReconnectRequired(
     },
   });
   return changed.count === 1;
+}
+
+/** Resolve the tenant connection before reading its credential owner's health. */
+export async function getScopedXeroAuthorisationMetadata(
+  input: XeroScope & { connectionId?: string },
+  client: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
+    input.clerkOrgId
+  )
+): Promise<{ status: string; last_refreshed_at: Date | null } | null> {
+  const connection = await client.xeroConnection.findFirst({
+    select: { xero_authorisation_id: true },
+    where: {
+      ...xeroScope(input),
+      ...(input.connectionId ? { id: input.connectionId } : {}),
+    },
+  });
+  if (!connection?.xero_authorisation_id) {
+    return null;
+  }
+  return await systemDatabase.xeroAuthorisation.findUnique({
+    select: { last_refreshed_at: true, status: true },
+    where: { id: connection.xero_authorisation_id },
+  });
 }

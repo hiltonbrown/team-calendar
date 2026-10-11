@@ -101,6 +101,14 @@
     "./queries/schedulable-xero-connections": {
       "types": "./queries/schedulable-xero-connections.ts",
       "default": "./queries/schedulable-xero-connections.ts"
+    },
+    "./runtime-role": {
+      "types": "./src/runtime-role.ts",
+      "default": "./src/runtime-role.ts"
+    },
+    "./system": {
+      "types": "./src/system-client.ts",
+      "default": "./src/system-client.ts"
     }
   },
   "main": "./index.ts",

@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "../generated/client";
-import { database } from "./client";
 import { type XeroScope, xeroScope } from "./queries/xero-connections";
+import { systemDatabase } from "./system-client";
 export async function lockXeroAuthorisation(
   tx: Prisma.TransactionClient,
   appId: string,
@@ -25,7 +25,7 @@ export async function withXeroGrantLock<T>(
   if (remaining <= 0) {
     throw new Error("Xero operation deadline expired");
   }
-  return await database.$transaction(
+  return await systemDatabase.$transaction(
     async (tx) => {
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${`${remaining}ms`}, true)`;
       const key = `xero-app:${input.providerAppId}`;
@@ -47,15 +47,21 @@ export async function lockActiveScopedXeroConnection(
   scope: XeroScope
 ): Promise<boolean> {
   await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
+  const connection = await tx.xeroConnection.findFirst({
+    select: { xero_authorisation_id: true },
+    where: {
+      ...xeroScope(scope),
+      disconnected_at: null,
+      status: "active",
+    },
+  });
+  if (!connection?.xero_authorisation_id) {
+    return false;
+  }
   return Boolean(
-    await tx.xeroConnection.findFirst({
+    await systemDatabase.xeroAuthorisation.findFirst({
       select: { id: true },
-      where: {
-        ...xeroScope(scope),
-        authorisation: { status: "active" },
-        disconnected_at: null,
-        status: "active",
-      },
+      where: { id: connection.xero_authorisation_id, status: "active" },
     })
   );
 }

@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
 }));
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     feed: {
       findFirst: mocks.findFirst,
       findMany: mocks.findMany,
     },
-  },
+  }),
 }));
 
 const { listFeedsForOrganisation, getFeedDetail } = await import("./feeds");

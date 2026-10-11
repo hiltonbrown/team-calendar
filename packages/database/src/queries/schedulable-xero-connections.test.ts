@@ -1,7 +1,9 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
 const findMany = vi.fn();
-vi.mock("../client", () => ({ database: { xeroConnection: { findMany } } }));
+vi.mock("../system-client", () => ({
+  systemDatabase: { xeroConnection: { findMany } },
+}));
 const { listSchedulableXeroConnections } = await import(
   "./schedulable-xero-connections"
 );

@@ -1,6 +1,5 @@
 export { limitTypes } from "@repo/core";
 export * from "./generated/client";
-export { type Database, database } from "./src/client";
 export {
   getOrCreateForOrganisation as getOrCreateOrganisationSettings,
   type OrganisationSettingsRow,
@@ -13,8 +12,20 @@ export * from "./src/queries/outbound-operations";
 export * from "./src/queries/public-holiday-resolution";
 export * from "./src/queries/schedulable-xero-connections";
 export * from "./src/queries/xero-authorisation";
+export {
+  getScopedXeroAuthorisationMetadata,
+  getScopedXeroConnection,
+  markScopedXeroConnectionReconnectRequired,
+} from "./src/queries/xero-connections";
 export * from "./src/seed/plan-sync";
 export * from "./src/seed/plans";
+export type { Database } from "./src/system-client";
+export { systemDatabase } from "./src/system-client";
+export {
+  type TenantDatabase,
+  tenantDatabase,
+  tenantTransaction,
+} from "./src/tenant-client";
 export {
   type ScopedQueryResult,
   scopedQuery,

@@ -8,6 +8,7 @@ const packageJsonPath = resolve(import.meta.dirname, "../package.json");
 const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const SRC_PATH_REGEX = /^\.\/src(\/.*)?$/;
+const LEGACY_CLIENT_IMPORT_REGEX = /from ["'](?:\.\.?\/)+client["']/;
 const TS_FILE_REGEX = /\.(ts|tsx)$/;
 const FORBIDDEN_IMPORT_PATTERN = new RegExp(
   ["@repo", "database", "src", ""].join("/")
@@ -79,7 +80,9 @@ describe("Database package exports boundary", () => {
   it("all declared subpaths resolve valid modules", async () => {
     const rootMod = await import("@repo/database");
     expect(rootMod).toBeDefined();
-    expect(rootMod.database).toBeDefined();
+    expect("database" in rootMod).toBe(false);
+    expect(rootMod.tenantDatabase).toBeTypeOf("function");
+    expect(rootMod.tenantTransaction).toBeTypeOf("function");
 
     const keysMod = await import("@repo/database/keys");
     expect(keysMod).toBeDefined();
@@ -142,4 +145,73 @@ describe("Database package exports boundary", () => {
 
     expect(violations).toEqual([]);
   });
+});
+
+const SYSTEM_IMPORT_ALLOWLIST = new Set([
+  "packages/database/index.ts",
+  "packages/database/src/system-client.ts",
+  "packages/database/src/xero-locks.ts",
+  "packages/database/src/queries/xero-authorisation.ts",
+  "packages/database/src/queries/xero-connections.ts",
+  "packages/database/src/queries/xero-connection-state.ts",
+  "packages/database/src/queries/schedulable-xero-connections.ts",
+  "packages/database/src/queries/billing.ts",
+  "packages/xero/src/oauth/service.ts",
+  "packages/xero/src/oauth/authorisation.ts",
+  "packages/xero/src/oauth/reencrypt-tokens.ts",
+  "packages/feeds/src/render/render-feed.ts",
+  "packages/jobs/src/handlers/schedule-xero-syncs.ts",
+  "packages/jobs/src/handlers/recover-xero-import-dispatch.ts",
+  "packages/jobs/src/handlers/recount-usage.ts",
+  "packages/jobs/src/handlers/send-notification-emails.ts",
+  "apps/api/app/ical/[token]/route.ts",
+  "apps/api/app/webhooks/clerk/route.ts",
+  "apps/api/app/webhooks/stripe/route.ts",
+]);
+
+it("only explicitly allowlisted production modules access the owner client", () => {
+  const violations: string[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (
+        ["node_modules", ".next", ".turbo", "generated", "dist"].includes(
+          entry.name
+        )
+      ) {
+        continue;
+      }
+      const fullPath = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath);
+        continue;
+      }
+      if (!TS_FILE_REGEX.test(entry.name) || entry.name.includes(".test.")) {
+        continue;
+      }
+      const path = fullPath.slice(repoRoot.length + 1);
+      if (
+        path.includes("test-fixture") ||
+        path.includes("/seed/") ||
+        entry.name === "seed.ts"
+      ) {
+        continue;
+      }
+      const source = readFileSync(fullPath, "utf8");
+      if (
+        source.includes("systemDatabase") &&
+        !SYSTEM_IMPORT_ALLOWLIST.has(path)
+      ) {
+        violations.push(path);
+      }
+      if (
+        LEGACY_CLIENT_IMPORT_REGEX.test(source) &&
+        path.startsWith("packages/database/")
+      ) {
+        violations.push(`${path}: legacy owner import`);
+      }
+    }
+  };
+  visit(resolve(repoRoot, "apps"));
+  visit(resolve(repoRoot, "packages"));
+  expect(violations).toEqual([]);
 });

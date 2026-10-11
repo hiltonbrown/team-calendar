@@ -1,6 +1,6 @@
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 
 export type OnboardingStep =
   | "details"
@@ -44,7 +44,9 @@ export async function getOnboardingRecord(
   organisationId: string
 ): Promise<Result<OnboardingRecord>> {
   try {
-    const organisation = await database.organisation.findFirst({
+    const organisation = await tenantDatabase(
+      clerkOrgId
+    ).organisation.findFirst({
       select: {
         onboarding_completed_at: true,
         onboarding_step: true,
@@ -77,7 +79,7 @@ export async function advanceOnboardingStep(
   to: OnboardingStep
 ): Promise<Result<{ advanced: boolean }>> {
   try {
-    const updated = await database.organisation.updateMany({
+    const updated = await tenantDatabase(clerkOrgId).organisation.updateMany({
       data: { onboarding_step: to },
       where: { ...scope(clerkOrgId, organisationId), onboarding_step: from },
     });
@@ -93,7 +95,7 @@ export async function setXeroSetupSkipped(
   skipped: boolean
 ): Promise<Result<void>> {
   try {
-    await database.organisation.updateMany({
+    await tenantDatabase(clerkOrgId).organisation.updateMany({
       data: { xero_setup_skipped_at: skipped ? new Date() : null },
       where: scope(clerkOrgId, organisationId),
     });
@@ -108,7 +110,7 @@ export async function completeOnboarding(
   organisationId: string
 ): Promise<Result<{ completedAt: Date }>> {
   try {
-    await database.organisation.updateMany({
+    await tenantDatabase(clerkOrgId).organisation.updateMany({
       data: { onboarding_completed_at: new Date(), onboarding_step: "finish" },
       where: {
         ...scope(clerkOrgId, organisationId),
@@ -134,7 +136,7 @@ export async function getWelcomeState(
   clerkUserId: string
 ): Promise<Result<{ completedAt: Date | null; personId: string } | null>> {
   try {
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(clerkOrgId).person.findFirst({
       select: { id: true, welcome_completed_at: true },
       where: {
         archived_at: null,
@@ -161,7 +163,7 @@ export async function completeWelcome(
   clerkUserId: string
 ): Promise<Result<void>> {
   try {
-    const updated = await database.person.updateMany({
+    const updated = await tenantDatabase(clerkOrgId).person.updateMany({
       data: { welcome_completed_at: new Date() },
       where: {
         archived_at: null,

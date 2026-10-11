@@ -1,5 +1,7 @@
 import type { Result, XeroConnectionState } from "@repo/core";
-import { database } from "../client";
+import type { Prisma } from "../../generated/client";
+import { systemDatabase } from "../system-client";
+import { tenantDatabase } from "../tenant-client";
 
 export type { XeroConnectionState } from "@repo/core";
 export interface XeroConnectionStateResult {
@@ -13,23 +15,32 @@ export interface XeroConnectionStateError {
   code: "state_unavailable";
 }
 export async function getXeroConnectionState(
-  input: XeroConnectionStateInput
+  input: XeroConnectionStateInput,
+  client: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
+    input.clerkOrgId
+  )
 ): Promise<Result<XeroConnectionStateResult, XeroConnectionStateError>> {
   try {
-    const connection = await database.xeroConnection.findFirst({
-      select: { authorisation: { select: { status: true } }, status: true },
+    const connection = await client.xeroConnection.findFirst({
+      select: { status: true, xero_authorisation_id: true },
       where: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
       },
     });
+    const authorisation = connection?.xero_authorisation_id
+      ? await systemDatabase.xeroAuthorisation.findUnique({
+          select: { status: true },
+          where: { id: connection.xero_authorisation_id },
+        })
+      : null;
     let state: XeroConnectionState = "connected";
     if (!connection || connection.status === "disconnected") {
       state = "not_connected";
     } else if (
-      !connection.authorisation ||
+      !authorisation ||
       connection.status === "reconnect_required" ||
-      connection.authorisation?.status === "reconnect_required"
+      authorisation?.status === "reconnect_required"
     ) {
       state = "reauthorisation_required";
     }

@@ -1,6 +1,6 @@
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 export async function listOrganisationsByClerkOrg(
   clerkOrgId: ClerkOrgId
@@ -22,7 +22,9 @@ export async function listOrganisationsByClerkOrg(
   >
 > {
   try {
-    const organisations = await database.organisation.findMany({
+    const organisations = await tenantDatabase(
+      clerkOrgId
+    ).organisation.findMany({
       orderBy: [{ created_at: "asc" }, { name: "asc" }],
       select: {
         clerk_org_id: true,
@@ -84,7 +86,9 @@ export async function getOrganisationById(
   }>
 > {
   try {
-    const organisation = await database.organisation.findFirst({
+    const organisation = await tenantDatabase(
+      clerkOrgId
+    ).organisation.findFirst({
       select: {
         clerk_org_id: true,
         country_code: true,
@@ -141,7 +145,9 @@ export async function hasXeroConnection(
   organisationId: OrganisationId
 ): Promise<Result<boolean>> {
   try {
-    const connection = await database.xeroConnection.findFirst({
+    const connection = await tenantDatabase(
+      clerkOrgId
+    ).xeroConnection.findFirst({
       select: { id: true },
       where: scopedQuery(clerkOrgId, organisationId),
     });

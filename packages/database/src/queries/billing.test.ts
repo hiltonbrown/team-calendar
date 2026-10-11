@@ -10,15 +10,18 @@ const mocks = vi.hoisted(() => ({
   xeroConnectionCount: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     $executeRaw: mocks.executeRaw,
     $queryRaw: mocks.queryRaw,
     feed: { count: mocks.feedCount },
     organisation: { count: mocks.organisationCount },
     person: { count: mocks.personCount },
     xeroConnection: { count: mocks.xeroConnectionCount },
-  },
+  }),
+}));
+vi.mock("../system-client", () => ({
+  systemDatabase: { $executeRaw: mocks.executeRaw, $queryRaw: mocks.queryRaw },
 }));
 const {
   getAuthoritativeUsageCount,
