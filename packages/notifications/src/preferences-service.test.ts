@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ database: {} }));
+vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   findUnique: vi.fn(),
+  tenantDatabase: vi.fn(),
   upsert: vi.fn(),
 }));
 
@@ -29,8 +30,15 @@ const input = {
 describe("preferences-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.tenantDatabase.mockReturnValue(client);
     mocks.findMany.mockResolvedValue([]);
     mocks.findUnique.mockResolvedValue(null);
+  });
+
+  it("loads preferences through the account-bound default client", async () => {
+    const result = await listPreferences(input);
+    expect(result.ok).toBe(true);
+    expect(mocks.tenantDatabase).toHaveBeenCalledWith(input.clerkOrgId);
   });
 
   it("returns defaults for every registry type", async () => {

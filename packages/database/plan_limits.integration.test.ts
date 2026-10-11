@@ -7,7 +7,9 @@ vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
   "packages/database/plan_limits.integration.test.ts"
 );
-const { database, plan_limit_type } = await import("./index.js");
+const { systemDatabase: database, plan_limit_type } = await import(
+  "./index.js"
+);
 
 const planId = fixture.globalKey("plan_id");
 const planKey = fixture.globalKey("plan_key");

@@ -25,13 +25,24 @@ import {
   connectXeroAction,
   disconnectXeroAction,
   pauseTenantSyncAction,
+  removeCompanyAction,
   resumeTenantSyncAction,
 } from "./_actions";
 
 interface XeroClientProps {
+  actingRole?: "owner" | "admin" | "manager" | "viewer";
   organisations: OrganisationWithConnectionView[];
+  payrollEntityAllowance?: {
+    used: number;
+    limit: number | null;
+    remaining: number | null;
+  } | null;
 }
-export const XeroClient = ({ organisations }: XeroClientProps) => {
+export const XeroClient = ({
+  organisations,
+  actingRole = "admin",
+  payrollEntityAllowance,
+}: XeroClientProps) => {
   const router = useRouter();
   const [disconnectMessage, setDisconnectMessage] = useState<string | null>(
     null
@@ -39,11 +50,11 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
   const [isPending, startTransition] = useTransition();
   const [disconnectTarget, setDisconnectTarget] = useState<{
     connectionId: string;
-    mode: "destructive" | "soft";
+    mode: "remove" | "soft";
     organisationId: string;
     organisationName: string;
   } | null>(null);
-  const handleConnect = (organisationId: string) => {
+  const handleConnect = (organisationId?: string) => {
     startTransition(async () => {
       const result = await connectXeroAction({ organisationId });
       if (!result.ok) {
@@ -58,17 +69,22 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       return;
     }
     startTransition(async () => {
-      const result = await disconnectXeroAction({
+      const removal = disconnectTarget.mode === "remove";
+      const input = {
         confirmationText: disconnectTarget.organisationName,
         connectionId: disconnectTarget.connectionId,
-        mode: disconnectTarget.mode,
         organisationId: disconnectTarget.organisationId,
-      });
+      };
+      const result = removal
+        ? await removeCompanyAction(input)
+        : await disconnectXeroAction({ ...input, mode: "soft" });
       if (!result.ok) {
         toast.error(result.error.message);
         return;
       }
-      const message = "Disconnected from Xero.";
+      const message = removal
+        ? "Company removed. Its Xero file can now be connected to another account."
+        : "Disconnected from Xero.";
       setDisconnectMessage(message);
       toast.message(message);
       if (result.ok) {
@@ -131,6 +147,13 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       }
     });
   };
+  if (actingRole !== "owner" && actingRole !== "admin") {
+    return null;
+  }
+  const addDisabled =
+    isPending ||
+    payrollEntityAllowance === null ||
+    payrollEntityAllowance?.remaining === 0;
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
@@ -138,6 +161,20 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         title="Xero Payroll"
       />
 
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-body-sm text-muted-foreground">
+          {allowanceDescription(payrollEntityAllowance)}
+        </p>
+        <Button disabled={addDisabled} onClick={() => handleConnect()}>
+          Add company
+        </Button>
+      </div>
+      {payrollEntityAllowance?.remaining === 0 ? (
+        <p className="text-body-sm text-muted-foreground">
+          Your plan has reached its Xero file allowance. Reconnect existing
+          companies or upgrade your plan to add another.
+        </p>
+      ) : null}
       {disconnectMessage !== null && (
         <Alert
           className="rounded-[20px] border-0 bg-surface-container"
@@ -213,6 +250,13 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                 />
               </div>
 
+              {tenant?.last_error_message ? (
+                <Alert role="alert">
+                  <AlertDescription>
+                    {tenant.last_error_message}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               {tenant?.leave_balances_stale_since ? (
                 <p className="text-label-md text-muted-foreground">
                   Rolling refresh in progress since{" "}
@@ -319,20 +363,22 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                     >
                       Disconnect Xero
                     </Button>
-                    <Button
-                      disabled={isPending}
-                      onClick={() =>
-                        setDisconnectTarget({
-                          connectionId: connection.id,
-                          mode: "destructive",
-                          organisationId: organisation.id,
-                          organisationName: organisation.name,
-                        })
-                      }
-                      variant="destructive"
-                    >
-                      Disconnect and purge data
-                    </Button>
+                    {actingRole === "owner" ? (
+                      <Button
+                        disabled={isPending}
+                        onClick={() =>
+                          setDisconnectTarget({
+                            connectionId: connection.id,
+                            mode: "remove",
+                            organisationId: organisation.id,
+                            organisationName: organisation.name,
+                          })
+                        }
+                        variant="destructive"
+                      >
+                        Remove company
+                      </Button>
+                    ) : null}
                   </div>
                 </details>
               ) : null}
@@ -343,13 +389,13 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
 
       <ConfirmActionDialog
         confirmLabel={
-          disconnectTarget?.mode === "destructive"
-            ? "Disconnect and purge"
+          disconnectTarget?.mode === "remove"
+            ? "Remove company"
             : "Disconnect Xero"
         }
         description={
-          disconnectTarget?.mode === "destructive"
-            ? "This disconnects Xero and permanently purges Xero-linked data. This cannot be undone."
+          disconnectTarget?.mode === "remove"
+            ? "This releases the Xero file so another Team Calendar account can connect it, and archives this company, its Xero people and availability records. Its events disappear from calendars and feeds. You cannot restore ownership after another account connects the file."
             : "This stops future Xero access. Historical Xero data remains read-only, and you can reconnect later."
         }
         destructive
@@ -363,8 +409,8 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         pending={isPending}
         requireTyping={disconnectTarget?.organisationName}
         title={
-          disconnectTarget?.mode === "destructive"
-            ? "Disconnect Xero and purge data?"
+          disconnectTarget?.mode === "remove"
+            ? "Remove company?"
             : "Disconnect Xero?"
         }
       />
@@ -422,4 +468,16 @@ function statusForState(
     default:
       return "error";
   }
+}
+
+function allowanceDescription(
+  allowance: XeroClientProps["payrollEntityAllowance"]
+): string {
+  if (allowance) {
+    return `${allowance.used} of ${allowance.limit ?? "unlimited"} Xero files used`;
+  }
+  if (allowance === null) {
+    return "Xero file allowance is temporarily unavailable.";
+  }
+  return "Connect another payroll company to this account.";
 }

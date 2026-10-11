@@ -514,8 +514,8 @@ model XeroConnection {
   clerk_org_id                      String
   organisation_id                   String                 @unique @db.Uuid
   xero_authorisation_id             String?                @db.Uuid
-  xero_tenant_id                    String                 @unique
-  remote_connection_id              String?                @unique
+  xero_tenant_id                    String
+  remote_connection_id              String?
   tenant_name                       String?
   tenant_type                       String?
   auth_event_id                     String?
@@ -524,6 +524,7 @@ model XeroConnection {
   sync_paused_at                    DateTime?
   last_connected_at                 DateTime?
   last_disconnected_at              DateTime?
+  released_at                       DateTime?
   disconnected_at                   DateTime?
   disconnected_by_user_id           String?
   last_error_code                   String?
@@ -554,6 +555,8 @@ model XeroConnection {
   leave_balances                    LeaveBalance[]
   sync_runs                         SyncRun[]
 
+  @@unique([xero_tenant_id], map: "xero_connections_owned_tenant_key", where: raw("released_at IS NULL"))
+  @@unique([remote_connection_id], map: "xero_connections_owned_remote_connection_key", where: raw("released_at IS NULL AND remote_connection_id IS NOT NULL"))
   @@unique([id, clerk_org_id, organisation_id])
   @@unique([organisation_id, clerk_org_id])
   @@index([clerk_org_id])
@@ -876,7 +879,7 @@ model PublicHolidayPreference {
 model Feed {
   id                        String                    @id @default(uuid()) @db.Uuid
   clerk_org_id              String
-  organisation_id           String                    @db.Uuid
+  organisation_id           String?                   @db.Uuid
   name                      String
   slug                      String
   description               String?
@@ -892,7 +895,7 @@ model Feed {
   created_at                DateTime                  @default(now())
   updated_at                DateTime                  @updatedAt
 
-  organisation       Organisation           @relation(fields: [organisation_id], references: [id])
+  organisation       Organisation?          @relation(fields: [organisation_id], references: [id])
   event_publications FeedEventPublication[]
   scopes             FeedScope[]
   tokens             FeedToken[]
@@ -906,7 +909,7 @@ model Feed {
 model FeedEventPublication {
   id                  String   @id @default(uuid()) @db.Uuid
   clerk_org_id        String
-  organisation_id     String   @db.Uuid
+  organisation_id     String?  @db.Uuid
   feed_id             String   @db.Uuid
   source_key          String
   published_uid       String
@@ -928,7 +931,7 @@ model FeedEventPublication {
 model FeedScope {
   id              String               @id @default(uuid()) @db.Uuid
   clerk_org_id    String
-  organisation_id String               @db.Uuid
+  organisation_id String?              @db.Uuid
   feed_id         String               @db.Uuid
   scope_type      feed_scope_rule_type
   scope_value     String?
@@ -946,7 +949,7 @@ model FeedScope {
 model FeedToken {
   id                    String            @id @default(uuid()) @db.Uuid
   clerk_org_id          String
-  organisation_id       String            @db.Uuid
+  organisation_id       String?           @db.Uuid
   feed_id               String            @db.Uuid
   token_hash            String            @unique
   token_hint            String
@@ -958,10 +961,10 @@ model FeedToken {
   created_at            DateTime          @default(now())
   updated_at            DateTime          @updatedAt
 
-  organisation       Organisation @relation(fields: [organisation_id], references: [id])
-  feed               Feed         @relation(fields: [feed_id], references: [id])
-  rotated_from_token FeedToken?   @relation("FeedTokenRotation", fields: [rotated_from_token_id], references: [id])
-  rotated_tokens     FeedToken[]  @relation("FeedTokenRotation")
+  organisation       Organisation? @relation(fields: [organisation_id], references: [id])
+  feed               Feed          @relation(fields: [feed_id], references: [id])
+  rotated_from_token FeedToken?    @relation("FeedTokenRotation", fields: [rotated_from_token_id], references: [id])
+  rotated_tokens     FeedToken[]   @relation("FeedTokenRotation")
 
   @@unique([feed_id], map: "feed_tokens_one_active_per_feed_key", where: raw("status = 'active'"))
   @@index([clerk_org_id])

@@ -69,7 +69,7 @@ const remoteY = allocation.id("remote", 1);
 let selectedTenant = tenantX;
 let selectedRemote = remoteX;
 const originalEnv = { ...process.env };
-let database: typeof import("@repo/database")["database"];
+let database: typeof import("@repo/database")["systemDatabase"];
 let actions: typeof import("./_actions");
 let xero: typeof import("@repo/xero");
 let crypto: typeof import("@repo/xero/src/crypto/tokens");
@@ -130,7 +130,7 @@ beforeAll(async () => {
   process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION = "1";
   delete process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON;
   delete process.env.VERCEL_ENV;
-  ({ database } = await import("@repo/database"));
+  ({ systemDatabase: database } = await import("@repo/database"));
   xero = await import("@repo/xero");
   crypto = await import("@repo/xero/src/crypto/tokens");
   actions = await import("./_actions");

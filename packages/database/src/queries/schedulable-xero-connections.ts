@@ -1,6 +1,6 @@
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { systemDatabase } from "../system-client";
 export interface SchedulableXeroConnection {
   clerkOrgId: string;
   connectionId: string;
@@ -30,7 +30,7 @@ export async function listSchedulableXeroConnections(
 ): Promise<Result<ListSchedulableXeroConnectionsResult>> {
   try {
     const limit = Math.min(100, Math.max(1, options.limit ?? 100));
-    const rows = await database.xeroConnection.findMany({
+    const rows = await systemDatabase.xeroConnection.findMany({
       take: limit + 1,
       ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
       orderBy: { id: "asc" },
@@ -55,6 +55,7 @@ export async function listSchedulableXeroConnections(
         initial_sync_completed_at: { not: null },
         organisation: { archived_at: null, is_active: true },
         payroll_region: "AU",
+        released_at: null,
         status: "active",
         sync_paused_at: null,
       },

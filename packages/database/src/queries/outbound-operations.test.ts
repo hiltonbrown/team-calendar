@@ -18,13 +18,17 @@ const transactionClient = {
   },
 };
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     $transaction: async (
       callback: (client: typeof transactionClient) => unknown
     ) => await callback(transactionClient),
     outboundOperation: transactionClient.outboundOperation,
-  },
+  }),
+  tenantTransaction: async (
+    _org: string,
+    fn: (tx: unknown) => Promise<unknown>
+  ) => fn(transactionClient),
 }));
 
 vi.mock("../xero-locks", () => ({

@@ -6,12 +6,31 @@ const mocks = vi.hoisted(() => ({
   xeroConnectionFindMany: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
-    syncRun: { findFirst: mocks.syncRunFindFirst },
-    xeroConnection: { findMany: mocks.xeroConnectionFindMany },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      syncRun: { findFirst: mocks.syncRunFindFirst },
+      xeroConnection: { findMany: mocks.xeroConnectionFindMany },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn() },
 }));

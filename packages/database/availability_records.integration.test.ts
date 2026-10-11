@@ -13,7 +13,7 @@ const {
   availability_publish_status,
   availability_record_type,
   availability_source_type,
-  database,
+  systemDatabase: database,
   getSubmitOperation,
   prepareAndClaimSubmitOperation,
   markSubmitDispatchStarted,

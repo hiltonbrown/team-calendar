@@ -51,6 +51,10 @@ describe("pricing experience", () => {
     expect(html).toContain("Team Calendar");
     expect(html).not.toContain("Team Calendar Engine");
     expect(html).toContain("Xero Payroll");
+    expect(html).toContain("Up to 5");
+    expect(html).toContain("Starter includes one Xero Payroll connection");
+    expect(html).toContain("Premium includes up to five");
+    expect(html).toContain("Enterprise includes unlimited connections");
     expect(html).not.toContain("Xero Payroll AU");
     expect(html.match(/Get started/g)).toHaveLength(2);
   });

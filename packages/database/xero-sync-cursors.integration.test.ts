@@ -3,6 +3,7 @@ import {
   advanceXeroSyncCursor,
   completeXeroInitialSync,
 } from "./src/queries/xero-sync-cursors";
+import { tenantTransaction } from "./src/tenant-client";
 import {
   createXeroConnectionFixture,
   xeroSimplificationFixture,
@@ -11,13 +12,14 @@ import {
 const { database } = xeroSimplificationFixture();
 afterAll(() => database.$disconnect());
 test("provider cursor commits are scoped, conditional and monotonic; old reconnect requests cannot complete", async () => {
-  await database
-    .$transaction(async (tx) => {
-      const { connection } = await createXeroConnectionFixture(tx);
-      const scope = {
-        clerkOrgId: connection.clerk_org_id,
-        organisationId: connection.organisation_id,
-      };
+  const owned = await database.$transaction(createXeroConnectionFixture);
+  const { connection } = owned;
+  const scope = {
+    clerkOrgId: connection.clerk_org_id,
+    organisationId: connection.organisation_id,
+  };
+  try {
+    await tenantTransaction(scope.clerkOrgId, async (tx) => {
       const first = new Date("2026-10-07T12:00:00Z");
       const next = new Date("2026-10-07T12:01:00Z");
       const cursor = {
@@ -94,14 +96,17 @@ test("provider cursor commits are scoped, conditional and monotonic; old reconne
           tx
         )
       ).toEqual(completed);
-      throw new Error("owned fixture rollback");
-    })
-    .catch((error: unknown) => {
-      if (
-        !(error instanceof Error) ||
-        error.message !== "owned fixture rollback"
-      ) {
-        throw error;
-      }
     });
+  } finally {
+    await database.xeroSyncCursor.deleteMany({
+      where: { xero_connection_id: connection.id },
+    });
+    await database.xeroConnection.delete({ where: { id: connection.id } });
+    await database.organisation.delete({
+      where: { id: owned.organisation.id },
+    });
+    await database.xeroAuthorisation.delete({
+      where: { id: owned.authorisation.id },
+    });
+  }
 });

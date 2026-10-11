@@ -1,7 +1,11 @@
 import "server-only";
 import type { Prisma } from "../../generated/client";
-import { database } from "../client";
-import { type XeroScope, xeroScope } from "./xero-connections";
+import { tenantDatabase, tenantTransaction } from "../tenant-client";
+import {
+  getScopedXeroAuthorisationMetadata,
+  type XeroScope,
+  xeroScope,
+} from "./xero-connections";
 export async function advanceXeroSyncCursor(
   input: {
     scope: XeroScope;
@@ -10,7 +14,10 @@ export async function advanceXeroSyncCursor(
     expectedModifiedSince: Date | null;
     nextModifiedSince: Date;
   },
-  tx: Prisma.TransactionClient = database
+  tx: Pick<
+    Prisma.TransactionClient,
+    "xeroSyncCursor" | "xeroConnection" | "$queryRaw"
+  > = tenantDatabase(input.scope.clerkOrgId)
 ) {
   if (
     input.expectedModifiedSince &&
@@ -56,12 +63,16 @@ export async function advanceXeroSyncCursor(
 export async function ensureXeroInitialSyncRequested(
   input: XeroScope & { connectionId: string }
 ): Promise<string | null> {
-  return await database.$transaction(async (tx) => {
+  return await tenantTransaction(input.clerkOrgId, async (tx) => {
     await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${input.connectionId}::uuid AND clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${input.organisationId}::uuid FOR UPDATE`;
+    const grant = await getScopedXeroAuthorisationMetadata(input, tx);
+    if (grant?.status !== "active") {
+      return null;
+    }
     const where = {
       ...xeroScope(input),
-      authorisation: { status: "active" as const },
       id: input.connectionId,
+      released_at: null,
       status: "active" as const,
       sync_paused_at: null,
     };
@@ -91,19 +102,26 @@ export async function ensureXeroInitialSyncRequested(
 
 export async function completeXeroInitialSync(
   input: XeroScope & { connectionId: string; requestedAt: string },
-  tx: Prisma.TransactionClient = database
+  tx: Pick<
+    Prisma.TransactionClient,
+    "xeroSyncCursor" | "xeroConnection" | "$queryRaw"
+  > = tenantDatabase(input.clerkOrgId)
 ): Promise<Date | null> {
+  const grant = await getScopedXeroAuthorisationMetadata(input, tx);
+  if (grant?.status !== "active") {
+    return null;
+  }
   const completedAt = new Date();
   const changed = await tx.xeroConnection.updateMany({
     data: { initial_sync_completed_at: completedAt },
     where: {
       ...xeroScope(input),
-      authorisation: { status: "active" },
       balance_next_person_id: null,
       balance_sweep_failed: false,
       id: input.connectionId,
       initial_sync_completed_at: null,
       initial_sync_requested_at: new Date(input.requestedAt),
+      released_at: null,
       status: "active",
       sync_paused_at: null,
     },
@@ -118,6 +136,7 @@ export async function completeXeroInitialSync(
       id: input.connectionId,
       initial_sync_completed_at: { not: null },
       initial_sync_requested_at: new Date(input.requestedAt),
+      released_at: null,
       status: "active",
     },
   });

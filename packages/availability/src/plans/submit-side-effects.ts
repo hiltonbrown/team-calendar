@@ -2,9 +2,10 @@ import "server-only";
 
 import type { Result } from "@repo/core";
 import {
-  database,
   fenceSubmitRecoverySideEffectClaim,
   type OutboundOperationAttemptScope,
+  tenantDatabase,
+  tenantTransaction,
 } from "@repo/database";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import {
@@ -28,7 +29,9 @@ export async function completeSubmitSideEffects(input: {
   organisationId: string;
   recordId: string;
 }): Promise<Result<void, { message: string }>> {
-  const publication = await database.auditEvent.findFirst({
+  const publication = await tenantDatabase(
+    input.clerkOrgId
+  ).auditEvent.findFirst({
     select: { id: true },
     where: checkpointWhere(
       input,
@@ -44,7 +47,7 @@ export async function completeSubmitSideEffects(input: {
     if (!result.ok) {
       return failure("Calendar publication is awaiting retry.");
     }
-    await database.auditEvent.create({
+    await tenantDatabase(input.clerkOrgId).auditEvent.create({
       data: checkpointData(
         input,
         "availability_records.submit_publication_completed"
@@ -63,7 +66,7 @@ export async function completeSubmitSideEffects(input: {
     const manager = recipient;
     let notified: false | { notificationId: string | null } = false;
     try {
-      notified = await database.$transaction(async (tx) => {
+      notified = await tenantTransaction(input.clerkOrgId, async (tx) => {
         if (
           !(await fenceSubmitRecoverySideEffectClaim(
             input.attempt,

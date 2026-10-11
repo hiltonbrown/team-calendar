@@ -1,4 +1,4 @@
-import { database } from "@repo/database";
+import { systemDatabase as database } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { rejectRetryableSyncResult } from "./xero-sync-access";
@@ -32,32 +32,53 @@ vi.mock("../client", () => ({
   },
 }));
 vi.mock("@repo/auth/server", () => ({ clerkClient: vi.fn() }));
-vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: vi.fn(async (callback) =>
-      callback({
-        auditEvent: { create: mocks.auditEventCreate },
-        availabilityRecord: { updateMany: mocks.availabilityRecordUpdateMany },
-      })
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      $transaction: vi.fn(async (callback) =>
+        callback({
+          auditEvent: { create: mocks.auditEventCreate },
+          availabilityRecord: {
+            updateMany: mocks.availabilityRecordUpdateMany,
+          },
+        })
+      ),
+      auditEvent: { create: mocks.auditEventCreate },
+      availabilityRecord: {
+        findMany: mocks.availabilityRecordFindMany,
+        updateMany: mocks.availabilityRecordUpdateMany,
+      },
+      failedRecord: { create: mocks.failedRecordCreate },
+      syncRun: {
+        create: mocks.syncRunCreate,
+        findFirst: mocks.syncRunFindFirst,
+        updateMany: mocks.syncRunUpdateMany,
+      },
+      xeroConnection: {
+        findFirst: mocks.xeroConnectionFindFirst,
+        updateMany: mocks.xeroConnectionUpdateMany,
+      },
+    },
+    scopedTo: mocks.scopedTo,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
     ),
-    auditEvent: { create: mocks.auditEventCreate },
-    availabilityRecord: {
-      findMany: mocks.availabilityRecordFindMany,
-      updateMany: mocks.availabilityRecordUpdateMany,
-    },
-    failedRecord: { create: mocks.failedRecordCreate },
-    syncRun: {
-      create: mocks.syncRunCreate,
-      findFirst: mocks.syncRunFindFirst,
-      updateMany: mocks.syncRunUpdateMany,
-    },
-    xeroConnection: {
-      findFirst: mocks.xeroConnectionFindFirst,
-      updateMany: mocks.xeroConnectionUpdateMany,
-    },
-  },
-  scopedTo: mocks.scopedTo,
-}));
+  };
+});
 vi.mock("@repo/database/generated/client", () => ({
   Prisma: { DbNull: "DbNull" },
 }));

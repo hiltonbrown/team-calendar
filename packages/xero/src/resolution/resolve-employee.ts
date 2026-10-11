@@ -1,5 +1,5 @@
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { XeroAccessContext } from "../write/types";
 export type ResolutionError =
   | {
@@ -19,7 +19,9 @@ export async function resolveXeroEmployeeId(input: {
   xeroConnection: XeroAccessContext;
 }): Promise<Result<string, ResolutionError>> {
   try {
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      input.xeroConnection.clerk_org_id
+    ).person.findFirst({
       select: {
         source_person_key: true,
         source_system: true,
@@ -32,9 +34,14 @@ export async function resolveXeroEmployeeId(input: {
       },
     });
     if (!person) {
-      const exists = await database.person.findFirst({
+      const exists = await tenantDatabase(
+        input.xeroConnection.clerk_org_id
+      ).person.findFirst({
         select: { id: true },
-        where: { id: input.personId },
+        where: {
+          clerk_org_id: input.xeroConnection.clerk_org_id,
+          id: input.personId,
+        },
       });
       return {
         error: {

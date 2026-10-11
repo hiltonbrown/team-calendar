@@ -10,12 +10,31 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.capture, flush: mocks.flush },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    xeroConnection: { findFirst: mocks.connection },
-    xeroPersonMatch: { count: mocks.matches },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      xeroConnection: { findFirst: mocks.connection },
+      xeroPersonMatch: { count: mocks.matches },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/observability/log", () => ({ log: { warn: vi.fn() } }));
 const { captureInitialSyncCompleted, checkXeroImportReadiness } = await import(
   "./activation"

@@ -7,15 +7,15 @@ const mocks = vi.hoisted(() => ({
   teamUpdateMany: vi.fn(),
 }));
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     availabilityRecord: { findMany: mocks.recordFindMany },
     team: {
       findFirst: mocks.teamFindFirst,
       findMany: mocks.teamFindMany,
       updateMany: mocks.teamUpdateMany,
     },
-  },
+  }),
 }));
 
 const {

@@ -3,28 +3,65 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   access: vi.fn(),
+  accountInvalidate: vi.fn(),
   audit: vi.fn(),
   authorisationDelete: vi.fn(),
-  availability: { findFirst: vi.fn(), updateMany: vi.fn() },
+  availability: {
+    findFirst: vi.fn(),
+    findMany: vi.fn(async () => []),
+    updateMany: vi.fn(),
+  },
   connectionUpdate: vi.fn(),
   cursorDelete: vi.fn(),
   feed: vi.fn(),
+  feedPublicationUpdate: vi.fn(),
+  feedUpdate: vi.fn(),
   http: vi.fn(),
   invalidate: vi.fn(),
   leaveBalance: vi.fn(),
   lock: vi.fn(),
+  organisationArchive: vi.fn(),
   person: vi.fn(),
+  publicationDelete: vi.fn(),
   scoped: vi.fn(),
   scopedLock: vi.fn(),
   sessionUpdate: vi.fn(),
   syncRun: vi.fn(),
+  tokenRevoke: vi.fn(),
   xeroPersonMatch: vi.fn(),
 }));
-vi.mock("@repo/database", () => ({
-  database: {},
-  lockScopedXeroConnection: mocks.scopedLock,
-  withXeroGrantLock: mocks.lock,
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      xeroConnection: {
+        findFirst: vi.fn(async () => (await mocks.scoped(input)).value),
+        findMany: vi.fn(async () => [
+          { id: input.connectionId, organisation_id: input.organisationId },
+          { id: "unavailable-connection", organisation_id: "sibling-company" },
+        ]),
+      },
+    },
+    lockScopedXeroConnection: mocks.scopedLock,
+    withXeroGrantLock: mocks.lock,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/database/queries/xero-connections", () => ({
   getScopedXeroConnection: mocks.scoped,
 }));
@@ -33,6 +70,7 @@ vi.mock("@repo/availability", () => ({
 }));
 vi.mock("@repo/feeds", () => ({
   ALL_PRIVACY_MODES: ["named", "anonymous", "hidden"],
+  invalidateAccountFeedCaches: mocks.accountInvalidate,
   invalidateFeedCache: mocks.invalidate,
 }));
 vi.mock("../rate-limit/xero-fetch", () => ({ xeroFetch: mocks.http }));
@@ -47,7 +85,11 @@ vi.mock("./authorisation", async (importOriginal) => ({
 }));
 
 import { encryptXeroToken } from "../crypto/tokens";
-import { disconnectXeroOAuthConnection } from "./disconnect";
+import {
+  disconnectAllXeroConnections,
+  disconnectXeroOAuthConnection,
+  removeXeroCompany,
+} from "./disconnect";
 
 const input = {
   clerkOrgId: "clerk-account",
@@ -82,9 +124,13 @@ let busy: boolean;
 let auditEvents: Record<string, unknown>[];
 const tx = {
   auditEvent: { create: mocks.audit },
+  availabilityPublication: { deleteMany: mocks.publicationDelete },
   availabilityRecord: mocks.availability,
-  feed: { findMany: mocks.feed },
+  feed: { findMany: mocks.feed, updateMany: mocks.feedUpdate },
+  feedEventPublication: { updateMany: mocks.feedPublicationUpdate },
+  feedToken: { updateMany: mocks.tokenRevoke },
   leaveBalance: { deleteMany: mocks.leaveBalance },
+  organisation: { updateMany: mocks.organisationArchive },
   person: { updateMany: mocks.person },
   syncRun: { deleteMany: mocks.syncRun },
   xeroAuthorisation: { deleteMany: mocks.authorisationDelete },
@@ -147,6 +193,7 @@ beforeEach(() => {
     }
     return Promise.resolve({ count: grantPresent ? 0 : 1 });
   });
+  mocks.availability.findMany.mockResolvedValue([]);
   mocks.http.mockResolvedValue(new Response(null, { status: 204 }));
 });
 function expectUnchanged(
@@ -176,6 +223,22 @@ function expectNoBusinessDataPurge() {
   expect(mocks.invalidate).not.toHaveBeenCalled();
 }
 
+describe("disconnect all outcomes", () => {
+  it("continues after a sibling disconnect fails", async () => {
+    expect(
+      await disconnectAllXeroConnections({ clerkOrgId: input.clerkOrgId })
+    ).toMatchObject({
+      ok: true,
+      value: {
+        outcomes: [
+          { connectionId: input.connectionId, ok: true },
+          { connectionId: "unavailable-connection", ok: false },
+        ],
+      },
+    });
+    expect(mocks.http).toHaveBeenCalledTimes(1);
+  });
+});
 describe("remote-first Xero disconnect", () => {
   it.each([204, 404])(
     "clears the scoped binding and audits only after provider confirmation %s",
@@ -333,5 +396,46 @@ describe("remote-first Xero disconnect", () => {
     });
     expect(mocks.http).not.toHaveBeenCalled();
     expectUnchanged(originalConnection, originalGrant);
+  });
+});
+
+describe("Remove company", () => {
+  it("refuses administrators before reading credentials", async () => {
+    expect(await removeXeroCompany({ ...input, role: "admin" })).toMatchObject({
+      error: { code: "forbidden" },
+      ok: false,
+    });
+    expect(mocks.scoped).not.toHaveBeenCalled();
+    expect(mocks.http).not.toHaveBeenCalled();
+  });
+  it.each([403, 500])(
+    "keeps ownership and company state when DELETE is uncertain %s",
+    async (status) => {
+      mocks.http.mockResolvedValue(new Response(null, { status }));
+      const before = { ...connection };
+      expect(
+        await removeXeroCompany({ ...input, role: "owner" })
+      ).toMatchObject({ ok: false });
+      expectUnchanged(before, grant);
+    }
+  );
+  it("releases only after remote confirmation, preserves a live selecting grant, and is idempotent", async () => {
+    hasLiveSelection = true;
+    mocks.feed.mockResolvedValue([{ id: "account-feed" }]);
+    expect(await removeXeroCompany({ ...input, role: "owner" })).toMatchObject({
+      ok: true,
+      value: { state: "removed" },
+    });
+    expect(connection.released_at).toBeInstanceOf(Date);
+    expect(grantPresent).toBe(true);
+    expect(auditEvents.map((event) => event.action)).toContain(
+      "company_removed"
+    );
+    expect(await removeXeroCompany({ ...input, role: "owner" })).toMatchObject({
+      ok: true,
+      value: { state: "removed" },
+    });
+    expect(mocks.http).toHaveBeenCalledTimes(1);
+    expect(mocks.syncRun).not.toHaveBeenCalled();
   });
 });

@@ -10,9 +10,15 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: { $transaction: mocks.transaction },
-}));
+vi.mock("@repo/database", () => {
+  const client = { $transaction: mocks.transaction };
+  return {
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback, options) =>
+      client.$transaction(callback, options)
+    ),
+  };
+});
 vi.mock("../projection/feed-projection", () => ({
   projectFeedEvents: mocks.project,
 }));
@@ -82,6 +88,12 @@ describe("durable feed representation", () => {
     expect(await establishFeedRepresentation(input)).toMatchObject({
       ok: true,
     });
+    const { tenantTransaction } = await import("@repo/database");
+    expect(tenantTransaction).toHaveBeenCalledWith(
+      input.clerkOrgId,
+      expect.any(Function),
+      expect.objectContaining({ isolationLevel: "Serializable" })
+    );
     expect(mocks.transaction).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({ isolationLevel: "Serializable" })

@@ -84,6 +84,7 @@ export {
   getCalendarRange,
   getEventDetail,
 } from "./src/calendar/calendar-service";
+export { createCompany } from "./src/companies/create-company";
 export {
   createDashboardCache,
   type DashboardCache,

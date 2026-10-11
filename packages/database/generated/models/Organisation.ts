@@ -1054,10 +1054,12 @@ export type OrganisationCreateNestedOneWithoutFeedsInput = {
   connect?: Prisma.OrganisationWhereUniqueInput
 }
 
-export type OrganisationUpdateOneRequiredWithoutFeedsNestedInput = {
+export type OrganisationUpdateOneWithoutFeedsNestedInput = {
   create?: Prisma.XOR<Prisma.OrganisationCreateWithoutFeedsInput, Prisma.OrganisationUncheckedCreateWithoutFeedsInput>
   connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutFeedsInput
   upsert?: Prisma.OrganisationUpsertWithoutFeedsInput
+  disconnect?: Prisma.OrganisationWhereInput | boolean
+  delete?: Prisma.OrganisationWhereInput | boolean
   connect?: Prisma.OrganisationWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganisationUpdateToOneWithWhereWithoutFeedsInput, Prisma.OrganisationUpdateWithoutFeedsInput>, Prisma.OrganisationUncheckedUpdateWithoutFeedsInput>
 }
@@ -1068,10 +1070,12 @@ export type OrganisationCreateNestedOneWithoutFeed_tokensInput = {
   connect?: Prisma.OrganisationWhereUniqueInput
 }
 
-export type OrganisationUpdateOneRequiredWithoutFeed_tokensNestedInput = {
+export type OrganisationUpdateOneWithoutFeed_tokensNestedInput = {
   create?: Prisma.XOR<Prisma.OrganisationCreateWithoutFeed_tokensInput, Prisma.OrganisationUncheckedCreateWithoutFeed_tokensInput>
   connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutFeed_tokensInput
   upsert?: Prisma.OrganisationUpsertWithoutFeed_tokensInput
+  disconnect?: Prisma.OrganisationWhereInput | boolean
+  delete?: Prisma.OrganisationWhereInput | boolean
   connect?: Prisma.OrganisationWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganisationUpdateToOneWithWhereWithoutFeed_tokensInput, Prisma.OrganisationUpdateWithoutFeed_tokensInput>, Prisma.OrganisationUncheckedUpdateWithoutFeed_tokensInput>
 }

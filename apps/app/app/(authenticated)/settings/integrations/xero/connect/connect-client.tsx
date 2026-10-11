@@ -1,5 +1,9 @@
 "use client";
-
+import {
+  Alert,
+  AlertDescription,
+} from "@repo/design-system/components/ui/alert";
+import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
   Card,
@@ -8,14 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@repo/design-system/components/ui/card";
+import { Checkbox } from "@repo/design-system/components/ui/checkbox";
 import { Label } from "@repo/design-system/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import type {
   PendingXeroSessionOrganisation,
@@ -26,159 +24,174 @@ import { completeTenantSelectionAction } from "./_actions";
 
 interface XeroConnectClientProps {
   organisations: PendingXeroSessionOrganisation[];
+  payrollEntityAllowance?: {
+    used: number;
+    limit: number | null;
+    remaining: number | null;
+  };
   presetOrganisationId: null | string;
   sessionId: string;
   tenants: PendingXeroSessionTenant[];
 }
-
+const UNAVAILABLE_COPY =
+  "This Xero organisation is connected to another Team Calendar account. Ask its administrator to remove it there first.";
 export function XeroConnectClient({
-  organisations,
   presetOrganisationId,
   sessionId,
   tenants,
+  payrollEntityAllowance,
 }: XeroConnectClientProps) {
   const [isPending, startTransition] = useTransition();
-  const [selectedTenantId, setSelectedTenantId] = useState<string>(
-    tenants[0]?.tenantId ?? ""
-  );
-  const [selectedOrganisationId, setSelectedOrganisationId] = useState<
-    string | undefined
-  >(presetOrganisationId ?? organisations[0]?.id);
-
-  const selectedTenant =
-    tenants.find((tenant) => tenant.tenantId === selectedTenantId) ?? null;
-  const requiresTenantSelection = tenants.length > 1;
-
-  const requiresOrganisationSelection =
-    organisations.length > 0 && !presetOrganisationId;
-
-  const handleComplete = () => {
+  const [selectedTenantIds, setSelectedTenantIds] = useState<string[]>(() => {
+    const first = tenants.find((tenant) => tenant.state !== "unavailable");
+    return first ? [first.tenantId] : [];
+  });
+  const [outcomes, setOutcomes] = useState<
+    Array<{ tenantId: string; ok: boolean; message?: string }>
+  >([]);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const newFileCount = presetOrganisationId
+    ? 0
+    : tenants.filter(
+        (tenant) =>
+          selectedTenantIds.includes(tenant.tenantId) &&
+          tenant.state !== "already_in_account"
+      ).length;
+  const exceedsAllowance =
+    typeof payrollEntityAllowance?.remaining === "number" &&
+    newFileCount > payrollEntityAllowance.remaining;
+  const handleComplete = () =>
     startTransition(async () => {
       const result = await completeTenantSelectionAction({
-        organisationId:
-          presetOrganisationId ??
-          (requiresOrganisationSelection ? selectedOrganisationId : undefined),
+        organisationId: presetOrganisationId ?? undefined,
         sessionId,
-        tenantId: selectedTenantId,
+        tenantIds: selectedTenantIds,
       });
-
       if (!result.ok) {
         toast.error(result.error.message);
         return;
       }
-
-      window.location.href = result.value.redirectTo;
+      setOutcomes(result.value.outcomes);
+      setRedirectTo(result.value.redirectTo);
+      if (result.value.outcomes.every((outcome) => outcome.ok)) {
+        window.location.href = result.value.redirectTo;
+      }
     });
-  };
-
   return (
     <div className="space-y-6">
       <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle>
-            {requiresTenantSelection
-              ? "Select a Xero tenant"
-              : "Xero payroll file"}
+            {presetOrganisationId
+              ? "Select a Xero organisation"
+              : "Select Xero organisations"}
           </CardTitle>
           <CardDescription>
-            {requiresTenantSelection
-              ? "Choose the payroll file to connect. Team Calendar will detect its payroll region after selection."
-              : "Team Calendar will detect this file's payroll region when connected."}
+            {presetOrganisationId
+              ? "Choose one Xero payroll file for this company."
+              : "Each selected payroll file becomes a company in this account. Files already in this account are reconnected."}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {requiresTenantSelection ? (
-            tenants.map((tenant) => (
-              <button
-                className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                  tenant.tenantId === selectedTenantId
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-background"
-                }`}
+        <CardContent className="space-y-4">
+          {payrollEntityAllowance ? (
+            <p className="text-body-sm text-muted-foreground">
+              {payrollEntityAllowance.used} of{" "}
+              {payrollEntityAllowance.limit ?? "unlimited"} Xero files used
+            </p>
+          ) : null}
+          {tenants.map((tenant) => {
+            const unavailable = tenant.state === "unavailable";
+            const id = `xero-tenant-${tenant.tenantId}`;
+            return (
+              <div
+                className="rounded-xl border border-border p-4"
                 key={tenant.tenantId}
-                onClick={() => setSelectedTenantId(tenant.tenantId)}
-                type="button"
               >
-                <p className="font-medium">{tenant.tenantName}</p>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    aria-describedby={unavailable ? `${id}-help` : undefined}
+                    checked={selectedTenantIds.includes(tenant.tenantId)}
+                    disabled={isPending || unavailable}
+                    id={id}
+                    onCheckedChange={(checked) =>
+                      setSelectedTenantIds((current) => {
+                        if (checked !== true) {
+                          return current.filter(
+                            (value) => value !== tenant.tenantId
+                          );
+                        }
+                        if (presetOrganisationId) {
+                          return [tenant.tenantId];
+                        }
+                        return [...current, tenant.tenantId];
+                      })
+                    }
+                  />
+                  <Label className="flex-1 font-medium" htmlFor={id}>
+                    {tenant.tenantName}
+                  </Label>
+                  <Badge variant="secondary">
+                    {tenantStateLabel(tenant.state)}
+                  </Badge>
+                </div>
                 {tenant.isCurrentConsent ? (
-                  <p className="text-body-sm text-muted-foreground">
+                  <p className="mt-2 text-body-sm text-muted-foreground">
                     Authorised just now
                   </p>
                 ) : null}
-                <p className="text-body-sm text-muted-foreground">
-                  {tenant.tenantId}
-                </p>
-              </button>
-            ))
-          ) : (
-            <div>
-              <p className="font-medium">{selectedTenant?.tenantName}</p>
-              <p className="text-body-sm text-muted-foreground">
-                {selectedTenant?.tenantId}
-              </p>
-            </div>
-          )}
+                {unavailable ? (
+                  <p
+                    className="mt-2 text-body-sm text-muted-foreground"
+                    id={`${id}-help`}
+                  >
+                    {UNAVAILABLE_COPY}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+          {exceedsAllowance ? (
+            <Alert role="alert">
+              <AlertDescription>
+                Your selections exceed the remaining Xero file allowance. Select
+                fewer new files or upgrade your plan.
+              </AlertDescription>
+            </Alert>
+          ) : null}
         </CardContent>
       </Card>
-
-      {organisations.length > 0 ? (
-        <Card className="rounded-2xl">
+      {outcomes.length > 0 ? (
+        <Card>
           <CardHeader>
-            <CardTitle>Attach to an existing payroll organisation</CardTitle>
-            <CardDescription>
-              Xero connections are stored per payroll organisation. Select the
-              organisation to attach before finalising the connection.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Label htmlFor="organisation">Organisation</Label>
-            <Select
-              disabled={Boolean(presetOrganisationId)}
-              onValueChange={setSelectedOrganisationId}
-              value={presetOrganisationId ?? selectedOrganisationId}
-            >
-              <SelectTrigger
-                className="h-12 w-full rounded-xl bg-background"
-                id="organisation"
-              >
-                <SelectValue placeholder="Select an organisation" />
-              </SelectTrigger>
-              <SelectContent>
-                {organisations.map((organisation) => (
-                  <SelectItem key={organisation.id} value={organisation.id}>
-                    {organisation.name} ({organisation.countryCode})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Create the first payroll organisation</CardTitle>
-            <CardDescription>
-              Team Calendar will create the first Organisation row using the
-              selected tenant name as the default label.
-            </CardDescription>
+            <CardTitle>Connection results</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-body-sm">
-              Selected tenant:{" "}
-              <span className="font-medium">
-                {selectedTenant?.tenantName ?? "None selected"}
-              </span>
-            </p>
+            <ul aria-live="polite" className="space-y-3">
+              {outcomes.map((outcome) => (
+                <li key={outcome.tenantId}>
+                  <p className="font-medium">
+                    {tenants.find(
+                      (tenant) => tenant.tenantId === outcome.tenantId
+                    )?.tenantName ?? "Xero organisation"}
+                  </p>
+                  <p className="text-body-sm">
+                    {outcome.ok ? "Connected" : outcome.message}
+                  </p>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
-      )}
-
-      <div className="flex justify-end">
+      ) : null}
+      <div className="flex justify-end gap-3">
+        {redirectTo ? (
+          <Button asChild variant="outline">
+            <a href={redirectTo}>Back to Xero settings</a>
+          </Button>
+        ) : null}
         <Button
           disabled={
-            isPending ||
-            !selectedTenantId ||
-            (requiresOrganisationSelection && !selectedOrganisationId)
+            isPending || selectedTenantIds.length === 0 || exceedsAllowance
           }
           onClick={handleComplete}
         >
@@ -187,4 +200,14 @@ export function XeroConnectClient({
       </div>
     </div>
   );
+}
+
+function tenantStateLabel(state: PendingXeroSessionTenant["state"]): string {
+  if (state === "unavailable") {
+    return "Unavailable";
+  }
+  if (state === "already_in_account") {
+    return "Already in this account";
+  }
+  return "Available";
 }

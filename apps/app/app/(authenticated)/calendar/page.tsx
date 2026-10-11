@@ -1,3 +1,4 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   type CalendarRange,
@@ -10,7 +11,12 @@ import {
   type OrganisationId,
   xeroRecoveryMessage,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import {
+  resolveAccountCompanies,
+  scopedQuery,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
@@ -48,42 +54,53 @@ async function loadCalendarResources(
   actingPersonId: string | null,
   parsedFilters: CalendarFilterInput,
   role: CalendarRole,
-  scope: CalendarScope
+  scope: CalendarScope,
+  companyIds: string[],
+  explicitCompanyIds?: string[]
 ) {
-  const [organisation, teams, locations, xeroConnection] = await Promise.all([
-    database.organisation.findFirst({
-      select: { name: true, timezone: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-    database.team.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.location.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.xeroConnection.findFirst({
-      select: {
-        last_leave_records_sync_at: true,
-        last_sync_error_message: true,
-        leave_records_stale_since: true,
-        sync_paused_at: true,
-        tenant_name: true,
-      },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        organisation_id: organisationId,
-      },
-    }),
-  ]);
+  const [organisation, teams, locations, xeroConnection] =
+    await tenantTransaction(clerkOrgId, (tx) =>
+      Promise.all([
+        tx.organisation.findFirst({
+          select: { name: true, timezone: true },
+          where: {
+            archived_at: null,
+            clerk_org_id: clerkOrgId,
+            id: organisationId,
+          },
+        }),
+        tx.team.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+          where: {
+            clerk_org_id: clerkOrgId,
+            organisation_id: { in: companyIds },
+          },
+        }),
+        tx.location.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+          where: {
+            clerk_org_id: clerkOrgId,
+            organisation_id: { in: companyIds },
+          },
+        }),
+        tx.xeroConnection.findFirst({
+          select: {
+            last_leave_records_sync_at: true,
+            last_sync_error_message: true,
+            leave_records_stale_since: true,
+            sync_paused_at: true,
+            tenant_name: true,
+          },
+          where: {
+            archived_at: null,
+            clerk_org_id: clerkOrgId,
+            organisation_id: organisationId,
+          },
+        }),
+      ])
+    );
   const timezone = organisation?.timezone ?? "UTC";
   const anchorDate = parsedFilters.anchor
     ? new Date(`${parsedFilters.anchor}T12:00:00.000Z`)
@@ -93,6 +110,7 @@ async function loadCalendarResources(
     actingUserId: userId,
     anchorDate,
     clerkOrgId,
+    companyIds: explicitCompanyIds,
     filters: {
       approvalStatus: parsedFilters.approvalStatus,
       includeDrafts: parsedFilters.includeDrafts,
@@ -101,7 +119,6 @@ async function loadCalendarResources(
       recordType: parsedFilters.recordType,
       recordTypeCategory: parsedFilters.recordTypeCategory,
     },
-    organisationId,
     role,
     scope,
     view: parsedFilters.view,
@@ -115,23 +132,60 @@ async function loadCalendarResources(
     xeroConnection,
   };
 }
+async function loadAccountCalendarContext(
+  orgParam: string | undefined,
+  filterParams: Record<string, string | string[] | undefined>
+) {
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const companies = await resolveAccountCompanies(clerkOrgId);
+  if (companies.length === 0) {
+    redirect("/onboarding");
+  }
+  const explicitContext = orgParam
+    ? await requireActiveOrgPageContext(orgParam)
+    : null;
+  let organisationId = (explicitContext?.organisationId ??
+    companies[0]?.id) as OrganisationId;
+  const orgQueryValue = explicitContext?.orgQueryValue ?? null;
+  const parsedFilters: CalendarFilterInput =
+    parseFilterParams(filterParams, CalendarFilterSchema) ??
+    defaultCalendarFilters;
+  const explicitCompanyIds =
+    parsedFilters.companyIds ?? (orgParam ? [organisationId] : undefined);
+  const companyIds =
+    explicitCompanyIds ?? companies.map((company) => company.id);
+  organisationId = (companyIds[0] ?? organisationId) as OrganisationId;
+  return {
+    clerkOrgId,
+    companies,
+    companyIds,
+    explicitCompanyIds,
+    organisationId,
+    orgQueryValue,
+    parsedFilters,
+  };
+}
 const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   await requirePageRole("org:viewer");
   const params = await searchParams;
   const { org, ...filterParams } = params;
-  const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(orgParam);
-  const parsedFilters: CalendarFilterInput =
-    parseFilterParams(filterParams, CalendarFilterSchema) ??
-    defaultCalendarFilters;
+  const orgParam = firstQueryValue(org);
+  const {
+    clerkOrgId,
+    companies,
+    organisationId,
+    orgQueryValue,
+    parsedFilters,
+    explicitCompanyIds,
+    companyIds,
+  } = await loadAccountCalendarContext(orgParam, filterParams);
   const { orgRole } = await auth();
   const user = await currentUser();
   if (!user) {
     redirect("/");
   }
   const role = calendarRole(orgRole);
-  const currentPerson = await database.person.findFirst({
+  const currentPerson = await tenantDatabase(clerkOrgId).person.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(clerkOrgId, organisationId),
@@ -163,7 +217,9 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
     currentPerson?.id ?? null,
     parsedFilters,
     role,
-    scope.value
+    scope.value,
+    companyIds,
+    explicitCompanyIds
   );
   if (!dataResult.ok) {
     if (dataResult.error.code === "invalid_scope") {
@@ -196,9 +252,14 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   return (
     <>
       <Header page="Calendar" />
-      <CalendarLiveUpdates organisationId={organisationId} />
+      {companies
+        .filter((company) => companyIds.includes(company.id))
+        .map((company) => (
+          <CalendarLiveUpdates key={company.id} organisationId={company.id} />
+        ))}
       <div className="flex flex-1 flex-col gap-8 p-6 pt-0">
-        {dataResult.value.xeroConnectionState === "connected" ? (
+        {companyIds.length === 1 &&
+        dataResult.value.xeroConnectionState === "connected" ? (
           <CalendarSyncStatus
             businessName={
               xeroConnection?.tenant_name ?? organisation?.name ?? "Xero"
@@ -212,16 +273,19 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
             orgQueryValue={orgQueryValue}
             syncError={xeroConnection?.last_sync_error_message ?? null}
           />
-        ) : (
+        ) : null}
+        {companyIds.length === 1 &&
+        dataResult.value.xeroConnectionState !== "connected" ? (
           <DisconnectedXeroBanner
             canConnect={role === "admin" || role === "owner"}
             orgQueryValue={orgQueryValue}
             xeroConnectionState={dataResult.value.xeroConnectionState}
           />
-        )}
+        ) : null}
 
         <CalendarToolbar
           actingPersonId={currentPerson?.id ?? null}
+          companies={companies}
           data={dataResult.value}
           filters={{
             ...parsedFilters,
@@ -384,4 +448,8 @@ function dateOnlyInTimeZone(date: Date, timezone: string): string {
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
   return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }

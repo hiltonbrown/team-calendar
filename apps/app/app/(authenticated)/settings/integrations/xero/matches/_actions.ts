@@ -1,12 +1,13 @@
 "use server";
 
+import { requireRole } from "@repo/auth/helpers";
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
 import {
   ignorePersonMatch,
   mergeCandidateIntoXeroPerson,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -40,6 +41,13 @@ export async function resolveXeroPersonMatchAction(input: {
   organisationId: string;
   resolution: "ignore" | "match";
 }): Promise<ActionResult<{ resolved: true }>> {
+  const [admin, owner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  if (!(admin || owner)) {
+    return notAuthorised();
+  }
   const parsed = ResolveMatchSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -110,7 +118,7 @@ async function resolveCallerContext(
 }
 
 function loadMatch(context: OrgContextValue, matchId: string) {
-  return database.xeroPersonMatch.findFirst({
+  return tenantDatabase(context.clerkOrgId).xeroPersonMatch.findFirst({
     include: {
       candidate_person: {
         select: {
@@ -161,7 +169,7 @@ async function resolveClerkUserId(args: {
   }
 
   if (resolvedClerkUserId) {
-    const alreadyLinked = await database.person.findFirst({
+    const alreadyLinked = await tenantDatabase(orgId).person.findFirst({
       select: { id: true },
       where: {
         clerk_org_id: orgId,

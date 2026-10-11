@@ -5,7 +5,7 @@ import type {
 } from "@repo/core";
 import { startOfUtcDay, toDateOnly } from "@repo/core";
 import type { Prisma } from "../../generated/client";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 /**
@@ -23,7 +23,10 @@ export async function loadHolidayResolutionData(
     /** Inclusive YYYY-MM-DD. */
     to: string;
   },
-  client: Prisma.TransactionClient = database
+  client: Pick<
+    Prisma.TransactionClient,
+    "organisation" | "location" | "publicHoliday" | "publicHolidayPreference"
+  > = tenantDatabase(input.clerkOrgId)
 ): Promise<ResolveHolidayData | null> {
   const scope = scopedQuery(input.clerkOrgId, input.organisationId);
   const organisation = await client.organisation.findFirst({

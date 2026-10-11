@@ -34,15 +34,15 @@ vi.mock("@repo/availability", () => ({
   isXeroLeaveType: (value: string) => value === "annual_leave",
 }));
 vi.mock("@repo/database", () => ({
-  database: {
-    leaveBalance: { findFirst: mocks.leaveBalance },
-    organisation: { findFirst: mocks.organisation },
-    person: { findFirst: mocks.person },
-  },
   scopedQuery: (clerkOrgId: string, payrollOrganisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: payrollOrganisationId,
   }),
+  tenantDatabase: vi.fn(() => ({
+    leaveBalance: { findFirst: mocks.leaveBalance },
+    organisation: { findFirst: mocks.organisation },
+    person: { findFirst: mocks.person },
+  })),
 }));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(),

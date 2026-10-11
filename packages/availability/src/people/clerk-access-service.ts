@@ -5,7 +5,7 @@ import {
   type OrganisationId,
   type Result,
 } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { noemailFallbackDomain } from "@repo/seo/branding";
 import { z } from "zod";
@@ -454,7 +454,7 @@ async function evaluateAllPeopleAndClerkAccess(params: {
 
   try {
     const [people, memberships, pendingInvitations] = await Promise.all([
-      database.person.findMany({
+      tenantDatabase(clerkOrgId).person.findMany({
         orderBy: [{ first_name: "asc" }, { last_name: "asc" }, { id: "asc" }],
         select: {
           archived_at: true,
@@ -584,7 +584,7 @@ export async function reconcileClerkAccessLinks(params: {
 
   for (const item of linkable) {
     if (item.clerkUserIdToLink) {
-      await database.person.update({
+      await tenantDatabase(clerkOrgId).person.update({
         data: { clerk_user_id: item.clerkUserIdToLink },
         where: {
           clerk_org_id: clerkOrgId,

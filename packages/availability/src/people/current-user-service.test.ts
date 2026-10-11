@@ -17,26 +17,54 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({ withinLimit: mocks.withinLimit }));
 vi.mock("@repo/database", () => ({
-  database: {
-    organisation: {
-      create: mocks.organisationCreate,
-      findFirst: mocks.organisationFindFirst,
-      update: mocks.organisationUpdate,
-    },
-    person: {
-      create: mocks.personCreate,
-      findFirst: mocks.personFindFirst,
-      findMany: mocks.personFindMany,
-      update: mocks.personUpdate,
-    },
-    xeroPersonMatch: {
-      findFirst: mocks.xeroPersonMatchFindFirst,
-    },
-  },
   scopedQuery: (inputClerkOrgId: string, inputOrganisationId: string) => ({
     clerk_org_id: inputClerkOrgId,
     organisation_id: inputOrganisationId,
   }),
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      organisation: {
+        create: mocks.organisationCreate,
+        findFirst: mocks.organisationFindFirst,
+        update: mocks.organisationUpdate,
+      },
+      person: {
+        create: mocks.personCreate,
+        findFirst: mocks.personFindFirst,
+        findMany: mocks.personFindMany,
+        update: mocks.personUpdate,
+      },
+      xeroPersonMatch: {
+        findFirst: mocks.xeroPersonMatchFindFirst,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        organisation: {
+          create: mocks.organisationCreate,
+          findFirst: mocks.organisationFindFirst,
+          update: mocks.organisationUpdate,
+        },
+        person: {
+          create: mocks.personCreate,
+          findFirst: mocks.personFindFirst,
+          findMany: mocks.personFindMany,
+          update: mocks.personUpdate,
+        },
+        xeroPersonMatch: {
+          findFirst: mocks.xeroPersonMatchFindFirst,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("@repo/feeds", () => ({
   ensureDefaultCalendarFeed: mocks.ensureDefaultCalendarFeed,

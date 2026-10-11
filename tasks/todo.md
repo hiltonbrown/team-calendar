@@ -829,3 +829,37 @@ Verification (local disposable PostgreSQL 16 with the new migration applied, and
 - `bun run test`: 17 of 18 tasks passed in the Turbo run; `app#test` failed one existing test (`xero-client.test.tsx`, "keeps connection history and a retry available after destructive disconnect fails") that could not find a dialog button under parallel load. It passed three isolated reruns and a full `apps/app` rerun (139 files, 835 tests). This branch does not change that component; treat it as an intermittent, load-sensitive test to stabilise separately.
 - `bun run test:integration --continue`: database 58, app 10, availability 26, feeds 31, jobs 84 passed. `@repo/xero` failed 51 of 102, identical to the base commit `970906b` (environmental, mostly `network_error`).
 - Browser rendering NOT VERIFIED: no Clerk keys in this environment. Before release, walk the owner wizard with Xero (single and multiple payroll files), without Xero, an OAuth cancel, and the member welcome for linked and unlinked members, at desktop and mobile widths in light and dark.
+
+## Xero multi-company accounts (2026-10-10 plan)
+
+- [x] Task 1: RLS roles, grants and policies
+- [x] Task 2: Tenant and system clients
+- [x] Task 3: Migrate all tenant call sites
+- [x] Task 4: Plan limits and pricing
+- [x] Task 5: Ownership release and conflict checks
+- [x] Task 6: Company creation through tenant selection
+- [x] Task 7: Reauthorisation and administrator replacement
+- [x] Task 8: Disconnect and Remove company
+- [x] Task 9: Consolidated calendar
+- [x] Task 10: Account-wide feeds
+- [x] Task 11: Jobs isolation
+- [x] Task 12: Integration permissions
+- [x] Task 13: Multi-company UI
+- [x] Task 14: Documentation
+- [x] Task 15: Verification and PR preparation
+
+### Review
+
+Implementation complete. Independent security review approved the final code with no Critical or Important findings remaining.
+
+Final verification on disposable local PostgreSQL 16 with a restricted application role and local Redis:
+
+- `bun run check`: passed, 1,273 files.
+- `bun run typecheck --concurrency=2`: passed, 19 tasks.
+- `bun run test --concurrency=1 -- --maxWorkers=2`: passed, 18 tasks and 3,550 tests. The final OAuth race fix was additionally checked with the full 727-test Xero unit suite.
+- `bun run test:integration --concurrency=1`: passed, all six packages. The final reviewed Xero suite passed 115 tests, compared with 102 on clean main, with zero failures. Combined final package counts: 364 integration tests.
+- `bun run build --concurrency=1`: passed, four tasks, using synthetic local build keys. Turbopack reports the existing `../oauth/authorisation.js` dynamic-import warning, also present in main; this import is unchanged by this plan.
+
+Security review fixes: removed-company custom feeds and tokens are archived/revoked with active-company projection checks; selection compares pre-inventory connection and ownership state under lock, including same-account and cross-account Remove races; runtime-role preflight rejects inherited ownership/elevated membership; confirmed Disconnect then Remove reuses locked audit proof; Starter preset picker does not count an extra company. Each finding has regression coverage.
+
+No live Xero calls were made. Authenticated browser walkthroughs, live multi-file Xero and Neon preview RLS/latency remain NOT VERIFIED. Deployment requires provisioning the restricted role and `DATABASE_APP_URL`, applying both migrations and passing the app/API role preflight, as documented in `SECURITY.md` and `AGENTS.md`.

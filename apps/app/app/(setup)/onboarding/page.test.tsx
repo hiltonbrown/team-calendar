@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   currentUser: vi.fn(),
+  ensureDefaultOrganisation: vi.fn(),
   getOrganisationById: vi.fn(),
   loadOnboardingPeople: vi.fn(),
   loadWizardSnapshot: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`redirect:${path}`);
   }),
   requireActiveOrgPageContext: vi.fn(),
+  resolveAccountCompanies: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,6 +27,12 @@ vi.mock("@repo/availability", () => ({
 }));
 vi.mock("@repo/database/queries/organisations", () => ({
   getOrganisationById: mocks.getOrganisationById,
+}));
+vi.mock("@repo/database/queries/account-companies", () => ({
+  resolveAccountCompanies: mocks.resolveAccountCompanies,
+}));
+vi.mock("@/lib/server/ensure-default-organisation", () => ({
+  ensureDefaultOrganisation: mocks.ensureDefaultOrganisation,
 }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
@@ -91,7 +99,14 @@ async function renderPage(params: Record<string, string> = {}) {
 
 describe("OnboardingPage", () => {
   beforeEach(() => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:owner" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:owner" });
+    mocks.resolveAccountCompanies.mockResolvedValue([
+      { id: organisationId, name: "Acme" },
+    ]);
+    mocks.ensureDefaultOrganisation.mockResolvedValue({
+      clerkOrgId: "org_1",
+      organisationId,
+    });
     mocks.currentUser.mockResolvedValue({ id: "user_owner" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
       clerkOrgId: "org_1",
@@ -117,6 +132,19 @@ describe("OnboardingPage", () => {
     vi.clearAllMocks();
   });
 
+  it("explicitly creates the initial company only during first-run onboarding", async () => {
+    mocks.resolveAccountCompanies.mockResolvedValue([]);
+    await renderPage();
+    expect(mocks.ensureDefaultOrganisation).toHaveBeenCalledWith("org_1");
+    expect(mocks.requireActiveOrgPageContext).toHaveBeenCalledWith(
+      organisationId
+    );
+  });
+  it("does not create a company while revisiting an existing company URL", async () => {
+    await renderPage({ org: organisationId });
+    expect(mocks.ensureDefaultOrganisation).not.toHaveBeenCalled();
+    expect(mocks.resolveAccountCompanies).not.toHaveBeenCalled();
+  });
   it("sends members back to the app", async () => {
     mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
     await expect(renderPage()).rejects.toThrow("redirect:/");

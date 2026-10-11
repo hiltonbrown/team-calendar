@@ -8,17 +8,45 @@ const mocked = vi.hoisted(() => ({
   findMany: vi.fn(),
   updateMany: vi.fn(),
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    organisation: { findMany: mocked.findMany },
-    xeroOAuthSession: {
-      create: mocked.create,
-      findFirst: mocked.findFirst,
-      updateMany: mocked.updateMany,
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      organisation: { findMany: mocked.findMany },
+      xeroOAuthSession: {
+        create: mocked.create,
+        findFirst: mocked.findFirst,
+        updateMany: mocked.updateMany,
+      },
     },
-  },
-}));
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/availability", () => ({}));
+vi.mock("@repo/database/queries/xero-ownership", () => ({
+  listXeroTenantOwnership: vi.fn(async () => new Map()),
+}));
+vi.mock("@repo/database/queries/payroll-entitlements", () => ({
+  checkPayrollEntityEntitlement: vi.fn(async () => ({
+    ok: true,
+    value: { allowed: true, current: 0, limit: 5 },
+  })),
+}));
 vi.mock("@repo/feeds", () => ({}));
 vi.mock("@repo/observability/log", () => ({ log: { error: vi.fn() } }));
 vi.mock("../../keys", () => ({
@@ -65,6 +93,7 @@ describe("canonical OAuth sessions", () => {
         {
           connectionId: "remote-link",
           isCurrentConsent: true,
+          state: "available",
           tenantId: "external-file",
           tenantName: "Payroll",
         },

@@ -1,4 +1,4 @@
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
@@ -25,7 +25,7 @@ export default async function XeroMatchesPage({
   const { clerkOrgId, organisationId } =
     await requireActiveOrgPageContext(orgParam);
 
-  const rawMatches = await database.xeroPersonMatch.findMany({
+  const rawMatches = await tenantDatabase(clerkOrgId).xeroPersonMatch.findMany({
     orderBy: [{ created_at: "asc" }, { id: "asc" }],
     select: xeroPersonMatchSelect,
     where: {

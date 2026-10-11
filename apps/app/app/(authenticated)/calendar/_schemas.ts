@@ -51,6 +51,7 @@ const optionalDateOnly = z.preprocess(
 export const CalendarFilterSchema = z.object({
   anchor: optionalDateOnly,
   approvalStatus: csvArray(z.enum(calendarApprovalStatuses)),
+  companyIds: csvArray(z.string().uuid()),
   includeDrafts: z
     .preprocess((value) => value === "true" || value === true, z.boolean())
     .default(false),

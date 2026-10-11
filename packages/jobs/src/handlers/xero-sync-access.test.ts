@@ -23,6 +23,17 @@ vi.mock("@repo/database", () => {
         operation(tx)
       ),
     },
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    tenantDatabase: vi.fn(() => tx),
+    tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+      mocks.transaction(operation)
+    ),
   };
 });
 vi.mock("@repo/xero", async () => ({
@@ -105,6 +116,25 @@ describe("Xero sync connection lock", () => {
         tx.person.updateMany({ data: { is_active: false } })
       )
     ).rejects.toBeInstanceOf(XeroBindingChangedError);
+    expect(mocks.writes).not.toHaveBeenCalled();
+  });
+  it("excludes released bindings from provider access and persistence", async () => {
+    mocks.resolve.mockResolvedValue({
+      ok: true,
+      value: { connectionId: scope.connectionId },
+    });
+    mocks.find.mockImplementation(async ({ where }) =>
+      where.released_at === null ? null : { id: scope.connectionId }
+    );
+    await expect(
+      resolveSyncTenant(scope, "payroll.employees.read")
+    ).rejects.toBeInstanceOf(XeroBindingChangedError);
+    await expect(
+      withXeroBinding(scope, (tx) =>
+        tx.person.updateMany({ data: { is_active: false } })
+      )
+    ).rejects.toBeInstanceOf(XeroBindingChangedError);
+    expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.writes).not.toHaveBeenCalled();
   });
   it("rejects mismatched scope nesting rather than reusing a sibling transaction", async () => {

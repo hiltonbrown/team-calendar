@@ -8,7 +8,7 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_record_type,
@@ -269,7 +269,9 @@ export async function listLeaveReportRecordsForDrilldown(
       return { ok: true, value: { nextCursor: null, records: [] } };
     }
 
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      input.clerkOrgId
+    ).availabilityRecord.findMany({
       cursor: parsed.data.cursor ? { id: parsed.data.cursor } : undefined,
       orderBy: [{ starts_at: "desc" }, { id: "desc" }],
       select: analyticsRecordSelect,
@@ -348,7 +350,9 @@ async function loadDatasetUncached(
     return { ok: true, value: { entries: [], people, records: [] } };
   }
 
-  const records = await database.availabilityRecord.findMany({
+  const records = await tenantDatabase(
+    input.clerkOrgId
+  ).availabilityRecord.findMany({
     orderBy: [{ starts_at: "asc" }, { id: "asc" }],
     select: analyticsRecordSelect,
     where: recordWhere(input, filters, personIds),
@@ -409,7 +413,9 @@ async function loadPeople(
   if (input.role === "viewer") {
     where.clerk_user_id = input.actingUserId;
   } else if (input.role === "manager") {
-    const actingPerson = await database.person.findFirst({
+    const actingPerson = await tenantDatabase(
+      input.clerkOrgId
+    ).person.findFirst({
       select: { id: true },
       where: {
         ...scoped,
@@ -429,7 +435,7 @@ async function loadPeople(
     };
   }
 
-  const people = await database.person.findMany({
+  const people = await tenantDatabase(input.clerkOrgId).person.findMany({
     include: { location: true, team: true },
     orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
     where,

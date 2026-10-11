@@ -48,7 +48,7 @@ const target = ownedTenant(0),
 const grantId = fixture.id("authorisation");
 const providerAppId = fixture.id("provider-app");
 const providerUserId = fixture.id("xero-user");
-let database: typeof import("@repo/database")["database"];
+let database: typeof import("@repo/database")["systemDatabase"];
 let resolve: typeof import("./authorisation")["resolveXeroAccess"];
 let verify: typeof import("./provider-connection")["verifyXeroProviderConnection"];
 let recover: typeof import("../adapter/auth-recovery")["executeWithXeroAuthRecovery"];
@@ -93,7 +93,7 @@ beforeAll(async () => {
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString(
     "base64"
   );
-  ({ database } = await import("@repo/database"));
+  ({ systemDatabase: database } = await import("@repo/database"));
   ({ resolveXeroAccess: resolve } = await import("./authorisation"));
   ({ verifyXeroProviderConnection: verify } = await import(
     "./provider-connection"

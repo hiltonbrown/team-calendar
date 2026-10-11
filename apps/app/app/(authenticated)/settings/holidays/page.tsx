@@ -3,7 +3,7 @@ import {
   type ResolvedPublicHoliday,
 } from "@repo/availability";
 import { toDateOnly } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
@@ -39,7 +39,7 @@ const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
   };
   const [settingsResult, locations] = await Promise.all([
     loadHolidaySettings(range),
-    database.location.findMany({
+    tenantDatabase(clerkOrgId).location.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
       where: scopedQuery(clerkOrgId, organisationId),

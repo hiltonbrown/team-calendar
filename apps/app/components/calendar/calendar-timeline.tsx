@@ -184,7 +184,11 @@ export function CalendarTimeline({
           event={selectedEvent}
           onClose={closeDetail}
           orgQueryValue={orgQueryValue}
-          timezone={data.range.timezone}
+          timezone={
+            data.companies.find(
+              (company) => company.id === selectedEvent?.companyId
+            )?.timezone ?? data.range.timezone
+          }
         />
         <MobileRunway
           data={data}
@@ -201,7 +205,11 @@ export function CalendarTimeline({
           event={selectedEvent}
           onClose={closeDetail}
           orgQueryValue={orgQueryValue}
-          timezone={data.range.timezone}
+          timezone={
+            data.companies.find(
+              (company) => company.id === selectedEvent?.companyId
+            )?.timezone ?? data.range.timezone
+          }
         />
       </div>
 
@@ -431,7 +439,11 @@ function TimelineLaneRow({
     ...lane.segments.map(({ level }) => level + 1)
   );
   const personName = lane.person?.displayName ?? lane.fallbackName;
-  const personMeta = [lane.person?.teamName, lane.person?.locationName]
+  const personMeta = [
+    lane.person?.companyName,
+    lane.person?.teamName,
+    lane.person?.locationName,
+  ]
     .filter(Boolean)
     .join(" · ");
   const gridTemplateColumns = `repeat(${days.length}, minmax(6.5rem, 1fr))`;
@@ -447,7 +459,10 @@ function TimelineLaneRow({
           "sticky left-0 z-10 flex min-w-0 items-center gap-2.5 px-3 py-3 outline-none hover:bg-surface-container-high focus-visible:ring-3 focus-visible:ring-ring",
           rowTone
         )}
-        href={withOrg(`/people/${lane.personId}`, orgQueryValue)}
+        href={withOrg(
+          `/people/${lane.personId}`,
+          lane.person?.companyId ?? orgQueryValue
+        )}
       >
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-semibold text-label-lg">
           {initialsForName(personName)}
@@ -556,7 +571,6 @@ function TimelineEventButton({
 function RunwayDetail({
   event,
   onClose,
-  orgQueryValue,
   timezone,
 }: {
   event: CalendarEvent | null;
@@ -608,6 +622,9 @@ function RunwayDetail({
               {formatCalendarEventDateRange(event, timezone)}
             </p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-label-lg">
+              {event.companyName ? (
+                <DetailDatum label="Company" value={event.companyName} />
+              ) : null}
               <DetailDatum
                 label="Status"
                 value={approvalStatusLabel(event.approvalStatus) ?? "Unknown"}
@@ -629,7 +646,7 @@ function RunwayDetail({
         <div className="flex items-center justify-end gap-2">
           {event.isEditableByActor ? (
             <Button asChild size="sm" variant="secondary">
-              <Link href={withOrg(`/plans/${event.id}/edit`, orgQueryValue)}>
+              <Link href={withOrg(`/plans/${event.id}/edit`, event.companyId)}>
                 View plan
                 <ArrowUpRightIcon aria-hidden="true" className="size-3.5" />
               </Link>

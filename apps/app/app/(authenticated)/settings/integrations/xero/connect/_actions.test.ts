@@ -47,19 +47,22 @@ vi.mock("@repo/database/queries/xero-connection-state", () => ({
   getXeroConnectionState: mocks.getXeroConnectionState,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     auditEvent: { create: mocks.auditEventCreate },
     xeroConnection: { findFirst: mocks.xeroConnectionFindFirst },
     xeroOAuthSession: { findFirst: mocks.sessionFind },
-  },
+  })),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));
+vi.mock("@repo/auth/helpers", () => ({
+  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+}));
 const { completeTenantSelectionAction } = await import("./_actions");
 const validInput = {
   sessionId: "11111111-1111-4111-8111-111111111111",
-  tenantId: "xero-tenant-abc",
+  tenantIds: ["xero-tenant-abc"],
 };
 describe("completeTenantSelectionAction", () => {
   beforeEach(() => {
@@ -83,11 +86,19 @@ describe("completeTenantSelectionAction", () => {
     mocks.completeXeroTenantSelection.mockResolvedValue({
       ok: true,
       value: {
-        connectionId: "44444444-4444-4444-8444-444444444444",
-        organisationId: "33333333-3333-4333-8333-333333333333",
+        outcomes: [
+          {
+            action: "connected",
+            connectionId: "44444444-4444-4444-8444-444444444444",
+            ok: true,
+            organisationId: "33333333-3333-4333-8333-333333333333",
+            tenantId: "xero-tenant-abc",
+          },
+        ],
         returnTo: "/settings/integrations/xero",
       },
     });
+    mocks.sessionFind.mockResolvedValue({ organisation_id: null });
     mocks.auditEventCreate.mockResolvedValue({});
     mocks.xeroConnectionFindFirst.mockResolvedValue({
       created_at: new Date("2026-09-19T00:00:00.000Z"),
@@ -100,6 +111,80 @@ describe("completeTenantSelectionAction", () => {
         queued: true,
       },
     });
+  });
+  it.each(["org:admin", "org:owner"])(
+    "allows %s to complete scoped tenant selection",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+      expect((await completeTenantSelectionAction(validInput)).ok).toBe(true);
+      expect(mocks.completeXeroTenantSelection).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clerkOrgId: "org_1",
+          tenantIds: validInput.tenantIds,
+          userId: "user_1",
+        })
+      );
+    }
+  );
+  it.each(["org:viewer", "org:manager"])(
+    "refuses %s before input validation and account lookup",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+      const result = await completeTenantSelectionAction({
+        sessionId: "invalid",
+        tenantIds: [],
+      });
+      expect(result).toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      expect(mocks.sessionFind).not.toHaveBeenCalled();
+      expect(mocks.completeXeroTenantSelection).not.toHaveBeenCalled();
+    }
+  );
+  it("dispatches successes separately and returns only safe mixed outcomes", async () => {
+    mocks.completeXeroTenantSelection.mockResolvedValue({
+      ok: true,
+      value: {
+        outcomes: [
+          {
+            action: "connected",
+            connectionId: "connection-a",
+            ok: true,
+            organisationId: "company-a",
+            tenantId: "file-a",
+          },
+          {
+            error: {
+              code: "tenant_binding_conflict",
+              message:
+                "access_token=secret xero_user_id=external-user raw_payload=provider",
+            },
+            ok: false,
+            tenantId: "file-b",
+          },
+        ],
+        returnTo: "/settings/integrations/xero",
+      },
+    });
+    const result = await completeTenantSelectionAction({
+      sessionId: validInput.sessionId,
+      tenantIds: ["file-a", "file-b"],
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledTimes(1);
+    const body = JSON.stringify(result);
+    expect(body).not.toContain("access_token");
+    expect(body).not.toContain("xero_user_id");
+    expect(body).not.toContain("raw_payload");
+    if (result.ok) {
+      expect(result.value.outcomes[1]).toEqual({
+        message:
+          "This Xero organisation is connected to another Team Calendar account. Ask its administrator to remove it there first.",
+        ok: false,
+        tenantId: "file-b",
+      });
+    }
   });
   it("dispatches durable initial sync after a successful connection", async () => {
     const result = await completeTenantSelectionAction(validInput);
@@ -164,6 +249,7 @@ describe("completeTenantSelectionAction", () => {
     await expect(completeTenantSelectionAction(validInput)).resolves.toEqual({
       ok: true,
       value: {
+        outcomes: [{ ok: true, tenantId: "xero-tenant-abc" }],
         redirectTo:
           "/settings/integrations/xero?org=33333333-3333-4333-8333-333333333333",
       },
@@ -178,9 +264,10 @@ describe("completeTenantSelectionAction", () => {
   });
   it("uses the durable connection creation time for the activation event", async () => {
     const createdAt = new Date("2026-09-18T03:04:05.000Z");
-    mocks.xeroConnectionFindFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ created_at: createdAt });
+    mocks.sessionFind.mockResolvedValue({
+      organisation_id: "33333333-3333-4333-8333-333333333333",
+    });
+    mocks.xeroConnectionFindFirst.mockResolvedValue({ created_at: createdAt });
     await completeTenantSelectionAction({
       ...validInput,
       organisationId: "33333333-3333-4333-8333-333333333333",

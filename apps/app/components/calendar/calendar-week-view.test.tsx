@@ -65,6 +65,13 @@ describe("CalendarWeekView", () => {
 });
 function weekRange() {
   return {
+    companies: [
+      {
+        id: "00000000-0000-4000-8000-000000000003",
+        name: "Acme Restaurants",
+        timezone: "Australia/Brisbane",
+      },
+    ],
     days: Array.from({ length: 7 }, (_, index) => ({
       date: new Date(Date.UTC(2026, 3, 13 + index)),
       dayOfWeek: ((index + 1) % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6,
@@ -101,6 +108,8 @@ function event() {
     allDay: true,
     approvalStatus: "approved",
     avatarUrl: null,
+    companyId: "00000000-0000-4000-8000-000000000003",
+    companyName: "Acme Restaurants",
     contactabilityStatus: "contactable",
     displayName: "Ari Report",
     endsAt: new Date("2026-04-16T00:00:00.000Z"),

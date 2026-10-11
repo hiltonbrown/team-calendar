@@ -1,5 +1,5 @@
 import { auth } from "@repo/auth/server";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { normaliseRole } from "@repo/feeds";
 import { FeedCreateForm } from "@/components/feed/feed-create-form";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -38,12 +38,12 @@ const NewFeedPage = async ({ searchParams }: NewFeedPageProps) => {
     );
   }
   const [teams, people] = await Promise.all([
-    database.team.findMany({
+    tenantDatabase(clerkOrgId).team.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
       where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
     }),
-    database.person.findMany({
+    tenantDatabase(clerkOrgId).person.findMany({
       orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
       select: { first_name: true, id: true, last_name: true },
       where: {

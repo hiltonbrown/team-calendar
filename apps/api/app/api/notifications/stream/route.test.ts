@@ -14,9 +14,9 @@ vi.mock("@repo/auth/helpers", () => ({
   requireOrg: mocks.requireOrg,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     organisation: { findFirst: mocks.organisationFindFirst },
-  },
+  })),
 }));
 vi.mock("@repo/notifications", () => ({
   pollNotificationStream: mocks.pollNotificationStream,

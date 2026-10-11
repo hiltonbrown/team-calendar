@@ -2,7 +2,7 @@ import "server-only";
 
 import { withinLimit } from "@repo/auth/server";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, lockPlanLimitMutations } from "@repo/database";
+import { lockPlanLimitMutations, tenantTransaction } from "@repo/database";
 
 export type CreateManualPersonError =
   | { code: "unknown_error"; message: string }
@@ -20,7 +20,7 @@ export async function createManualPerson(input: {
   organisationId: OrganisationId;
 }): Promise<Result<{ personId: string }, CreateManualPersonError>> {
   try {
-    return await database.$transaction(async (tx) => {
+    return await tenantTransaction(input.clerkOrgId, async (tx) => {
       await lockPlanLimitMutations(tx, input.clerkOrgId);
       const entitlement = await withinLimit(
         input.clerkOrgId,

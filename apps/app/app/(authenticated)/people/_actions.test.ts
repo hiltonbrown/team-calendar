@@ -1,3 +1,4 @@
+import { tenantDatabase } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -43,11 +44,11 @@ vi.mock("@repo/availability", () => ({
   updateAlternativeContact: mocks.updateAlternativeContact,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
   scopedQuery: (cOrgId: string, orgId: string) => ({
     clerk_org_id: cOrgId,
     organisation_id: orgId,
   }),
+  tenantDatabase: vi.fn(() => mocks.database),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -162,6 +163,7 @@ describe("people server actions", () => {
         organisationId,
         personId,
       });
+      expect(tenantDatabase).toHaveBeenCalledWith(clerkOrgId);
       expect(mocks.database.person.findFirst).toHaveBeenCalledWith({
         select: { id: true },
         where: {

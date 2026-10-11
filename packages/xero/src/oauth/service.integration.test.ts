@@ -13,7 +13,10 @@ import {
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/feeds", () => ({
+  ALL_PRIVACY_MODES: ["named", "anonymous", "hidden"],
   ensureDefaultCalendarFeed: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  invalidateAccountFeedCaches: vi.fn().mockResolvedValue(undefined),
+  invalidateFeedCache: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@repo/availability", () => ({
   XERO_WRITE_CLAIM_LEASE_MS: 5 * 60 * 1000,
@@ -52,7 +55,7 @@ const ownedGrants = [
   allocation.id("authorisation", 1),
 ];
 const originalEnv = { ...process.env };
-let database: typeof import("@repo/database")["database"];
+let database: typeof import("@repo/database")["systemDatabase"];
 let crypto: typeof import("../crypto/tokens");
 let canonical: typeof import("./authorisation");
 let service: typeof import("./service");
@@ -65,7 +68,7 @@ beforeAll(async () => {
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString(
     "base64"
   );
-  ({ database } = await import("@repo/database"));
+  ({ systemDatabase: database } = await import("@repo/database"));
   crypto = await import("../crypto/tokens");
   service = await import("./service");
   canonical = await import("./authorisation");
@@ -102,6 +105,8 @@ async function clean() {
   await database.xeroConnection.deleteMany({ where: ownedScopes });
   await database.person.deleteMany({ where: ownedScopes });
   await database.organisation.deleteMany({ where: ownedScopes });
+  await database.clerkOrgSubscription.deleteMany({ where: ownedScopes });
+
   await database.xeroAuthorisation.deleteMany({
     where: { id: { in: ownedGrants } },
   });
@@ -442,14 +447,8 @@ describe("canonical OAuth persistence", () => {
     expect(provider).not.toHaveBeenCalled();
     expect(identity.verify).not.toHaveBeenCalled();
   });
-  it("rejects an OAuth start without an existing organisation or initiating Clerk user", async () => {
+  it("requires an initiating Clerk user for OAuth", async () => {
     await organisation();
-    expect(
-      await service.buildXeroOAuthStartUrl({
-        clerkOrgId: fixture.clerkOrgId,
-        userId: "user_integration_1",
-      })
-    ).toMatchObject({ ok: false });
     expect(
       await service.buildXeroOAuthStartUrl({
         clerkOrgId: fixture.clerkOrgId,
@@ -460,6 +459,461 @@ describe("canonical OAuth persistence", () => {
       0
     );
   });
+  it("starts Add company without an existing organisation", async () => {
+    const started = await service.buildXeroOAuthStartUrl({
+      clerkOrgId: fixture.clerkOrgId,
+      userId: "user_integration_1",
+    });
+    expect(started.ok).toBe(true);
+    expect(
+      await database.xeroOAuthSession.findFirst({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toMatchObject({ organisation_id: null, status: "pending" });
+  });
+  it("connects three selected files with one shared grant and replays without duplicates", async () => {
+    await database.clerkOrgSubscription.create({
+      data: {
+        clerk_org_id: fixture.clerkOrgId,
+        plan_key: "premium",
+        status: "active",
+      },
+    });
+    await selection(fixture.externalId, null);
+    const tenants = Array.from({ length: 3 }, (_, index) => ({
+      connectionId: allocation.id("multi-remote", index),
+      tenantId: allocation.id("multi-file", index),
+      tenantName: `Payroll ${index}`,
+    }));
+    await database.xeroOAuthSession.update({
+      data: { available_tenants_json: { tenants } },
+      where: { id: fixture.sessionId },
+    });
+    const provider = vi.fn(async (url) =>
+      String(url).endsWith("/connections")
+        ? Response.json(
+            tenants.map((tenant) => ({
+              id: tenant.connectionId,
+              tenantId: tenant.tenantId,
+              tenantName: tenant.tenantName,
+              tenantType: "ORGANISATION",
+            }))
+          )
+        : Response.json({ Organisations: [{ CountryCode: "AU" }] })
+    );
+    vi.stubGlobal("fetch", provider);
+    const input = {
+      clerkOrgId: fixture.clerkOrgId,
+      sessionId: fixture.sessionId,
+      tenantIds: tenants.map((tenant) => tenant.tenantId),
+      userId: "user_integration_1",
+    };
+    const first = await service.completeXeroTenantSelection(input);
+    expect(first).toMatchObject({
+      ok: true,
+      value: {
+        outcomes: tenants.map((tenant) => ({
+          action: "connected",
+          ok: true,
+          tenantId: tenant.tenantId,
+        })),
+      },
+    });
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(3);
+    const connections = await database.xeroConnection.findMany({
+      where: { clerk_org_id: fixture.clerkOrgId },
+    });
+    expect(connections.map((binding) => binding.xero_authorisation_id)).toEqual(
+      new Array(3).fill(fixture.authorisationId)
+    );
+    expect(
+      provider.mock.calls.filter(([url]) =>
+        String(url).endsWith("/connections")
+      )
+    ).toHaveLength(1);
+    expect(await service.completeXeroTenantSelection(input)).toEqual(first);
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(3);
+    expect(
+      await database.feed.count({ where: { clerk_org_id: fixture.clerkOrgId } })
+    ).toBe(0);
+  });
+  it("keeps a successful company when another selection exceeds Basic's allowance", async () => {
+    await selection(fixture.externalId, null);
+    const tenants = [0, 1].map((index) => ({
+      connectionId: allocation.id("limit-remote", index),
+      tenantId: allocation.id("limit-file", index),
+      tenantName: `Payroll ${index}`,
+    }));
+    await database.xeroOAuthSession.update({
+      data: { available_tenants_json: { tenants } },
+      where: { id: fixture.sessionId },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) =>
+        String(url).endsWith("/connections")
+          ? Response.json(
+              tenants.map((tenant) => ({
+                id: tenant.connectionId,
+                ...tenant,
+                tenantType: "ORGANISATION",
+              }))
+            )
+          : Response.json({ Organisations: [{ CountryCode: "AU" }] })
+      )
+    );
+    expect(
+      await service.completeXeroTenantSelection({
+        clerkOrgId: fixture.clerkOrgId,
+        sessionId: fixture.sessionId,
+        tenantIds: tenants.map((tenant) => tenant.tenantId),
+        userId: "user_integration_1",
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {
+        outcomes: [
+          { ok: true },
+          { error: { code: "plan_limit_exceeded" }, ok: false },
+        ],
+      },
+    });
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(1);
+    expect(
+      await database.xeroConnection.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(1);
+    expect(
+      await database.auditEvent.count({
+        where: { action: "xero_connected", clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(1);
+  });
+  it("uses a neutral ownership error and still connects a different available file", async () => {
+    await organisation(secondary);
+    await selection(fixture.externalId, null);
+    const tenants = [0, 1].map((index) => ({
+      connectionId: allocation.id("owned-remote", index),
+      tenantId: allocation.id("owned-file", index),
+      tenantName: `Payroll ${index}`,
+    }));
+    await database.xeroConnection.create({
+      data: {
+        clerk_org_id: secondary.clerkOrgId,
+        organisation_id: secondary.organisationId,
+        payroll_region: "AU",
+        remote_connection_id: tenants[0]?.connectionId,
+        xero_tenant_id: tenants[0]?.tenantId,
+      },
+    });
+    await database.xeroOAuthSession.update({
+      data: { available_tenants_json: { tenants } },
+      where: { id: fixture.sessionId },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) =>
+        String(url).endsWith("/connections")
+          ? Response.json(
+              tenants.map((tenant) => ({
+                id: tenant.connectionId,
+                ...tenant,
+                tenantType: "ORGANISATION",
+              }))
+            )
+          : Response.json({ Organisations: [{ CountryCode: "AU" }] })
+      )
+    );
+    const result = await service.completeXeroTenantSelection({
+      clerkOrgId: fixture.clerkOrgId,
+      sessionId: fixture.sessionId,
+      tenantIds: tenants.map((tenant) => tenant.tenantId),
+      userId: "user_integration_1",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        outcomes: [
+          {
+            error: {
+              code: "tenant_binding_conflict",
+              message: "This Xero file cannot be connected to this account.",
+            },
+            ok: false,
+          },
+          { ok: true },
+        ],
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain(secondary.clerkOrgId);
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(1);
+  });
+  it("reconnects an already-owned file in place and preserves its old grant's live session", async () => {
+    await connection();
+    const nextGrant = await grant(
+      new Date(Date.now() + 1_800_000),
+      ownedGrants[1]
+    );
+    await selection(fixture.externalId, null);
+    await database.xeroOAuthSession.update({
+      data: { xero_authorisation_id: nextGrant.id },
+      where: { id: fixture.sessionId },
+    });
+    await database.xeroOAuthSession.create({
+      data: {
+        clerk_org_id: fixture.clerkOrgId,
+        created_by_user_id: "user_integration_1",
+        expires_at: new Date(Date.now() + 600_000),
+        id: allocation.id("surviving-session"),
+        return_to: "/settings",
+        status: "selecting",
+        xero_authorisation_id: fixture.authorisationId,
+      },
+    });
+    stubPayroll();
+    expect(
+      await service.completeXeroTenantSelection({
+        clerkOrgId: fixture.clerkOrgId,
+        sessionId: fixture.sessionId,
+        tenantIds: [fixture.externalId],
+        userId: "user_integration_1",
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {
+        outcomes: [
+          {
+            action: "reconnected",
+            connectionId: fixture.connectionId,
+            ok: true,
+            organisationId: fixture.organisationId,
+          },
+        ],
+      },
+    });
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(1);
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: fixture.connectionId },
+      })
+    ).toMatchObject({
+      initial_sync_requested_at: expect.any(Date),
+      xero_authorisation_id: nextGrant.id,
+    });
+    expect(
+      await database.xeroAuthorisation.findUnique({
+        where: { id: fixture.authorisationId },
+      })
+    ).not.toBeNull();
+  });
+  it("does not reactivate an owned file disconnected while Add inventory is pending", async () => {
+    await connection();
+    const nextGrant = await grant(
+      new Date(Date.now() + 1_800_000),
+      ownedGrants[1]
+    );
+    await selection(fixture.externalId, null);
+    await database.xeroOAuthSession.update({
+      data: { xero_authorisation_id: nextGrant.id },
+      where: { id: fixture.sessionId },
+    });
+    let releaseInventory: () => void = () => {
+      throw new Error("Inventory latch not initialised");
+    };
+    let inventoryStarted: () => void = () => {
+      throw new Error("Inventory latch not initialised");
+    };
+    const inventoryWait = new Promise<void>((resolve) => {
+      releaseInventory = resolve;
+    });
+    const inventoryReady = new Promise<void>((resolve) => {
+      inventoryStarted = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url, init) => {
+        if (init?.method === "DELETE") {
+          return new Response(null, { status: 204 });
+        }
+        if (String(url).endsWith("/connect/token")) {
+          return tokenResponse();
+        }
+        if (String(url).endsWith("/connections")) {
+          inventoryStarted();
+          await inventoryWait;
+          return Response.json([
+            {
+              id: fixture.remoteId,
+              tenantId: fixture.externalId,
+              tenantName: "Payroll",
+              tenantType: "ORGANISATION",
+            },
+          ]);
+        }
+        return Response.json({ Organisations: [{ CountryCode: "AU" }] });
+      })
+    );
+    const pending = service.completeXeroTenantSelection({
+      clerkOrgId: fixture.clerkOrgId,
+      sessionId: fixture.sessionId,
+      tenantIds: [fixture.externalId],
+      userId: "user_integration_1",
+    });
+    await inventoryReady;
+    const { disconnectXeroOAuthConnection } = await import("./disconnect");
+    expect(
+      await disconnectXeroOAuthConnection({ ...scope(), destructive: false })
+    ).toMatchObject({ ok: true });
+    releaseInventory();
+    expect(await pending).toMatchObject({
+      ok: true,
+      value: {
+        outcomes: [{ error: { code: "tenant_binding_conflict" }, ok: false }],
+      },
+    });
+    expect(
+      await database.xeroConnection.findUnique({
+        where: { id: fixture.connectionId },
+      })
+    ).toMatchObject({ remote_connection_id: null, status: "disconnected" });
+  });
+  it.each(["same_account", "other_account"])(
+    "does not recreate a released %s company while Add inventory is pending",
+    async (originalOwner) => {
+      await connection();
+      let removedScope = scope();
+      if (originalOwner === "other_account") {
+        await organisation(secondary);
+        await database.xeroConnection.update({
+          data: {
+            clerk_org_id: secondary.clerkOrgId,
+            organisation_id: secondary.organisationId,
+          },
+          where: { id: fixture.connectionId },
+        });
+        await database.clerkOrgSubscription.create({
+          data: {
+            clerk_org_id: fixture.clerkOrgId,
+            plan_key: "premium",
+            status: "active",
+          },
+        });
+        removedScope = {
+          clerkOrgId: secondary.clerkOrgId,
+          connectionId: fixture.connectionId,
+          organisationId: secondary.organisationId,
+        };
+      }
+      const nextGrant = await grant(
+        new Date(Date.now() + 1_800_000),
+        ownedGrants[1]
+      );
+      await selection(fixture.externalId, null);
+      await database.xeroOAuthSession.update({
+        data: { xero_authorisation_id: nextGrant.id },
+        where: { id: fixture.sessionId },
+      });
+      let releaseInventory: () => void = () => {
+        throw new Error("Inventory latch not initialised");
+      };
+      let inventoryStarted: () => void = () => {
+        throw new Error("Inventory latch not initialised");
+      };
+      const inventoryWait = new Promise<void>((resolve) => {
+        releaseInventory = resolve;
+      });
+      const inventoryReady = new Promise<void>((resolve) => {
+        inventoryStarted = resolve;
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url, init) => {
+          if (init?.method === "DELETE") {
+            return new Response(null, { status: 204 });
+          }
+          if (String(url).endsWith("/connect/token")) {
+            return tokenResponse();
+          }
+          if (String(url).endsWith("/connections")) {
+            inventoryStarted();
+            await inventoryWait;
+            return Response.json([
+              {
+                id: fixture.remoteId,
+                tenantId: fixture.externalId,
+                tenantName: "Payroll",
+                tenantType: "ORGANISATION",
+              },
+            ]);
+          }
+          return Response.json({ Organisations: [{ CountryCode: "AU" }] });
+        })
+      );
+      const pending = service.completeXeroTenantSelection({
+        clerkOrgId: fixture.clerkOrgId,
+        sessionId: fixture.sessionId,
+        tenantIds: [fixture.externalId],
+        userId: "user_integration_1",
+      });
+      await inventoryReady;
+      const { removeXeroCompany } = await import("./disconnect");
+      expect(
+        await removeXeroCompany({ ...removedScope, role: "owner" })
+      ).toMatchObject({ ok: true });
+      releaseInventory();
+      expect(await pending).toMatchObject({
+        ok: true,
+        value: {
+          outcomes: [{ error: { code: "tenant_binding_conflict" }, ok: false }],
+        },
+      });
+      expect(
+        await database.xeroConnection.findUnique({
+          where: { id: fixture.connectionId },
+        })
+      ).toMatchObject({
+        released_at: expect.any(Date),
+        remote_connection_id: null,
+        status: "disconnected",
+      });
+      expect(
+        await database.organisation.count({
+          where: { clerk_org_id: fixture.clerkOrgId },
+        })
+      ).toBe(1);
+      expect(
+        await database.organisation.findUnique({
+          where: { id: removedScope.organisationId },
+        })
+      ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
+      expect(
+        await database.xeroConnection.count({
+          where: { clerk_org_id: fixture.clerkOrgId, released_at: null },
+        })
+      ).toBe(0);
+    }
+  );
   it("cannot select a sibling organisation in a session bound to the original payroll organisation", async () => {
     await organisation();
     const sibling = await organisation({
@@ -563,10 +1017,34 @@ describe("canonical OAuth persistence", () => {
   });
   it("serialises concurrent refreshes and persists exactly one rotated token pair", async () => {
     await connection();
+    const sibling = await organisation({
+      ...primary,
+      organisationId: allocation.id("refresh-sibling"),
+    });
+    const second = await database.xeroConnection.create({
+      data: {
+        clerk_org_id: fixture.clerkOrgId,
+        organisation_id: sibling.id,
+        payroll_region: "AU",
+        remote_connection_id: allocation.id("refresh-remote"),
+        xero_authorisation_id: fixture.authorisationId,
+        xero_tenant_id: allocation.id("refresh-file"),
+      },
+    });
     const fetchSpy = vi.fn(async () => tokenResponse());
     vi.stubGlobal("fetch", fetchSpy);
     const results = await Promise.all(
-      Array.from({ length: 5 }, () => canonical.resolveXeroAccess(scope()))
+      Array.from({ length: 5 }, (_, index) =>
+        canonical.resolveXeroAccess(
+          index % 2
+            ? {
+                clerkOrgId: fixture.clerkOrgId,
+                connectionId: second.id,
+                organisationId: sibling.id,
+              }
+            : scope()
+        )
+      )
     );
     for (const result of results) {
       expect(result).toMatchObject({

@@ -1,5 +1,5 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { pollNotificationStream } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
@@ -259,7 +259,7 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
     select: { id: true },
     where: {
       clerk_org_id: clerkOrgId,

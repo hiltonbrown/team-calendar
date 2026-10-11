@@ -8,7 +8,6 @@ import type {
 } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
-  database,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
   markSubmitDispatchStarted,
@@ -18,6 +17,7 @@ import {
   type PreparedSubmitOperation,
   prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects,
+  tenantDatabase,
 } from "@repo/database";
 import type { availability_approval_status } from "@repo/database/generated/enums";
 import {
@@ -194,7 +194,10 @@ export async function completeXeroWriteSideEffects(input: {
     await releaseSubmitRecoverySideEffects(input.attempt, claimedAt);
     return false;
   }
-  return await markSubmitCompleted(input.attempt, database);
+  return await markSubmitCompleted(
+    input.attempt,
+    tenantDatabase(input.clerkOrgId)
+  );
 }
 
 export const mutationRequestFingerprint = (

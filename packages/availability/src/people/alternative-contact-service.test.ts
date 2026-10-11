@@ -34,17 +34,39 @@ vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: mocks.transaction,
-    alternativeContact: {
-      findFirst: mocks.alternativeContactFindFirst,
-      findMany: mocks.alternativeContactFindMany,
-    },
-    person: {
-      findFirst: mocks.personFindFirst,
-    },
-  },
   scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: mocks.transaction,
+      alternativeContact: {
+        findFirst: mocks.alternativeContactFindFirst,
+        findMany: mocks.alternativeContactFindMany,
+      },
+      person: {
+        findFirst: mocks.personFindFirst,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: mocks.transaction,
+        alternativeContact: {
+          findFirst: mocks.alternativeContactFindFirst,
+          findMany: mocks.alternativeContactFindMany,
+        },
+        person: {
+          findFirst: mocks.personFindFirst,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 
 const {

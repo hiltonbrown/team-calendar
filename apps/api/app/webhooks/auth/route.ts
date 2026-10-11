@@ -3,7 +3,7 @@ import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { ensureCurrentUserPerson } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -265,7 +265,7 @@ export const handleOrganizationMembershipDeleted = async (
     event: "Organisation Member Deleted",
   });
 
-  await database.person.updateMany({
+  await tenantDatabase(data.organization.id).person.updateMany({
     data: {
       clerk_user_id: null,
     },
@@ -281,7 +281,9 @@ export const handleOrganizationMembershipDeleted = async (
 async function ensurePeopleForMembership(
   data: ClerkOrganizationMembershipData
 ): Promise<boolean> {
-  const organisations = await database.organisation.findMany({
+  const organisations = await tenantDatabase(
+    data.organization.id
+  ).organisation.findMany({
     select: {
       clerk_org_id: true,
       id: true,

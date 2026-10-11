@@ -41,6 +41,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://team-calendar:team-calendar@localhost:5432/team-calendar_test
+      DATABASE_APP_URL: postgresql://team_calendar_app:local-test-only@localhost:5432/team-calendar_test
       # Throwaway 32-byte base64 value. CI never talks to Xero; this only
       # satisfies the required env schema in packages/xero/keys.ts so the
       # build can run. Not a secret and not used in any deployment.
@@ -78,6 +79,9 @@ jobs:
 
       - name: Run migrate deploy
         run: bun run migrate:deploy
+
+      - name: Provision restricted integration login
+        run: bun run packages/database/scripts/provision-local-app-role.ts
 
       - name: Drift check (schema must match deployed migrations)
         run: |

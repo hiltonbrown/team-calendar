@@ -1,9 +1,10 @@
+import type { Prisma } from "@repo/database";
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import {
-  database,
   getOrCreateOrganisationSettings,
+  tenantDatabase,
   updateOrganisationSettings,
 } from "@repo/database";
 import { z } from "zod";
@@ -31,7 +32,8 @@ const UpdateSettingsSchema = GetSettingsSchema.extend({
 });
 
 export async function getSettings(
-  input: z.input<typeof GetSettingsSchema>
+  input: z.input<typeof GetSettingsSchema>,
+  client?: Prisma.TransactionClient
 ): Promise<Result<OrganisationSettings, SettingsServiceError>> {
   const parsed = GetSettingsSchema.safeParse(input);
   if (!parsed.success) {
@@ -39,10 +41,17 @@ export async function getSettings(
   }
 
   try {
-    const value = await loadSettings(
-      parsed.data.clerkOrgId,
-      parsed.data.organisationId
-    );
+    const value = client
+      ? mapOrganisationSettingsRow(
+          await getOrCreateOrganisationSettings(
+            {
+              clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+              organisationId: parsed.data.organisationId as OrganisationId,
+            },
+            client
+          )
+        )
+      : await loadSettings(parsed.data.clerkOrgId, parsed.data.organisationId);
     return { ok: true, value };
   } catch {
     return unknownError("Failed to load organisation settings.");
@@ -76,7 +85,7 @@ export async function updateSettings(
       settingsCacheKey(parsed.data.clerkOrgId, parsed.data.organisationId)
     );
 
-    await database.auditEvent.create({
+    await tenantDatabase(parsed.data.clerkOrgId).auditEvent.create({
       data: {
         action: "organisation_settings.updated",
         actor_user_id: parsed.data.actingUserId,

@@ -6,7 +6,7 @@ import {
   type XeroConnectionDisplayState,
   xeroRecoveryMessage,
 } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 
 export type OnboardingStepStatus = "complete" | "next" | "optional" | "pending";
 export interface OnboardingStep {
@@ -44,7 +44,7 @@ export async function loadOnboardingState({
   };
   const [connection, organisation, activeFeedCount] = await Promise.all([
     getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
-    database.organisation.findFirst({
+    tenantDatabase(clerkOrgId).organisation.findFirst({
       select: { country_code: true },
       where: {
         archived_at: null,
@@ -52,7 +52,7 @@ export async function loadOnboardingState({
         id: organisationId,
       },
     }),
-    database.feed.count({
+    tenantDatabase(clerkOrgId).feed.count({
       where: { ...scope, status: { in: ["active", "paused"] } },
     }),
   ]);

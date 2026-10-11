@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { loadFeedScopeData, resolvePeopleForFeed } from "../scope/feed-scope";
 import {
@@ -18,7 +18,9 @@ export async function feedIdsForPeople(input: {
   clerkOrgId: string;
   organisationId: string;
   personIds: string[];
-}): Promise<Array<{ id: string; privacyMode: string }>> {
+}): Promise<
+  Array<{ id: string; organisationId: string | null; privacyMode: string }>
+> {
   if (input.personIds.length === 0) {
     return [];
   }
@@ -29,18 +31,33 @@ export async function feedIdsForPeople(input: {
   const preloaded = preloadedResult.ok ? preloadedResult.value : undefined;
 
   const wanted = new Set(input.personIds);
-  const feeds = await database.feed.findMany({
+  const feeds = await tenantDatabase(input.clerkOrgId).feed.findMany({
     select: feedScopeSelect,
     where: {
       archived_at: null,
       clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
+      OR: [
+        { organisation_id: input.organisationId },
+        { organisation_id: null },
+      ],
       status: "active",
     },
   });
 
-  const matching: Array<{ id: string; privacyMode: string }> = [];
+  const matching: Array<{
+    id: string;
+    organisationId: string | null;
+    privacyMode: string;
+  }> = [];
   for (const feed of feeds) {
+    if (feed.organisation_id === null) {
+      matching.push({
+        id: feed.id,
+        organisationId: feed.organisation_id,
+        privacyMode: feed.privacy_mode,
+      });
+      continue;
+    }
     const people = await resolvePeopleForFeed({
       clerkOrgId: input.clerkOrgId,
       createdByUserId: feed.created_by_user_id,
@@ -54,11 +71,19 @@ export async function feedIdsForPeople(input: {
     // If scope resolution fails we cannot prove the person is out of scope; invalidate
     // defensively so a transient error never leaves a stale feed body in the cache.
     if (!people.ok) {
-      matching.push({ id: feed.id, privacyMode: feed.privacy_mode });
+      matching.push({
+        id: feed.id,
+        organisationId: feed.organisation_id,
+        privacyMode: feed.privacy_mode,
+      });
       continue;
     }
     if (people.value.some((person) => wanted.has(person.id))) {
-      matching.push({ id: feed.id, privacyMode: feed.privacy_mode });
+      matching.push({
+        id: feed.id,
+        organisationId: feed.organisation_id,
+        privacyMode: feed.privacy_mode,
+      });
     }
   }
   return matching;
@@ -92,6 +117,7 @@ export async function invalidateFeedCachesForPerson(input: {
 const feedScopeSelect = {
   created_by_user_id: true,
   id: true,
+  organisation_id: true,
   privacy_mode: true,
   scopes: {
     select: {
@@ -100,3 +126,29 @@ const feedScopeSelect = {
     },
   },
 } satisfies Prisma.FeedSelect;
+
+// Company membership or removal changes every account feed, even without a remaining person.
+export async function invalidateAccountFeedCaches(input: {
+  clerkOrgId: string;
+}): Promise<Result<{ feedIds: string[] }, FeedCacheError>> {
+  const feeds = await tenantDatabase(input.clerkOrgId).feed.findMany({
+    select: { id: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: null,
+    },
+  });
+  const results = await Promise.all(
+    feeds.map((feed) =>
+      invalidateFeedCache({
+        feedId: feed.id,
+        privacyModes: [...ALL_PRIVACY_MODES],
+      })
+    )
+  );
+  const failure = results.find((result) => !result.ok);
+  return (
+    failure ?? { ok: true, value: { feedIds: feeds.map((feed) => feed.id) } }
+  );
+}

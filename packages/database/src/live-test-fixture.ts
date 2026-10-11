@@ -13,6 +13,9 @@ export const LIVE_FIXTURE_SUITES = {
       tenants: 2,
     },
   "packages/availability/index.integration.test.ts": { tenants: 3 },
+  "packages/availability/src/calendar/calendar-service.integration.test.ts": {
+    tenants: 3,
+  },
   "packages/availability/src/people/clerk-access-service.integration.test.ts": {
     tenants: 2,
   },

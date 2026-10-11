@@ -2,8 +2,17 @@ import { describe, expect, test, vi } from "vitest";
 
 const findFirst = vi.fn();
 const updateMany = vi.fn();
-vi.mock("../client", () => ({
-  database: { xeroConnection: { findFirst, updateMany } },
+vi.mock("../system-client", () => ({
+  systemDatabase: {
+    xeroAuthorisation: {
+      findFirst: async () => ({ id: "grant" }),
+      findUnique: async () => null,
+    },
+    xeroConnection: { updateMany },
+  },
+}));
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({ xeroConnection: { findFirst, updateMany } }),
 }));
 const module = await import("./xero-connections").catch(() => null);
 describe("canonical scoped connections", () => {
@@ -16,11 +25,11 @@ describe("canonical scoped connections", () => {
       organisationId: "payroll",
     });
     expect(findFirst).toHaveBeenCalledWith({
-      include: { authorisation: true },
       where: {
         clerk_org_id: "account",
         id: "connection",
         organisation_id: "payroll",
+        released_at: null,
       },
     });
     expect(result).toEqual({
@@ -35,6 +44,7 @@ describe("provider disconnect compare-and-set", () => {
     expect(module?.markScopedXeroConnectionReconnectRequired).toBeTypeOf(
       "function"
     );
+    findFirst.mockResolvedValue({ id: "connection" });
     updateMany.mockResolvedValue({ count: 1 });
     const captured = {
       authorisationId: "grant",
@@ -65,6 +75,7 @@ describe("provider disconnect compare-and-set", () => {
         id: "connection",
         last_connected_at: captured.lastConnectedAt,
         organisation_id: "payroll",
+        released_at: null,
         remote_connection_id: "remote",
         status: "active",
         xero_authorisation_id: "grant",

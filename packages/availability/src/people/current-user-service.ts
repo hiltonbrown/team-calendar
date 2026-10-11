@@ -7,9 +7,10 @@ import {
   type OrganisationId,
   type Result,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
+import { createCompany } from "../companies/create-company";
 import {
   normaliseCurrentUserProfile,
   safeCurrentUserProfilePatch,
@@ -90,7 +91,9 @@ const mapPerson = (person: {
 export const ensureOrganisationForClerk = async (
   input: OrganisationSettingsInput
 ): Promise<TenantContext> => {
-  const existingOrganisation = await database.organisation.findFirst({
+  const existingOrganisation = await tenantDatabase(
+    input.clerkOrgId
+  ).organisation.findFirst({
     orderBy: { created_at: "asc" },
     where: {
       archived_at: null,
@@ -117,7 +120,7 @@ export const ensureOrganisationForClerk = async (
   }
 
   const organisation = existingOrganisation
-    ? await database.organisation.update({
+    ? await tenantDatabase(input.clerkOrgId).organisation.update({
         data: {
           country_code: input.countryCode,
           fiscal_year_start: input.fiscalYearStart ?? 7,
@@ -129,18 +132,7 @@ export const ensureOrganisationForClerk = async (
         },
         where: { id: existingOrganisation.id },
       })
-    : await database.organisation.create({
-        data: {
-          clerk_org_id: input.clerkOrgId,
-          country_code: input.countryCode,
-          fiscal_year_start: input.fiscalYearStart ?? 7,
-          locale: input.locale ?? "en-AU",
-          name: input.name,
-          reporting_unit: input.reportingUnit ?? "hours",
-          timezone: input.timezone ?? "UTC",
-          working_hours_per_day: input.workingHoursPerDay ?? 7.6,
-        },
-      });
+    : await createCompany(input, tenantDatabase(input.clerkOrgId));
 
   const defaultFeed = await ensureDefaultCalendarFeed({
     clerkOrgId: input.clerkOrgId,
@@ -163,7 +155,9 @@ async function findResolvedMatchPerson(
   clerkUserId: string,
   safeProfilePatch: Record<string, unknown>
 ): Promise<PersonWithRelations | null> {
-  const resolvedMatch = await database.xeroPersonMatch.findFirst({
+  const resolvedMatch = await tenantDatabase(
+    scoped.clerk_org_id
+  ).xeroPersonMatch.findFirst({
     include: {
       resolved_person: { include: { location: true, team: true } },
       xero_person: { include: { location: true, team: true } },
@@ -181,7 +175,7 @@ async function findResolvedMatchPerson(
     return null;
   }
   if (targetPerson.clerk_user_id !== clerkUserId) {
-    await database.person.update({
+    await tenantDatabase(scoped.clerk_org_id).person.update({
       data: {
         ...safeProfilePatch,
         clerk_user_id: clerkUserId,
@@ -201,7 +195,9 @@ export const ensureCurrentUserPerson = async (
   const safeProfilePatch = safeCurrentUserProfilePatch(profile);
 
   try {
-    const existingLinkedPerson = await database.person.findFirst({
+    const existingLinkedPerson = await tenantDatabase(
+      tenant.clerkOrgId
+    ).person.findFirst({
       include: { location: true, team: true },
       where: {
         ...scoped,
@@ -224,7 +220,9 @@ export const ensureCurrentUserPerson = async (
     }
 
     if (profile.email) {
-      const sameEmailPeople = await database.person.findMany({
+      const sameEmailPeople = await tenantDatabase(
+        tenant.clerkOrgId
+      ).person.findMany({
         include: { location: true, team: true },
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         where: {
@@ -247,7 +245,7 @@ export const ensureCurrentUserPerson = async (
 
       const [sameEmailPerson] = sameEmailPeople;
       if (sameEmailPerson) {
-        const person = await database.person.update({
+        const person = await tenantDatabase(tenant.clerkOrgId).person.update({
           data: {
             ...safeProfilePatch,
             clerk_user_id: input.clerkUserId,
@@ -278,7 +276,7 @@ export const ensureCurrentUserPerson = async (
       };
     }
 
-    const person = await database.person.create({
+    const person = await tenantDatabase(tenant.clerkOrgId).person.create({
       data: {
         avatar_url: profile.avatarUrl,
         clerk_org_id: tenant.clerkOrgId,
@@ -301,8 +299,8 @@ export const ensureCurrentUserPerson = async (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      const concurrentlyLinkedPerson = await database.person
-        .findFirst({
+      const concurrentlyLinkedPerson = await tenantDatabase(tenant.clerkOrgId)
+        .person.findFirst({
           include: { location: true, team: true },
           where: {
             ...scoped,
@@ -329,7 +327,7 @@ export const ensureCurrentUserPerson = async (
 export const listPersonViews = async (
   tenant: TenantContext
 ): Promise<PersonView[]> => {
-  const people = await database.person.findMany({
+  const people = await tenantDatabase(tenant.clerkOrgId).person.findMany({
     include: { location: true, team: true },
     orderBy: [{ display_name: "asc" }, { first_name: "asc" }],
     where: {

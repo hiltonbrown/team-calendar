@@ -95,7 +95,8 @@ export async function publishOrganisationNotificationEvent(
     return;
   }
 
-  const recipientClient = client ?? (await import("@repo/database")).database;
+  const recipientClient =
+    client ?? (await import("@repo/database")).tenantDatabase(input.clerkOrgId);
   const recipients = await recipientClient.person.findMany({
     select: { clerk_user_id: true },
     where: {

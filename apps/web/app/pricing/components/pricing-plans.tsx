@@ -5,10 +5,15 @@ import { paidPlanPresentation } from "../constants";
 
 type PlanItem = (typeof PUBLIC_PLAN_CATALOGUE)[number];
 
-const formatLimit = (value: number, singular: string, plural: string) =>
-  value === -1
-    ? `Multiple ${plural}`
-    : `${value} ${value === 1 ? singular : plural}`;
+const formatLimit = (value: number, singular: string, plural: string) => {
+  if (value === -1) {
+    return `Multiple ${plural}`;
+  }
+  if (value === 1) {
+    return `1 ${singular}`;
+  }
+  return `Up to ${value} ${plural}`;
+};
 
 const getPlanPrice = (
   planKey: string,

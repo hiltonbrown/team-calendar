@@ -19,7 +19,7 @@ import {
   updateAlternativeContact,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { syncXeroLeaveBalances } from "@repo/jobs";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
@@ -214,7 +214,9 @@ export async function refreshBalancesAction(
     return result;
   }
   if (result.value.queued) {
-    const xeroConnection = await database.xeroConnection.findFirst({
+    const xeroConnection = await tenantDatabase(
+      context.value.clerkOrgId
+    ).xeroConnection.findFirst({
       select: { id: true },
       where: {
         clerk_org_id: context.value.clerkOrgId,
@@ -303,7 +305,9 @@ async function resolveActionContext(organisationId: string): Promise<
   if (!context.ok) {
     return notAuthorised(context.error.message);
   }
-  const actingPerson = await database.person.findFirst({
+  const actingPerson = await tenantDatabase(
+    context.value.clerkOrgId
+  ).person.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(context.value.clerkOrgId, context.value.organisationId),
@@ -327,13 +331,15 @@ async function resolveContactPersonId(
   organisationId: OrganisationId,
   contactId: string
 ): Promise<string | null> {
-  const contact = await database.alternativeContact.findFirst({
-    select: { person_id: true },
-    where: {
-      ...scopedQuery(clerkOrgId, organisationId),
-      id: contactId,
-    },
-  });
+  const contact = await tenantDatabase(clerkOrgId).alternativeContact.findFirst(
+    {
+      select: { person_id: true },
+      where: {
+        ...scopedQuery(clerkOrgId, organisationId),
+        id: contactId,
+      },
+    }
+  );
   return contact?.person_id ?? null;
 }
 function effectiveRole(role: string | null | undefined): PeopleRole | null {
@@ -375,7 +381,7 @@ export async function loadClerkAccessCandidates(
   if (!reviewResult.ok) {
     return reviewResult;
   }
-  await database.auditEvent.create({
+  await tenantDatabase(context.value.clerkOrgId).auditEvent.create({
     data: {
       action: "people.clerk_access_reviewed",
       actor_user_id: context.value.actingUserId,
@@ -422,7 +428,7 @@ export async function inviteClerkAccessCandidates(
   if (!inviteResult.ok) {
     return inviteResult;
   }
-  await database.auditEvent.create({
+  await tenantDatabase(context.value.clerkOrgId).auditEvent.create({
     data: {
       action: "people.clerk_invitations_sent",
       actor_user_id: context.value.actingUserId,

@@ -11,7 +11,9 @@ export {
   resolveXeroAccess,
 } from "./src/oauth/authorisation";
 export {
+  disconnectAllXeroConnections,
   disconnectXeroOAuthConnection,
+  removeXeroCompany,
   type XeroDisconnectResult,
 } from "./src/oauth/disconnect";
 export { hasXeroCapability, XERO_SCOPES } from "./src/oauth/scopes";
@@ -27,7 +29,9 @@ export {
   type PendingXeroSessionTenant,
   purgeClosedXeroOAuthSessions,
   readOAuthStateReturnTo,
+  type XeroMultiTenantSelectionResult,
   type XeroOAuthError,
+  type XeroTenantSelectionOutcome,
 } from "./src/oauth/service";
 export {
   type XeroRateClass,

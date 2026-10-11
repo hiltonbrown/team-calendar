@@ -1,5 +1,6 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { database } from "../client";
+import type { Prisma } from "../../generated/client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 export interface OrganisationSettingsRow {
@@ -48,11 +49,17 @@ const organisationSettingsSelect = {
   updated_at: true,
 } as const;
 
-export async function getOrCreateForOrganisation(input: {
-  clerkOrgId: ClerkOrgId;
-  organisationId: OrganisationId;
-}): Promise<OrganisationSettingsRow> {
-  const existing = await database.organisationSettings.findFirst({
+export async function getOrCreateForOrganisation(
+  input: {
+    clerkOrgId: ClerkOrgId;
+    organisationId: OrganisationId;
+  },
+  client: Pick<
+    Prisma.TransactionClient,
+    "organisationSettings"
+  > = tenantDatabase(input.clerkOrgId)
+): Promise<OrganisationSettingsRow> {
+  const existing = await client.organisationSettings.findFirst({
     select: organisationSettingsSelect,
     where: scopedQuery(input.clerkOrgId, input.organisationId),
   });
@@ -61,7 +68,7 @@ export async function getOrCreateForOrganisation(input: {
   }
 
   try {
-    return await database.organisationSettings.create({
+    return await client.organisationSettings.create({
       data: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
@@ -69,26 +76,32 @@ export async function getOrCreateForOrganisation(input: {
       select: organisationSettingsSelect,
     });
   } catch {
-    return await database.organisationSettings.findFirstOrThrow({
+    return await client.organisationSettings.findFirstOrThrow({
       select: organisationSettingsSelect,
       where: scopedQuery(input.clerkOrgId, input.organisationId),
     });
   }
 }
 
-export async function updateForOrganisation(input: {
-  clerkOrgId: ClerkOrgId;
-  organisationId: OrganisationId;
-  patch: OrganisationSettingsUpdateInput;
-}): Promise<OrganisationSettingsRow> {
-  await getOrCreateForOrganisation(input);
+export async function updateForOrganisation(
+  input: {
+    clerkOrgId: ClerkOrgId;
+    organisationId: OrganisationId;
+    patch: OrganisationSettingsUpdateInput;
+  },
+  client: Pick<
+    Prisma.TransactionClient,
+    "organisationSettings"
+  > = tenantDatabase(input.clerkOrgId)
+): Promise<OrganisationSettingsRow> {
+  await getOrCreateForOrganisation(input, client);
 
-  await database.organisationSettings.updateMany({
+  await client.organisationSettings.updateMany({
     data: input.patch,
     where: scopedQuery(input.clerkOrgId, input.organisationId),
   });
 
-  return await database.organisationSettings.findFirstOrThrow({
+  return await client.organisationSettings.findFirstOrThrow({
     select: organisationSettingsSelect,
     where: scopedQuery(input.clerkOrgId, input.organisationId),
   });

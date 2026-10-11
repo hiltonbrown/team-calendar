@@ -10,10 +10,10 @@ vi.mock("@repo/availability", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     feed: { count: mocks.feedCount },
     organisation: { findFirst: mocks.organisationFindFirst },
-  },
+  })),
 }));
 
 const { loadOnboardingState } = await import("./load-onboarding-state");

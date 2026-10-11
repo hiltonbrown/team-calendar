@@ -2,11 +2,14 @@ import { randomUUID } from "node:crypto";
 import type { ProviderMutationRequest, XeroMutationIdentity } from "@repo/core";
 import type { Prisma } from "../../generated/client";
 import type { availability_approval_status } from "../../generated/enums";
-import { type Database, database } from "../client";
+import { tenantDatabase, tenantTransaction } from "../tenant-client";
 import { scopedTo } from "../tenant-query";
 import { lockActiveScopedXeroConnection } from "../xero-locks";
 
-type OperationClient = Database | Prisma.TransactionClient;
+type OperationClient = Pick<
+  Prisma.TransactionClient,
+  "outboundOperation" | "availabilityRecord"
+>;
 
 export interface OutboundOperationScope {
   action?: "approve" | "decline" | "withdraw";
@@ -52,7 +55,7 @@ class SubmitClaimConflictError extends Error {}
 
 export const getSubmitOperation = async (
   scope: OutboundOperationScope,
-  client: OperationClient = database
+  client: OperationClient = tenantDatabase(scope.clerkOrgId)
 ) =>
   client.outboundOperation.findFirst({
     where: {
@@ -67,7 +70,7 @@ export const prepareAndClaimSubmitOperation = async (
 ): Promise<PreparedSubmitOperation | null> => {
   try {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep the connection guard and payroll operation claim in one atomic transaction.
-    return await database.$transaction(async (tx) => {
+    return await tenantTransaction(input.clerkOrgId, async (tx) => {
       if (!(await lockActiveScopedXeroConnection(tx, input))) {
         throw new SubmitClaimConflictError();
       }
@@ -286,7 +289,9 @@ export const markSubmitDispatchStarted = async (
   ) {
     return false;
   }
-  const updated = await database.outboundOperation.updateMany({
+  const updated = await tenantDatabase(
+    scope.clerkOrgId
+  ).outboundOperation.updateMany({
     data: {
       dispatch_started_at: operation.dispatch_started_at ?? firstDispatchedAt,
       idempotency_first_dispatched_at: firstDispatchedAt,
@@ -311,7 +316,7 @@ export const markSubmitDispatchStarted = async (
 export const markSubmitDefinitiveFailure = async (
   scope: OutboundOperationAttemptScope,
   safeErrorCode: string,
-  client: OperationClient = database
+  client: OperationClient = tenantDatabase(scope.clerkOrgId)
 ): Promise<boolean> => {
   const updated = await client.outboundOperation.updateMany({
     data: { safe_error_code: safeErrorCode, status: "definitive_failure" },
@@ -330,7 +335,9 @@ export const markSubmitOutcomeUnknown = async (
   scope: OutboundOperationAttemptScope,
   safeErrorCode: string
 ): Promise<boolean> => {
-  const updated = await database.outboundOperation.updateMany({
+  const updated = await tenantDatabase(
+    scope.clerkOrgId
+  ).outboundOperation.updateMany({
     data: { safe_error_code: safeErrorCode, status: "outcome_unknown" },
     where: {
       ...scopedTo(scope),
@@ -348,7 +355,9 @@ export const markSubmitProviderAccepted = async (
   scope: OutboundOperationAttemptScope,
   remoteId: string
 ): Promise<boolean> => {
-  const updated = await database.outboundOperation.updateMany({
+  const updated = await tenantDatabase(
+    scope.clerkOrgId
+  ).outboundOperation.updateMany({
     data: {
       known_remote_id: remoteId,
       provider_accepted_at: new Date(),
@@ -406,7 +415,9 @@ export const acquireSubmitRecoverySideEffects = async (
   claimableBefore: Date
 ): Promise<Date | null> => {
   const claimedAt = new Date();
-  const updated = await database.outboundOperation.updateMany({
+  const updated = await tenantDatabase(
+    scope.clerkOrgId
+  ).outboundOperation.updateMany({
     data: { side_effect_claimed_at: claimedAt },
     where: {
       ...scopedTo(scope),
@@ -427,7 +438,7 @@ export const releaseSubmitRecoverySideEffects = async (
   scope: OutboundOperationAttemptScope,
   claimedAt: Date
 ): Promise<void> => {
-  await database.outboundOperation.updateMany({
+  await tenantDatabase(scope.clerkOrgId).outboundOperation.updateMany({
     data: { side_effect_claimed_at: null },
     where: {
       ...scopedTo(scope),
@@ -461,7 +472,7 @@ export const fenceSubmitRecoverySideEffectClaim = async (
 
 export const hasUnresolvedSubmitOperation = async (
   scope: OutboundOperationScope,
-  client: OperationClient = database
+  client: OperationClient = tenantDatabase(scope.clerkOrgId)
 ): Promise<boolean> => {
   const count = await client.outboundOperation.count({
     where: {

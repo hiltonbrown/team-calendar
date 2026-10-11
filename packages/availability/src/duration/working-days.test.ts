@@ -12,11 +12,27 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    location: { findFirst: mocks.findLocation },
-    organisation: { findFirst: mocks.findOrganisation },
-  },
   scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      location: { findFirst: mocks.findLocation },
+      organisation: { findFirst: mocks.findOrganisation },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        location: { findFirst: mocks.findLocation },
+        organisation: { findFirst: mocks.findOrganisation },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("../holidays/resolve-public-holidays", async (importOriginal) => ({
   ...(await importOriginal<

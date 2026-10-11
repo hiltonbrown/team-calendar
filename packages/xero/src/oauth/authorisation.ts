@@ -8,8 +8,8 @@ const SCOPE_SEPARATOR = /\s+/;
 import "server-only";
 import type { Result } from "@repo/core";
 import {
-  database,
   lockXeroAuthorisation,
+  systemDatabase,
   withXeroGrantLock,
 } from "@repo/database";
 import type {
@@ -151,7 +151,7 @@ export async function refreshXeroAuthorisation(
 ): Promise<Result<XeroAuthorisation, XeroOAuthError>> {
   const deadline = tokenDeadline(input.deadline);
   try {
-    const initial = await database.xeroAuthorisation.findUnique({
+    const initial = await systemDatabase.xeroAuthorisation.findUnique({
       where: { id: input.authorisationId },
     });
     if (!initial) {
