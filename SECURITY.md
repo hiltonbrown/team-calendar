@@ -69,3 +69,11 @@ Please do not publicly disclose vulnerabilities until:
 2. We confirm affected users have had reasonable time to apply it.
 
 Thank you for helping keep Team Calendar and its customers safe.
+
+## Database isolation
+
+Tenant requests use `DATABASE_APP_URL` and the restricted `team_calendar_app` role. PostgreSQL RLS applies the transaction-local `app.clerk_org_id` to reads and writes, checks company ownership and denies access without context. Application filters retain both account and company scope. `tenantDatabase(clerkOrgId)` binds one query; `tenantTransaction` binds related queries and raw SQL without leaking context to pooled connections.
+
+`DATABASE_URL` is the owner connection for migrations and narrowly allowlisted system operations. Canonical Xero authorisations and Stripe routing events are unavailable to the app role. Global schedulers and public feed-token discovery resolve the account, then hand off to tenant clients. The import-boundary test guards system-client usage.
+
+Apply migrations with the owner, provision `team_calendar_app` with a unique login password, and configure `DATABASE_APP_URL` for each environment. Do not grant superuser, `BYPASSRLS`, elevated Neon membership or table ownership. Local/CI provisioning uses `packages/database/scripts/provision-local-app-role.ts` only with local URLs. Run `bun run preflight app` and `bun run preflight api` as deployment gates: it requires the restricted URL and checks the connected role in the database catalogue. Next configuration does not automatically perform that catalogue check. Preview branch URLs must use the provisioned restricted role.
