@@ -22,6 +22,7 @@ vi.mock("@repo/database", () => {
       clerk_org_id: input.clerkOrgId,
       organisation_id: input.organisationId,
     }),
+    TENANT_READ_TRANSACTION_OPTIONS: { maxWait: 10_000, timeout: 30_000 },
     tenantDatabase: vi.fn(() => client),
     tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
   };
@@ -165,7 +166,8 @@ describe("previewFeed", () => {
     const { tenantTransaction } = await import("@repo/database");
     expect(tenantTransaction).toHaveBeenCalledExactlyOnceWith(
       baseInput.clerkOrgId,
-      expect.any(Function)
+      expect.any(Function),
+      { maxWait: 10_000, timeout: 30_000 }
     );
     const visibilityClient = mocks.canViewFeed.mock.calls[0]?.[0].client;
     expect(visibilityClient).toBeDefined();

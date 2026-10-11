@@ -25,6 +25,7 @@ export * from "./src/seed/plans";
 export type { Database } from "./src/system-client";
 export { systemDatabase } from "./src/system-client";
 export {
+  TENANT_READ_TRANSACTION_OPTIONS,
   type TenantDatabase,
   tenantDatabase,
   tenantTransaction,

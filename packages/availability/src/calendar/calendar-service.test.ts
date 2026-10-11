@@ -34,6 +34,7 @@ vi.mock("@repo/database", () => ({
   resolveAccountCompanies: mocks.accountCompanies,
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
+  TENANT_READ_TRANSACTION_OPTIONS: { maxWait: 10_000, timeout: 30_000 },
   tenantDatabase: vi.fn((accountId: string) => {
     if (!accountId) {
       throw new Error("Missing tenant context");
@@ -96,7 +97,8 @@ describe("calendar-service", () => {
     expect(result.ok).toBe(true);
     expect(tenantTransaction).toHaveBeenCalledExactlyOnceWith(
       ids.clerkOrg,
-      expect.any(Function)
+      expect.any(Function),
+      { maxWait: 10_000, timeout: 30_000 }
     );
   });
   beforeEach(() => {
@@ -523,6 +525,30 @@ describe("calendar-service", () => {
       );
     }
   );
+  it("uses the selected company's time zone and lists only selected companies", async () => {
+    mocks.accountCompanies.mockResolvedValue([
+      company(ids.otherOrg, "Brisbane office"),
+      { ...company(ids.org, "Perth office"), timezone: "Australia/Perth" },
+    ]);
+    const result = await getCalendarRange({
+      ...baseInput,
+      anchorDate: new Date("2026-10-07T00:00:00Z"),
+      view: "day",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        companies: [
+          { id: ids.org, name: "Perth office", timezone: "Australia/Perth" },
+        ],
+        range: {
+          start: new Date("2026-10-06T16:00:00Z"),
+          timezone: "Australia/Perth",
+        },
+      },
+    });
+    expect(result.ok && result.value.companies).toHaveLength(1);
+  });
   it.each([
     ["2026-04-05", "2026-04-04T13:00:00Z", "2026-04-05T14:00:00Z", 25],
     ["2026-10-04", "2026-10-03T14:00:00Z", "2026-10-04T13:00:00Z", 23],
