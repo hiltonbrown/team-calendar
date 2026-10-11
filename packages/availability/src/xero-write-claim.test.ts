@@ -11,13 +11,30 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: async (work: (tx: unknown) => unknown) =>
-      work({ availabilityRecord: { updateMany: mocks.updateMany } }),
-    availabilityRecord: { updateMany: mocks.updateMany },
-  },
   lockActiveScopedXeroConnection: mocks.lockActiveScopedXeroConnection,
   scopedTo: mocks.scopedTo,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: async (work: (tx: unknown) => unknown) =>
+        work({ availabilityRecord: { updateMany: mocks.updateMany } }),
+      availabilityRecord: { updateMany: mocks.updateMany },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: async (work: (tx: unknown) => unknown) =>
+          work({ availabilityRecord: { updateMany: mocks.updateMany } }),
+        availabilityRecord: { updateMany: mocks.updateMany },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 
 const {

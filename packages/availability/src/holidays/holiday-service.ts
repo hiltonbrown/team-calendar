@@ -8,7 +8,7 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
 
 /**
  * Custom holidays an organisation adds itself. Official holidays come from the
@@ -62,7 +62,9 @@ export async function addCustomHoliday(
 
     const dateOnly = toDateOnly(input.date);
     const sourceRemoteId = `custom:${dateOnly}:${name.toLowerCase()}`;
-    const existing = await database.publicHoliday.findFirst({
+    const existing = await tenantDatabase(
+      input.clerkOrgId
+    ).publicHoliday.findFirst({
       select: { id: true },
       where: {
         ...scopedQuery(input.clerkOrgId, input.organisationId),
@@ -80,23 +82,25 @@ export async function addCustomHoliday(
       };
     }
 
-    const holiday = await database.publicHoliday.create({
-      data: {
-        clerk_org_id: input.clerkOrgId,
-        country_code: countryCode,
-        created_by_user_id: input.userId,
-        default_classification: "non_working",
-        holiday_date: startOfUtcDay(dateOnly),
-        holiday_type: "custom",
-        name,
-        organisation_id: input.organisationId,
-        region_code: regionCode,
-        source: "manual",
-        source_remote_id: sourceRemoteId,
-        updated_by_user_id: input.userId,
-      },
-      select: { id: true },
-    });
+    const holiday = await tenantDatabase(input.clerkOrgId).publicHoliday.create(
+      {
+        data: {
+          clerk_org_id: input.clerkOrgId,
+          country_code: countryCode,
+          created_by_user_id: input.userId,
+          default_classification: "non_working",
+          holiday_date: startOfUtcDay(dateOnly),
+          holiday_type: "custom",
+          name,
+          organisation_id: input.organisationId,
+          region_code: regionCode,
+          source: "manual",
+          source_remote_id: sourceRemoteId,
+          updated_by_user_id: input.userId,
+        },
+        select: { id: true },
+      }
+    );
 
     return { ok: true, value: { id: holiday.id } };
   } catch {
@@ -113,7 +117,7 @@ export async function deleteCustomHoliday(
   holidayId: string
 ): Promise<Result<{ id: string }>> {
   try {
-    const holiday = await database.publicHoliday.findFirst({
+    const holiday = await tenantDatabase(clerkOrgId).publicHoliday.findFirst({
       select: { id: true },
       where: {
         ...scopedQuery(clerkOrgId, organisationId),
@@ -124,15 +128,17 @@ export async function deleteCustomHoliday(
     if (!holiday) {
       return { error: appError("not_found", "Holiday not found"), ok: false };
     }
-    await database.$transaction([
-      database.publicHolidayPreference.deleteMany({
+    await tenantTransaction(clerkOrgId, async (tx) => {
+      await tx.publicHolidayPreference.deleteMany({
         where: {
           ...scopedQuery(clerkOrgId, organisationId),
           holiday_key: `custom:${holidayId}`,
         },
-      }),
-      database.publicHoliday.delete({ where: { id: holidayId } }),
-    ]);
+      });
+      await tx.publicHoliday.delete({
+        where: { ...scopedQuery(clerkOrgId, organisationId), id: holidayId },
+      });
+    });
     return { ok: true, value: { id: holidayId } };
   } catch {
     return {

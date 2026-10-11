@@ -1,9 +1,10 @@
 import "server-only";
 
 import {
-  database,
   lockActiveScopedXeroConnection,
   scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
@@ -34,7 +35,7 @@ export async function acquireXeroWriteClaim(
   const now = input.now ?? new Date();
   const claimedAt = input.claimedAt ?? now;
   const staleBefore = new Date(now.getTime() - XERO_WRITE_CLAIM_LEASE_MS);
-  return await database.$transaction(async (tx) => {
+  return await tenantTransaction(input.clerkOrgId, async (tx) => {
     const activeConnection = await lockActiveScopedXeroConnection(tx, input);
     if (!(activeConnection || input.localAction)) {
       return null;
@@ -67,7 +68,9 @@ export async function acquireXeroWriteClaim(
 export async function releaseXeroWriteClaim(
   input: ClaimScope & { claimedAt: Date }
 ): Promise<boolean> {
-  const result = await database.availabilityRecord.updateMany({
+  const result = await tenantDatabase(
+    input.clerkOrgId
+  ).availabilityRecord.updateMany({
     data: { xero_write_claimed_at: null },
     where: {
       ...scoped(input),

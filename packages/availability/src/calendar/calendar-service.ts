@@ -1,8 +1,9 @@
+import type { Prisma } from "@repo/database";
 import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { recordFallsOnDay, recordQueryWindow } from "@repo/core";
-import { database, scopedTo } from "@repo/database";
+import { scopedTo, tenantDatabase, tenantTransaction } from "@repo/database";
 import type {
   availability_approval_status,
   availability_contactability,
@@ -235,129 +236,150 @@ export async function getCalendarRange(
     return validationError(parsed.error);
   }
   try {
-    const [organisation, settingsResult] = await Promise.all([
-      database.organisation.findFirst({
-        select: { timezone: true },
-        where: {
-          archived_at: null,
-          clerk_org_id: parsed.data.clerkOrgId,
-          id: parsed.data.organisationId,
-        },
-      }),
-      getSettings({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      }),
-    ]);
-    const timezone = organisation?.timezone ?? "UTC";
-    const localRange = resolveLocalRange(
-      parsed.data.view,
-      parsed.data.anchorDate,
-      timezone
-    );
-    const range = {
-      end: zonedStartOfDayToUtc(localRange.endDateOnly, timezone),
-      start: zonedStartOfDayToUtc(localRange.startDateOnly, timezone),
-      timezone,
-    };
-    const allPeople = await loadPeople(parsed.data);
-    const managerReportIds = authorisedReportIds(
-      parsed.data,
-      allPeople,
-      settingsResult
-    );
-    const scopedPeopleResult = resolvePeopleForScope(parsed.data, allPeople, {
-      includeIndirectReports:
-        settingsResult.ok &&
-        settingsResult.value.managerVisibilityScope === "all_team_leave",
-      managerReportIds,
-    });
-    if (!scopedPeopleResult.ok) {
-      return scopedPeopleResult;
-    }
-    const filteredPeople = applyPeopleFilters(
-      scopedPeopleResult.value,
-      parsed.data.filters
-    );
-    const totalPeopleInScope = filteredPeople.length;
-    const visiblePeople = filteredPeople.slice(0, MAX_VISIBLE_PEOPLE);
-    const visiblePersonIds = new Set(visiblePeople.map((person) => person.id));
-    const records = await loadRecords(
-      parsed.data,
-      recordQueryWindow(
-        localRange.startDateOnly,
-        addDays(localRange.endDateOnly, -1),
-        timezone
-      ),
-      [...visiblePersonIds],
-      {
-        showPendingOnCalendar: settingsResult.ok
-          ? settingsResult.value.showPendingOnCalendar
-          : true,
+    return await tenantTransaction(
+      parsed.data.clerkOrgId,
+      async (tx): Promise<Result<CalendarRange, CalendarServiceError>> => {
+        const [organisation, settingsResult] = await Promise.all([
+          tx.organisation.findFirst({
+            select: { timezone: true },
+            where: {
+              archived_at: null,
+              clerk_org_id: parsed.data.clerkOrgId,
+              id: parsed.data.organisationId,
+            },
+          }),
+          getSettings(
+            {
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            },
+            tx
+          ),
+        ]);
+        const timezone = organisation?.timezone ?? "UTC";
+        const localRange = resolveLocalRange(
+          parsed.data.view,
+          parsed.data.anchorDate,
+          timezone
+        );
+        const range = {
+          end: zonedStartOfDayToUtc(localRange.endDateOnly, timezone),
+          start: zonedStartOfDayToUtc(localRange.startDateOnly, timezone),
+          timezone,
+        };
+        const allPeople = await loadPeople(parsed.data, tx);
+        const managerReportIds = authorisedReportIds(
+          parsed.data,
+          allPeople,
+          settingsResult
+        );
+        const scopedPeopleResult = resolvePeopleForScope(
+          parsed.data,
+          allPeople,
+          {
+            includeIndirectReports:
+              settingsResult.ok &&
+              settingsResult.value.managerVisibilityScope === "all_team_leave",
+            managerReportIds,
+          }
+        );
+        if (!scopedPeopleResult.ok) {
+          return scopedPeopleResult;
+        }
+        const filteredPeople = applyPeopleFilters(
+          scopedPeopleResult.value,
+          parsed.data.filters
+        );
+        const totalPeopleInScope = filteredPeople.length;
+        const visiblePeople = filteredPeople.slice(0, MAX_VISIBLE_PEOPLE);
+        const visiblePersonIds = new Set(
+          visiblePeople.map((person) => person.id)
+        );
+        const records = await loadRecords(
+          parsed.data,
+          recordQueryWindow(
+            localRange.startDateOnly,
+            addDays(localRange.endDateOnly, -1),
+            timezone
+          ),
+          [...visiblePersonIds],
+          {
+            showPendingOnCalendar: settingsResult.ok
+              ? settingsResult.value.showPendingOnCalendar
+              : true,
+          },
+          tx
+        );
+        const events = records
+          .filter((record) => visiblePersonIds.has(record.person_id))
+          .map((record) =>
+            toCalendarEvent(record, {
+              actingPersonId: parsed.data.actingPersonId ?? null,
+              managerReportIds,
+              role: parsed.data.role,
+            })
+          );
+        const dayDateOnly = localRange.dateOnlyValues;
+        const holidays = await loadPublicHolidayCells(
+          {
+            clerkOrgId: parsed.data.clerkOrgId,
+            dateOnlyValues: dayDateOnly,
+            organisationId: parsed.data.organisationId,
+            people: visiblePeople,
+            range,
+            timezone,
+          },
+          tx
+        );
+        const dayBoundaries = dayDateOnly.map((dateOnly) => ({
+          dateKey: dateOnly,
+          dateOnly,
+          end: zonedStartOfDayToUtc(addDays(dateOnly, 1), timezone),
+          start: zonedStartOfDayToUtc(dateOnly, timezone),
+        }));
+        const eventsInView = events.filter((event) =>
+          dayBoundaries.some((day) => recordFallsOnDay(event, day))
+        );
+        const failedCounts = countFailedByPerson(eventsInView);
+        const today = dateOnlyInTimeZone(new Date(), timezone);
+        const days = dayBoundaries.map((day) => ({
+          date: dateOnlyToUtcDate(day.dateOnly),
+          dayOfWeek: dateOnlyToUtcDate(
+            day.dateOnly
+          ).getUTCDay() as CalendarDay["dayOfWeek"],
+          events: eventsInView.filter((event) => recordFallsOnDay(event, day)),
+          isToday: day.dateOnly === today,
+          publicHolidays: holidays.get(day.dateOnly) ?? [],
+        }));
+        const xeroStateResult = await getXeroConnectionStateForScope(
+          {
+            clerkOrgId: parsed.data.clerkOrgId,
+            organisationId: parsed.data.organisationId,
+          },
+          tx
+        );
+        const xeroConnectionState = xeroStateResult.ok
+          ? xeroStateResult.value.state
+          : "unavailable";
+        return {
+          ok: true,
+          value: {
+            days,
+            people: visiblePeople.map((person) =>
+              toCalendarPerson(person, failedCounts.get(person.id) ?? 0)
+            ),
+            range,
+            totalPeopleInScope,
+            truncated: totalPeopleInScope > MAX_VISIBLE_PEOPLE,
+            view: parsed.data.view,
+            xeroConnectionState,
+            xeroSyncFailedCount: eventsInView.filter(
+              (event) => event.approvalStatus === "xero_sync_failed"
+            ).length,
+          },
+        };
       }
     );
-    const events = records
-      .filter((record) => visiblePersonIds.has(record.person_id))
-      .map((record) =>
-        toCalendarEvent(record, {
-          actingPersonId: parsed.data.actingPersonId ?? null,
-          managerReportIds,
-          role: parsed.data.role,
-        })
-      );
-    const dayDateOnly = localRange.dateOnlyValues;
-    const holidays = await loadPublicHolidayCells({
-      clerkOrgId: parsed.data.clerkOrgId,
-      dateOnlyValues: dayDateOnly,
-      organisationId: parsed.data.organisationId,
-      people: visiblePeople,
-      range,
-      timezone,
-    });
-    const dayBoundaries = dayDateOnly.map((dateOnly) => ({
-      dateKey: dateOnly,
-      dateOnly,
-      end: zonedStartOfDayToUtc(addDays(dateOnly, 1), timezone),
-      start: zonedStartOfDayToUtc(dateOnly, timezone),
-    }));
-    const eventsInView = events.filter((event) =>
-      dayBoundaries.some((day) => recordFallsOnDay(event, day))
-    );
-    const failedCounts = countFailedByPerson(eventsInView);
-    const today = dateOnlyInTimeZone(new Date(), timezone);
-    const days = dayBoundaries.map((day) => ({
-      date: dateOnlyToUtcDate(day.dateOnly),
-      dayOfWeek: dateOnlyToUtcDate(
-        day.dateOnly
-      ).getUTCDay() as CalendarDay["dayOfWeek"],
-      events: eventsInView.filter((event) => recordFallsOnDay(event, day)),
-      isToday: day.dateOnly === today,
-      publicHolidays: holidays.get(day.dateOnly) ?? [],
-    }));
-    const xeroStateResult = await getXeroConnectionStateForScope({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
-    const xeroConnectionState = xeroStateResult.ok
-      ? xeroStateResult.value.state
-      : "unavailable";
-    return {
-      ok: true,
-      value: {
-        days,
-        people: visiblePeople.map((person) =>
-          toCalendarPerson(person, failedCounts.get(person.id) ?? 0)
-        ),
-        range,
-        totalPeopleInScope,
-        truncated: totalPeopleInScope > MAX_VISIBLE_PEOPLE,
-        view: parsed.data.view,
-        xeroConnectionState,
-        xeroSyncFailedCount: eventsInView.filter(
-          (event) => event.approvalStatus === "xero_sync_failed"
-        ).length,
-      },
-    };
   } catch {
     return unknownError("Failed to load calendar.");
   }
@@ -374,7 +396,9 @@ export async function getEventDetail(
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    const record = await database.availabilityRecord.findFirst({
+    const record = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).availabilityRecord.findFirst({
       select: recordSelect,
       where: {
         ...scopedTo({
@@ -435,8 +459,13 @@ export async function getEventDetail(
     return unknownError("Failed to load calendar event.");
   }
 }
-async function loadPeople(input: ParsedRangeInput): Promise<ScopedPerson[]> {
-  return await database.person.findMany({
+async function loadPeople(
+  input: ParsedRangeInput,
+  client:
+    | Prisma.TransactionClient
+    | ReturnType<typeof tenantDatabase> = tenantDatabase(input.clerkOrgId)
+): Promise<ScopedPerson[]> {
+  return await client.person.findMany({
     orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
     select: personSelect,
     where: {
@@ -568,7 +597,10 @@ async function loadRecords(
   personIds: string[],
   options: {
     showPendingOnCalendar: boolean;
-  }
+  },
+  client:
+    | Prisma.TransactionClient
+    | ReturnType<typeof tenantDatabase> = tenantDatabase(input.clerkOrgId)
 ): Promise<ScopedRecord[]> {
   if (personIds.length === 0) {
     return [];
@@ -589,7 +621,7 @@ async function loadRecords(
         ]
       : []),
   ];
-  return await database.availabilityRecord.findMany({
+  return await client.availabilityRecord.findMany({
     orderBy: [{ starts_at: "asc" }, { person_id: "asc" }, { id: "asc" }],
     select: recordSelect,
     where: {
@@ -630,14 +662,17 @@ function approvalStatusesForFilter(
       status !== "draft"
   );
 }
-async function loadPublicHolidayCells(input: {
-  clerkOrgId: string;
-  dateOnlyValues: string[];
-  organisationId: string;
-  people: ScopedPerson[];
-  range: CalendarRange["range"];
-  timezone: string;
-}): Promise<Map<string, PublicHolidayCell[]>> {
+async function loadPublicHolidayCells(
+  input: {
+    clerkOrgId: string;
+    dateOnlyValues: string[];
+    organisationId: string;
+    people: ScopedPerson[];
+    range: CalendarRange["range"];
+    timezone: string;
+  },
+  client?: Prisma.TransactionClient
+): Promise<Map<string, PublicHolidayCell[]>> {
   const sortedDates = [...input.dateOnlyValues].sort();
   const [from] = sortedDates;
   const to = sortedDates.at(-1);
@@ -650,12 +685,16 @@ async function loadPublicHolidayCells(input: {
       .filter((person) => person.location)
       .map((person) => [person.location?.id ?? "", person.location])
   );
-  const result = await resolvePublicHolidays({
-    clerkOrgId: input.clerkOrgId as ClerkOrgId,
-    from,
-    organisationId: input.organisationId as OrganisationId,
-    to,
-  });
+  const result = await resolvePublicHolidays(
+    {
+      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      from,
+      organisationId: input.organisationId as OrganisationId,
+      to,
+    },
+    undefined,
+    client
+  );
   if (!result.ok) {
     return cells;
   }
@@ -1008,7 +1047,9 @@ function uniqueSorted(values: string[]): string[] {
 async function recordNotFound(
   input: ParsedDetailInput
 ): Promise<Result<never, CalendarServiceError>> {
-  const exists = await database.availabilityRecord.findFirst({
+  const exists = await tenantDatabase(
+    input.clerkOrgId
+  ).availabilityRecord.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.recordId },
   });

@@ -31,7 +31,7 @@ const {
   loadWizardSnapshot,
   updateManualAvailability,
 } = await import("./index");
-const { database } = await import("@repo/database");
+const { systemDatabase: database } = await import("@repo/database");
 interface TenantFixture {
   clerkOrgId: string;
   organisationId: string;
@@ -970,10 +970,19 @@ describe("release list-query evidence", () => {
   test("keeps plan query count constant at 1, 50, and 200 rows", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
-    const findMany = vi.spyOn(database.availabilityRecord, "findMany");
-    const count = vi.spyOn(database.availabilityRecord, "count");
-    const balanceFindMany = vi.spyOn(database.leaveBalance, "findMany");
-    const tenantFindFirst = vi.spyOn(database.xeroConnection, "findFirst");
+    const tenantClient = await import("../database/src/tenant-client");
+    const createTenantClient = tenantClient.tenantDatabase;
+    let tenantQueryCount = 0;
+    vi.spyOn(tenantClient, "tenantDatabase").mockImplementation((accountId) =>
+      createTenantClient(accountId).$extends({
+        query: {
+          $allOperations: ({ args, query }) => {
+            tenantQueryCount += 1;
+            return query(args);
+          },
+        },
+      })
+    );
     const measurements: Array<{
       durationMs: number;
       payloadBytes: number;
@@ -1007,11 +1016,7 @@ describe("release list-query evidence", () => {
           starts_at: equalStartsAt,
         })),
       });
-      const beforeCalls =
-        findMany.mock.calls.length +
-        count.mock.calls.length +
-        balanceFindMany.mock.calls.length +
-        tenantFindFirst.mock.calls.length;
+      const beforeCalls = tenantQueryCount;
       const startedAt = process.hrtime.bigint();
       const result = await listTeamRecordsPage({
         actingOrgRole: "org:admin",
@@ -1025,11 +1030,7 @@ describe("release list-query evidence", () => {
       if (!result.ok) {
         continue;
       }
-      const afterCalls =
-        findMany.mock.calls.length +
-        count.mock.calls.length +
-        balanceFindMany.mock.calls.length +
-        tenantFindFirst.mock.calls.length;
+      const afterCalls = tenantQueryCount;
       const expectedIds = Array.from({ length: rowCount }, (_, index) =>
         fixture.id(`plan-${rowCount}-record`, index)
       ).sort();
@@ -1042,7 +1043,10 @@ describe("release list-query evidence", () => {
         rowCount,
       });
     }
-    expect(measurements.map(({ queryCount }) => queryCount)).toEqual([4, 4, 4]);
+    expect(measurements.every(({ queryCount }) => queryCount > 0)).toBe(true);
+    expect(new Set(measurements.map(({ queryCount }) => queryCount)).size).toBe(
+      1
+    );
     expect(measurements.map(({ rowCount }) => rowCount)).toEqual([1, 50, 200]);
     expect(
       measurements.every(

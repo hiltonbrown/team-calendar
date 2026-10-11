@@ -9,7 +9,6 @@ import type {
 import { xeroRecoveryMessage } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
-  database,
   getSubmitOperation,
   hasUnresolvedSubmitOperation,
   markSubmitCompleted,
@@ -18,6 +17,8 @@ import {
   markSubmitProviderAccepted,
   releaseSubmitRecoverySideEffects,
   scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
 } from "@repo/database";
 import {
   type AvailabilityRecord,
@@ -181,7 +182,9 @@ async function transitionLocalSubmission(
     ) {
       return submissionOutcomeUnknown();
     }
-    const organisation = await database.organisation.findFirst({
+    const organisation = await tenantDatabase(
+      input.clerkOrgId
+    ).organisation.findFirst({
       select: { country_code: true },
       where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
     });
@@ -201,43 +204,46 @@ async function transitionLocalSubmission(
     if (!prepared.ok) {
       return prepared;
     }
-    const notificationId = await database.$transaction(async (tx) => {
-      const updated = await tx.availabilityRecord.updateMany({
-        data: {
-          approval_status: "submitted",
-          derived_sequence: { increment: 1 },
-          failed_action: null,
-          submitted_at: new Date(),
-          updated_by_user_id: input.actingUserId,
-          xero_write_error: null,
-          xero_write_error_raw: Prisma.DbNull,
-        },
-        where: {
-          ...scoped(input),
-          approval_status: expectedStatus,
-          archived_at: null,
-          derived_sequence: record.derived_sequence,
-          failed_action:
-            expectedStatus === "xero_sync_failed" ? "submit" : null,
-          id: record.id,
-          source_remote_id: null,
-          ...unclaimedOrExpiredXeroWriteWhere(),
-          ...noUnresolvedSubmitOperationWhere(),
-        },
-      });
-      if (updated.count !== 1) {
-        throw new OptimisticConflictError();
+    const notificationId = await tenantTransaction(
+      input.clerkOrgId,
+      async (tx) => {
+        const updated = await tx.availabilityRecord.updateMany({
+          data: {
+            approval_status: "submitted",
+            derived_sequence: { increment: 1 },
+            failed_action: null,
+            submitted_at: new Date(),
+            updated_by_user_id: input.actingUserId,
+            xero_write_error: null,
+            xero_write_error_raw: Prisma.DbNull,
+          },
+          where: {
+            ...scoped(input),
+            approval_status: expectedStatus,
+            archived_at: null,
+            derived_sequence: record.derived_sequence,
+            failed_action:
+              expectedStatus === "xero_sync_failed" ? "submit" : null,
+            id: record.id,
+            source_remote_id: null,
+            ...unclaimedOrExpiredXeroWriteWhere(),
+            ...noUnresolvedSubmitOperationWhere(),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new OptimisticConflictError();
+        }
+        await tx.auditEvent.create({
+          data: auditData(input, "availability_records.submitted", {
+            contractVersion: "au-contract-v1",
+          }),
+        });
+        return await notifyManager(tx, input, record, "leave_submitted", {
+          actionUrl: `/leave-approvals?recordId=${record.id}`,
+          publishRealtime: false,
+        });
       }
-      await tx.auditEvent.create({
-        data: auditData(input, "availability_records.submitted", {
-          contractVersion: "au-contract-v1",
-        }),
-      });
-      return await notifyManager(tx, input, record, "leave_submitted", {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-        publishRealtime: false,
-      });
-    });
+    );
     if (notificationId) {
       await publishPersistedNotification({
         clerkOrgId: input.clerkOrgId,
@@ -311,7 +317,7 @@ export async function revertToDraft(
     ) {
       return submissionOutcomeUnknown();
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "draft",
@@ -490,7 +496,7 @@ export async function withdrawSubmission(
         });
       }
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "withdrawn",
@@ -597,7 +603,9 @@ async function performApprovalCreation(
     if (!record) {
       return recordNotFound();
     }
-    const actingPerson = await database.person.findFirst({
+    const actingPerson = await tenantDatabase(
+      input.clerkOrgId
+    ).person.findFirst({
       select: { id: true },
       where: {
         ...scoped(input),
@@ -665,7 +673,9 @@ async function performApprovalCreation(
         ok: false,
       };
     }
-    const organisation = await database.organisation.findFirst({
+    const organisation = await tenantDatabase(
+      input.clerkOrgId
+    ).organisation.findFirst({
       select: { country_code: true },
       where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
     });
@@ -796,7 +806,7 @@ async function performApprovalCreation(
       preparedOperation.actorUserId === parsed.data.actingUserId
         ? (actingPerson?.id ?? null)
         : ((
-            await database.person.findFirst({
+            await tenantDatabase(parsed.data.clerkOrgId).person.findFirst({
               select: { id: true },
               where: {
                 ...scoped(parsed.data),
@@ -805,7 +815,7 @@ async function performApprovalCreation(
               },
             })
           )?.id ?? null);
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "approved",
@@ -877,7 +887,12 @@ async function performApprovalCreation(
       );
       return submissionOutcomeUnknown();
     }
-    if (!(await markSubmitCompleted(operationAttempt, database))) {
+    if (
+      !(await markSubmitCompleted(
+        operationAttempt,
+        tenantDatabase(parsed.data.clerkOrgId)
+      ))
+    ) {
       return submissionOutcomeUnknown();
     }
     const updated = await loadBareRecord(parsed.data);
@@ -1033,7 +1048,7 @@ async function persistXeroFailure(input: {
   error: ProviderWriteError;
 }): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
   const plainMessage = input.error.userMessage;
-  await database.$transaction(async (tx) => {
+  await tenantTransaction(input.input.clerkOrgId, async (tx) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
         approval_status: input.preserveApproved
@@ -1086,7 +1101,7 @@ async function persistXeroFailure(input: {
   return { ok: true, value: updated };
 }
 function loadScopedRecord(input: RecordActionInput) {
-  return database.availabilityRecord.findFirst({
+  return tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
     include: {
       person: {
         select: {
@@ -1113,7 +1128,7 @@ function loadScopedRecord(input: RecordActionInput) {
   });
 }
 function loadBareRecord(input: RecordActionInput) {
-  return database.availabilityRecord.findFirst({
+  return tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
     where: {
       ...scoped(input),
       id: input.recordId,
@@ -1146,7 +1161,7 @@ async function loadAndAuthorise(
 ): Promise<Result<LoadedRecord, SubmitServiceError>> {
   const [record, actingPerson] = await Promise.all([
     loadScopedRecord(input),
-    database.person.findFirst({
+    tenantDatabase(input.clerkOrgId).person.findFirst({
       select: { id: true },
       where: {
         ...scoped(input),
@@ -1228,7 +1243,13 @@ async function notifyManagerBestEffort(
   }
 ): Promise<void> {
   try {
-    await notifyManager(database, input, record, type, options);
+    await notifyManager(
+      tenantDatabase(input.clerkOrgId),
+      input,
+      record,
+      type,
+      options
+    );
   } catch (error) {
     log.error("Failed to dispatch manager notification", {
       availabilityRecordId: record.id,
@@ -1248,7 +1269,13 @@ async function notifySubmitFailureBestEffort(
   }
 ): Promise<void> {
   try {
-    await notifyOwnerAndManager(database, input, record, type, options);
+    await notifyOwnerAndManager(
+      tenantDatabase(input.clerkOrgId),
+      input,
+      record,
+      type,
+      options
+    );
   } catch (error) {
     log.error("Failed to dispatch failure notification", {
       availabilityRecordId: record.id,

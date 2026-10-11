@@ -1,3 +1,4 @@
+import { tenantTransaction } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ids = {
@@ -29,16 +30,36 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    availabilityRecord: {
-      findFirst: mocks.availabilityFindFirst,
-      findMany: mocks.availabilityFindMany,
-    },
-    organisation: { findFirst: mocks.organisationFindFirst },
-    person: { findMany: mocks.personFindMany },
-  },
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      availabilityRecord: {
+        findFirst: mocks.availabilityFindFirst,
+        findMany: mocks.availabilityFindMany,
+      },
+      organisation: { findFirst: mocks.organisationFindFirst },
+      person: { findMany: mocks.personFindMany },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    async (accountId: string, callback: (tx: unknown) => Promise<unknown>) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return await callback({
+        availabilityRecord: {
+          findFirst: mocks.availabilityFindFirst,
+          findMany: mocks.availabilityFindMany,
+        },
+        organisation: { findFirst: mocks.organisationFindFirst },
+        person: { findMany: mocks.personFindMany },
+      });
+    }
+  ),
 }));
 vi.mock("../holidays/resolve-public-holidays", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
@@ -68,6 +89,14 @@ const baseInput = {
   view: "week",
 } as const;
 describe("calendar-service", () => {
+  it("loads the calendar through one account transaction", async () => {
+    const result = await getCalendarRange(baseInput);
+    expect(result.ok).toBe(true);
+    expect(tenantTransaction).toHaveBeenCalledExactlyOnceWith(
+      ids.clerkOrg,
+      expect.any(Function)
+    );
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.organisationFindFirst.mockResolvedValue({
@@ -556,12 +585,16 @@ describe("calendar-service", () => {
       startsAt: null,
     });
     expect(cells[1]).toMatchObject({ startsAt: "18:00" });
-    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
-      clerkOrgId: ids.clerkOrg,
-      from: "2026-04-13",
-      organisationId: ids.org,
-      to: "2026-04-19",
-    });
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
+      {
+        clerkOrgId: ids.clerkOrg,
+        from: "2026-04-13",
+        organisationId: ids.org,
+        to: "2026-04-19",
+      },
+      undefined,
+      expect.objectContaining({ person: expect.any(Object) })
+    );
   });
 });
 function detailInput() {

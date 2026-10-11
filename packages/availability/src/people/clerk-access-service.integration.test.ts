@@ -14,7 +14,7 @@ import {
 const fixture = allocateLiveTestFixture(
   "packages/availability/src/people/clerk-access-service.integration.test.ts"
 );
-const { database } = await import("@repo/database");
+const { systemDatabase: database } = await import("@repo/database");
 const tenantA = {
   clerkOrgId: fixture.tenants[0]?.clerkOrgId as ClerkOrgId,
   organisationId: fixture.tenants[0]?.organisationId as OrganisationId,

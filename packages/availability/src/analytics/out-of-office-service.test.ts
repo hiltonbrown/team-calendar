@@ -12,14 +12,33 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    availabilityRecord: { findMany: mocks.availabilityFindMany },
-    person: {
-      findFirst: mocks.personFindFirst,
-      findMany: mocks.personFindMany,
-    },
-  },
   scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      availabilityRecord: { findMany: mocks.availabilityFindMany },
+      person: {
+        findFirst: mocks.personFindFirst,
+        findMany: mocks.personFindMany,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        availabilityRecord: { findMany: mocks.availabilityFindMany },
+        person: {
+          findFirst: mocks.personFindFirst,
+          findMany: mocks.personFindMany,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 
 const { aggregateOutOfOffice, listOutOfOfficeRecordsForDrilldown } =

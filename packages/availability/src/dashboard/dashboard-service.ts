@@ -7,7 +7,7 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type {
   availability_approval_status,
   availability_record_type,
@@ -201,7 +201,7 @@ export async function resolveDashboardRole(
     return validationError(parsed.error);
   }
   try {
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
       select: { id: true },
       where: {
         archived_at: null,
@@ -219,7 +219,9 @@ export async function resolveDashboardRole(
     if (!person) {
       return { ok: true, value: "viewer" };
     }
-    const directReportCount = await database.person.count({
+    const directReportCount = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.count({
       where: {
         archived_at: null,
         clerk_org_id: parsed.data.clerkOrgId,
@@ -290,7 +292,7 @@ export async function getManagerView(
         clerkOrgId: data.clerkOrgId,
         organisationId: data.organisationId,
       }),
-      database.person.count({
+      tenantDatabase(data.clerkOrgId).person.count({
         where: {
           archived_at: null,
           clerk_org_id: data.clerkOrgId,
@@ -360,7 +362,7 @@ export async function getAdminView(
       timeline,
     ] = await Promise.all([
       loadBaseView(data, cache),
-      database.organisation.findFirst({
+      tenantDatabase(input.clerkOrgId).organisation.findFirst({
         select: { name: true },
         where: {
           clerk_org_id: data.clerkOrgId,

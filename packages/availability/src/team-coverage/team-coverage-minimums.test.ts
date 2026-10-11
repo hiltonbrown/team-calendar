@@ -15,7 +15,23 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@repo/database", () => ({
-  database: { $transaction: mocks.$transaction },
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return { $transaction: mocks.$transaction };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return { $transaction: mocks.$transaction }.$transaction(
+        transactionCallback,
+        options
+      );
+    }
+  ),
 }));
 
 vi.mock("@repo/database/queries/teams", () => ({

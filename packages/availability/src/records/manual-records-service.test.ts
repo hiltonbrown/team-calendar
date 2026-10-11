@@ -15,18 +15,41 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    availabilityRecord: {
-      create: mocks.availabilityCreate,
-      findFirst: mocks.availabilityFindFirst,
-      findMany: mocks.availabilityFindMany,
-      update: mocks.availabilityUpdate,
-    },
-    person: {
-      findFirst: mocks.personFindFirst,
-    },
-  },
   scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      availabilityRecord: {
+        create: mocks.availabilityCreate,
+        findFirst: mocks.availabilityFindFirst,
+        findMany: mocks.availabilityFindMany,
+        update: mocks.availabilityUpdate,
+      },
+      person: {
+        findFirst: mocks.personFindFirst,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        availabilityRecord: {
+          create: mocks.availabilityCreate,
+          findFirst: mocks.availabilityFindFirst,
+          findMany: mocks.availabilityFindMany,
+          update: mocks.availabilityUpdate,
+        },
+        person: {
+          findFirst: mocks.personFindFirst,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
