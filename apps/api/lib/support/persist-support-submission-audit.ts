@@ -7,7 +7,7 @@ import type {
   SupportSubmissionCategory,
 } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 
 export interface PersistSupportSubmissionAuditInput {
   category: SupportSubmissionCategory;
@@ -28,7 +28,7 @@ export async function persistSupportSubmissionAudit(
   try {
     const issueId = String(input.issueNumber);
 
-    await database.auditEvent.create({
+    await tenantDatabase(input.clerkOrgId).auditEvent.create({
       data: {
         action: "support_submissions.github_issue_created",
         actor_user_id: input.userId,

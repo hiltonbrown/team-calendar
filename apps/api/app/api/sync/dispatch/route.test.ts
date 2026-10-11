@@ -25,10 +25,10 @@ vi.mock("@repo/database/queries/xero-connection-state", () => ({
   getXeroConnectionState: mocks.getXeroConnectionState,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     syncRun: { findFirst: mocks.syncRunFindFirst },
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-  },
+  })),
 }));
 vi.mock("@repo/jobs", () => ({
   reconcileXeroApprovalState: mocks.reconcileXeroApprovalState,

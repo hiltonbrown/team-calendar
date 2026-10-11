@@ -1,5 +1,5 @@
 import { type Result, xeroRecoveryMessage } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
 import {
   reconcileXeroApprovalState,
@@ -60,7 +60,9 @@ export async function executeLocalSyncFallback(
     if (state.value.state !== "connected") {
       return syncFailed(xeroRecoveryMessage(state.value.state));
     }
-    const tenant = await database.xeroConnection.findFirst({
+    const tenant = await tenantDatabase(
+      input.clerkOrgId
+    ).xeroConnection.findFirst({
       select: { id: true },
       where: {
         clerk_org_id: input.clerkOrgId,
@@ -87,7 +89,7 @@ export async function executeLocalSyncFallback(
       syncResult.value.status === "cancelled"
     ) {
       if (syncResult.value.status === "failed") {
-        const run = await database.syncRun.findFirst({
+        const run = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
           select: { error_summary: true },
           where: {
             clerk_org_id: input.clerkOrgId,
