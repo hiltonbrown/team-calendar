@@ -1,9 +1,14 @@
+import { getScopedXeroAuthorisationMetadata } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { sanitizeObject } from "@repo/observability/scrubber";
 import "server-only";
 import type { Result } from "@repo/core";
 import { xeroRecoveryMessage, xeroRecoveryMessageFromCode } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import { z } from "zod";
 import { scrubXeroWriteErrorRaw } from "../settings/shared";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
@@ -257,8 +262,9 @@ export async function listTenantSummaries(
     return notAuthorised();
   }
   try {
-    const tenants = await database.xeroConnection.findMany({
-      include: { authorisation: { select: { last_refreshed_at: true } } },
+    const tenants = await tenantDatabase(
+      input.clerkOrgId
+    ).xeroConnection.findMany({
       orderBy: { tenant_name: "asc" },
       where: scoped(parsed.data),
     });
@@ -270,6 +276,21 @@ export async function listTenantSummaries(
     if (tenantIds.length === 0) {
       return { ok: true, value: [] };
     }
+    const metadataByConnection = new Map(
+      await Promise.all(
+        tenants.map(
+          async (tenant) =>
+            [
+              tenant.id,
+              await getScopedXeroAuthorisationMetadata({
+                clerkOrgId: parsed.data.clerkOrgId,
+                connectionId: tenant.id,
+                organisationId: parsed.data.organisationId,
+              }),
+            ] as const
+        )
+      )
+    );
     const since = daysAgo(30);
     const summarySelect = {
       completed_at: true,
@@ -286,7 +307,7 @@ export async function listTenantSummaries(
         Promise.all(
           tenants.flatMap((tenant) =>
             syncRunTypes.map((runType) =>
-              database.syncRun.findFirst({
+              tenantDatabase(parsed.data.clerkOrgId).syncRun.findFirst({
                 orderBy: [{ started_at: "desc" }, { id: "desc" }],
                 select: summarySelect,
                 where: {
@@ -302,7 +323,7 @@ export async function listTenantSummaries(
         Promise.all(
           tenants.flatMap((tenant) =>
             syncRunTypes.map((runType) =>
-              database.syncRun.findFirst({
+              tenantDatabase(parsed.data.clerkOrgId).syncRun.findFirst({
                 orderBy: [{ started_at: "desc" }, { id: "desc" }],
                 select: summarySelect,
                 where: {
@@ -317,7 +338,7 @@ export async function listTenantSummaries(
         ).then(nonNullRows),
         Promise.all(
           tenants.map((tenant) =>
-            database.syncRun.findFirst({
+            tenantDatabase(parsed.data.clerkOrgId).syncRun.findFirst({
               orderBy: [{ started_at: "desc" }, { id: "desc" }],
               select: summarySelect,
               where: {
@@ -328,7 +349,7 @@ export async function listTenantSummaries(
             })
           )
         ).then(nonNullRows),
-        database.syncRun.groupBy({
+        tenantDatabase(input.clerkOrgId).syncRun.groupBy({
           _count: { _all: true },
           by: ["xero_connection_id", "status"],
           where: {
@@ -345,7 +366,9 @@ export async function listTenantSummaries(
             (run) =>
               run.xero_connection_id === tenant.id && run.run_type === runType
           );
-          const count = await database.failedRecord.count({
+          const count = await tenantDatabase(
+            parsed.data.clerkOrgId
+          ).failedRecord.count({
             where: {
               ...scoped(parsed.data),
               ...(success ? { created_at: { gt: success.started_at } } : {}),
@@ -417,7 +440,8 @@ export async function listTenantSummaries(
             "leave_records"
           ),
           lastPeopleSync: latestCompletedRunAt(completedRuns, "people"),
-          lastRefreshedAt: tenant.authorisation?.last_refreshed_at ?? null,
+          lastRefreshedAt:
+            metadataByConnection.get(tenant.id)?.last_refreshed_at ?? null,
           lastRun: lastRun
             ? {
                 completedAt: lastRun.completed_at,
@@ -461,7 +485,7 @@ export async function listRuns(input: z.input<typeof ListRunsSchema>): Promise<
     const pageSize = parsed.data.pagination?.pageSize ?? 50;
     const cursor = decodeCursor(parsed.data.pagination?.cursor ?? null);
     const where = runWhere(parsed.data, cursor);
-    const rows = await database.syncRun.findMany({
+    const rows = await tenantDatabase(input.clerkOrgId).syncRun.findMany({
       include: {
         _count: { select: { failed_records: true } },
         xero_connection: { select: { id: true, tenant_name: true } },
@@ -499,7 +523,7 @@ export async function getRunDetail(
     return notAuthorised();
   }
   try {
-    const run = await database.syncRun.findFirst({
+    const run = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
       include: {
         _count: { select: { failed_records: true } },
         xero_connection: { select: { id: true, tenant_name: true } },
@@ -514,7 +538,7 @@ export async function getRunDetail(
     }
     const [people, failedRecords, timeline] = await Promise.all([
       loadTriggeredByPeople(parsed.data, [run]),
-      database.failedRecord.findMany({
+      tenantDatabase(input.clerkOrgId).failedRecord.findMany({
         orderBy: [{ created_at: "desc" }, { id: "desc" }],
         select: {
           created_at: true,
@@ -530,7 +554,7 @@ export async function getRunDetail(
           sync_run_id: run.id,
         },
       }),
-      database.auditEvent.findMany({
+      tenantDatabase(input.clerkOrgId).auditEvent.findMany({
         orderBy: [{ created_at: "desc" }, { id: "desc" }],
         select: {
           action: true,
@@ -591,14 +615,14 @@ export async function listRunFailedRecords(
     return validationErrorMessage("Invalid page cursor.");
   }
   try {
-    const runExists = await database.syncRun.findFirst({
+    const runExists = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
       select: { id: true },
       where: { ...scoped(parsed.data), id: parsed.data.runId },
     });
     if (!runExists) {
       return await runNotFound(parsed.data);
     }
-    const rows = await database.failedRecord.findMany({
+    const rows = await tenantDatabase(input.clerkOrgId).failedRecord.findMany({
       orderBy: [{ created_at: "desc" }, { id: "desc" }],
       select: {
         created_at: true,
@@ -648,14 +672,14 @@ export async function listRunTimeline(
     return validationErrorMessage("Invalid page cursor.");
   }
   try {
-    const runExists = await database.syncRun.findFirst({
+    const runExists = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
       select: { id: true },
       where: { ...scoped(parsed.data), id: parsed.data.runId },
     });
     if (!runExists) {
       return await runNotFound(parsed.data);
     }
-    const rows = await database.auditEvent.findMany({
+    const rows = await tenantDatabase(input.clerkOrgId).auditEvent.findMany({
       orderBy: [{ created_at: "desc" }, { id: "desc" }],
       select: { action: true, actor_user_id: true, created_at: true, id: true },
       take: parsed.data.pageSize + 1,
@@ -704,7 +728,7 @@ export async function getRedactedFailedRecordPayload(
     return notAuthorised();
   }
   try {
-    return await database.$transaction(async (tx) => {
+    return await tenantTransaction(input.clerkOrgId, async (tx) => {
       const failure = await tx.failedRecord.findFirst({
         select: { id: true, raw_payload: true },
         where: {
@@ -758,8 +782,9 @@ export async function dispatchManualSync(
     return notAuthorised();
   }
   try {
-    const tenant = await database.xeroConnection.findFirst({
-      include: { authorisation: { select: { last_refreshed_at: true } } },
+    const tenant = await tenantDatabase(
+      input.clerkOrgId
+    ).xeroConnection.findFirst({
       where: {
         ...scoped(parsed.data),
         id: parsed.data.connectionId,
@@ -839,7 +864,7 @@ export async function dispatchManualSync(
         ok: false,
       };
     }
-    await database.auditEvent.create({
+    await tenantDatabase(parsed.data.clerkOrgId).auditEvent.create({
       data: {
         ...auditBase(parsed.data, parsed.data.actingUserId),
         action: "sync.manual_dispatched",
@@ -880,7 +905,7 @@ export async function exportFailedRecordsCsv(
     return notAuthorised();
   }
   try {
-    const run = await database.syncRun.findFirst({
+    const run = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
       select: { id: true },
       where: {
         ...scoped(parsed.data),
@@ -890,7 +915,9 @@ export async function exportFailedRecordsCsv(
     if (!run) {
       return await runNotFound(parsed.data);
     }
-    const failedRecords = await database.failedRecord.findMany({
+    const failedRecords = await tenantDatabase(
+      input.clerkOrgId
+    ).failedRecord.findMany({
       orderBy: { created_at: "asc" },
       select: {
         created_at: true,
@@ -934,7 +961,7 @@ export async function exportFailedRecordsCsv(
       ],
       ...rows,
     ]);
-    await database.auditEvent.create({
+    await tenantDatabase(input.clerkOrgId).auditEvent.create({
       data: {
         ...auditBase(parsed.data, parsed.data.actingUserId),
         action: "sync.failed_records_exported",
@@ -977,7 +1004,7 @@ export async function cancelRun(
     return notAuthorised();
   }
   try {
-    const run = await database.syncRun.findFirst({
+    const run = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
       select: { id: true },
       where: {
         ...scoped(parsed.data),
@@ -988,7 +1015,7 @@ export async function cancelRun(
     if (!run) {
       return await runNotFound(parsed.data);
     }
-    await database.syncRun.update({
+    await tenantDatabase(input.clerkOrgId).syncRun.update({
       data: { cancel_requested_at: new Date() },
       where: { id: run.id },
     });
@@ -997,7 +1024,7 @@ export async function cancelRun(
       organisationId: parsed.data.organisationId,
       runId: run.id,
     });
-    await database.auditEvent.create({
+    await tenantDatabase(parsed.data.clerkOrgId).auditEvent.create({
       data: {
         ...auditBase(parsed.data, parsed.data.actingUserId),
         action: "sync.cancel_requested",
@@ -1233,7 +1260,7 @@ async function loadTriggeredByPeople(
   if (userIds.length === 0) {
     return new Map();
   }
-  const people = await database.person.findMany({
+  const people = await tenantDatabase(input.clerkOrgId).person.findMany({
     select: {
       clerk_user_id: true,
       first_name: true,
@@ -1317,7 +1344,7 @@ function toRunListItem(
 async function runNotFound(
   input: GetRunDetailInput | ExportFailedRecordsCsvInput | CancelRunInput
 ): Promise<Result<never, SyncMonitorError>> {
-  const existing = await database.syncRun.findUnique({
+  const existing = await tenantDatabase(input.clerkOrgId).syncRun.findUnique({
     select: {
       clerk_org_id: true,
       organisation_id: true,
@@ -1344,7 +1371,9 @@ async function runNotFound(
 async function tenantNotFound(
   input: DispatchManualSyncInput
 ): Promise<Result<never, SyncMonitorError>> {
-  const existing = await database.xeroConnection.findUnique({
+  const existing = await tenantDatabase(
+    input.clerkOrgId
+  ).xeroConnection.findUnique({
     select: {
       clerk_org_id: true,
       organisation_id: true,

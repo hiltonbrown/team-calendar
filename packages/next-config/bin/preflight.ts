@@ -24,6 +24,12 @@ try {
     appName: appNameArg,
     launchMode: launchModeArg,
   });
+  if (appNameArg !== "web") {
+    const { assertRestrictedDatabaseRole } = await import(
+      "@repo/database/runtime-role"
+    );
+    await assertRestrictedDatabaseRole(process.env.DATABASE_APP_URL ?? "");
+  }
   console.log(
     `✅ Production preflight PASSED for app "${result.appName}" in launch mode "${result.launchMode}". Checked ${result.checkedVars.length} variables.`
   );

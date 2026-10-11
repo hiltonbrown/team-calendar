@@ -158,3 +158,17 @@ describe("database unit-test isolation", () => {
     );
   });
 });
+
+it("does not let a local owner URL authorize a remote app connection", () => {
+  Object.assign(process.env, {
+    ALLOW_LOCAL_DATABASE_TESTS: "1",
+    DATABASE_URL: "postgresql://owner:unused@localhost/test",
+    NODE_ENV: "test",
+  });
+  delete process.env.ALLOW_LIVE_DATABASE_TESTS;
+  expect(() =>
+    assertTestDatabaseConnectionAllowed(
+      "postgresql://team_calendar_app:unused@example.neon.tech/test"
+    )
+  ).toThrow("local database");
+});

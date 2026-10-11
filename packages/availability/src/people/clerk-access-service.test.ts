@@ -1,7 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ database: {} }));
+vi.mock("@repo/database", () => ({
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {};
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {}.$transaction(transactionCallback, options);
+    }
+  ),
+}));
 
 import {
   isFallbackEmail,

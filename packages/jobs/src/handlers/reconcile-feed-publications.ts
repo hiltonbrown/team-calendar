@@ -1,6 +1,6 @@
 import "server-only";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import {
   feedIdsForPeople,
   materialiseAvailabilityPublication,
@@ -84,17 +84,19 @@ async function reconcileFeedPublicationsInternal(
       const records: Array<{
         id: string;
         person_id: string;
-      }> = await database.availabilityRecord.findMany({
-        cursor: cursor ? { id: cursor } : undefined,
-        orderBy: { id: "asc" },
-        select: { id: true, person_id: true },
-        skip: cursor ? 1 : 0,
-        take: PAGE_SIZE,
-        where: {
-          clerk_org_id: context.clerkOrgId,
-          organisation_id: context.organisationId,
-        },
-      });
+      }> = await tenantDatabase(context.clerkOrgId).availabilityRecord.findMany(
+        {
+          cursor: cursor ? { id: cursor } : undefined,
+          orderBy: { id: "asc" },
+          select: { id: true, person_id: true },
+          skip: cursor ? 1 : 0,
+          take: PAGE_SIZE,
+          where: {
+            clerk_org_id: context.clerkOrgId,
+            organisation_id: context.organisationId,
+          },
+        }
+      );
       if (records.length === 0) {
         break;
       }
@@ -137,7 +139,7 @@ async function reconcileFeedPublicationsInternal(
           data: {
             clerkOrgId: context.clerkOrgId,
             feedId: feed.id,
-            organisationId: context.organisationId,
+            organisationId: feed.organisationId,
             reason: "publication_reconciled",
           },
           name: "rebuild-feed-cache" as const,

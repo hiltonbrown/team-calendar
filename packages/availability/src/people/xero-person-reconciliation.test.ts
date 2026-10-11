@@ -75,12 +75,25 @@ vi.mock("@repo/database", () => {
     },
   };
   return {
-    database: db,
     scopedTo: vi.fn(
       (context: { clerkOrgId: string; organisationId: string }) => ({
         clerk_org_id: context.clerkOrgId,
         organisation_id: context.organisationId,
       })
+    ),
+    tenantDatabase: vi.fn((accountId: string) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return db;
+    }),
+    tenantTransaction: vi.fn(
+      (accountId: string, transactionCallback: unknown, options?: unknown) => {
+        if (!accountId) {
+          throw new Error("Missing tenant context");
+        }
+        return db.$transaction(transactionCallback, options);
+      }
     ),
   };
 });

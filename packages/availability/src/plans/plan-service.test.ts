@@ -54,30 +54,63 @@ const mocks = vi.hoisted(() => {
 });
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: (callback: (tx: unknown) => unknown) =>
-      callback({
-        auditEvent: { create: mocks.auditCreate },
-        availabilityRecord: {
-          create: mocks.availabilityCreate,
-          deleteMany: mocks.availabilityDeleteMany,
-          updateMany: mocks.availabilityUpdateMany,
-        },
-      }),
-    availabilityRecord: {
-      count: mocks.availabilityCount,
-      findFirst: mocks.availabilityFindFirst,
-      findMany: mocks.availabilityFindMany,
-    },
-    leaveBalance: {
-      findFirst: mocks.leaveBalanceFindFirst,
-      findMany: mocks.leaveBalanceFindMany,
-    },
-    person: { findFirst: mocks.personFindFirst },
-  },
   hasUnresolvedSubmitOperation: mocks.hasUnresolvedSubmitOperation,
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: (callback: (tx: unknown) => unknown) =>
+        callback({
+          auditEvent: { create: mocks.auditCreate },
+          availabilityRecord: {
+            create: mocks.availabilityCreate,
+            deleteMany: mocks.availabilityDeleteMany,
+            updateMany: mocks.availabilityUpdateMany,
+          },
+        }),
+      availabilityRecord: {
+        count: mocks.availabilityCount,
+        findFirst: mocks.availabilityFindFirst,
+        findMany: mocks.availabilityFindMany,
+      },
+      leaveBalance: {
+        findFirst: mocks.leaveBalanceFindFirst,
+        findMany: mocks.leaveBalanceFindMany,
+      },
+      person: { findFirst: mocks.personFindFirst },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: (callback: (tx: unknown) => unknown) =>
+          callback({
+            auditEvent: { create: mocks.auditCreate },
+            availabilityRecord: {
+              create: mocks.availabilityCreate,
+              deleteMany: mocks.availabilityDeleteMany,
+              updateMany: mocks.availabilityUpdateMany,
+            },
+          }),
+        availabilityRecord: {
+          count: mocks.availabilityCount,
+          findFirst: mocks.availabilityFindFirst,
+          findMany: mocks.availabilityFindMany,
+        },
+        leaveBalance: {
+          findFirst: mocks.leaveBalanceFindFirst,
+          findMany: mocks.leaveBalanceFindMany,
+        },
+        person: { findFirst: mocks.personFindFirst },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
@@ -129,6 +162,7 @@ function scopedRecordFixture({
     approval_status: "approved",
     approved_at: new Date("2026-01-01T00:00:00.000Z"),
     archived_at: null,
+    clerk_org_id: baseInput.clerkOrgId,
     contactability: "contactable",
     created_at: new Date("2026-01-01T00:00:00.000Z"),
     created_by_user_id: "user_1",

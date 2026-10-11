@@ -11,17 +11,42 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: async (callback: (tx: unknown) => unknown) => {
-      const result = await callback({
-        auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
-      });
-      mocks.committed();
-      return result;
-    },
-    auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
-  },
   fenceSubmitRecoverySideEffectClaim: mocks.fence,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: async (callback: (tx: unknown) => unknown) => {
+        const result = await callback({
+          auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
+        });
+        mocks.committed();
+        return result;
+      },
+      auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: async (callback: (tx: unknown) => unknown) => {
+          const result = await callback({
+            auditEvent: {
+              create: mocks.auditCreate,
+              findFirst: mocks.auditFind,
+            },
+          });
+          mocks.committed();
+          return result;
+        },
+        auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialise,

@@ -24,7 +24,7 @@ describe("local persistence integration", async () => {
   const fixture = allocateLiveTestFixture(
     "packages/jobs/src/handlers/sync-xero-leave-balances.integration.test.ts"
   );
-  const { database } = await import("@repo/database");
+  const { systemDatabase: database } = await import("@repo/database");
   const { syncXeroLeaveBalances } = await import("./sync-xero-leave-balances");
   const tenantA = {
     authorisationId: fixture.id("authorisation", 0),

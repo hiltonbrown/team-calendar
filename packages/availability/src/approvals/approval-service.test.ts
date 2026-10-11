@@ -48,44 +48,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
-  database: {
-    $transaction: async (callback: (tx: unknown) => unknown) =>
-      await callback({
-        auditEvent: {
-          create: mocks.auditCreate,
-          findFirst: vi.fn(async () => null),
-        },
-        availabilityRecord: {
-          updateMany: (mutation: {
-            data: { xero_write_claimed_at?: Date | null };
-          }) =>
-            mutation.data.xero_write_claimed_at
-              ? mocks.availabilityClaimUpdateMany(mutation)
-              : mocks.availabilityUpdateMany(mutation),
-        },
-      }),
-    auditEvent: {
-      create: mocks.auditCreate,
-      findFirst: vi.fn(async () => null),
-      findMany: mocks.auditCreate,
-    },
-    availabilityRecord: {
-      count: mocks.availabilityCount,
-      findFirst: mocks.availabilityFindFirst,
-      findMany: mocks.availabilityFindMany,
-      updateMany: mocks.availabilityClaimUpdateMany,
-    },
-    leaveBalance: {
-      findFirst: mocks.leaveBalanceFindFirst,
-      findMany: mocks.leaveBalanceFindMany,
-    },
-    location: { findMany: mocks.locationFindMany },
-    organisation: { findFirst: mocks.organisationFindFirst },
-    person: {
-      findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
-    },
-    xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-  },
   fenceSubmitRecoverySideEffectClaim: vi.fn(async () => true),
   getSubmitOperation: mocks.getOperation,
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
@@ -98,6 +60,94 @@ vi.mock("@repo/database", () => ({
   prepareAndClaimSubmitOperation: mocks.prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects: vi.fn(),
   scopedTo: mocks.scopedTo,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: async (callback: (tx: unknown) => unknown) =>
+        await callback({
+          auditEvent: {
+            create: mocks.auditCreate,
+            findFirst: vi.fn(async () => null),
+          },
+          availabilityRecord: {
+            updateMany: (mutation: {
+              data: { xero_write_claimed_at?: Date | null };
+            }) =>
+              mutation.data.xero_write_claimed_at
+                ? mocks.availabilityClaimUpdateMany(mutation)
+                : mocks.availabilityUpdateMany(mutation),
+          },
+        }),
+      auditEvent: {
+        create: mocks.auditCreate,
+        findFirst: vi.fn(async () => null),
+        findMany: mocks.auditCreate,
+      },
+      availabilityRecord: {
+        count: mocks.availabilityCount,
+        findFirst: mocks.availabilityFindFirst,
+        findMany: mocks.availabilityFindMany,
+        updateMany: mocks.availabilityClaimUpdateMany,
+      },
+      leaveBalance: {
+        findFirst: mocks.leaveBalanceFindFirst,
+        findMany: mocks.leaveBalanceFindMany,
+      },
+      location: { findMany: mocks.locationFindMany },
+      organisation: { findFirst: mocks.organisationFindFirst },
+      person: {
+        findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
+      },
+      xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: async (callback: (tx: unknown) => unknown) =>
+          await callback({
+            auditEvent: {
+              create: mocks.auditCreate,
+              findFirst: vi.fn(async () => null),
+            },
+            availabilityRecord: {
+              updateMany: (mutation: {
+                data: { xero_write_claimed_at?: Date | null };
+              }) =>
+                mutation.data.xero_write_claimed_at
+                  ? mocks.availabilityClaimUpdateMany(mutation)
+                  : mocks.availabilityUpdateMany(mutation),
+            },
+          }),
+        auditEvent: {
+          create: mocks.auditCreate,
+          findFirst: vi.fn(async () => null),
+          findMany: mocks.auditCreate,
+        },
+        availabilityRecord: {
+          count: mocks.availabilityCount,
+          findFirst: mocks.availabilityFindFirst,
+          findMany: mocks.availabilityFindMany,
+          updateMany: mocks.availabilityClaimUpdateMany,
+        },
+        leaveBalance: {
+          findFirst: mocks.leaveBalanceFindFirst,
+          findMany: mocks.leaveBalanceFindMany,
+        },
+        location: { findMany: mocks.locationFindMany },
+        organisation: { findFirst: mocks.organisationFindFirst },
+        person: {
+          findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
+        },
+        xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { z } from "zod";
 import { csvEscape, scrubXeroWriteErrorRaw } from "./shared";
 
@@ -88,7 +88,7 @@ export async function listEvents(input: z.input<typeof ListSchema>): Promise<
   try {
     const where = whereFor(parsed.data);
     const [events, totalCount] = await Promise.all([
-      database.auditEvent.findMany({
+      tenantDatabase(input.clerkOrgId).auditEvent.findMany({
         cursor: parsed.data.pagination.cursor
           ? { id: parsed.data.pagination.cursor }
           : undefined,
@@ -97,7 +97,7 @@ export async function listEvents(input: z.input<typeof ListSchema>): Promise<
         take: parsed.data.pagination.pageSize + 1,
         where,
       }),
-      database.auditEvent.count({ where }),
+      tenantDatabase(input.clerkOrgId).auditEvent.count({ where }),
     ]);
 
     const page = events.slice(0, parsed.data.pagination.pageSize).map(mapEvent);
@@ -129,7 +129,7 @@ export async function getEventDetail(
   }
 
   try {
-    const event = await database.auditEvent.findFirst({
+    const event = await tenantDatabase(input.clerkOrgId).auditEvent.findFirst({
       where: {
         clerk_org_id: parsed.data.clerkOrgId,
         id: parsed.data.eventId,
@@ -171,7 +171,7 @@ export async function exportCsv(
   }
 
   try {
-    const events = await database.auditEvent.findMany({
+    const events = await tenantDatabase(input.clerkOrgId).auditEvent.findMany({
       orderBy: [{ created_at: "desc" }, { id: "desc" }],
       take: EXPORT_LIMIT + 1,
       where: whereFor({
@@ -196,7 +196,7 @@ export async function exportCsv(
         ),
       ]);
 
-    await database.auditEvent.create({
+    await tenantDatabase(input.clerkOrgId).auditEvent.create({
       data: {
         action: "audit_log.exported",
         actor_user_id: parsed.data.actingUserId,

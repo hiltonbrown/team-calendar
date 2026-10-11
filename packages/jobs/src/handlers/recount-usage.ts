@@ -1,4 +1,4 @@
-import { database } from "@repo/database";
+import { tenantDatabase, tenantTransaction } from "@repo/database";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
@@ -13,21 +13,21 @@ export type RecountUsageInput = z.input<typeof RecountUsageSchema>;
 export const recountUsage = async (input: unknown) => {
   const parsed = RecountUsageSchema.parse(input);
   const [seats, payrollEntities, feeds] = await Promise.all([
-    database.person.count({
+    tenantDatabase(parsed.clerkOrgId).person.count({
       where: {
         archived_at: null,
         clerk_org_id: parsed.clerkOrgId,
         is_active: true,
       },
     }),
-    database.organisation.count({
+    tenantDatabase(parsed.clerkOrgId).organisation.count({
       where: {
         archived_at: null,
         clerk_org_id: parsed.clerkOrgId,
         is_active: true,
       },
     }),
-    database.feed.count({
+    tenantDatabase(parsed.clerkOrgId).feed.count({
       where: {
         archived_at: null,
         clerk_org_id: parsed.clerkOrgId,
@@ -43,7 +43,9 @@ export const recountUsage = async (input: unknown) => {
     payroll_entities: payrollEntities,
     seats,
   })) {
-    await database.$executeRaw`
+    await tenantTransaction(
+      parsed.clerkOrgId,
+      (tx) => tx.$executeRaw`
       INSERT INTO usage_counters (id, clerk_org_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
       VALUES (gen_random_uuid(), ${parsed.clerkOrgId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
       ON CONFLICT (clerk_org_id, counter_type) DO UPDATE SET
@@ -52,7 +54,8 @@ export const recountUsage = async (input: unknown) => {
         period_start = EXCLUDED.period_start,
         period_end = EXCLUDED.period_end,
         updated_at = EXCLUDED.updated_at
-    `;
+    `
+    );
   }
   return { feeds, payrollEntities, seats };
 };

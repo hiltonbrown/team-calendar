@@ -1,24 +1,35 @@
 import { vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+const database = vi.hoisted(() => ({
+  publicHoliday: { create: vi.fn(), delete: vi.fn(), findFirst: vi.fn() },
+  publicHolidayPreference: { deleteMany: vi.fn() },
+}));
 vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: vi.fn(async (operations: unknown[]) => operations),
-    publicHoliday: {
-      create: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    publicHolidayPreference: { deleteMany: vi.fn() },
-  },
   scopedQuery: vi.fn((clerk: string, organisation: string) => ({
     clerk_org_id: clerk,
     organisation_id: organisation,
   })),
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return database;
+  }),
+  tenantTransaction: vi.fn(
+    async (
+      accountId: string,
+      callback: (client: typeof database) => Promise<unknown>
+    ) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return await callback(database);
+    }
+  ),
 }));
 
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { database } from "@repo/database";
 import { beforeEach, describe, expect, it } from "vitest";
 import { addCustomHoliday, deleteCustomHoliday } from "./holiday-service";
 
@@ -132,7 +143,11 @@ describe("holiday-service", () => {
         },
       });
       expect(database.publicHoliday.delete).toHaveBeenCalledWith({
-        where: { id: "h-1" },
+        where: {
+          clerk_org_id: clerkOrgId,
+          id: "h-1",
+          organisation_id: organisationId,
+        },
       });
     });
 

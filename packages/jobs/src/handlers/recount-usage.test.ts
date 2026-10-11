@@ -13,14 +13,33 @@ vi.mock("../client", () => ({
     send: vi.fn(),
   },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    $executeRaw: mocks.executeRaw,
-    feed: { count: mocks.feedCount },
-    organisation: { count: mocks.organisationCount },
-    person: { count: mocks.personCount },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      $executeRaw: mocks.executeRaw,
+      feed: { count: mocks.feedCount },
+      organisation: { count: mocks.organisationCount },
+      person: { count: mocks.personCount },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 
 const { recountUsage } = await import("./recount-usage");
 

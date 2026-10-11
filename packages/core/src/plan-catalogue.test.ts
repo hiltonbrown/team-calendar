@@ -26,7 +26,7 @@ describe("public plan catalogue", () => {
     });
     expect(getPublicPlanDefinition("premium")).toMatchObject({
       features: { analytics: true, priority_support: true },
-      limits: { feeds: -1, payroll_entities: 1, seats: 50 },
+      limits: { feeds: -1, payroll_entities: 5, seats: 50 },
     });
     expect(getPublicPlanDefinition("enterprise")).toMatchObject({
       limits: { feeds: -1, payroll_entities: -1, seats: -1 },

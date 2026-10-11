@@ -5,12 +5,12 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
 }));
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     person: {
       findMany: mocks.findMany,
     },
-  },
+  }),
 }));
 
 const { listPeopleForOrganisation } = await import("./people");

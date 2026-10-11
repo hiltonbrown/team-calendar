@@ -7,7 +7,7 @@ import type {
 } from "@repo/core";
 import { appError } from "@repo/core";
 
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 export interface AvailabilityRecordData {
@@ -86,7 +86,9 @@ export async function listAvailabilityForCalendar(
       whereConditions.person_id = { in: filters.personIds };
     }
 
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      clerkOrgId
+    ).availabilityRecord.findMany({
       orderBy: [{ starts_at: "asc" }, { person_id: "asc" }],
       select: {
         approval_status: true,
@@ -129,7 +131,9 @@ export async function listAvailabilityForPerson(
   dateRange: DateRange
 ): Promise<Result<AvailabilityRecordData[]>> {
   try {
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      clerkOrgId
+    ).availabilityRecord.findMany({
       orderBy: { starts_at: "asc" },
       select: {
         approval_status: true,
@@ -195,7 +199,9 @@ export async function listPendingApprovalRecords(
       whereConditions.record_type = { in: filters.recordTypes };
     }
 
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      clerkOrgId
+    ).availabilityRecord.findMany({
       orderBy: { created_at: "asc" },
       select: {
         approval_status: true,
@@ -301,7 +307,9 @@ export async function listManualAvailability(
       whereConditions.ends_at = { gte: filters.dateRange.startDate };
     }
 
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      clerkOrgId
+    ).availabilityRecord.findMany({
       orderBy: { starts_at: "asc" },
       select: {
         all_day: true,
@@ -374,7 +382,9 @@ export async function getAvailabilityRecordById(
   recordId: AvailabilityRecordId
 ): Promise<Result<ManualAvailabilityListData>> {
   try {
-    const record = await database.availabilityRecord.findFirst({
+    const record = await tenantDatabase(
+      clerkOrgId
+    ).availabilityRecord.findFirst({
       select: {
         all_day: true,
         approval_status: true,

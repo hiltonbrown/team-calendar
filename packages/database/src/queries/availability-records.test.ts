@@ -6,13 +6,13 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
 }));
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     availabilityRecord: {
       findFirst: mocks.findFirst,
       findMany: mocks.findMany,
     },
-  },
+  }),
 }));
 
 const { listAvailabilityForCalendar } = await import("./availability-records");

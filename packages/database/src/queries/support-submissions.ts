@@ -6,7 +6,7 @@ import {
   SupportSubmissionCategorySchema,
 } from "@repo/core";
 import { z } from "zod";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 const SupportSubmissionAuditPayloadSchema = z.object({
@@ -40,7 +40,7 @@ export async function listRecentSupportSubmissionAudits(
   limit?: number
 ): Promise<Result<SupportSubmissionAuditData[]>> {
   try {
-    const auditEvents = await database.auditEvent.findMany({
+    const auditEvents = await tenantDatabase(clerkOrgId).auditEvent.findMany({
       orderBy: { created_at: "desc" },
       select: {
         action: true,

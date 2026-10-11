@@ -1,5 +1,5 @@
 import { type Result, xeroRecoveryMessage } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
 import {
   reconcileXeroApprovalState,
@@ -60,7 +60,9 @@ export async function executeLocalSyncFallback(
     if (state.value.state !== "connected") {
       return syncFailed(xeroRecoveryMessage(state.value.state));
     }
-    const tenant = await database.xeroConnection.findFirst({
+    const tenant = await tenantDatabase(
+      input.clerkOrgId
+    ).xeroConnection.findFirst({
       select: { id: true },
       where: {
         clerk_org_id: input.clerkOrgId,
@@ -82,16 +84,20 @@ export async function executeLocalSyncFallback(
     if (!syncResult.ok) {
       return syncResult;
     }
+    const { runId } = syncResult.value;
+    if (!runId) {
+      return syncFailed("The Xero connection changed. Try again.");
+    }
     if (
       syncResult.value.status === "failed" ||
       syncResult.value.status === "cancelled"
     ) {
       if (syncResult.value.status === "failed") {
-        const run = await database.syncRun.findFirst({
+        const run = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
           select: { error_summary: true },
           where: {
             clerk_org_id: input.clerkOrgId,
-            id: syncResult.value.runId,
+            id: runId,
             organisation_id: input.organisationId,
           },
         });
@@ -109,7 +115,7 @@ export async function executeLocalSyncFallback(
         failed: value.failed,
         ...(hasCount(value, "fetched") ? { fetched: value.fetched } : {}),
         queued: true,
-        runId: value.runId,
+        runId,
         ...(hasCount(value, "skipped") ? { skipped: value.skipped } : {}),
         status,
         ...(hasCount(value, "upserted") ? { upserted: value.upserted } : {}),

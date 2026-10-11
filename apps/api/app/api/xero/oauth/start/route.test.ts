@@ -132,18 +132,31 @@ describe("Xero OAuth start route", () => {
   });
 });
 
-describe("Organisation-bound Xero consent", () => {
-  it("rejects consent without a target payroll Organisation", async () => {
+describe("Add company Xero consent", () => {
+  it("starts consent without a preset payroll company", async () => {
     vi.clearAllMocks();
     mocks.requireOrg.mockResolvedValue("org_clerk_123");
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
     mocks.requireRole.mockResolvedValue(true);
+    mocks.buildXeroOAuthStartUrl.mockResolvedValue({
+      ok: true,
+      value: {
+        nonce: "nonce",
+        redirectUrl: "https://login.xero.com/identity/connect/authorize",
+      },
+    });
     const response = await GET(
       new Request(
         "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
       )
     );
-    expect(response.status).toBe(400);
-    expect(mocks.buildXeroOAuthStartUrl).not.toHaveBeenCalled();
+    expect(response.status).toBe(307);
+    expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: "org_clerk_123",
+        organisationId: null,
+        userId: "user_1",
+      })
+    );
   });
 });

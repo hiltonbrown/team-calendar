@@ -7,7 +7,7 @@ import {
   type OrganisationId,
   type Result,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { z } from "zod";
 
@@ -50,7 +50,7 @@ const isUniqueConflict = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   error.code === "P2002";
 
-type Transaction = Parameters<Parameters<typeof database.$transaction>[0]>[0];
+type Transaction = Prisma.TransactionClient;
 
 const failure = (
   code: HolidayPreferenceError["code"],
@@ -80,7 +80,9 @@ async function resolveHoliday(input: Base): Promise<PreferenceTarget | null> {
     if (!z.string().uuid().safeParse(id).success) {
       return null;
     }
-    const custom = await database.publicHoliday.findFirst({
+    const custom = await tenantDatabase(
+      input.clerkOrgId
+    ).publicHoliday.findFirst({
       select: { default_classification: true, name: true },
       where: {
         ...scopeOf(input),
@@ -113,7 +115,7 @@ async function resolveLocationName(
   if (locationId === null) {
     return { name: null, ok: true };
   }
-  const location = await database.location.findFirst({
+  const location = await tenantDatabase(input.clerkOrgId).location.findFirst({
     select: { id: true, name: true },
     where: {
       ...scopeOf(input),
@@ -198,7 +200,7 @@ async function applyPreference(
       location_id: input.locationId,
     };
     const write = () =>
-      database.$transaction(async (tx) => {
+      tenantTransaction(input.clerkOrgId, async (tx) => {
         const existing = await tx.publicHolidayPreference.findFirst({
           select: { id: true, setting: true },
           where,

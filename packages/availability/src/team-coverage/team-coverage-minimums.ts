@@ -1,5 +1,5 @@
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantTransaction } from "@repo/database";
 import {
   listTeamsWithCoverageMinimum,
   setTeamCoverageMinimum,
@@ -110,7 +110,7 @@ export async function updateTeamCoverageMinimum(
       return failure("validation_error", rangeMessage(team.activePeopleCount));
     }
     const { minimum } = value;
-    const result = await database.$transaction(async (tx) => {
+    const result = await tenantTransaction(input.clerkOrgId, async (tx) => {
       const change = await setTeamCoverageMinimum(
         {
           clerkOrgId: value.clerkOrgId,

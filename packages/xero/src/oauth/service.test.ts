@@ -36,11 +36,30 @@ const feedMock = vi.hoisted(() => ({ ensureDefaultCalendarFeed: vi.fn() }));
 const availabilityMock = vi.hoisted(() => ({}));
 const lockMock = vi.hoisted(() => ({ grant: vi.fn() }));
 const identityMock = vi.hoisted(() => ({ verify: vi.fn() }));
-vi.mock("@repo/database", () => ({
-  database: dbMock,
-  lockXeroAuthorisation: vi.fn(),
-  withXeroGrantLock: lockMock.grant,
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: dbMock,
+    lockXeroAuthorisation: vi.fn(),
+    withXeroGrantLock: lockMock.grant,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/database/queries/xero-connections", () => ({
   getScopedXeroConnection: async (input: {
     clerkOrgId: string;
@@ -69,6 +88,16 @@ vi.mock("./identity", () => ({
 vi.mock("@repo/observability/log", () => ({ log: loggerMock }));
 vi.mock("@repo/feeds", () => feedMock);
 vi.mock("@repo/availability", () => availabilityMock);
+vi.mock("@repo/database/queries/xero-ownership", () => ({
+  claimXeroTenant: vi.fn(async () => ({ status: "unowned" })),
+  listXeroTenantOwnership: vi.fn(async () => new Map()),
+}));
+vi.mock("@repo/database/queries/payroll-entitlements", () => ({
+  checkPayrollEntityEntitlement: vi.fn(async () => ({
+    ok: true,
+    value: { allowed: true, current: 0, limit: 5 },
+  })),
+}));
 const {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
@@ -191,11 +220,8 @@ describe("isPreviewDeployment", () => {
 });
 
 describe("buildXeroOAuthStartUrl", () => {
-  it.each([
-    { clerkOrgId: "org_1", userId: "user_1" },
-    { clerkOrgId: "org_1", organisationId: "payroll_1" },
-  ])(
-    "requires the Organisation and initiating user before consent: %j",
+  it.each([{ clerkOrgId: "org_1", organisationId: "payroll_1" }])(
+    "requires the initiating user before consent: %j",
     async (input) => {
       expect(await buildXeroOAuthStartUrl(input)).toMatchObject({
         error: { code: "invalid_state" },

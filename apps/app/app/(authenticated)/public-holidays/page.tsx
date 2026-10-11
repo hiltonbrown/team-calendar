@@ -3,7 +3,7 @@ import {
   type ResolvedPublicHoliday,
   resolvePublicHolidays,
 } from "@repo/availability";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { requirePageRole } from "@/lib/auth/require-page-role";
@@ -47,7 +47,7 @@ const PublicHolidaysPage = async ({
       organisationId,
       to: `${filters.year}-12-31`,
     }),
-    database.location.findMany({
+    tenantDatabase(clerkOrgId).location.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true },
       where: scopedQuery(clerkOrgId, organisationId),

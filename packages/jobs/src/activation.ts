@@ -1,7 +1,7 @@
 import "server-only";
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 export interface CaptureInitialSyncCompletedInput {
   clerkOrgId: string;
@@ -25,7 +25,9 @@ export async function captureInitialSyncCompleted(
   input: CaptureInitialSyncCompletedInput
 ): Promise<void> {
   try {
-    const connection = await database.xeroConnection.findFirst({
+    const connection = await tenantDatabase(
+      input.clerkOrgId
+    ).xeroConnection.findFirst({
       select: { initial_sync_completed_at: true },
       where: connectionWhere(input),
     });
@@ -52,11 +54,11 @@ export async function checkXeroImportReadiness(
   input: CaptureInitialSyncCompletedInput
 ): Promise<XeroImportReadiness> {
   const [connection, unresolvedPeopleCount] = await Promise.all([
-    database.xeroConnection.findFirst({
+    tenantDatabase(input.clerkOrgId).xeroConnection.findFirst({
       select: { initial_sync_completed_at: true },
       where: connectionWhere(input),
     }),
-    database.xeroPersonMatch.count({
+    tenantDatabase(input.clerkOrgId).xeroPersonMatch.count({
       where: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,

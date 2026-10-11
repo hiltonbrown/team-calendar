@@ -97,7 +97,11 @@ export function CalendarMonthView({
                         event={event}
                         key={`${event.id}-${dateOnly}`}
                         orgQueryValue={orgQueryValue}
-                        timezone={data.range.timezone}
+                        timezone={
+                          data.companies.find(
+                            (company) => company.id === event.companyId
+                          )?.timezone ?? data.range.timezone
+                        }
                       />
                     ))}
                     {hiddenCount > 0 && (
@@ -172,7 +176,11 @@ export function CalendarMonthView({
                       event={event}
                       key={`${event.id}-${dateOnly}-agenda`}
                       orgQueryValue={orgQueryValue}
-                      timezone={data.range.timezone}
+                      timezone={
+                        data.companies.find(
+                          (company) => company.id === event.companyId
+                        )?.timezone ?? data.range.timezone
+                      }
                     />
                   ))
                 ) : (

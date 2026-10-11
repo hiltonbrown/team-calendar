@@ -1,3 +1,7 @@
+vi.mock("@repo/auth/helpers", () => ({
+  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+}));
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -25,7 +29,12 @@ vi.mock("@repo/auth/server", () => ({
   clerkClient: mocks.clerkClient,
   currentUser: mocks.currentUser,
 }));
-vi.mock("@repo/database", () => ({ database: mocks.database }));
+vi.mock("@repo/database", () => ({
+  tenantDatabase: vi.fn(() => mocks.database),
+  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+    mocks.database.$transaction(operation)
+  ),
+}));
 vi.mock("@repo/observability/log", () => ({ log: mocks.log }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/server/get-active-org-context", () => ({

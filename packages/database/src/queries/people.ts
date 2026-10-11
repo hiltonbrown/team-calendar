@@ -1,6 +1,6 @@
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 export interface PersonData {
@@ -32,7 +32,7 @@ export async function listPeopleForOrganisation(
   filters?: PeopleFilters
 ): Promise<Result<PersonData[]>> {
   try {
-    const people = await database.person.findMany({
+    const people = await tenantDatabase(clerkOrgId).person.findMany({
       orderBy: { first_name: "asc" },
       select: {
         clerk_org_id: true,
@@ -83,7 +83,7 @@ export async function getPersonProfile(
   >
 > {
   try {
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(clerkOrgId).person.findFirst({
       select: {
         clerk_org_id: true,
         created_at: true,

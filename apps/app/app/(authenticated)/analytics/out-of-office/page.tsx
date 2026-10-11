@@ -6,7 +6,7 @@ import {
   resolveDateRange,
 } from "@repo/availability";
 import { getAvailabilityRecordLabel } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import {
   Card,
   CardContent,
@@ -73,7 +73,7 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
 
   const { clerkOrgId, organisationId } =
     await requireActiveOrgPageContext(orgParam);
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
     select: { timezone: true },
     where: {
       archived_at: null,

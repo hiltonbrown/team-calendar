@@ -1,3 +1,4 @@
+import { tenantDatabase } from "@repo/database";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const uuidV5Pattern =
@@ -28,10 +29,10 @@ vi.mock("@repo/availability", () => ({
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     organisation: { findMany: mocks.organisationFindMany },
     person: { updateMany: mocks.personUpdateMany },
-  },
+  })),
 }));
 vi.mock("@repo/observability/log", () => ({
   log: {
@@ -99,6 +100,9 @@ describe("Clerk organisation membership webhook handling", () => {
     );
 
     expect(response.status).toBe(201);
+    expect(tenantDatabase).toHaveBeenCalledWith(
+      membershipFixture().organization.id
+    );
     expect(mocks.organisationFindMany).toHaveBeenCalledWith({
       select: {
         clerk_org_id: true,

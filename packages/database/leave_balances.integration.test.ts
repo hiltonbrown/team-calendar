@@ -9,7 +9,11 @@ const fixture = allocateLiveTestFixture(
   "packages/database/leave_balances.integration.test.ts"
 );
 
-const { database, employment_type, source_system } = await import("./index.js");
+const {
+  systemDatabase: database,
+  employment_type,
+  source_system,
+} = await import("./index.js");
 const { listLeaveBalancesForOrganisation, listLeaveBalancesForPerson } =
   await import("./src/queries/leave-balances.js");
 

@@ -1,7 +1,7 @@
 import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
@@ -325,7 +325,7 @@ export async function listPeople(input: {
     const personWhere: Prisma.PersonWhereInput = statusWhere
       ? { AND: [baseWhere, statusWhere] }
       : baseWhere;
-    const people = await database.person.findMany({
+    const people = await tenantDatabase(clerkOrgId).person.findMany({
       orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
       select: personListSelect,
       take: pagination.pageSize + 1,
@@ -333,9 +333,13 @@ export async function listPeople(input: {
         ? { AND: [personWhere, peopleCursorWhere(cursor)] }
         : personWhere,
     });
-    const totalCount = await database.person.count({ where: personWhere });
+    const totalCount = await tenantDatabase(clerkOrgId).person.count({
+      where: personWhere,
+    });
     const pageRows = people.slice(0, pagination.pageSize);
-    const failedCounts = await database.availabilityRecord.groupBy({
+    const failedCounts = await tenantDatabase(
+      clerkOrgId
+    ).availabilityRecord.groupBy({
       _count: { _all: true },
       by: ["person_id"],
       where: {
@@ -504,7 +508,7 @@ async function buildCurrentStatusWhere(input: {
   });
   const approved = active(LEAVE_TYPES, "approved");
   const pending = active(LEAVE_TYPES, "submitted");
-  const locations = await database.location.findMany({
+  const locations = await tenantDatabase(input.clerkOrgId).location.findMany({
     select: { id: true },
     where: scoped,
   });
@@ -618,7 +622,9 @@ export async function getPersonProfile(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: personProfileSelect,
       where: {
         ...scoped,
@@ -649,7 +655,7 @@ export async function getPersonProfile(input: {
         organisationId: parsed.data.organisationId,
         personId: person.id,
       }),
-      database.leaveBalance.findMany({
+      tenantDatabase(parsed.data.clerkOrgId).leaveBalance.findMany({
         orderBy: [{ leave_type_name: "asc" }, { leave_type_xero_id: "asc" }],
         select: leaveBalanceProfileSelect,
         where: {
@@ -657,7 +663,7 @@ export async function getPersonProfile(input: {
           person_id: person.id,
         },
       }),
-      database.availabilityRecord.count({
+      tenantDatabase(parsed.data.clerkOrgId).availabilityRecord.count({
         where: {
           ...scoped,
           approval_status: "xero_sync_failed",
@@ -668,7 +674,7 @@ export async function getPersonProfile(input: {
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
       }),
-      database.alternativeContact.findMany({
+      tenantDatabase(parsed.data.clerkOrgId).alternativeContact.findMany({
         orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
         select: alternativeContactSelect,
         where: {
@@ -686,9 +692,7 @@ export async function getPersonProfile(input: {
       ? balances.filter((balance) => balance.xero_connection_id !== null)
       : balances.filter((balance) => balance.xero_connection_id === null);
     const balanceRows =
-      (xeroLinked && hasXero) || !hasXero
-        ? visibleBalances.map(toBalanceRow)
-        : [];
+      xeroLinked || !hasXero ? visibleBalances.map(toBalanceRow) : [];
     const balancesLastFetchedAt = hasXero
       ? maxDate(visibleBalances.map((row) => row.last_fetched_at))
       : null;
@@ -778,7 +782,9 @@ export async function listHistoryPage(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
     });
@@ -786,7 +792,9 @@ export async function listHistoryPage(input: {
       return await personNotFound(parsed.data);
     }
     const cursor = decodeDateCursor(parsed.data.cursor ?? null);
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).availabilityRecord.findMany({
       orderBy: [{ starts_at: "desc" }, { id: "desc" }],
       select: availabilityRecordSelect,
       take: parsed.data.pageSize + 1,
@@ -832,7 +840,9 @@ export async function listUpcomingRecords(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
     });
@@ -842,7 +852,9 @@ export async function listUpcomingRecords(input: {
     const now = new Date();
     const horizonEnd = new Date(now);
     horizonEnd.setUTCDate(horizonEnd.getUTCDate() + parsed.data.horizonDays);
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).availabilityRecord.findMany({
       orderBy: [{ starts_at: "asc" }, { id: "asc" }],
       select: availabilityRecordSelect,
       where: {
@@ -1160,7 +1172,7 @@ async function personNotFound(input: {
   organisationId: string;
   personId: string;
 }): Promise<Result<never, PeopleServiceError>> {
-  const exists = await database.person.findFirst({
+  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.personId },
   });

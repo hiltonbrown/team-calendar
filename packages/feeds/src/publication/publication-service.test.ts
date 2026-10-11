@@ -125,8 +125,8 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     availabilityPublication: {
       create: mocks.availabilityPublicationCreate,
       findFirst: mocks.availabilityPublicationFindUnique,
@@ -135,8 +135,12 @@ vi.mock("@repo/database", () => ({
     availabilityRecord: {
       findFirst: mocks.availabilityRecordFindFirst,
     },
-  },
-}));
+  };
+  return {
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 
 const { materialiseAvailabilityPublication } = await import(
   "./publication-service"

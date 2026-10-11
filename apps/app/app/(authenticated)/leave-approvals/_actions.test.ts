@@ -40,7 +40,7 @@ vi.mock("@repo/availability", () => ({
   revertApprovalAttempt: mocks.revertApprovalAttempt,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
+  tenantDatabase: vi.fn(() => mocks.database),
 }));
 vi.mock("@repo/xero", () => ({
   XeroWriteAdapter: {},

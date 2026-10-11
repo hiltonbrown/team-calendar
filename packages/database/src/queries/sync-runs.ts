@@ -1,6 +1,6 @@
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 export interface SyncRunSummaryData {
@@ -39,7 +39,7 @@ export async function getLatestSyncRunSummary(
   organisationId: OrganisationId
 ): Promise<Result<SyncRunSummaryData | null>> {
   try {
-    const syncRun = await database.syncRun.findFirst({
+    const syncRun = await tenantDatabase(clerkOrgId).syncRun.findFirst({
       orderBy: { started_at: "desc" },
       select: {
         completed_at: true,
@@ -88,7 +88,7 @@ export async function listRecentSyncRuns(
   limit?: number
 ): Promise<Result<SyncRunSummaryData[]>> {
   try {
-    const syncRuns = await database.syncRun.findMany({
+    const syncRuns = await tenantDatabase(clerkOrgId).syncRun.findMany({
       orderBy: { started_at: "desc" },
       select: {
         completed_at: true,
@@ -131,7 +131,9 @@ export async function listFailedRecordsForSyncRun(
   syncRunId: string
 ): Promise<Result<FailedRecordData[]>> {
   try {
-    const failedRecords = await database.failedRecord.findMany({
+    const failedRecords = await tenantDatabase(
+      clerkOrgId
+    ).failedRecord.findMany({
       orderBy: { created_at: "desc" },
       select: {
         created_at: true,
@@ -172,7 +174,7 @@ export async function listRecentAuditEvents(
   limit?: number
 ): Promise<Result<AuditEventData[]>> {
   try {
-    const auditEvents = await database.auditEvent.findMany({
+    const auditEvents = await tenantDatabase(clerkOrgId).auditEvent.findMany({
       orderBy: { created_at: "desc" },
       select: {
         action: true,

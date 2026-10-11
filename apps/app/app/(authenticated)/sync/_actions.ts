@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   cancelRun,
@@ -90,6 +91,13 @@ export async function dispatchManualSyncAction(input: {
   runType: string;
   connectionId: string;
 }): Promise<Result<DispatchResultValue, SyncActionError>> {
+  const [admin, owner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  if (!(admin || owner)) {
+    return notAuthorised();
+  }
   const parsed = DispatchManualSyncActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -162,6 +170,13 @@ export async function cancelRunAction(input: {
 }): Promise<
   Result<{ cancellationRequested: true; eventQueued: boolean }, SyncActionError>
 > {
+  const [admin, owner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  if (!(admin || owner)) {
+    return notAuthorised();
+  }
   const parsed = CancelRunActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);

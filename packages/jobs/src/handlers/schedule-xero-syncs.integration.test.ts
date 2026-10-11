@@ -37,7 +37,7 @@ describe("local persistence integration", async () => {
   const fixture = allocateLiveTestFixture(
     "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts"
   );
-  const { database } = await import("@repo/database");
+  const { systemDatabase: database } = await import("@repo/database");
   const { scheduleXeroSyncsPage } = await import("./schedule-xero-syncs");
   const tenantA = {
     authorisationId: fixture.id("authorisation", 0),

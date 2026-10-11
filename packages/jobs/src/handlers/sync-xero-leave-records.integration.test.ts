@@ -23,29 +23,30 @@ vi.mock("@repo/database", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/database")>();
   return {
     ...original,
-    database: new Proxy(original.database, {
-      get(target, property, receiver) {
-        if (property !== "availabilityRecord") {
-          return Reflect.get(target, property, receiver);
-        }
-        return new Proxy(target.availabilityRecord, {
-          get(delegate, method, delegateReceiver) {
-            if (method !== "findMany") {
-              return Reflect.get(delegate, method, delegateReceiver);
-            }
-            return async (
-              args: import("@repo/database").Prisma.AvailabilityRecordFindManyArgs
-            ) => {
-              const rows = await delegate.findMany(args);
-              if (args.select?.source_last_modified_at === true) {
-                await afterSnapshotRead();
+    tenantDatabase: (clerkOrgId: string) =>
+      new Proxy(original.tenantDatabase(clerkOrgId), {
+        get(target, property, receiver) {
+          if (property !== "availabilityRecord") {
+            return Reflect.get(target, property, receiver);
+          }
+          return new Proxy(target.availabilityRecord, {
+            get(delegate, method, delegateReceiver) {
+              if (method !== "findMany") {
+                return Reflect.get(delegate, method, delegateReceiver);
               }
-              return rows;
-            };
-          },
-        });
-      },
-    }),
+              return async (
+                args: import("@repo/database").Prisma.AvailabilityRecordFindManyArgs
+              ) => {
+                const rows = await delegate.findMany(args);
+                if (args.select?.source_last_modified_at === true) {
+                  await afterSnapshotRead();
+                }
+                return rows;
+              };
+            },
+          });
+        },
+      }),
   };
 });
 vi.mock("@repo/xero", async (importOriginal) => {
@@ -77,7 +78,7 @@ describe("local persistence integration", async () => {
   const fixture = allocateLiveTestFixture(
     "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts"
   );
-  const { database } = await import("@repo/database");
+  const { systemDatabase: database } = await import("@repo/database");
   const { syncXeroLeaveRecords } = await import("./sync-xero-leave-records");
   const tenantA = {
     authorisationId: fixture.id("authorisation", 0),

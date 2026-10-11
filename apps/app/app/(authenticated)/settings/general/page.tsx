@@ -1,6 +1,6 @@
 import { auth, clerkClient } from "@repo/auth/server";
 import { isCountryCode, REGIONS } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
@@ -32,7 +32,7 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
 
   const [clerk, organisation] = await Promise.all([
     clerkClient(),
-    database.organisation.findFirst({
+    tenantDatabase(clerkOrgId).organisation.findFirst({
       select: {
         country_code: true,
         name: true,

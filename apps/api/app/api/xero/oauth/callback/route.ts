@@ -1,3 +1,4 @@
+import { requireRole } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import {
@@ -72,6 +73,24 @@ export async function GET(request: Request) {
       )
     );
   }
+  const session = await auth();
+  if (!(session.orgId && session.userId)) {
+    return clearNonce(
+      NextResponse.json({ error: "Not authenticated." }, { status: 401 })
+    );
+  }
+  const [admin, owner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  if (!hasCallbackPrivilege(session.orgRole, admin, owner)) {
+    return clearNonce(
+      NextResponse.json(
+        { error: "Only admins and owners can connect Xero." },
+        { status: 403 }
+      )
+    );
+  }
   const url = new URL(request.url);
   const code = url.searchParams.get("code"),
     state = url.searchParams.get("state");
@@ -91,20 +110,6 @@ export async function GET(request: Request) {
       NextResponse.json(
         { error: "Missing Xero OAuth callback parameters." },
         { status: 400 }
-      )
-    );
-  }
-  const session = await auth();
-  if (!(session.orgId && session.userId)) {
-    return clearNonce(
-      NextResponse.json({ error: "Not authenticated." }, { status: 401 })
-    );
-  }
-  if (session.orgRole !== "org:owner" && session.orgRole !== "org:admin") {
-    return clearNonce(
-      NextResponse.json(
-        { error: "Only admins and owners can connect Xero." },
-        { status: 403 }
       )
     );
   }
@@ -150,4 +155,12 @@ export async function GET(request: Request) {
     ? result.value.redirectTo
     : XERO_SETTINGS_PATH;
   return clearNonce(NextResponse.redirect(new URL(redirectTo, appBaseUrl)));
+}
+
+function hasCallbackPrivilege(
+  role: string | null | undefined,
+  admin: boolean,
+  owner: boolean
+): boolean {
+  return (admin || owner) && (role === "org:admin" || role === "org:owner");
 }

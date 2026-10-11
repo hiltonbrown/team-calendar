@@ -11,7 +11,7 @@ import {
   type WizardSnapshot,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { setXeroSetupSkipped } from "@repo/database/queries/onboarding";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -140,14 +140,18 @@ export async function linkSelfAction(
     organisation_id: actor.value.organisationId,
   };
   try {
-    const alreadyLinked = await database.person.findFirst({
+    const alreadyLinked = await tenantDatabase(
+      actor.value.clerkOrgId
+    ).person.findFirst({
       select: { id: true },
       where: { ...scope, clerk_user_id: actor.value.userId },
     });
     if (alreadyLinked) {
       return validationError("Your account is already linked to a person.");
     }
-    const linked = await database.person.updateMany({
+    const linked = await tenantDatabase(
+      actor.value.clerkOrgId
+    ).person.updateMany({
       data: { clerk_user_id: actor.value.userId },
       where: { ...scope, clerk_user_id: null, id: parsed.data.personId },
     });
@@ -156,7 +160,7 @@ export async function linkSelfAction(
         "That person is already linked to another account. Choose someone else."
       );
     }
-    await database.auditEvent.create({
+    await tenantDatabase(actor.value.clerkOrgId).auditEvent.create({
       data: {
         action: "person.linked_to_user",
         actor_user_id: actor.value.userId,

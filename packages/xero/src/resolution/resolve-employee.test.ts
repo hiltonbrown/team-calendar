@@ -3,11 +3,30 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   personFindFirst: vi.fn(),
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    person: { findFirst: mocks.personFindFirst },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      person: { findFirst: mocks.personFindFirst },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 const { resolveXeroEmployeeId } = await import("./resolve-employee");
 const xeroConnection = {
   accessToken: "access-token",

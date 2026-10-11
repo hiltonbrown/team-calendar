@@ -12,6 +12,7 @@ import { inngest } from "../client";
 import { syncXeroLeaveBalances } from "./sync-xero-leave-balances";
 import { syncXeroLeaveRecords } from "./sync-xero-leave-records";
 import { syncXeroPeople } from "./sync-xero-people";
+import { isCurrentXeroSyncBinding } from "./xero-sync-access";
 
 const InputSchema = z.object({
   clerkOrgId: z.string().min(1),
@@ -45,7 +46,10 @@ function successfulPhase<T extends { status: string }>(
 async function executeInitialSync(
   input: InitialXeroSyncInput,
   runStep: RunStep
-): Promise<InitialXeroSyncResult> {
+): Promise<InitialXeroSyncResult | { status: "ignored" }> {
+  if (!(await isCurrentXeroSyncBinding(input))) {
+    return { status: "ignored" };
+  }
   const requestedAt =
     input.requestedAt ?? (await ensureXeroInitialSyncRequested(input));
   if (!requestedAt) {
@@ -104,7 +108,9 @@ export const initialXeroSyncFunction: InngestFunction.Any =
   );
 export async function initialXeroSync(
   input: unknown
-): Promise<Result<InitialXeroSyncResult, InitialXeroSyncError>> {
+): Promise<
+  Result<InitialXeroSyncResult | { status: "ignored" }, InitialXeroSyncError>
+> {
   const parsed = InputSchema.safeParse(input);
   if (!parsed.success) {
     return {

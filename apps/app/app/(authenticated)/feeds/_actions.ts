@@ -3,7 +3,7 @@
 import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import {
   archiveFeed,
   buildFeedSubscribeUrl,
@@ -225,7 +225,7 @@ export async function rotateTokenAction(
   // Fetch feed name cheaply to include in notification body
   let feedName: string | null = null;
   try {
-    const feed = await database.feed.findFirst({
+    const feed = await tenantDatabase(context.value.clerkOrgId).feed.findFirst({
       select: { name: true },
       where: {
         // Both tenant keys: one Clerk Organisation can own several Organisation

@@ -247,6 +247,7 @@ export const runProductionPreflight = (
 
   if (appName === "app" || appName === "api") {
     checkPresent("DATABASE_URL");
+    checkUrl("DATABASE_APP_URL");
     checkPresent("XERO_TOKEN_ENCRYPTION_KEY");
     checkedVars.push(
       "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION",

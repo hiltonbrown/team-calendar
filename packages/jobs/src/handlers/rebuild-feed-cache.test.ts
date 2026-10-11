@@ -30,11 +30,33 @@ vi.mock("../client", () => ({
     send: vi.fn(),
   },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    feed: { findFirst: mocks.feedFindFirst, updateMany: mocks.feedUpdateMany },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      feed: {
+        findFirst: mocks.feedFindFirst,
+        updateMany: mocks.feedUpdateMany,
+      },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/feeds", () => ({
   feedCacheKey: mocks.feedCacheKey,
   invalidateFeedCache: mocks.invalidateFeedCache,
@@ -89,6 +111,17 @@ describe("rebuildFeedCache", () => {
       privacy_mode: "named",
       updated_at: new Date("2026-05-01T00:00:00.000Z"),
     });
+  });
+  it("rebuilds account-wide feeds with null company scope", async () => {
+    const result = await rebuildFeedCache(input({ organisationId: null }));
+    expect(result.ok).toBe(true);
+    expect(mocks.renderFeedBody).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: CLERK_ORG_ID,
+        feedId: FEED_ID,
+        organisationId: null,
+      })
+    );
   });
   it("scopes the feed lookup by both clerk org and organisation", async () => {
     await rebuildFeedCache(input());

@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@repo/auth/server";
 import { isOnboardingAdmin, loadWizardSnapshot } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { ChevronLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
@@ -10,6 +11,7 @@ import { SetupColumn } from "@/components/setup/setup-column";
 import { StepIndicator } from "@/components/setup/step-indicator";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { withOrg } from "@/lib/navigation/org-url";
+import { ensureDefaultOrganisation } from "@/lib/server/ensure-default-organisation";
 import { loadOnboardingPeople } from "@/lib/server/load-onboarding-people";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { DetailsStep } from "./steps/details-step";
@@ -46,12 +48,21 @@ function first(value: string | string[] | undefined): string | null {
 
 const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
   const params = await searchParams;
-  const [{ orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(user && isOnboardingAdmin(orgRole))) {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  if (!(orgId && user && isOnboardingAdmin(orgRole))) {
     redirect("/");
   }
+  let requestedOrganisationId = first(params.org) ?? undefined;
+  if (!requestedOrganisationId) {
+    const companies = await resolveAccountCompanies(orgId);
+    if (companies.length === 0) {
+      // First-run onboarding explicitly provisions the account's initial company.
+      const initial = await ensureDefaultOrganisation(orgId as ClerkOrgId);
+      requestedOrganisationId = initial.organisationId;
+    }
+  }
   const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(first(params.org) ?? undefined);
+    await requireActiveOrgPageContext(requestedOrganisationId);
   const actor = {
     actingRole: orgRole,
     clerkOrgId,

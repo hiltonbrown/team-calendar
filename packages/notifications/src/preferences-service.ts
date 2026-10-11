@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, database } from "@repo/database";
+import { type Database, tenantDatabase } from "@repo/database";
 import type { notification_type } from "@repo/database/generated/enums";
 import { z } from "zod";
 import {
@@ -54,12 +54,13 @@ const ChannelSchema = ScopedUserSchema.extend({
 
 export async function listPreferences(
   input: z.input<typeof ScopedUserSchema>,
-  client: PreferencesServiceDatabase = database
+  providedClient?: PreferencesServiceDatabase
 ): Promise<Result<NotificationPreferenceRow[], PreferencesServiceError>> {
   const parsed = ScopedUserSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
 
   try {
     const storedRows = await client.notificationPreference.findMany({
@@ -99,12 +100,13 @@ export async function listPreferences(
 
 export async function upsertPreference(
   input: z.input<typeof UpsertSchema>,
-  client: PreferencesServiceDatabase = database
+  providedClient?: PreferencesServiceDatabase
 ): Promise<Result<NotificationPreferenceRow, PreferencesServiceError>> {
   const parsed = UpsertSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
   if (!isKnownNotificationType(parsed.data.notificationType)) {
     return invalidType();
   }
@@ -160,12 +162,13 @@ export async function upsertPreference(
 
 export async function shouldDeliverToChannel(
   input: z.input<typeof ChannelSchema>,
-  client: PreferencesServiceDatabase = database
+  providedClient?: PreferencesServiceDatabase
 ): Promise<Result<boolean, PreferencesServiceError>> {
   const parsed = ChannelSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
   if (!isKnownNotificationType(parsed.data.notificationType)) {
     return invalidType();
   }

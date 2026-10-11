@@ -2,7 +2,7 @@ import { log } from "@repo/observability/log";
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
 import { z } from "zod";
 import type { AlternativeContactSnapshot, PeopleRole } from "./people-service";
 
@@ -91,7 +91,9 @@ export async function addAlternativeContact(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: { id: true, manager_person_id: true },
       where: {
         ...scoped,
@@ -107,43 +109,46 @@ export async function addAlternativeContact(input: {
       return notAuthorised();
     }
 
-    const contact = await database.$transaction(async (tx) => {
-      const lastContact = await tx.alternativeContact.findFirst({
-        orderBy: { display_order: "desc" },
-        select: { display_order: true },
-        where: {
-          ...scoped,
-          person_id: person.id,
-        },
-      });
-      const created = await tx.alternativeContact.create({
-        data: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          display_order: (lastContact?.display_order ?? -1) + 1,
-          email: emptyToNull(parsed.data.email),
-          name: parsed.data.name,
-          notes: emptyToNull(parsed.data.notes),
-          organisation_id: parsed.data.organisationId,
-          person_id: person.id,
-          phone: emptyToNull(parsed.data.phone),
-          role: emptyToNull(parsed.data.role),
-        },
-        select: alternativeContactSelect,
-      });
-      await tx.auditEvent.create({
-        data: auditData(
-          parsed.data,
-          "alternative_contacts.added",
-          person.id,
-          created.id,
-          {
-            contactId: created.id,
-            personId: person.id,
-          }
-        ),
-      });
-      return created;
-    });
+    const contact = await tenantTransaction(
+      parsed.data.clerkOrgId,
+      async (tx) => {
+        const lastContact = await tx.alternativeContact.findFirst({
+          orderBy: { display_order: "desc" },
+          select: { display_order: true },
+          where: {
+            ...scoped,
+            person_id: person.id,
+          },
+        });
+        const created = await tx.alternativeContact.create({
+          data: {
+            clerk_org_id: parsed.data.clerkOrgId,
+            display_order: (lastContact?.display_order ?? -1) + 1,
+            email: emptyToNull(parsed.data.email),
+            name: parsed.data.name,
+            notes: emptyToNull(parsed.data.notes),
+            organisation_id: parsed.data.organisationId,
+            person_id: person.id,
+            phone: emptyToNull(parsed.data.phone),
+            role: emptyToNull(parsed.data.role),
+          },
+          select: alternativeContactSelect,
+        });
+        await tx.auditEvent.create({
+          data: auditData(
+            parsed.data,
+            "alternative_contacts.added",
+            person.id,
+            created.id,
+            {
+              contactId: created.id,
+              personId: person.id,
+            }
+          ),
+        });
+        return created;
+      }
+    );
 
     return { ok: true, value: toAlternativeContactSnapshot(contact) };
   } catch {
@@ -202,44 +207,47 @@ export async function updateAlternativeContact(input: {
       return validationError(contactFields.error);
     }
 
-    const updated = await database.$transaction(async (tx) => {
-      const row = await tx.alternativeContact.update({
-        data: {
-          email:
-            parsed.data.patch.email === undefined
-              ? undefined
-              : emptyToNull(parsed.data.patch.email),
-          name: parsed.data.patch.name,
-          notes:
-            parsed.data.patch.notes === undefined
-              ? undefined
-              : emptyToNull(parsed.data.patch.notes),
-          phone:
-            parsed.data.patch.phone === undefined
-              ? undefined
-              : emptyToNull(parsed.data.patch.phone),
-          role:
-            parsed.data.patch.role === undefined
-              ? undefined
-              : emptyToNull(parsed.data.patch.role),
-        },
-        select: alternativeContactSelect,
-        where: { id: existing.id },
-      });
-      await tx.auditEvent.create({
-        data: auditData(
-          parsed.data,
-          "alternative_contacts.updated",
-          existing.person_id,
-          existing.id,
-          {
-            contactId: existing.id,
-            personId: existing.person_id,
-          }
-        ),
-      });
-      return row;
-    });
+    const updated = await tenantTransaction(
+      parsed.data.clerkOrgId,
+      async (tx) => {
+        const row = await tx.alternativeContact.update({
+          data: {
+            email:
+              parsed.data.patch.email === undefined
+                ? undefined
+                : emptyToNull(parsed.data.patch.email),
+            name: parsed.data.patch.name,
+            notes:
+              parsed.data.patch.notes === undefined
+                ? undefined
+                : emptyToNull(parsed.data.patch.notes),
+            phone:
+              parsed.data.patch.phone === undefined
+                ? undefined
+                : emptyToNull(parsed.data.patch.phone),
+            role:
+              parsed.data.patch.role === undefined
+                ? undefined
+                : emptyToNull(parsed.data.patch.role),
+          },
+          select: alternativeContactSelect,
+          where: { id: existing.id },
+        });
+        await tx.auditEvent.create({
+          data: auditData(
+            parsed.data,
+            "alternative_contacts.updated",
+            existing.person_id,
+            existing.id,
+            {
+              contactId: existing.id,
+              personId: existing.person_id,
+            }
+          ),
+        });
+        return row;
+      }
+    );
 
     return { ok: true, value: toAlternativeContactSnapshot(updated) };
   } catch {
@@ -279,7 +287,7 @@ export async function deleteAlternativeContact(input: {
       return notAuthorised();
     }
 
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       await tx.alternativeContact.delete({ where: { id: existing.id } });
       const remaining = await tx.alternativeContact.findMany({
         orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
@@ -334,7 +342,9 @@ export async function reorderAlternativeContacts(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: { id: true, manager_person_id: true },
       where: {
         ...scoped,
@@ -350,7 +360,9 @@ export async function reorderAlternativeContacts(input: {
       return notAuthorised();
     }
 
-    const existing = await database.alternativeContact.findMany({
+    const existing = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).alternativeContact.findMany({
       orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
       select: { id: true },
       where: {
@@ -373,7 +385,7 @@ export async function reorderAlternativeContacts(input: {
       };
     }
 
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       for (const [
         displayOrder,
         contactId,
@@ -418,7 +430,7 @@ function loadContact(
   scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId },
   contactId: string
 ) {
-  return database.alternativeContact.findFirst({
+  return tenantDatabase(scoped.clerk_org_id).alternativeContact.findFirst({
     select: {
       ...alternativeContactSelect,
       person: {
@@ -499,7 +511,7 @@ async function personNotFound(input: {
   organisationId: string;
   personId: string;
 }): Promise<Result<never, AlternativeContactServiceError>> {
-  const exists = await database.person.findFirst({
+  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.personId },
   });
@@ -526,7 +538,9 @@ async function contactNotFound(input: {
   contactId: string;
   organisationId: string;
 }): Promise<Result<never, AlternativeContactServiceError>> {
-  const exists = await database.alternativeContact.findFirst({
+  const exists = await tenantDatabase(
+    input.clerkOrgId
+  ).alternativeContact.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.contactId },
   });

@@ -9,7 +9,7 @@ vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
   "packages/availability/src/people/current-user-service.integration.test.ts"
 );
-const { database } = await import("@repo/database");
+const { systemDatabase: database } = await import("@repo/database");
 const { ensureCurrentUserPerson } = await import("./current-user-service");
 
 const tenantA = {

@@ -6,7 +6,7 @@ vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
   "packages/database/onboarding.integration.test.ts"
 );
-const { database } = await import("./index.js");
+const { systemDatabase: database } = await import("./index.js");
 const {
   advanceOnboardingStep,
   completeOnboarding,

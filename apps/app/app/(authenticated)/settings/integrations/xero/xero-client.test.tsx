@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   dispatchManualSyncAction: vi.fn(),
   pauseTenantSyncAction: vi.fn(),
   refresh: vi.fn(),
+  removeCompanyAction: vi.fn(),
   resumeTenantSyncAction: vi.fn(),
   toastError: vi.fn(),
   toastMessage: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("./_actions", () => ({
   connectXeroAction: mocks.connectXeroAction,
   disconnectXeroAction: mocks.disconnectXeroAction,
   pauseTenantSyncAction: mocks.pauseTenantSyncAction,
+  removeCompanyAction: mocks.removeCompanyAction,
   resumeTenantSyncAction: mocks.resumeTenantSyncAction,
 }));
 const OAUTH_ACTION_REGEX = /^(Connect|Reconnect) Xero$/;
@@ -369,12 +371,6 @@ describe("XeroClient component", () => {
       openLabel: "Disconnect Xero",
       title: "Disconnect Xero?",
     },
-    {
-      confirmLabel: "Disconnect and purge",
-      mode: "destructive",
-      openLabel: "Disconnect and purge data",
-      title: "Disconnect Xero and purge data?",
-    },
   ])(
     "keeps connection history and a retry available after $mode disconnect fails",
     async ({ mode, openLabel, title, confirmLabel }) => {
@@ -428,6 +424,91 @@ describe("XeroClient component", () => {
       expect(mocks.refresh).toHaveBeenCalledTimes(1);
     }
   );
+  it("shows allowance and all company rows while disabling Add company at the limit", () => {
+    render(
+      <XeroClient
+        organisations={[
+          baseOrg,
+          { ...baseOrg, id: "company-b", name: "Acme Hotels" },
+        ]}
+        payrollEntityAllowance={{ limit: 5, remaining: 0, used: 5 }}
+      />
+    );
+    expect(screen.getByText("5 of 5 Xero files used")).toBeDefined();
+    expect(screen.getByText("Acme Corp")).toBeDefined();
+    expect(screen.getByText("Acme Hotels")).toBeDefined();
+    expect(
+      screen
+        .getByRole("button", { name: "Add company" })
+        .hasAttribute("disabled")
+    ).toBe(true);
+  });
+  it.each(["viewer", "manager"] as const)(
+    "hides integration controls from %s",
+    (role) => {
+      render(<XeroClient actingRole={role} organisations={[baseOrg]} />);
+      expect(screen.queryByRole("button")).toBeNull();
+    }
+  );
+  it("does not offer company removal to admins", () => {
+    render(<XeroClient actingRole="admin" organisations={[baseOrg]} />);
+    expect(screen.queryByRole("button", { name: "Remove company" })).toBeNull();
+  });
+  it("requires confirmation explaining ownership release and archive before owner removal", async () => {
+    mocks.removeCompanyAction.mockResolvedValue({
+      ok: true,
+      value: { removed: true },
+    });
+    render(<XeroClient actingRole="owner" organisations={[baseOrg]} />);
+    fireEvent.click(screen.getByText("Connection controls"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove company" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Remove company?" });
+    expect(dialog.textContent).toContain("releases the Xero file");
+    expect(dialog.textContent).toContain("archives this company");
+    const confirm = within(dialog).getByRole("button", {
+      name: "Remove company",
+    });
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(
+      within(dialog).getByLabelText(DISCONNECT_CONFIRMATION_REGEX),
+      { target: { value: "Acme Corp" } }
+    );
+    fireEvent.click(confirm);
+    await waitFor(() =>
+      expect(mocks.removeCompanyAction).toHaveBeenCalledWith({
+        confirmationText: "Acme Corp",
+        connectionId: baseConnection.id,
+        organisationId: baseOrg.id,
+      })
+    );
+    expect(mocks.disconnectXeroAction).not.toHaveBeenCalled();
+  });
+  it("keeps ownership controls and retry after an uncertain removal failure", async () => {
+    mocks.removeCompanyAction.mockResolvedValue({
+      error: { message: "Ownership retained. Try again." },
+      ok: false,
+    });
+    render(<XeroClient actingRole="owner" organisations={[baseOrg]} />);
+    fireEvent.click(screen.getByText("Connection controls"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove company" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Remove company?" });
+    fireEvent.change(
+      within(dialog).getByLabelText(DISCONNECT_CONFIRMATION_REGEX),
+      { target: { value: "Acme Corp" } }
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Remove company" })
+    );
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        "Ownership retained. Try again."
+      )
+    );
+    expect(
+      screen.getByRole("alertdialog", { name: "Remove company?" })
+    ).toBeDefined();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
   it("exposes the existing audited pause action", async () => {
     mocks.pauseTenantSyncAction.mockResolvedValue({
       ok: true,

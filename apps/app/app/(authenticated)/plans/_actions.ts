@@ -20,7 +20,7 @@ import {
   withdrawSubmission,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
@@ -223,7 +223,9 @@ async function captureSubmissionActivation(input: {
   if (!input.submittedAt) {
     return;
   }
-  const first = await database.availabilityRecord.findFirst({
+  const first = await tenantDatabase(
+    input.clerkOrgId
+  ).availabilityRecord.findFirst({
     orderBy: { submitted_at: "asc" },
     select: { submitted_at: true },
     where: {
@@ -590,7 +592,9 @@ async function resolveFormDates(
     endsAt: Date;
   }>
 > {
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(
+    context.clerkOrgId
+  ).organisation.findFirst({
     select: { timezone: true },
     where: {
       archived_at: null,
@@ -617,7 +621,7 @@ async function resolveFormDates(
     timezone
   );
   const existing = recordId
-    ? await database.availabilityRecord.findFirst({
+    ? await tenantDatabase(context.clerkOrgId).availabilityRecord.findFirst({
         select: { all_day: true, ends_at: true, starts_at: true },
         where: {
           archived_at: null,

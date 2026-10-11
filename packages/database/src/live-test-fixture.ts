@@ -13,6 +13,9 @@ export const LIVE_FIXTURE_SUITES = {
       tenants: 2,
     },
   "packages/availability/index.integration.test.ts": { tenants: 3 },
+  "packages/availability/src/calendar/calendar-service.integration.test.ts": {
+    tenants: 3,
+  },
   "packages/availability/src/people/clerk-access-service.integration.test.ts": {
     tenants: 2,
   },
@@ -71,7 +74,7 @@ export const LIVE_FIXTURE_SUITES = {
     tenants: 2,
   },
   "packages/xero/src/oauth/service.integration.test.ts": {
-    globalKeys: { authorisation: 1, provider_app: 1 },
+    globalKeys: { authorisation: 1, plan_id: 1, plan_key: 1, provider_app: 1 },
     tenants: 2,
   },
   "packages/xero/src/rate-limit/shared-store.integration.test.ts": {

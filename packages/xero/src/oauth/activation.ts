@@ -1,7 +1,7 @@
 import "server-only";
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 
 export async function captureXeroConnected(input: {
   clerkOrgId: string;
@@ -9,7 +9,9 @@ export async function captureXeroConnected(input: {
   connectionId: string;
 }): Promise<void> {
   try {
-    const durableConnection = await database.xeroConnection.findFirst({
+    const durableConnection = await tenantDatabase(
+      input.clerkOrgId
+    ).xeroConnection.findFirst({
       select: { created_at: true },
       where: {
         clerk_org_id: input.clerkOrgId,

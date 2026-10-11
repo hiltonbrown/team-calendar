@@ -12,15 +12,15 @@ const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
 }));
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     organisationSettings: {
       create: mocks.create,
       findFirst: mocks.findFirst,
       findFirstOrThrow: mocks.findFirstOrThrow,
       updateMany: mocks.updateMany,
     },
-  },
+  }),
 }));
 vi.mock("../tenant-query", () => ({
   scopedQuery: mocks.scopedQuery,

@@ -7,7 +7,6 @@ import type {
 } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
-  database,
   getSubmitOperation,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
@@ -15,6 +14,8 @@ import {
   persistSubmitRecoveryMerge,
   releaseSubmitRecoverySideEffects,
   scopedTo,
+  tenantDatabase,
+  tenantTransaction,
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
@@ -169,7 +170,7 @@ export async function attachSubmitRecoveryCandidate(
     context.value.record.approval_status === targetStatus;
   const originalApprover =
     context.value.operation.action === "approve"
-      ? await database.person.findFirst({
+      ? await tenantDatabase(parsed.data.clerkOrgId).person.findFirst({
           select: { id: true },
           where: {
             ...scopedTo(parsed.data),
@@ -180,7 +181,7 @@ export async function attachSubmitRecoveryCandidate(
       : null;
   if (!alreadyAttached) {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep verified recovery state, original actor and reason, merge fencing and audit in one transaction.
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const duplicate = await tx.availabilityRecord.findFirst({
         where: {
           ...scopedTo(parsed.data),
@@ -294,7 +295,12 @@ export async function attachSubmitRecoveryCandidate(
     return sideEffects;
   }
 
-  if (!(await markSubmitCompleted(attempt, database))) {
+  if (
+    !(await markSubmitCompleted(
+      attempt,
+      tenantDatabase(parsed.data.clerkOrgId)
+    ))
+  ) {
     return recoveryError(
       "not_recoverable",
       "This operation changed. Reload and try again."
@@ -372,7 +378,7 @@ export async function resolveSubmitAsNotCreated(
       "No uncertain leave action is awaiting resolution."
     );
   }
-  const resolved = await database.$transaction(async (tx) => {
+  const resolved = await tenantTransaction(input.clerkOrgId, async (tx) => {
     const marked = await markSubmitDefinitiveFailure(
       operationAttempt(
         parsed.data,
@@ -420,7 +426,7 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
     return recoveryError("not_authorised", "Administrator access is required.");
   }
   const [record, operation] = await Promise.all([
-    database.availabilityRecord.findFirst({
+    tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
       include: {
         person: {
           select: {

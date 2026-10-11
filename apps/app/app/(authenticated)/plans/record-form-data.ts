@@ -6,7 +6,7 @@ import {
   getXeroConnectionStateForScope,
   isXeroLeaveType,
 } from "@repo/availability";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { withOrg } from "@/lib/navigation/org-url";
@@ -39,7 +39,7 @@ export async function loadPlanFormData({
   }
   const { clerkOrgId, organisationId, orgQueryValue } =
     await requireActiveOrgPageContext(org);
-  const currentPerson = await database.person.findFirst({
+  const currentPerson = await tenantDatabase(clerkOrgId).person.findFirst({
     select: {
       email: true,
       first_name: true,
@@ -63,7 +63,7 @@ export async function loadPlanFormData({
     last_name: string | null;
   }> = [];
   if (canSelectPerson) {
-    people = await database.person.findMany({
+    people = await tenantDatabase(clerkOrgId).person.findMany({
       orderBy: [{ first_name: "asc" }, { last_name: "asc" }],
       select: {
         email: true,
@@ -104,7 +104,7 @@ export async function loadPlanFormData({
   if (recordResult && !recordResult.ok) {
     notFound();
   }
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
     select: { timezone: true },
     where: { archived_at: null, clerk_org_id: clerkOrgId, id: organisationId },
   });
@@ -123,7 +123,7 @@ export async function loadPlanFormData({
   const balanceRecordType = prefillRecord?.recordType ?? "annual_leave";
   const balance =
     balancePersonId && isXeroLeaveType(balanceRecordType)
-      ? await database.leaveBalance.findFirst({
+      ? await tenantDatabase(clerkOrgId).leaveBalance.findFirst({
           orderBy: { updated_at: "desc" },
           select: {
             balance: true,

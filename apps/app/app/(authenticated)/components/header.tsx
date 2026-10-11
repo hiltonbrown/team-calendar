@@ -1,6 +1,7 @@
 import { requireOrg } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import type { ClerkOrgId } from "@repo/core";
+import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { listOrganisationsByClerkOrg } from "@repo/database/queries/organisations";
 import { ModeToggle } from "@repo/design-system/components/mode-toggle";
 import { Separator } from "@repo/design-system/components/ui/separator";
@@ -9,6 +10,7 @@ import { getUnreadCount, listRecentUnread } from "@repo/notifications";
 import { type ReactNode, Suspense } from "react";
 import { NotificationsBell } from "@/components/notifications/bell";
 import { CommandMenuTrigger } from "./command-menu-trigger";
+import { CompanySelector } from "./company-selector";
 import { CustomUserButton } from "./custom-user-button";
 
 interface HeaderProps {
@@ -23,7 +25,10 @@ export const Header = async ({
   children,
   organisationId,
 }: HeaderProps) => {
-  const bell = await loadBellData(organisationId);
+  const [bell, companies] = await Promise.all([
+    loadBellData(organisationId),
+    loadCompanies(),
+  ]);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-border border-b bg-background px-4 shadow-[var(--elev-sticky)]">
@@ -37,6 +42,10 @@ export const Header = async ({
       </div>
 
       <div className="flex items-center gap-2">
+        <CompanySelector
+          companies={companies}
+          organisationId={organisationId}
+        />
         {children}
         <CommandMenuTrigger />
         {bell ? (
@@ -120,5 +129,14 @@ async function loadBellData(organisationId?: string | null): Promise<{
     };
   } catch {
     return null;
+  }
+}
+
+async function loadCompanies(): Promise<Array<{ id: string; name: string }>> {
+  try {
+    const companies = await resolveAccountCompanies(await requireOrg());
+    return companies.map(({ id, name }) => ({ id, name }));
+  } catch {
+    return [];
   }
 }

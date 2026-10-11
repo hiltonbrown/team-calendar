@@ -20,8 +20,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     feed: {
       count: mocks.feedCount,
       findFirst: mocks.feedFindFirst,
@@ -34,9 +34,13 @@ vi.mock("@repo/database", () => ({
     team: {
       findMany: mocks.teamFindMany,
     },
-  },
-  scopedTo: mocks.scopedTo,
-}));
+  };
+  return {
+    scopedTo: mocks.scopedTo,
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+  };
+});
 
 const { createSignedFeedToken, getFeedDetail, listFeeds } = await import(
   "../index"
@@ -233,6 +237,7 @@ function buildFeed(input: {
     includes_public_holidays: false,
     last_rendered_at: null,
     name: `Feed ${input.id}`,
+    organisation_id: baseInput.organisationId,
     privacy_mode: "named",
     scopes: input.scopes,
     status: "active",

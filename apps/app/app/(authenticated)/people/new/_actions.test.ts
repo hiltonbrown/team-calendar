@@ -19,8 +19,11 @@ vi.mock("@repo/auth/server", () => ({
   withinLimit: mocks.withinLimit,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
   lockPlanLimitMutations: mocks.lockPlanLimitMutations,
+  tenantDatabase: vi.fn(() => mocks.database),
+  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+    mocks.database.$transaction(operation)
+  ),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,

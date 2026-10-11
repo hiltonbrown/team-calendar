@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   disconnectXeroOAuthConnection: vi.fn(),
   getActiveOrgContext: vi.fn(),
   headers: vi.fn(),
+  removeXeroCompany: vi.fn(),
   revalidatePath: vi.fn(),
   transaction: {
     auditEvent: { create: vi.fn() },
@@ -24,13 +25,17 @@ vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
+  tenantDatabase: vi.fn(() => mocks.database),
+  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
+    mocks.database.$transaction(operation)
+  ),
 }));
 vi.mock("@repo/next-config/keys", () => ({
   keys: mocks.coreKeys,
 }));
 vi.mock("@repo/xero", () => ({
   disconnectXeroOAuthConnection: mocks.disconnectXeroOAuthConnection,
+  removeXeroCompany: mocks.removeXeroCompany,
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -41,12 +46,16 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
+vi.mock("@repo/auth/helpers", () => ({
+  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+}));
 const actions = await import("./_actions");
 const {
   connectXeroAction,
   disconnectXeroAction,
   pauseTenantSyncAction,
   resumeTenantSyncAction,
+  removeCompanyAction,
 } = actions;
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const connectionId = "00000000-0000-4000-8000-000000000002";
@@ -90,6 +99,76 @@ describe("xero settings integration server actions", () => {
     });
   });
 
+  it.each(["org:admin", "org:owner"])(
+    "permits %s to connect, reconnect, disconnect, pause and resume scoped companies",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
+      expect((await connectXeroAction({ organisationId })).ok).toBe(true);
+      expect(
+        (
+          await disconnectXeroAction({
+            confirmationText: orgName,
+            connectionId,
+            mode: "soft",
+            organisationId,
+          })
+        ).ok
+      ).toBe(true);
+      expect(
+        (await pauseTenantSyncAction({ connectionId, organisationId })).ok
+      ).toBe(true);
+      expect(
+        (await resumeTenantSyncAction({ connectionId, organisationId })).ok
+      ).toBe(true);
+    }
+  );
+  it("refuses company removal if the owner is downgraded during the request", async () => {
+    mocks.auth
+      .mockResolvedValueOnce({ orgRole: "org:owner" })
+      .mockResolvedValueOnce({ orgRole: "org:admin" });
+    const result = await removeCompanyAction({
+      confirmationText: orgName,
+      connectionId,
+      organisationId,
+    });
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.removeXeroCompany).not.toHaveBeenCalled();
+  });
+  it("starts Add company with the authenticated account and no preset company", async () => {
+    mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole: "org:admin" });
+    const result = await connectXeroAction({});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(
+        new URL(result.value.redirectUrl).searchParams.has("organisationId")
+      ).toBe(false);
+    }
+    expect(mocks.getActiveOrgContext).not.toHaveBeenCalled();
+  });
+  it("delegates confirmed company removal only for an owner", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:owner" });
+    mocks.removeXeroCompany.mockResolvedValue({
+      ok: true,
+      value: { connectionId, organisationId, state: "removed" },
+    });
+    const result = await removeCompanyAction({
+      confirmationText: orgName,
+      connectionId,
+      organisationId,
+    });
+    expect(result).toEqual({ ok: true, value: { removed: true } });
+    expect(mocks.removeXeroCompany).toHaveBeenCalledWith({
+      clerkOrgId,
+      connectionId,
+      organisationId,
+      performedByUserId: userId,
+      role: "owner",
+    });
+    expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
+  });
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers for all actions", async () => {
       mocks.currentUser.mockResolvedValue(null);
@@ -217,7 +296,7 @@ describe("xero settings integration server actions", () => {
       const result = await disconnectXeroAction({
         confirmationText: "Wrong Name",
         connectionId,
-        mode: "destructive",
+        mode: "soft",
         organisationId,
       });
       expect(result).toEqual({
@@ -303,35 +382,28 @@ describe("xero settings integration server actions", () => {
       expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
       expect(mocks.revalidatePath).not.toHaveBeenCalled();
     });
-    it("passes destructive flag correctly to disconnect service", async () => {
-      const resDestructive = await disconnectXeroAction({
+    it("rejects legacy destructive disconnect and keeps ordinary disconnect soft", async () => {
+      const legacy = await disconnectXeroAction({
         confirmationText: orgName,
         connectionId,
         mode: "destructive",
         organisationId,
       });
-      expect(resDestructive.ok).toBe(true);
-      expect(mocks.disconnectXeroOAuthConnection).toHaveBeenCalledWith({
-        clerkOrgId,
-        connectionId,
-        destructive: true,
-        organisationId,
-        performedByUserId: "user_456",
+      expect(legacy).toMatchObject({
+        error: { code: "validation_error" },
+        ok: false,
       });
-      const resSoft = await disconnectXeroAction({
+      expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
+      const result = await disconnectXeroAction({
         confirmationText: orgName,
         connectionId,
         mode: "soft",
         organisationId,
       });
-      expect(resSoft.ok).toBe(true);
-      expect(mocks.disconnectXeroOAuthConnection).toHaveBeenCalledWith({
-        clerkOrgId,
-        connectionId,
-        destructive: false,
-        organisationId,
-        performedByUserId: "user_456",
-      });
+      expect(result.ok).toBe(true);
+      expect(mocks.disconnectXeroOAuthConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ destructive: false })
+      );
     });
     it("connectXeroAction generates OAuth start URL with correct org params", async () => {
       const result = await connectXeroAction({ organisationId });
@@ -434,3 +506,41 @@ describe("xero settings integration server actions", () => {
   });
 });
 vi.mock("server-only", () => ({}));
+
+describe("Xero mutation role ordering", () => {
+  it.each(["org:manager", "org:viewer"])(
+    "rejects %s before validating input or resolving companies",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.getActiveOrgContext.mockClear();
+      for (const action of [
+        connectXeroAction,
+        pauseTenantSyncAction,
+        resumeTenantSyncAction,
+      ]) {
+        const result = await action({
+          connectionId: "invalid",
+          organisationId: "invalid",
+        });
+        expect(result).toMatchObject({
+          error: { code: "not_authorised" },
+          ok: false,
+        });
+      }
+      expect(mocks.getActiveOrgContext).not.toHaveBeenCalled();
+    }
+  );
+  it("refuses company removal to admins before reading input", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    const result = await removeCompanyAction({
+      confirmationText: "",
+      connectionId: "invalid",
+      organisationId: "invalid",
+    });
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.removeXeroCompany).not.toHaveBeenCalled();
+  });
+});

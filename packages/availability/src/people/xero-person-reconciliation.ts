@@ -1,11 +1,23 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase, tenantTransaction } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { invalidateFeedCachesForPerson } from "@repo/feeds";
 import { log } from "@repo/observability/log";
 import { noemailFallbackDomain } from "@repo/seo/branding";
+
+type ReconciliationClient = Pick<
+  Prisma.TransactionClient,
+  | "alternativeContact"
+  | "auditEvent"
+  | "availabilityRecord"
+  | "feedScope"
+  | "leaveBalance"
+  | "notification"
+  | "person"
+  | "xeroPersonMatch"
+>;
 
 export interface ReconcileXeroPersonContext {
   clerkOrgId: string;
@@ -58,7 +70,7 @@ function isSyntheticEmail(email: string | null | undefined): boolean {
 }
 
 async function findExistingExactMatch(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   input: ReconcileXeroPersonInput,
   resolvedEmail: string,
@@ -128,7 +140,7 @@ async function findExistingExactMatch(
 }
 
 async function tryUpgradeManualCandidate(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   input: ReconcileXeroPersonInput,
   manualCandidates: Array<{
@@ -190,7 +202,7 @@ async function tryUpgradeManualCandidate(
 }
 
 async function handleCandidatesOrNewPerson(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   input: ReconcileXeroPersonInput,
   manualCandidates: Array<{
@@ -323,7 +335,7 @@ export async function reconcileXeroPerson(
   input: ReconcileXeroPersonInput,
   tx?: Prisma.TransactionClient
 ): Promise<ReconcileOutcome> {
-  const client = tx ?? database;
+  const client = tx ?? tenantDatabase(context.clerkOrgId);
   const rawEmail =
     input.email?.trim() ||
     `${input.firstName}.${input.lastName}@${noemailFallbackDomain}`;
@@ -388,7 +400,7 @@ interface ValidatedMergeTarget {
 }
 
 async function validateMergeInput(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   input: MergePersonMatchInput
 ): Promise<Result<ValidatedMergeTarget, ReconciliationError>> {
@@ -470,7 +482,7 @@ async function validateMergeInput(
 }
 
 async function transferCandidateRelations(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>>,
   xeroPerson: Prisma.PersonGetPayload<Record<string, never>>
@@ -549,7 +561,7 @@ async function transferCandidateRelations(
 }
 
 async function transferCandidateBalancesAndScopes(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>>,
   xeroPerson: Prisma.PersonGetPayload<Record<string, never>>
@@ -626,7 +638,7 @@ async function transferCandidateBalancesAndScopes(
 }
 
 async function finaliseMergeAndAudit(
-  client: Prisma.TransactionClient,
+  client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   input: MergePersonMatchInput,
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>> | null,
@@ -706,7 +718,7 @@ export async function mergeCandidateIntoXeroPerson(
 ): Promise<
   Result<{ merged: true; xeroPersonId: string }, ReconciliationError>
 > {
-  const runMerge = async (client: Prisma.TransactionClient) => {
+  const runMerge = async (client: ReconciliationClient) => {
     const validation = await validateMergeInput(client, context, input);
     if (!validation.ok) {
       return validation;
@@ -747,7 +759,7 @@ export async function mergeCandidateIntoXeroPerson(
   if (tx) {
     return await runMerge(tx);
   }
-  return await database.$transaction(runMerge);
+  return await tenantTransaction(context.clerkOrgId, runMerge);
 }
 
 /**
@@ -762,7 +774,7 @@ export async function ignorePersonMatch(
   },
   tx?: Prisma.TransactionClient
 ): Promise<Result<{ ignored: true }, ReconciliationError>> {
-  const runIgnore = async (client: Prisma.TransactionClient) => {
+  const runIgnore = async (client: ReconciliationClient) => {
     const match = await client.xeroPersonMatch.findFirst({
       where: {
         clerk_org_id: context.clerkOrgId,
@@ -812,5 +824,5 @@ export async function ignorePersonMatch(
   if (tx) {
     return await runIgnore(tx);
   }
-  return await database.$transaction(runIgnore);
+  return await tenantTransaction(context.clerkOrgId, runIgnore);
 }

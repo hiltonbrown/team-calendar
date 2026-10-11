@@ -4,7 +4,7 @@ import {
   getApprovalSummaryCounts,
   listForApprover,
 } from "@repo/availability";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { z } from "zod";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -83,7 +83,7 @@ const LeaveApprovalsPage = async ({
     return <PermissionDeniedState />;
   }
 
-  const actingPerson = await database.person.findFirst({
+  const actingPerson = await tenantDatabase(clerkOrgId).person.findFirst({
     select: { id: true },
     where: {
       archived_at: null,

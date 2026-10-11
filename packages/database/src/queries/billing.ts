@@ -1,7 +1,8 @@
 import type { LimitType, PlanKey } from "@repo/core";
 import type { Prisma } from "../../generated/client";
-import { database } from "../client";
 import { getPlanDefinition } from "../seed/plans";
+import { systemDatabase } from "../system-client";
+import { referenceDatabase, tenantDatabase } from "../tenant-client";
 export type AuthoritativeUsageType =
   | LimitType
   | "connections"
@@ -37,7 +38,9 @@ export interface BillingSubscriptionRow {
 export const getSubscriptionForOrg = async (
   clerkOrgId: string
 ): Promise<BillingSubscriptionRow | null> => {
-  const rows = await database.$queryRaw<BillingSubscriptionRow[]>`
+  const rows = await tenantDatabase(clerkOrgId).$queryRaw<
+    BillingSubscriptionRow[]
+  >`
     SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
     FROM clerk_org_subscriptions
@@ -49,7 +52,7 @@ export const getSubscriptionForOrg = async (
 export const getSubscriptionForStripeCustomer = async (
   stripeCustomerId: string
 ): Promise<BillingSubscriptionRow | null> => {
-  const rows = await database.$queryRaw<BillingSubscriptionRow[]>`
+  const rows = await systemDatabase.$queryRaw<BillingSubscriptionRow[]>`
     SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
     FROM clerk_org_subscriptions
@@ -61,7 +64,7 @@ export const getSubscriptionForStripeCustomer = async (
 export const getSubscriptionForStripeSubscription = async (
   stripeSubscriptionId: string
 ): Promise<BillingSubscriptionRow | null> => {
-  const rows = await database.$queryRaw<BillingSubscriptionRow[]>`
+  const rows = await systemDatabase.$queryRaw<BillingSubscriptionRow[]>`
     SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
     FROM clerk_org_subscriptions
@@ -75,7 +78,7 @@ export const getSubscriptionByStripeCustomerId =
 export const getFirstActiveOrganisationIdForClerkOrg = async (
   clerkOrgId: string
 ): Promise<string | null> => {
-  const rows = await database.$queryRaw<
+  const rows = await tenantDatabase(clerkOrgId).$queryRaw<
     Array<{
       id: string;
     }>
@@ -90,7 +93,7 @@ export const getFirstActiveOrganisationIdForClerkOrg = async (
   return rows[0]?.id ?? null;
 };
 export const getPlanLimits = async (planKey: PlanKey) => {
-  const rows = await database.$queryRaw<
+  const rows = await referenceDatabase.$queryRaw<
     Array<{
       limit_type: LimitType;
       limit_value: number;
@@ -115,7 +118,7 @@ export const getUsageCounter = async (
   clerkOrgId: string,
   counterType: LimitType
 ) => {
-  const rows = await database.$queryRaw<
+  const rows = await tenantDatabase(clerkOrgId).$queryRaw<
     Array<{
       current_value: number;
     }>
@@ -133,7 +136,7 @@ export const getUsageCounter = async (
 export const getAuthoritativeUsageCount = (
   clerkOrgId: string,
   usageType: AuthoritativeUsageType,
-  client: AuthoritativeUsageClient = database
+  client: AuthoritativeUsageClient = tenantDatabase(clerkOrgId)
 ): Promise<number> => {
   switch (usageType) {
     case "seats":
@@ -196,7 +199,7 @@ export const lockPlanLimitMutations = async (
 };
 export const upsertSubscriptionFromWebhook = (
   input: SubscriptionMirrorInput
-) => database.$executeRaw`
+) => tenantDatabase(input.clerkOrgId).$executeRaw`
     INSERT INTO clerk_org_subscriptions (
       id, clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at,
@@ -224,7 +227,7 @@ export const upsertSubscriptionFromWebhook = (
 export const isStripeEventProcessed = async (
   eventId: string
 ): Promise<boolean> => {
-  const rows = await database.$queryRaw<
+  const rows = await systemDatabase.$queryRaw<
     Array<{
       stripe_event_id: string;
     }>
@@ -244,7 +247,7 @@ export const recordStripeEvent = async (
     stripeCustomerId: string | null;
   } = { clerkOrgId: null, eventCreatedAt: null, stripeCustomerId: null }
 ): Promise<void> => {
-  await database.$executeRaw`
+  await systemDatabase.$executeRaw`
     INSERT INTO stripe_events (
       id, stripe_event_id, type, delivery_state, attempt_count, clerk_org_id,
       stripe_customer_id, event_created_at, last_attempted_at, processed_at,
@@ -270,7 +273,7 @@ export const recordStripeEventIgnored = async (
   type: string,
   eventCreatedAt: Date | null
 ): Promise<void> => {
-  await database.$executeRaw`
+  await systemDatabase.$executeRaw`
     INSERT INTO stripe_events (
       id, stripe_event_id, type, delivery_state, attempt_count, event_created_at,
       last_attempted_at, processed_at, created_at, updated_at
@@ -291,7 +294,7 @@ export const recordStripeEventFailure = async (input: {
   stripeCustomerId: string | null;
   type: string;
 }): Promise<boolean> => {
-  const rows = await database.$queryRaw<
+  const rows = await systemDatabase.$queryRaw<
     Array<{
       attempt_count: number;
     }>
@@ -341,7 +344,7 @@ const mapFailedStripeEvent = (row: {
 export const getUnresolvedStripeEventsForOrg = async (
   clerkOrgId: string
 ): Promise<FailedStripeEventSummary[]> => {
-  const rows = await database.$queryRaw<
+  const rows = await systemDatabase.$queryRaw<
     Array<{
       error_category: string;
       last_attempted_at: Date;
@@ -359,7 +362,7 @@ export const getUnresolvedStripeEventsForOrg = async (
 export const getFailedStripeEventsForOperators = async (): Promise<
   FailedStripeEventSummary[]
 > => {
-  const rows = await database.$queryRaw<
+  const rows = await systemDatabase.$queryRaw<
     Array<{
       clerk_org_id: string | null;
       error_category: string;
@@ -379,7 +382,7 @@ export const hasUnresolvedStripeEventForOrg = async (
   clerkOrgId: string,
   mirroredAt: Date | null
 ): Promise<boolean> => {
-  const rows = await database.$queryRaw<
+  const rows = await systemDatabase.$queryRaw<
     Array<{
       exists: boolean;
     }>

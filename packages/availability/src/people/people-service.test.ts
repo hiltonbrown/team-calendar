@@ -19,18 +19,41 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    availabilityRecord: {
-      count: mocks.availabilityCount,
-      groupBy: mocks.availabilityGroupBy,
-    },
-    location: { findMany: mocks.locationFindMany },
-    person: {
-      count: mocks.personCount,
-      findMany: mocks.personFindMany,
-    },
-  },
   scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      availabilityRecord: {
+        count: mocks.availabilityCount,
+        groupBy: mocks.availabilityGroupBy,
+      },
+      location: { findMany: mocks.locationFindMany },
+      person: {
+        count: mocks.personCount,
+        findMany: mocks.personFindMany,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        availabilityRecord: {
+          count: mocks.availabilityCount,
+          groupBy: mocks.availabilityGroupBy,
+        },
+        location: { findMany: mocks.locationFindMany },
+        person: {
+          count: mocks.personCount,
+          findMany: mocks.personFindMany,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("@repo/database/generated/client", () => ({
   Prisma: {

@@ -11,14 +11,34 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    auditEvent: {
-      count: mocks.auditCount,
-      create: mocks.auditCreate,
-      findFirst: mocks.auditFindFirst,
-      findMany: mocks.auditFindMany,
-    },
-  },
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      auditEvent: {
+        count: mocks.auditCount,
+        create: mocks.auditCreate,
+        findFirst: mocks.auditFindFirst,
+        findMany: mocks.auditFindMany,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        auditEvent: {
+          count: mocks.auditCount,
+          create: mocks.auditCreate,
+          findFirst: mocks.auditFindFirst,
+          findMany: mocks.auditFindMany,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 
 const { exportCsv, getEventDetail, listEvents } = await import(

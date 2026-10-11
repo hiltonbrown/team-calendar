@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import {
   nonWorkingHolidayDates,
   type ResolvedPublicHoliday,
@@ -73,7 +73,7 @@ export async function loadWorkingDaysReferenceData(
   ];
   const [locations, organisation] = await Promise.all([
     ids.length
-      ? database.location.findMany({
+      ? tenantDatabase(first.clerkOrgId).location.findMany({
           select: {
             country_code: true,
             id: true,
@@ -83,7 +83,7 @@ export async function loadWorkingDaysReferenceData(
           where: { ...scoped, id: { in: ids } },
         })
       : Promise.resolve([]),
-    database.organisation.findFirst({
+    tenantDatabase(first.clerkOrgId).organisation.findFirst({
       select: { country_code: true, timezone: true },
       where: {
         archived_at: null,
@@ -339,7 +339,7 @@ export function computeWorkingDaysFromReferenceData(
 
 async function loadDurationLocation(input: ComputeWorkingDaysInput) {
   if (input.locationId) {
-    return await database.location.findFirst({
+    return await tenantDatabase(input.clerkOrgId).location.findFirst({
       select: {
         country_code: true,
         region_code: true,
@@ -355,7 +355,9 @@ async function loadDurationLocation(input: ComputeWorkingDaysInput) {
     });
   }
 
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(
+    input.clerkOrgId
+  ).organisation.findFirst({
     select: {
       country_code: true,
       timezone: true,

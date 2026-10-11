@@ -1,7 +1,7 @@
 import "server-only";
 
 import { appError, type Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantTransaction } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type { availability_privacy_mode } from "@repo/database/generated/enums";
 import { invalidateFeedCachesForPerson } from "../cache/feed-invalidation";
@@ -23,7 +23,7 @@ export interface MaterialisedPublication {
 }
 
 type PublicationClient = Pick<
-  typeof database,
+  Prisma.TransactionClient,
   "availabilityPublication" | "availabilityRecord"
 >;
 
@@ -38,38 +38,43 @@ export async function materialiseAvailabilityPublication(input: {
   organisationId: string;
 }): Promise<Result<MaterialisedPublication>> {
   try {
-    const record = await database.availabilityRecord.findFirst({
-      select: recordPublicationSelect,
-      where: {
-        clerk_org_id: input.clerkOrgId,
-        id: input.availabilityRecordId,
-        organisation_id: input.organisationId,
-      },
-    });
-    if (!record) {
-      return {
-        error: appError("not_found", "Availability record not found."),
-        ok: false,
-      };
-    }
+    const result: Result<MaterialisedPublication> = await tenantTransaction(
+      input.clerkOrgId,
+      async (tx) => {
+        const record = await tx.availabilityRecord.findFirst({
+          select: recordPublicationSelect,
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            id: input.availabilityRecordId,
+            organisation_id: input.organisationId,
+          },
+        });
+        if (!record) {
+          return {
+            error: appError("not_found", "Availability record not found."),
+            ok: false,
+          };
+        }
 
-    const { changed, publication } = await upsertPublication(database, record);
+        const { changed, publication } = await upsertPublication(tx, record);
 
-    if (input.invalidateCache !== false) {
+        return {
+          ok: true,
+          value: toMaterialisedPublication(publication, {
+            changed,
+            personId: record.person_id,
+          }),
+        };
+      }
+    );
+    if (result.ok && input.invalidateCache !== false) {
       await invalidateRecordFeedCaches({
         clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
-        personId: record.person_id,
+        personId: result.value.personId,
       });
     }
-
-    return {
-      ok: true,
-      value: toMaterialisedPublication(publication, {
-        changed,
-        personId: record.person_id,
-      }),
-    };
+    return result;
   } catch {
     return {
       error: appError("internal", "Failed to materialise publication."),

@@ -19,6 +19,8 @@ const validAppVars = {
   XERO_REDIRECT_URI: "https://api.teamcalendar.online/oauth/callback",
   ...validCommonVars,
   CLERK_SECRET_KEY: "clerk_sec_123456",
+  DATABASE_APP_URL:
+    "postgresql://team_calendar_app:test@localhost:5432/teamcalendar",
   DATABASE_URL:
     "postgresql://postgres:secretpassword@localhost:5432/teamcalendar",
   KV_REST_API_TOKEN: "kv_token_123",
@@ -547,4 +549,13 @@ describe("complete Xero configuration preflight", () => {
       result.checkedVars.filter((name) => name.startsWith("XERO_"))
     ).toEqual([]);
   });
+});
+
+it("requires restricted database URL for production app", () => {
+  expect(() =>
+    runProductionPreflight({
+      appName: "app",
+      envVars: { ...validAppVars, DATABASE_APP_URL: undefined },
+    })
+  ).toThrow("DATABASE_APP_URL");
 });

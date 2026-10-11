@@ -226,7 +226,7 @@ Clerk Organisation (clerk_org_id)   : one per customer account; one country code
 - Membership and roles are managed entirely by Clerk. No custom membership or role tables.
 - Personal Accounts are disabled. Every user must belong to at least one Clerk Organisation.
 - Billing enforced at the Clerk Organisation level via `clerk_org_subscriptions`.
-- In-app switching between multiple Organisations is not currently implemented. `CustomUserButton` (`apps/app/app/(authenticated)/components/custom-user-button.tsx`) exposes only Clerk's organisation-profile action (`openOrganizationProfile()`). Adding `<OrganizationSwitcher />` or an equivalent control is an open gap, not a shipped mechanism.
+- A company selector on company-scoped pages chooses a payroll Organisation inside the account; the calendar company filter defaults to all companies. Company selection differs from switching the top-level Clerk account. `CustomUserButton` still exposes Clerk's organisation profile, with account membership managed by Clerk.
 
 ### Auth helpers (`packages/auth`)
 
@@ -253,20 +253,33 @@ For Inngest jobs and background API routes, call `getToken()` and pass the token
 | Role | Scope |
 |---|---|
 | owner | Full Clerk Organisation access |
-| admin | Full Organisation (payroll entity) access |
+| admin | Manage all payroll companies in the current Clerk account |
 | manager | Team and direct-report access |
 | viewer | Read-only filtered access |
 
 Roles are custom roles in the Clerk dashboard. Permission checks use `auth().has({ role: 'org:admin' })` or helpers from `@repo/auth`.
 
+### Database runtime roles and RLS
+
+`DATABASE_URL` uses the migration owner. `DATABASE_APP_URL` uses `team_calendar_app`, a non-owner role without superuser, `BYPASSRLS` or `neon_superuser` membership. Production preflight rejects unsafe roles. Run `bun run preflight app` and `bun run preflight api` as deployment gates; Next configuration alone does not run the database catalogue check.
+
+Tenant tables enforce PostgreSQL row-level security using the transaction-local `app.clerk_org_id`. Policies check both the account and ownership of any company ID. Missing context fails closed. RLS complements explicit query filters.
+
+- Use `tenantDatabase(clerkOrgId)` for single queries. Its immutable context wraps each query in a restricted transaction.
+- Use `tenantTransaction(clerkOrgId, async (tx) => { ... })` for related queries, raw SQL or interactive transactions. Do not call `$transaction` on the query client.
+- `systemDatabase` is restricted to the checked import allowlist: migrations/fixtures, account discovery for scheduled fan-out, public-token discovery, Stripe routing and canonical Xero grant/ownership operations. Once the account is known, tenant data uses the restricted client.
+- Canonical Xero authorisations and Stripe routing events have no app-role grant. Public plan definitions and limits are read-only to the app role. New tables require an explicit grant and policy review.
+
+Provision each environment by applying owner migrations first. The RLS migration creates `team_calendar_app` without login. A database administrator then enables login with a unique secret password and configures `DATABASE_APP_URL` for that same database, with no elevated memberships or table ownership. Neon child branches must inherit the provisioned role; configure the branch-specific connection URL. For disposable local/CI databases only, `bun packages/database/scripts/provision-local-app-role.ts` enables the role using the two local URLs. Never use that script against production. Run preflight before deployment and restricted-role integration tests before release.
+
 ### Query scoping pattern
 
-Every service function that queries tenant data must accept and apply both `clerk_org_id` and `organisation_id`:
+Every company-scoped service must accept and apply both `clerk_org_id` and `organisation_id`. Account-wide calendar/feed queries validate company sets with `resolveAccountCompanies(clerkOrgId)` and use the owned IDs explicitly:
 
 ```typescript
 // Correct
 async function listPeople(clerkOrgId: ClerkOrgId, organisationId: OrganisationId) {
-  return db.person.findMany({
+  return tenantDatabase(clerkOrgId).person.findMany({
     where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
   });
 }
@@ -472,7 +485,8 @@ Optional variables with format constraints must be absent (commented out), not `
 
 | Variable | Used by | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `packages/database` | Neon Postgres connection string |
+| `DATABASE_URL` | `packages/database` | Owner connection for migrations and allowlisted system operations |
+| `DATABASE_APP_URL` | `packages/database` | Restricted `team_calendar_app` connection for every tenant operation |
 | `CLERK_SECRET_KEY` | `packages/auth` | Clerk server-side auth |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `packages/auth` | Clerk client-side auth |
 | `RESEND_TOKEN` | `packages/email` | Resend API key |

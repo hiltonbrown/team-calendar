@@ -10,6 +10,7 @@ import {
   type Result,
   resolvePublicHolidaysFromData,
 } from "@repo/core";
+import type { Prisma } from "@repo/database";
 import { loadHolidayResolutionData } from "@repo/database";
 
 export type {
@@ -39,10 +40,13 @@ export interface ResolvePublicHolidaysInput {
 /** The public holidays that apply to each location and the organisation level. */
 export async function resolvePublicHolidays(
   input: ResolvePublicHolidaysInput,
-  listReference: ListReferenceHolidays = listReferenceHolidays
+  listReference: ListReferenceHolidays = listReferenceHolidays,
+  client?: Prisma.TransactionClient
 ): Promise<Result<ResolvedPublicHoliday[]>> {
   try {
-    const data = await loadHolidayResolutionData(input);
+    const data = client
+      ? await loadHolidayResolutionData(input, client)
+      : await loadHolidayResolutionData(input);
     if (!data) {
       return {
         error: appError("not_found", "Organisation not found"),

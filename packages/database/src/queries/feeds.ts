@@ -1,6 +1,6 @@
 import type { ClerkOrgId, FeedId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 
 export interface FeedData {
@@ -49,7 +49,7 @@ export async function listFeedsForOrganisation(
   organisationId: OrganisationId
 ): Promise<Result<FeedData[]>> {
   try {
-    const feeds = await database.feed.findMany({
+    const feeds = await tenantDatabase(clerkOrgId).feed.findMany({
       orderBy: { slug: "asc" },
       select: {
         clerk_org_id: true,
@@ -110,7 +110,7 @@ export async function getFeedDetail(
   feedId: FeedId
 ): Promise<Result<FeedDetailData>> {
   try {
-    const feed = await database.feed.findFirst({
+    const feed = await tenantDatabase(clerkOrgId).feed.findFirst({
       select: {
         clerk_org_id: true,
         created_at: true,
@@ -198,7 +198,9 @@ export async function listFeedPublications(
   filters?: { dateRange?: { startDate: Date; endDate: Date }; limit?: number }
 ): Promise<Result<FeedPublicationData[]>> {
   try {
-    const publications = await database.availabilityPublication.findMany({
+    const publications = await tenantDatabase(
+      clerkOrgId
+    ).availabilityPublication.findMany({
       orderBy: { published_at: "desc" },
       select: {
         availability_record_id: true,

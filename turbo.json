@@ -40,5 +40,6 @@
     "//#clean": {
       "cache": false
     }
-  }
+  },
+  "globalPassThroughEnv": ["DATABASE_URL", "DATABASE_APP_URL"]
 }

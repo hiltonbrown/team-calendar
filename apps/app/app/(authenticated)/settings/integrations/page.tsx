@@ -1,6 +1,6 @@
 import { auth } from "@repo/auth/server";
 import { getXeroConnectionStateForScope } from "@repo/availability";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { organisationWithConnectionSelect } from "./_connection-view";
@@ -15,7 +15,7 @@ export default async function IntegrationsPage() {
   if (!orgId) {
     throw new Error("Organisation context is required.");
   }
-  const organisations = await database.organisation.findMany({
+  const organisations = await tenantDatabase(orgId).organisation.findMany({
     orderBy: [{ created_at: "asc" }, { name: "asc" }],
     select: organisationWithConnectionSelect,
     where: {

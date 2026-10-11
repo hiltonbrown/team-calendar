@@ -1,4 +1,4 @@
-import { database } from "@repo/database";
+import { systemDatabase as database } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -31,32 +31,51 @@ vi.mock("../client", () => ({
     send: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    failedRecord: { create: mocks.failedRecordCreate },
-    person: {
-      findFirst: mocks.personFindFirst,
-      findMany: mocks.personFindMany,
-      updateMany: mocks.personUpdateMany,
-      upsert: mocks.personUpsert,
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      failedRecord: { create: mocks.failedRecordCreate },
+      person: {
+        findFirst: mocks.personFindFirst,
+        findMany: mocks.personFindMany,
+        updateMany: mocks.personUpdateMany,
+        upsert: mocks.personUpsert,
+      },
+      syncRun: {
+        create: mocks.syncRunCreate,
+        findFirst: mocks.syncRunFindFirst,
+        updateMany: mocks.syncRunUpdateMany,
+      },
+      xeroConnection: {
+        findFirst: mocks.xeroConnectionFindFirst,
+        updateMany: mocks.xeroConnectionUpdateMany,
+      },
+      xeroSyncCursor: {
+        createMany: mocks.xeroSyncCursorCreateMany,
+        findFirst: mocks.xeroSyncCursorFindFirst,
+        updateMany: mocks.xeroSyncCursorUpdateMany,
+      },
     },
-    syncRun: {
-      create: mocks.syncRunCreate,
-      findFirst: mocks.syncRunFindFirst,
-      updateMany: mocks.syncRunUpdateMany,
-    },
-    xeroConnection: {
-      findFirst: mocks.xeroConnectionFindFirst,
-      updateMany: mocks.xeroConnectionUpdateMany,
-    },
-    xeroSyncCursor: {
-      createMany: mocks.xeroSyncCursorCreateMany,
-      findFirst: mocks.xeroSyncCursorFindFirst,
-      updateMany: mocks.xeroSyncCursorUpdateMany,
-    },
-  },
-  scopedTo: mocks.scopedTo,
-}));
+    scopedTo: mocks.scopedTo,
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/notifications", () => ({
   publishOrganisationNotificationEvent:
     mocks.publishOrganisationNotificationEvent,

@@ -1,7 +1,7 @@
 import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
   availability_record_type,
@@ -126,7 +126,9 @@ export async function setManualLeaveBalance(input: {
         ok: false,
       };
     }
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
     });
@@ -163,7 +165,7 @@ async function createOrUpdateManualBalance(
     return await updateManualBalance(input, scoped, existing.id);
   }
   try {
-    const created = await database.leaveBalance.create({
+    const created = await tenantDatabase(input.clerkOrgId).leaveBalance.create({
       data: {
         ...scoped,
         ...manualBalanceData(input),
@@ -201,7 +203,7 @@ async function updateManualBalance(
     ManualBalanceServiceError
   >
 > {
-  await database.leaveBalance.updateMany({
+  await tenantDatabase(input.clerkOrgId).leaveBalance.updateMany({
     data: {
       ...manualBalanceData(input),
       updated_at: new Date(),
@@ -230,7 +232,7 @@ function findManualBalance(
     organisation_id: OrganisationId;
   }
 ) {
-  return database.leaveBalance.findFirst({
+  return tenantDatabase(input.clerkOrgId).leaveBalance.findFirst({
     select: { id: true },
     where: {
       ...scoped,
@@ -244,7 +246,7 @@ async function auditManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   balanceId: string
 ) {
-  await database.auditEvent.create({
+  await tenantDatabase(input.clerkOrgId).auditEvent.create({
     data: {
       action: "leave_balances.manual_balance_saved",
       actor_user_id: input.actingUserId,
@@ -266,7 +268,7 @@ async function personNotFound(input: {
   organisationId: string;
   personId: string;
 }): Promise<Result<never, ManualBalanceServiceError>> {
-  const exists = await database.person.findFirst({
+  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.personId },
   });

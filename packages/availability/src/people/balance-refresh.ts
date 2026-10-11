@@ -2,7 +2,7 @@ import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { xeroRecoveryMessage } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { z } from "zod";
 import { dispatchSyncEvent } from "../sync/sync-events";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
@@ -85,7 +85,9 @@ export async function dispatchBalanceRefresh(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await database.person.findFirst({
+    const person = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).person.findFirst({
       select: {
         id: true,
         xero_employee_id: true,
@@ -136,7 +138,9 @@ export async function dispatchBalanceRefresh(input: {
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
     }
-    const xeroConnection = await database.xeroConnection.findFirst({
+    const xeroConnection = await tenantDatabase(
+      parsed.data.clerkOrgId
+    ).xeroConnection.findFirst({
       select: { id: true },
       where: {
         ...scoped,
@@ -185,7 +189,7 @@ async function auditDispatch(
     reason?: BalanceRefreshReason;
   }
 ) {
-  await database.auditEvent.create({
+  await tenantDatabase(input.clerkOrgId).auditEvent.create({
     data: {
       action: "availability_records.balance_refresh_dispatched",
       actor_user_id: input.actingUserId,
@@ -207,7 +211,7 @@ async function personNotFound(input: {
   organisationId: string;
   personId: string;
 }): Promise<Result<never, BalanceRefreshError>> {
-  const exists = await database.person.findFirst({
+  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.personId },
   });

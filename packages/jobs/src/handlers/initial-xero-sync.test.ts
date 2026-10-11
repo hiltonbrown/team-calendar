@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   balances: vi.fn(),
+  binding: vi.fn(),
   capture: vi.fn(),
   complete: vi.fn(),
   leave: vi.fn(),
@@ -26,6 +27,9 @@ vi.mock("./sync-xero-leave-records", () => ({
 vi.mock("./sync-xero-leave-balances", () => ({
   syncXeroLeaveBalances: mocks.balances,
 }));
+vi.mock("./xero-sync-access", () => ({
+  isCurrentXeroSyncBinding: mocks.binding,
+}));
 const { initialXeroSync, initialXeroSyncFunction } = await import(
   "./initial-xero-sync"
 );
@@ -39,6 +43,7 @@ const input = {
 describe("one durable full initial import", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.binding.mockResolvedValue(true);
     mocks.request.mockResolvedValue(input.requestedAt);
     mocks.people.mockResolvedValue({
       ok: true,
@@ -50,6 +55,17 @@ describe("one durable full initial import", () => {
       value: { hasMore: false, status: "succeeded" },
     });
     mocks.complete.mockResolvedValue(new Date("2026-10-07T12:03:00Z"));
+  });
+  it("ignores a stale binding before requesting or running the initial import", async () => {
+    mocks.binding.mockResolvedValue(false);
+    expect(await initialXeroSync(input)).toEqual({
+      ok: true,
+      value: { status: "ignored" },
+    });
+    expect(mocks.request).not.toHaveBeenCalled();
+    expect(mocks.people).not.toHaveBeenCalled();
+    expect(mocks.complete).not.toHaveBeenCalled();
+    expect(mocks.capture).not.toHaveBeenCalled();
   });
   it("imports all 81 balance people in three durable pages before completing", async () => {
     let imported = 0;

@@ -22,8 +22,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/database", () => ({
-  database: {
+vi.mock("@repo/database", () => {
+  const client = {
     $queryRaw: mocks.queryRaw,
     $transaction: mocks.transaction,
     auditEvent: {
@@ -39,9 +39,15 @@ vi.mock("@repo/database", () => ({
       update: mocks.feedTokenUpdate,
       updateMany: mocks.feedTokenUpdateMany,
     },
-  },
-  scopedTo: mocks.scopedTo,
-}));
+  };
+  return {
+    scopedTo: mocks.scopedTo,
+    tenantDatabase: vi.fn(() => client),
+    tenantTransaction: vi.fn((_clerkOrgId, callback, options) =>
+      client.$transaction(callback, options)
+    ),
+  };
+});
 vi.mock("../cache/feed-cache", () => ({
   invalidateFeedCache: mocks.invalidateFeedCache,
 }));
@@ -74,7 +80,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.transaction.mockImplementation((callback) => callback(mockDatabase()));
   mocks.auditEventCreate.mockResolvedValue({ id: "audit_1" });
-  mocks.feedFindFirst.mockResolvedValue({ id: baseInput.feedId });
+  mocks.feedFindFirst.mockResolvedValue({
+    id: baseInput.feedId,
+    organisation_id: baseInput.organisationId,
+  });
   mocks.feedFindMany.mockResolvedValue([]);
   mocks.queryRaw.mockImplementation(
     (_strings: TemplateStringsArray, tokenId: string) =>
@@ -137,7 +146,10 @@ describe("feed token pure functions", () => {
 
 describe("existing feed token issuance", () => {
   it("issues a replacement without an active predecessor and audits its scope", async () => {
-    mocks.feedFindFirst.mockResolvedValue({ id: baseInput.feedId });
+    mocks.feedFindFirst.mockResolvedValue({
+      id: baseInput.feedId,
+      organisation_id: baseInput.organisationId,
+    });
     mocks.queryRaw.mockResolvedValue([
       { id: "71000000-0000-4000-8000-000000000010" },
     ]);
@@ -154,7 +166,10 @@ describe("existing feed token issuance", () => {
     );
   });
   it("fails concurrent one-active insertion without returning a disclosure", async () => {
-    mocks.feedFindFirst.mockResolvedValue({ id: baseInput.feedId });
+    mocks.feedFindFirst.mockResolvedValue({
+      id: baseInput.feedId,
+      organisation_id: baseInput.organisationId,
+    });
     mocks.queryRaw.mockResolvedValue([]);
     expect(await issueToken(baseInput)).toMatchObject({
       error: { code: "active_token_conflict" },
@@ -183,12 +198,16 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(result.value.plaintext).toMatch(SIGNED_TOKEN_PATTERN);
     expect(result.value.hint).toBe(result.value.plaintext.slice(-4));
     expect(mocks.feedFindFirst).toHaveBeenCalledWith({
-      select: { id: true },
+      select: { id: true, organisation_id: true },
       where: scopedFeed(),
     });
     expect(mocks.feedTokenFindFirst).toHaveBeenCalledWith({
       select: { id: true },
-      where: scopedTokenByFeed(),
+      where: {
+        clerk_org_id: baseInput.clerkOrgId,
+        feed_id: baseInput.feedId,
+        organisation_id: baseInput.organisationId,
+      },
     });
     const [insertCall] = mocks.queryRaw.mock.calls;
     const tokenHash = insertCall?.[5];
@@ -228,6 +247,7 @@ describe("feed token lifecycle with a mocked database", () => {
       select: {
         created_by_user_id: true,
         id: true,
+        organisation_id: true,
         scopes: { select: { scope_type: true } },
       },
       where: {
@@ -268,6 +288,7 @@ describe("feed token lifecycle with a mocked database", () => {
     mocks.feedFindFirst.mockResolvedValue({
       created_by_user_id: "user_owner",
       id: baseInput.feedId,
+      organisation_id: baseInput.organisationId,
       scopes: [{ scope_type: "self" }],
     });
 
@@ -351,7 +372,10 @@ describe("feed token lifecycle with a mocked database", () => {
       where: {
         clerk_org_id: baseInput.clerkOrgId,
         id: "71000000-0000-4000-8000-000000000020",
-        organisation_id: baseInput.organisationId,
+        OR: [
+          { organisation_id: baseInput.organisationId },
+          { organisation_id: null },
+        ],
       },
     });
     expect(mocks.feedTokenUpdate).toHaveBeenCalledWith({
@@ -472,7 +496,10 @@ function scopedFeed() {
   return {
     clerk_org_id: baseInput.clerkOrgId,
     id: baseInput.feedId,
-    organisation_id: baseInput.organisationId,
+    OR: [
+      { organisation_id: baseInput.organisationId },
+      { organisation_id: null },
+    ],
   };
 }
 
@@ -480,7 +507,10 @@ function scopedTokenByFeed() {
   return {
     clerk_org_id: baseInput.clerkOrgId,
     feed_id: baseInput.feedId,
-    organisation_id: baseInput.organisationId,
+    OR: [
+      { organisation_id: baseInput.organisationId },
+      { organisation_id: null },
+    ],
   };
 }
 

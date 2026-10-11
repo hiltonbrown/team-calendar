@@ -1,6 +1,6 @@
 import { auth } from "@repo/auth/server";
 import { getXeroConnectionStateForScope, listPeople } from "@repo/availability";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { requirePageRole } from "@/lib/auth/require-page-role";
@@ -45,7 +45,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
     peopleRole = "owner";
   }
   const actingPerson = userId
-    ? await database.person.findFirst({
+    ? await tenantDatabase(clerkOrgId).person.findFirst({
         select: { id: true },
         where: {
           clerk_org_id: clerkOrgId,
@@ -67,17 +67,17 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
         },
         role: peopleRole,
       }),
-      database.team.findMany({
+      tenantDatabase(clerkOrgId).team.findMany({
         orderBy: { name: "asc" },
         select: { id: true, name: true },
         where: scopedQuery(clerkOrgId, organisationId),
       }),
-      database.location.findMany({
+      tenantDatabase(clerkOrgId).location.findMany({
         orderBy: { name: "asc" },
         select: { id: true, name: true },
         where: scopedQuery(clerkOrgId, organisationId),
       }),
-      database.xeroConnection.findFirst({
+      tenantDatabase(clerkOrgId).xeroConnection.findFirst({
         select: {
           id: true,
         },

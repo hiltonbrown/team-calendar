@@ -9,9 +9,28 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  database: { xeroConnection: { findFirst: mocks.findFirst } },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: { xeroConnection: { findFirst: mocks.findFirst } },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.capture, flush: mocks.flush },
 }));

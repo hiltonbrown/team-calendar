@@ -28,13 +28,32 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    organisation: { findFirst: mocks.organisationFindFirst },
-    person: {
-      count: mocks.personCount,
-      findFirst: mocks.personFindFirst,
-    },
-  },
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      organisation: { findFirst: mocks.organisationFindFirst },
+      person: {
+        count: mocks.personCount,
+        findFirst: mocks.personFindFirst,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        organisation: { findFirst: mocks.organisationFindFirst },
+        person: {
+          count: mocks.personCount,
+          findFirst: mocks.personFindFirst,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("@repo/notifications", () => ({
   listForUser: mocks.listForUser,

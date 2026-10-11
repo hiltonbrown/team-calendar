@@ -101,6 +101,13 @@ describe("CalendarDayView", () => {
 });
 function rangeWithEvents() {
   return {
+    companies: [
+      {
+        id: "00000000-0000-4000-8000-000000000003",
+        name: "Acme Restaurants",
+        timezone: "Australia/Brisbane",
+      },
+    ],
     days: [
       {
         date: new Date("2026-04-15T00:00:00.000Z"),
@@ -147,6 +154,8 @@ function event() {
     allDay: true,
     approvalStatus: "approved",
     avatarUrl: null,
+    companyId: "00000000-0000-4000-8000-000000000003",
+    companyName: "Acme Restaurants",
     contactabilityStatus: "contactable",
     displayName: "Ari Report",
     endsAt: new Date("2026-04-16T00:00:00.000Z"),

@@ -31,11 +31,11 @@ vi.mock("@repo/availability", () => ({
   getBillingSummary: mocks.getBillingSummary,
 }));
 vi.mock("@repo/database", () => ({
-  database: { auditEvent: { create: mocks.auditCreate } },
   getActivationDashboardSummary: mocks.getActivationDashboardSummary,
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
   getUnresolvedStripeEventsForOrg: mocks.getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
+  tenantDatabase: vi.fn(() => ({ auditEvent: { create: mocks.auditCreate } })),
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,

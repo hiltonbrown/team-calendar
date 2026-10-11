@@ -18,6 +18,48 @@ describe("CalendarToolbar", () => {
     cleanup();
     vi.clearAllMocks();
   });
+  it("shows a company filter for multi-company accounts", () => {
+    render(
+      <CalendarToolbar
+        actingPersonId={null}
+        companies={[
+          { id: "company-a", name: "Restaurants" },
+          { id: "company-b", name: "Hotels" },
+        ]}
+        data={calendarRange()}
+        filters={{
+          includeDrafts: false,
+          recordTypeCategory: "all",
+          surface: "calendar",
+          view: "week",
+        }}
+        locations={[]}
+        orgQueryValue={null}
+        teams={[]}
+      />
+    );
+    expect(screen.getByRole("combobox", { name: "Company" })).toBeDefined();
+    expect(screen.getByText("All companies")).toBeDefined();
+  });
+  it("hides the company filter for a single company", () => {
+    render(
+      <CalendarToolbar
+        actingPersonId={null}
+        companies={[{ id: "company-a", name: "Restaurants" }]}
+        data={calendarRange()}
+        filters={{
+          includeDrafts: false,
+          recordTypeCategory: "all",
+          surface: "calendar",
+          view: "week",
+        }}
+        locations={[]}
+        orgQueryValue={null}
+        teams={[]}
+      />
+    );
+    expect(screen.queryByRole("combobox", { name: "Company" })).toBeNull();
+  });
   it.each([
     ["2026-01-31", "Next month", "2026-02-28"],
     ["2026-03-31", "Previous month", "2026-02-28"],
@@ -82,6 +124,13 @@ describe("CalendarToolbar", () => {
 });
 function calendarRange() {
   return {
+    companies: [
+      {
+        id: "00000000-0000-4000-8000-000000000003",
+        name: "Acme Restaurants",
+        timezone: "Australia/Brisbane",
+      },
+    ],
     days: [
       {
         date: new Date("2026-04-15T00:00:00.000Z"),

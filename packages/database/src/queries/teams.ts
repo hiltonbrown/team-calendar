@@ -9,7 +9,8 @@ import {
 } from "@repo/core";
 import { z } from "zod";
 import type { availability_record_type } from "../../generated/enums";
-import { type Database, database } from "../client";
+import type { Database } from "../system-client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedTo } from "../tenant-query";
 
 interface TenantScope {
@@ -45,7 +46,7 @@ export async function listTeamsWithCoverageMinimum(
 ): Promise<Result<TeamCoverageMinimumRow[]>> {
   try {
     const scope = scopedTo(input);
-    const teams = await database.team.findMany({
+    const teams = await tenantDatabase(input.clerkOrgId).team.findMany({
       orderBy: [{ name: "asc" }, { id: "asc" }],
       select: {
         _count: {
@@ -81,7 +82,7 @@ export async function listTeamsWithCoverageMinimum(
  */
 export async function setTeamCoverageMinimum(
   input: TenantScope & { minimum: number | null; teamId: string },
-  client: TeamCoverageMinimumClient = database
+  client: TeamCoverageMinimumClient = tenantDatabase(input.clerkOrgId)
 ): Promise<Result<TeamCoverageMinimumChange>> {
   try {
     const where = { ...scopedTo(input), id: input.teamId };
@@ -170,7 +171,9 @@ export async function countAwayPeopleByTeamAndDay(
     }
     const window = recordQueryWindow(input.from, input.to, input.timezone);
     const scope = scopedTo(input);
-    const records = await database.availabilityRecord.findMany({
+    const records = await tenantDatabase(
+      input.clerkOrgId
+    ).availabilityRecord.findMany({
       select: {
         all_day: true,
         ends_at: true,

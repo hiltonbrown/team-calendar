@@ -8,7 +8,7 @@ vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
   "packages/database/src/seed/seed.integration.test.ts"
 );
-const { database } = await import("../../index.js");
+const { systemDatabase: database } = await import("../../index.js");
 const { seedDevelopmentData } = await import("./seed.js");
 const clerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
 const organisationIds = fixture.tenants.map((tenant) => tenant.organisationId);

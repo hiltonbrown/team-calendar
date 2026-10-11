@@ -4,12 +4,31 @@ const mocks = vi.hoisted(() => ({
   leaveBalanceFindFirst: vi.fn(),
   personFindFirst: vi.fn(),
 }));
-vi.mock("@repo/database", () => ({
-  database: {
-    leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
-    person: { findFirst: mocks.personFindFirst },
-  },
-}));
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
+      person: { findFirst: mocks.personFindFirst },
+    },
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 const { resolveXeroLeaveTypeId } = await import("./resolve-leave-type");
 const xeroConnection = {
   accessToken: "access-token",

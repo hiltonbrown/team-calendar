@@ -2,8 +2,8 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({ findMany: vi.fn() }));
-vi.mock("../client", () => ({
-  database: { xeroAuthorisation: { findMany: mocks.findMany } },
+vi.mock("../system-client", () => ({
+  systemDatabase: { xeroAuthorisation: { findMany: mocks.findMany } },
 }));
 const queries = await import("./xero-authorisation");
 beforeEach(() => {

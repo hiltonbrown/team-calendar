@@ -9,11 +9,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     auditEvent: {
       create: mocks.create,
     },
-  },
+  })),
 }));
 
 const { persistSupportSubmissionAudit } = await import(

@@ -86,7 +86,11 @@ export function CalendarDayView({
                     event={event}
                     key={`${event.id}-${dateOnly}`}
                     orgQueryValue={orgQueryValue}
-                    timezone={data.range.timezone}
+                    timezone={
+                      data.companies.find(
+                        (company) => company.id === event.companyId
+                      )?.timezone ?? data.range.timezone
+                    }
                   />
                 ))}
               </div>
@@ -94,6 +98,7 @@ export function CalendarDayView({
           )}
 
           <OffHoursGroup
+            companies={data.companies}
             events={earlierEvents}
             label="Earlier than 06:00"
             orgQueryValue={orgQueryValue}
@@ -128,7 +133,11 @@ export function CalendarDayView({
                         event={event}
                         key={`${event.id}-${hour}`}
                         orgQueryValue={orgQueryValue}
-                        timezone={data.range.timezone}
+                        timezone={
+                          data.companies.find(
+                            (company) => company.id === event.companyId
+                          )?.timezone ?? data.range.timezone
+                        }
                       />
                     ))}
                     <CalendarCreateLauncher
@@ -144,6 +153,7 @@ export function CalendarDayView({
             })}
           </div>
           <OffHoursGroup
+            companies={data.companies}
             events={laterEvents}
             label="Later than 20:59"
             orgQueryValue={orgQueryValue}
@@ -156,11 +166,13 @@ export function CalendarDayView({
 }
 
 function OffHoursGroup({
+  companies,
   events,
   label,
   orgQueryValue,
   timezone,
 }: {
+  companies: CalendarRange["companies"];
   events: CalendarRange["days"][number]["events"];
   label: string;
   orgQueryValue: string | null;
@@ -180,7 +192,10 @@ function OffHoursGroup({
             event={event}
             key={event.id}
             orgQueryValue={orgQueryValue}
-            timezone={timezone}
+            timezone={
+              companies.find((company) => company.id === event.companyId)
+                ?.timezone ?? timezone
+            }
           />
         ))}
       </div>

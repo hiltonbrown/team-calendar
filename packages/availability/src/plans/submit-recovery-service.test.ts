@@ -24,23 +24,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
-  database: {
-    $transaction: async (callback: (client: unknown) => unknown) =>
-      await callback({
-        auditEvent: {
-          create: mocks.auditCreate,
-          findFirst: mocks.auditFindFirst,
-        },
-        availabilityRecord: {
-          findFirst: mocks.availabilityFindFirst,
-          update: mocks.availabilityUpdate,
-          updateMany: mocks.availabilityUpdateMany,
-        },
-      }),
-    auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFindFirst },
-    availabilityRecord: { findFirst: mocks.availabilityFindFirst },
-    person: { findFirst: mocks.personFindFirst },
-  },
   fenceSubmitRecoverySideEffectClaim: mocks.hasSideEffectClaim,
   getSubmitOperation: mocks.getSubmitOperation,
   markSubmitCompleted: mocks.markSubmitCompleted,
@@ -52,6 +35,58 @@ vi.mock("@repo/database", () => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
   }),
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: async (callback: (client: unknown) => unknown) =>
+        await callback({
+          auditEvent: {
+            create: mocks.auditCreate,
+            findFirst: mocks.auditFindFirst,
+          },
+          availabilityRecord: {
+            findFirst: mocks.availabilityFindFirst,
+            update: mocks.availabilityUpdate,
+            updateMany: mocks.availabilityUpdateMany,
+          },
+        }),
+      auditEvent: {
+        create: mocks.auditCreate,
+        findFirst: mocks.auditFindFirst,
+      },
+      availabilityRecord: { findFirst: mocks.availabilityFindFirst },
+      person: { findFirst: mocks.personFindFirst },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: async (callback: (client: unknown) => unknown) =>
+          await callback({
+            auditEvent: {
+              create: mocks.auditCreate,
+              findFirst: mocks.auditFindFirst,
+            },
+            availabilityRecord: {
+              findFirst: mocks.availabilityFindFirst,
+              update: mocks.availabilityUpdate,
+              updateMany: mocks.availabilityUpdateMany,
+            },
+          }),
+        auditEvent: {
+          create: mocks.auditCreate,
+          findFirst: mocks.auditFindFirst,
+        },
+        availabilityRecord: { findFirst: mocks.availabilityFindFirst },
+        person: { findFirst: mocks.personFindFirst },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialise,

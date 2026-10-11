@@ -1,7 +1,7 @@
 import "server-only";
 import { appError, type Result } from "@repo/core";
 import type { Prisma } from "../../generated/client";
-import { database } from "../client";
+import { systemDatabase } from "../system-client";
 export interface DueXeroAuthorisation {
   id: string;
   last_refreshed_at: Date;
@@ -10,7 +10,7 @@ export interface DueXeroAuthorisation {
 }
 export async function listDueXeroAuthorisations(
   now: Date,
-  tx: Prisma.TransactionClient = database
+  tx: Prisma.TransactionClient = systemDatabase
 ): Promise<Result<DueXeroAuthorisation[]>> {
   const due = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
   try {
@@ -44,7 +44,7 @@ export async function listDueXeroAuthorisations(
 }
 export async function saveXeroAuthorisation(
   data: Prisma.XeroAuthorisationUncheckedCreateInput,
-  tx: Prisma.TransactionClient = database
+  tx: Prisma.TransactionClient = systemDatabase
 ) {
   const {
     id: _id,

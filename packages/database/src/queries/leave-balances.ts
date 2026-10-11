@@ -1,6 +1,6 @@
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 import { scopedQuery } from "../tenant-query";
 export interface LeaveBalanceData {
   balance: number;
@@ -31,7 +31,7 @@ export async function listLeaveBalancesForPerson(
   personId: PersonId
 ): Promise<Result<LeaveBalanceData[]>> {
   try {
-    const balances = await database.leaveBalance.findMany({
+    const balances = await tenantDatabase(clerkOrgId).leaveBalance.findMany({
       orderBy: { leave_type_xero_id: "asc" },
       select: {
         balance: true,
@@ -80,7 +80,7 @@ export async function listLeaveBalancesForOrganisation(
   }
 ): Promise<Result<LeaveBalanceSummaryData[]>> {
   try {
-    const balances = await database.leaveBalance.findMany({
+    const balances = await tenantDatabase(clerkOrgId).leaveBalance.findMany({
       orderBy: [
         { person: { first_name: "asc" } },
         { leave_type_xero_id: "asc" },

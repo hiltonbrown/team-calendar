@@ -27,7 +27,7 @@ export function CalendarScanPanel({
     return null;
   }
 
-  const items = scanItemsForDay(day, orgQueryValue);
+  const items = scanItemsForDay(day);
   const visibleItems = items.slice(0, 3);
   const remainingCount = items.length - visibleItems.length;
   const dayHref = calendarDayHref(
@@ -138,10 +138,7 @@ function selectScanDay(data: CalendarRange): CalendarDay | null {
   );
 }
 
-function scanItemsForDay(
-  day: CalendarDay,
-  orgQueryValue: string | null
-): AvailabilityStatusItem[] {
+function scanItemsForDay(day: CalendarDay): AvailabilityStatusItem[] {
   const holidayItems: AvailabilityStatusItem[] = day.publicHolidays.map(
     (holiday) => ({
       endsAt: day.date,
@@ -159,7 +156,7 @@ function scanItemsForDay(
     approvalStatus: event.approvalStatus,
     contactabilityStatus: event.contactabilityStatus,
     endsAt: event.endsAt,
-    href: withOrg(`/people/${event.personId}`, orgQueryValue),
+    href: withOrg(`/people/${event.personId}`, event.companyId),
     id: event.id,
     name: event.displayName,
     personId: event.personId,

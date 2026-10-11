@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantTransaction } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import {
   type PreviewEvent,
@@ -20,7 +20,7 @@ export interface FeedRepresentation {
 export interface RepresentationScope {
   clerkOrgId: string;
   feedId: string;
-  organisationId: string;
+  organisationId: string | null;
 }
 
 interface RepresentationError {
@@ -33,7 +33,8 @@ export async function establishFeedRepresentation(
 ): Promise<Result<FeedRepresentation, RepresentationError>> {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await database.$transaction(
+      return await tenantTransaction(
+        input.clerkOrgId,
         async (tx) => reconcileRepresentation(tx, input),
         {
           isolationLevel: "Serializable",
@@ -92,20 +93,29 @@ async function reconcileRepresentation(
     horizonDays: 366,
   });
   if (!projected.ok) {
+    if (projected.error.code === "feed_not_found") {
+      return {
+        error: { code: "not_found", message: projected.error.message },
+        ok: false,
+      };
+    }
     // Aborting avoids committing a partly reconciled ledger or using a mixed read.
     throw new Error(projected.error.message);
   }
   const ledger = await tx.feedEventPublication.findMany({
     where: { ...scope, feed_id: input.feedId },
   });
+  const existingByUid = new Map(ledger.map((row) => [row.published_uid, row]));
   const existingBySource = new Map(ledger.map((row) => [row.source_key, row]));
   const seen = new Set<string>();
   const events: PreviewEvent[] = [];
   const now = new Date();
   for (const event of projected.value) {
-    const sourceKey = `${event.isPublicHoliday ? "holiday" : "availability"}:${event.sourceRecordId}`;
+    const sourceKey = eventSourceKey(event, input.organisationId);
     seen.add(sourceKey);
-    const existing = existingBySource.get(sourceKey);
+    const existing =
+      existingBySource.get(sourceKey) ?? existingByUid.get(event.publishedUid);
+    seen.add(existing?.source_key ?? sourceKey);
     const uid = existing?.published_uid ?? event.publishedUid;
     const representationHash = hashEventRepresentation({
       ...event,
@@ -246,4 +256,15 @@ function isRetryableConflict(error: unknown): boolean {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     (error.code === "P2034" || error.code === "P2002")
   );
+}
+
+function eventSourceKey(
+  event: PreviewEvent,
+  organisationId: string | null
+): string {
+  if (!event.isPublicHoliday) {
+    return `availability:${event.sourceRecordId}`;
+  }
+  const prefix = organisationId === null ? `${event.sourceCompanyId}:` : "";
+  return `holiday:${prefix}${event.sourceRecordId}`;
 }

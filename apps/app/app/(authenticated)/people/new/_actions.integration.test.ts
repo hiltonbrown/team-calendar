@@ -30,7 +30,7 @@ if (!tenant) {
 }
 const { clerkOrgId, organisationId } = tenant;
 const { createManualPersonAction } = await import("./_actions");
-const { database } = await import("@repo/database");
+const { systemDatabase: database } = await import("@repo/database");
 
 describe("manual person plan-limit enforcement", () => {
   beforeEach(async () => {

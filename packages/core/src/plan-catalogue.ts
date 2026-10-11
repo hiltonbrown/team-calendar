@@ -16,7 +16,7 @@ export const PUBLIC_PLAN_CATALOGUE = [
   },
   {
     features: { analytics: true, priority_support: true },
-    limits: { feeds: -1, payroll_entities: 1, seats: 50 },
+    limits: { feeds: -1, payroll_entities: 5, seats: 50 },
     name: "Premium",
     plan_key: "premium",
   },

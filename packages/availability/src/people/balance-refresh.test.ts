@@ -13,15 +13,32 @@ vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("@repo/database", () => ({
-  database: {
-    auditEvent: { create: mocks.auditCreate },
-    person: { findFirst: mocks.personFindFirst },
-    xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-  },
   scopedQuery: (clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   }),
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      auditEvent: { create: mocks.auditCreate },
+      person: { findFirst: mocks.personFindFirst },
+      xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        auditEvent: { create: mocks.auditCreate },
+        person: { findFirst: mocks.personFindFirst },
+        xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,

@@ -7,7 +7,9 @@ vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
   "packages/database/authoritative-usage.integration.test.ts"
 );
-const { database, getAuthoritativeUsageCount } = await import("./index.js");
+const { systemDatabase: database, getAuthoritativeUsageCount } = await import(
+  "./index.js"
+);
 const clerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
 const activeOrganisationId = fixture.tenants[0]?.organisationId as string;
 const archivedOrganisationId = fixture.tenants[1]?.organisationId as string;

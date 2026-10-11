@@ -7,7 +7,23 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: { person: { findMany: mocks.findMany } },
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return { person: { findMany: mocks.findMany } };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return { person: { findMany: mocks.findMany } }.$transaction(
+        transactionCallback,
+        options
+      );
+    }
+  ),
 }));
 vi.mock("./organisation-settings-service", () => ({
   getSettings: mocks.getSettings,

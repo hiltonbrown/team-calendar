@@ -9,11 +9,12 @@ import type {
 } from "@repo/core";
 import { xeroRecoveryMessage } from "@repo/core";
 import {
-  database,
   getSubmitOperation,
   hasUnresolvedSubmitOperation,
   type OutboundOperationAttemptScope,
   scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
@@ -334,7 +335,9 @@ async function loadApproverPage(data: ListData): Promise<
     filters.status,
     hasExplicitDateFilter
   );
-  const records = await database.availabilityRecord.findMany({
+  const records = await tenantDatabase(
+    data.clerkOrgId
+  ).availabilityRecord.findMany({
     cursor: cursor ? { id: cursor } : undefined,
     orderBy: [{ submitted_at: "asc" }, { starts_at: "asc" }, { id: "asc" }],
     select: approvalRecordSelect,
@@ -465,7 +468,7 @@ export async function getApprovalDetail(
       return authorised;
     }
     const item = await toApprovalListItem(authorised.value);
-    const history = await database.auditEvent.findMany({
+    const history = await tenantDatabase(input.clerkOrgId).auditEvent.findMany({
       orderBy: { created_at: "asc" },
       select: {
         action: true,
@@ -533,20 +536,20 @@ export async function getApprovalSummaryCounts(input: {
     } satisfies Prisma.AvailabilityRecordWhereInput;
     const [pending, failedSync, approvedThisMonth, declinedThisMonth] =
       await Promise.all([
-        database.availabilityRecord.count({
+        tenantDatabase(input.clerkOrgId).availabilityRecord.count({
           where: { ...baseWhere, approval_status: "submitted" },
         }),
-        database.availabilityRecord.count({
+        tenantDatabase(input.clerkOrgId).availabilityRecord.count({
           where: { ...baseWhere, approval_status: "xero_sync_failed" },
         }),
-        database.availabilityRecord.count({
+        tenantDatabase(input.clerkOrgId).availabilityRecord.count({
           where: {
             ...baseWhere,
             approval_status: "approved",
             approved_at: { gte: startOfMonth },
           },
         }),
-        database.availabilityRecord.count({
+        tenantDatabase(input.clerkOrgId).availabilityRecord.count({
           where: {
             ...baseWhere,
             approval_status: "declined",
@@ -678,7 +681,7 @@ export async function requestMoreInfo(
     if (record.approval_status !== "submitted") {
       return invalidState("invalid_state_for_info_request");
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(input.clerkOrgId, async (tx) => {
       await notifyUser(tx, parsed.data, record, {
         actionUrl: `/plans?recordId=${record.id}`,
         payload: { body: parsed.data.question },
@@ -724,7 +727,7 @@ export async function revertApprovalAttempt(
     ) {
       return invalidState("invalid_state_for_revert");
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(input.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_note:
@@ -825,7 +828,9 @@ async function dispatchXeroSyncInternal(
     ApprovalServiceError
   >
 > {
-  const tenant = await database.xeroConnection.findFirst({
+  const tenant = await tenantDatabase(
+    input.clerkOrgId
+  ).xeroConnection.findFirst({
     orderBy: { created_at: "asc" },
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -976,7 +981,7 @@ async function performApproval(
       journal.value.actorUserId === parsed.data.actingUserId
         ? parsed.data.actingPersonId
         : ((
-            await database.person.findFirst({
+            await tenantDatabase(parsed.data.clerkOrgId).person.findFirst({
               select: { id: true },
               where: {
                 archived_at: null,
@@ -1022,7 +1027,7 @@ async function performApproval(
     xeroWriteSucceeded = true;
     failureStage = "local_transaction";
     const now = new Date();
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "approved",
@@ -1205,7 +1210,7 @@ async function performDecline(
       originalActorUserId === input.actingUserId
         ? input.actingPersonId
         : ((
-            await database.person.findFirst({
+            await tenantDatabase(input.clerkOrgId).person.findFirst({
               select: { id: true },
               where: {
                 archived_at: null,
@@ -1254,7 +1259,7 @@ async function performDecline(
     xeroWriteSucceeded = xeroLeaveApplicationId !== null;
     failureStage = "local_transaction";
     const now = new Date();
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(input.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_note: journal?.ok
@@ -1484,7 +1489,7 @@ async function persistApprovalFailure(input: {
   error: ProviderWriteError;
 }): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   const plainMessage = input.error.userMessage;
-  await database.$transaction(async (tx) => {
+  await tenantTransaction(input.input.clerkOrgId, async (tx) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
         approval_note: input.approvalNote ?? input.record.approval_note,
@@ -1535,7 +1540,7 @@ function loadRecord(input: {
   organisationId: string;
   recordId: string;
 }) {
-  return database.availabilityRecord.findFirst({
+  return tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
     include: recordInclude,
     where: {
       ...scoped(input),
@@ -1595,7 +1600,7 @@ async function loadApprovalListContext(
   const [locations, organisation] = await Promise.all([
     cache.getOrLoad("approval-list:locations", () =>
       locationIds.length
-        ? database.location.findMany({
+        ? tenantDatabase(clerkOrgId).location.findMany({
             select: {
               country_code: true,
               id: true,
@@ -1610,7 +1615,7 @@ async function loadApprovalListContext(
         : Promise.resolve([])
     ),
     cache.getOrLoad("approval-list:organisation", async () => {
-      const row = await database.organisation.findFirst({
+      const row = await tenantDatabase(clerkOrgId).organisation.findFirst({
         select: {
           country_code: true,
           timezone: true,
@@ -1676,7 +1681,7 @@ async function loadApprovalListContext(
   ];
   const balances =
     personIds.length && recordTypes.length
-      ? await database.leaveBalance.findMany({
+      ? await tenantDatabase(clerkOrgId).leaveBalance.findMany({
           orderBy: { updated_at: "desc" },
           select: {
             balance: true,
@@ -1809,7 +1814,7 @@ async function loadBalanceSnapshot(
     ? (context.balanceByPersonAndRecordType.get(
         balanceKey(record.person_id, record.record_type)
       ) ?? null)
-    : await database.leaveBalance.findFirst({
+    : await tenantDatabase(record.clerk_org_id).leaveBalance.findFirst({
         orderBy: { updated_at: "desc" },
         select: {
           balance: true,
@@ -2041,7 +2046,7 @@ async function notifyApprovalBestEffort(
   }
 ): Promise<void> {
   try {
-    await notifyUser(database, input, record, {
+    await notifyUser(tenantDatabase(input.clerkOrgId), input, record, {
       actionUrl: options.actionUrl,
       payload: options.payload,
       recipientUserId: record.person.clerk_user_id,
@@ -2051,10 +2056,15 @@ async function notifyApprovalBestEffort(
     logApprovalNotificationFailure(error, input, record, options.type);
   }
   try {
-    await notifyManagersIfEnabled(database, input, record, {
-      actionUrl: `/leave-approvals?recordId=${record.id}`,
-      type: options.type,
-    });
+    await notifyManagersIfEnabled(
+      tenantDatabase(input.clerkOrgId),
+      input,
+      record,
+      {
+        actionUrl: `/leave-approvals?recordId=${record.id}`,
+        type: options.type,
+      }
+    );
   } catch (error) {
     logApprovalNotificationFailure(error, input, record, options.type);
   }
@@ -2081,9 +2091,14 @@ async function notifyApprovalFailureBestEffort(
   }
 ): Promise<void> {
   try {
-    await notifyOwnerAndApprover(database, input, record, {
-      actionUrl: options.actionUrl,
-    });
+    await notifyOwnerAndApprover(
+      tenantDatabase(input.clerkOrgId),
+      input,
+      record,
+      {
+        actionUrl: options.actionUrl,
+      }
+    );
   } catch (error) {
     logApprovalNotificationFailure(
       error,

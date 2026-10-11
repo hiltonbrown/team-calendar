@@ -254,7 +254,7 @@ export type FeedGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
 export type FeedGroupByOutputType = {
   id: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id: string | null
   name: string
   slug: string
   description: string | null
@@ -297,7 +297,7 @@ export type FeedWhereInput = {
   NOT?: Prisma.FeedWhereInput | Prisma.FeedWhereInput[]
   id?: Prisma.UuidFilter<"Feed"> | string
   clerk_org_id?: Prisma.StringFilter<"Feed"> | string
-  organisation_id?: Prisma.UuidFilter<"Feed"> | string
+  organisation_id?: Prisma.UuidNullableFilter<"Feed"> | string | null
   name?: Prisma.StringFilter<"Feed"> | string
   slug?: Prisma.StringFilter<"Feed"> | string
   description?: Prisma.StringNullableFilter<"Feed"> | string | null
@@ -312,7 +312,7 @@ export type FeedWhereInput = {
   archived_at?: Prisma.DateTimeNullableFilter<"Feed"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Feed"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Feed"> | Date | string
-  organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
+  organisation?: Prisma.XOR<Prisma.OrganisationNullableScalarRelationFilter, Prisma.OrganisationWhereInput> | null
   event_publications?: Prisma.FeedEventPublicationListRelationFilter
   scopes?: Prisma.FeedScopeListRelationFilter
   tokens?: Prisma.FeedTokenListRelationFilter
@@ -321,7 +321,7 @@ export type FeedWhereInput = {
 export type FeedOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
-  organisation_id?: Prisma.SortOrder
+  organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -349,7 +349,7 @@ export type FeedWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.FeedWhereInput[]
   NOT?: Prisma.FeedWhereInput | Prisma.FeedWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"Feed"> | string
-  organisation_id?: Prisma.UuidFilter<"Feed"> | string
+  organisation_id?: Prisma.UuidNullableFilter<"Feed"> | string | null
   name?: Prisma.StringFilter<"Feed"> | string
   slug?: Prisma.StringFilter<"Feed"> | string
   description?: Prisma.StringNullableFilter<"Feed"> | string | null
@@ -364,7 +364,7 @@ export type FeedWhereUniqueInput = Prisma.AtLeast<{
   archived_at?: Prisma.DateTimeNullableFilter<"Feed"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Feed"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Feed"> | Date | string
-  organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
+  organisation?: Prisma.XOR<Prisma.OrganisationNullableScalarRelationFilter, Prisma.OrganisationWhereInput> | null
   event_publications?: Prisma.FeedEventPublicationListRelationFilter
   scopes?: Prisma.FeedScopeListRelationFilter
   tokens?: Prisma.FeedTokenListRelationFilter
@@ -373,7 +373,7 @@ export type FeedWhereUniqueInput = Prisma.AtLeast<{
 export type FeedOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
-  organisation_id?: Prisma.SortOrder
+  organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -401,7 +401,7 @@ export type FeedScalarWhereWithAggregatesInput = {
   NOT?: Prisma.FeedScalarWhereWithAggregatesInput | Prisma.FeedScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"Feed"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"Feed"> | string
-  organisation_id?: Prisma.UuidWithAggregatesFilter<"Feed"> | string
+  organisation_id?: Prisma.UuidNullableWithAggregatesFilter<"Feed"> | string | null
   name?: Prisma.StringWithAggregatesFilter<"Feed"> | string
   slug?: Prisma.StringWithAggregatesFilter<"Feed"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Feed"> | string | null
@@ -435,7 +435,7 @@ export type FeedCreateInput = {
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
   event_publications?: Prisma.FeedEventPublicationCreateNestedManyWithoutFeedInput
   scopes?: Prisma.FeedScopeCreateNestedManyWithoutFeedInput
   tokens?: Prisma.FeedTokenCreateNestedManyWithoutFeedInput
@@ -444,7 +444,7 @@ export type FeedCreateInput = {
 export type FeedUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   name: string
   slug: string
   description?: string | null
@@ -481,7 +481,7 @@ export type FeedUpdateInput = {
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeedsNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeedsNestedInput
   event_publications?: Prisma.FeedEventPublicationUpdateManyWithoutFeedNestedInput
   scopes?: Prisma.FeedScopeUpdateManyWithoutFeedNestedInput
   tokens?: Prisma.FeedTokenUpdateManyWithoutFeedNestedInput
@@ -490,7 +490,7 @@ export type FeedUpdateInput = {
 export type FeedUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -513,7 +513,7 @@ export type FeedUncheckedUpdateInput = {
 export type FeedCreateManyInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   name: string
   slug: string
   description?: string | null
@@ -552,7 +552,7 @@ export type FeedUpdateManyMutationInput = {
 export type FeedUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -821,7 +821,7 @@ export type FeedScalarWhereInput = {
   NOT?: Prisma.FeedScalarWhereInput | Prisma.FeedScalarWhereInput[]
   id?: Prisma.UuidFilter<"Feed"> | string
   clerk_org_id?: Prisma.StringFilter<"Feed"> | string
-  organisation_id?: Prisma.UuidFilter<"Feed"> | string
+  organisation_id?: Prisma.UuidNullableFilter<"Feed"> | string | null
   name?: Prisma.StringFilter<"Feed"> | string
   slug?: Prisma.StringFilter<"Feed"> | string
   description?: Prisma.StringNullableFilter<"Feed"> | string | null
@@ -855,7 +855,7 @@ export type FeedCreateWithoutEvent_publicationsInput = {
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
   scopes?: Prisma.FeedScopeCreateNestedManyWithoutFeedInput
   tokens?: Prisma.FeedTokenCreateNestedManyWithoutFeedInput
 }
@@ -863,7 +863,7 @@ export type FeedCreateWithoutEvent_publicationsInput = {
 export type FeedUncheckedCreateWithoutEvent_publicationsInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   name: string
   slug: string
   description?: string | null
@@ -915,7 +915,7 @@ export type FeedUpdateWithoutEvent_publicationsInput = {
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeedsNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeedsNestedInput
   scopes?: Prisma.FeedScopeUpdateManyWithoutFeedNestedInput
   tokens?: Prisma.FeedTokenUpdateManyWithoutFeedNestedInput
 }
@@ -923,7 +923,7 @@ export type FeedUpdateWithoutEvent_publicationsInput = {
 export type FeedUncheckedUpdateWithoutEvent_publicationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -959,7 +959,7 @@ export type FeedCreateWithoutScopesInput = {
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
   event_publications?: Prisma.FeedEventPublicationCreateNestedManyWithoutFeedInput
   tokens?: Prisma.FeedTokenCreateNestedManyWithoutFeedInput
 }
@@ -967,7 +967,7 @@ export type FeedCreateWithoutScopesInput = {
 export type FeedUncheckedCreateWithoutScopesInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   name: string
   slug: string
   description?: string | null
@@ -1019,7 +1019,7 @@ export type FeedUpdateWithoutScopesInput = {
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeedsNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeedsNestedInput
   event_publications?: Prisma.FeedEventPublicationUpdateManyWithoutFeedNestedInput
   tokens?: Prisma.FeedTokenUpdateManyWithoutFeedNestedInput
 }
@@ -1027,7 +1027,7 @@ export type FeedUpdateWithoutScopesInput = {
 export type FeedUncheckedUpdateWithoutScopesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1063,7 +1063,7 @@ export type FeedCreateWithoutTokensInput = {
   archived_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
-  organisation: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
+  organisation?: Prisma.OrganisationCreateNestedOneWithoutFeedsInput
   event_publications?: Prisma.FeedEventPublicationCreateNestedManyWithoutFeedInput
   scopes?: Prisma.FeedScopeCreateNestedManyWithoutFeedInput
 }
@@ -1071,7 +1071,7 @@ export type FeedCreateWithoutTokensInput = {
 export type FeedUncheckedCreateWithoutTokensInput = {
   id?: string
   clerk_org_id: string
-  organisation_id: string
+  organisation_id?: string | null
   name: string
   slug: string
   description?: string | null
@@ -1123,7 +1123,7 @@ export type FeedUpdateWithoutTokensInput = {
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutFeedsNestedInput
+  organisation?: Prisma.OrganisationUpdateOneWithoutFeedsNestedInput
   event_publications?: Prisma.FeedEventPublicationUpdateManyWithoutFeedNestedInput
   scopes?: Prisma.FeedScopeUpdateManyWithoutFeedNestedInput
 }
@@ -1131,7 +1131,7 @@ export type FeedUpdateWithoutTokensInput = {
 export type FeedUncheckedUpdateWithoutTokensInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1299,7 +1299,7 @@ export type FeedSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.Feed$organisationArgs<ExtArgs>
   event_publications?: boolean | Prisma.Feed$event_publicationsArgs<ExtArgs>
   scopes?: boolean | Prisma.Feed$scopesArgs<ExtArgs>
   tokens?: boolean | Prisma.Feed$tokensArgs<ExtArgs>
@@ -1324,7 +1324,7 @@ export type FeedSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.Feed$organisationArgs<ExtArgs>
 }, ExtArgs["result"]["feed"]>
 
 export type FeedSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1345,7 +1345,7 @@ export type FeedSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   archived_at?: boolean
   created_at?: boolean
   updated_at?: boolean
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.Feed$organisationArgs<ExtArgs>
 }, ExtArgs["result"]["feed"]>
 
 export type FeedSelectScalar = {
@@ -1370,23 +1370,23 @@ export type FeedSelectScalar = {
 
 export type FeedOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "name" | "slug" | "description" | "status" | "privacy_mode" | "includes_public_holidays" | "last_rendered_at" | "representation_hash" | "representation_generation" | "last_etag" | "created_by_user_id" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["feed"]>
 export type FeedInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.Feed$organisationArgs<ExtArgs>
   event_publications?: boolean | Prisma.Feed$event_publicationsArgs<ExtArgs>
   scopes?: boolean | Prisma.Feed$scopesArgs<ExtArgs>
   tokens?: boolean | Prisma.Feed$tokensArgs<ExtArgs>
   _count?: boolean | Prisma.FeedCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FeedIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.Feed$organisationArgs<ExtArgs>
 }
 export type FeedIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
+  organisation?: boolean | Prisma.Feed$organisationArgs<ExtArgs>
 }
 
 export type $FeedPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Feed"
   objects: {
-    organisation: Prisma.$OrganisationPayload<ExtArgs>
+    organisation: Prisma.$OrganisationPayload<ExtArgs> | null
     event_publications: Prisma.$FeedEventPublicationPayload<ExtArgs>[]
     scopes: Prisma.$FeedScopePayload<ExtArgs>[]
     tokens: Prisma.$FeedTokenPayload<ExtArgs>[]
@@ -1394,7 +1394,7 @@ export type $FeedPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
-    organisation_id: string
+    organisation_id: string | null
     name: string
     slug: string
     description: string | null
@@ -1803,7 +1803,7 @@ readonly fields: FeedFieldRefs;
  */
 export interface Prisma__FeedClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  organisation<T extends Prisma.Feed$organisationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Feed$organisationArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   event_publications<T extends Prisma.Feed$event_publicationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Feed$event_publicationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FeedEventPublicationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   scopes<T extends Prisma.Feed$scopesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Feed$scopesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FeedScopePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tokens<T extends Prisma.Feed$tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Feed$tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FeedTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2251,6 +2251,25 @@ export type FeedDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Internal
    * Limit how many Feeds to delete.
    */
   limit?: number
+}
+
+/**
+ * Feed.organisation
+ */
+export type Feed$organisationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Organisation
+   */
+  select?: Prisma.OrganisationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Organisation
+   */
+  omit?: Prisma.OrganisationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrganisationInclude<ExtArgs> | null
+  where?: Prisma.OrganisationWhereInput
 }
 
 /**

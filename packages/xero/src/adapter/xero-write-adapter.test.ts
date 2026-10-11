@@ -21,13 +21,32 @@ vi.mock("@repo/observability/log", () => ({ log: { info: mocks.metricLog } }));
 beforeEach(() => {
   mocks.metricLog.mockReset();
 });
-vi.mock("@repo/database", () => ({
-  database: {
-    xeroConnection: {
-      findFirst: mocks.tenantFindFirst,
+vi.mock("@repo/database", () => {
+  const exports = {
+    database: {
+      xeroConnection: {
+        findFirst: mocks.tenantFindFirst,
+      },
     },
-  },
-}));
+  };
+  return {
+    ...exports,
+    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+      ok: true,
+      value: {
+        authorisation: { status: "active" },
+        id: bindingScope.connectionId,
+      },
+    })),
+    systemDatabase: exports.database,
+    tenantDatabase: vi.fn(() => exports.database),
+    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
+      "$transaction" in exports.database
+        ? exports.database.$transaction(callback)
+        : callback(exports.database)
+    ),
+  };
+});
 vi.mock("../oauth/authorisation", () => ({
   resolveXeroAccess: mocks.resolveXeroAccess,
 }));

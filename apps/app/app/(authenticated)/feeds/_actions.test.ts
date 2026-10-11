@@ -59,7 +59,7 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
 vi.mock("@repo/database", () => ({
-  database: mocks.database,
+  tenantDatabase: vi.fn(() => mocks.database),
 }));
 vi.mock("@repo/observability/log", () => ({
   log: mocks.log,

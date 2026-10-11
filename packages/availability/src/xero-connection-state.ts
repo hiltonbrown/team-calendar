@@ -1,3 +1,4 @@
+import type { Prisma } from "@repo/database";
 import "server-only";
 import type { Result } from "@repo/core";
 import {
@@ -10,10 +11,13 @@ import {
 export type { XeroConnectionStateInput } from "@repo/database/queries/xero-connection-state";
 
 export async function getXeroConnectionStateForScope(
-  input: XeroConnectionStateInput
+  input: XeroConnectionStateInput,
+  client?: Prisma.TransactionClient
 ): Promise<Result<XeroConnectionStateResult, XeroConnectionStateError>> {
   try {
-    return await getXeroConnectionState(input);
+    return client
+      ? await getXeroConnectionState(input, client)
+      : await getXeroConnectionState(input);
   } catch {
     return { error: { code: "state_unavailable" }, ok: false };
   }

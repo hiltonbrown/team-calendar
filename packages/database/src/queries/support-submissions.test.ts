@@ -9,12 +9,12 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("../client", () => ({
-  database: {
+vi.mock("../tenant-client", () => ({
+  tenantDatabase: () => ({
     auditEvent: {
       findMany: mocks.findMany,
     },
-  },
+  }),
 }));
 
 vi.mock("../tenant-query", () => ({

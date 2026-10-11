@@ -5,7 +5,7 @@ import {
   type OrganisationId,
   startOfUtcDay,
 } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type {
   availability_approval_status,
   availability_contactability,
@@ -152,7 +152,7 @@ export async function computeCurrentStatusForPeople(input: {
 
   const [locations, organisation, activeRecords] = await Promise.all([
     locationIds.length
-      ? database.location.findMany({
+      ? tenantDatabase(clerkOrgId).location.findMany({
           select: {
             country_code: true,
             id: true,
@@ -165,7 +165,7 @@ export async function computeCurrentStatusForPeople(input: {
           },
         })
       : Promise.resolve([]),
-    database.organisation.findFirst({
+    tenantDatabase(clerkOrgId).organisation.findFirst({
       select: {
         country_code: true,
         timezone: true,
@@ -176,7 +176,7 @@ export async function computeCurrentStatusForPeople(input: {
         id: organisationId,
       },
     }),
-    database.availabilityRecord.findMany({
+    tenantDatabase(clerkOrgId).availabilityRecord.findMany({
       select: {
         approval_status: true,
         archived_at: true,
@@ -256,7 +256,7 @@ export async function computePublicHolidayApplicability(input: {
   const organisationId = input.organisationId as OrganisationId;
   const [locations, organisation] = await Promise.all([
     input.locationIds.length
-      ? database.location.findMany({
+      ? tenantDatabase(clerkOrgId).location.findMany({
           select: {
             country_code: true,
             id: true,
@@ -269,7 +269,7 @@ export async function computePublicHolidayApplicability(input: {
           },
         })
       : Promise.resolve([]),
-    database.organisation.findFirst({
+    tenantDatabase(clerkOrgId).organisation.findFirst({
       select: { country_code: true, timezone: true },
       where: {
         archived_at: null,
@@ -323,7 +323,7 @@ export async function computeCurrentStatus(input: {
   const organisationId = input.organisationId as OrganisationId;
   const [location, organisation, activeRecords] = await Promise.all([
     input.locationId
-      ? database.location.findFirst({
+      ? tenantDatabase(clerkOrgId).location.findFirst({
           select: {
             country_code: true,
             region_code: true,
@@ -335,7 +335,7 @@ export async function computeCurrentStatus(input: {
           },
         })
       : Promise.resolve(null),
-    database.organisation.findFirst({
+    tenantDatabase(clerkOrgId).organisation.findFirst({
       select: {
         country_code: true,
         timezone: true,
@@ -346,7 +346,7 @@ export async function computeCurrentStatus(input: {
         id: organisationId,
       },
     }),
-    database.availabilityRecord.findMany({
+    tenantDatabase(clerkOrgId).availabilityRecord.findMany({
       select: {
         approval_status: true,
         archived_at: true,

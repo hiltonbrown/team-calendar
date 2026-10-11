@@ -22,7 +22,9 @@ const manifestSchema = z.object({
   version: z.literal(1),
 });
 
-export const assertTestDatabaseConnectionAllowed = (): void => {
+export const assertTestDatabaseConnectionAllowed = (
+  databaseUrl: string | undefined = process.env.DATABASE_URL
+): void => {
   if (process.env.TC_SOURCE_GATES === "1") {
     throw new Error(
       "Database connections are disabled during source-only gates"
@@ -31,7 +33,6 @@ export const assertTestDatabaseConnectionAllowed = (): void => {
   if (process.env.NODE_ENV !== "test") {
     return;
   }
-  const databaseUrl = process.env.DATABASE_URL;
 
   if (process.env.ALLOW_LIVE_DATABASE_TESTS === "I_ACKNOWLEDGE_LIVE_MUTATION") {
     const manifestPath = process.env.TC_RELEASE_MANIFEST;

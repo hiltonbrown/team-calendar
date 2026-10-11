@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   failedRecordFindFirst: vi.fn(),
   failedRecordFindMany: vi.fn(),
   getRegisteredSyncEventName: vi.fn(),
+  metadata: vi.fn(),
   scopedTo: vi.fn((input: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
@@ -25,30 +26,69 @@ vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.state,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
-    $transaction: vi.fn((callback) =>
-      callback({
-        auditEvent: { create: mocks.auditCreate },
-        failedRecord: { findFirst: mocks.failedRecordFindFirst },
-      })
-    ),
-    auditEvent: { create: mocks.auditCreate, findMany: mocks.auditFindMany },
-    failedRecord: {
-      count: mocks.failedRecordCount,
-      findFirst: mocks.failedRecordFindFirst,
-      findMany: mocks.failedRecordFindMany,
-    },
-    syncRun: {
-      findFirst: mocks.syncRunFindFirst,
-      findMany: mocks.syncRunFindMany,
-      groupBy: mocks.syncRunGroupBy,
-    },
-    xeroConnection: {
-      findFirst: mocks.xeroTenantFindFirst,
-      findMany: mocks.xeroTenantFindMany,
-    },
-  },
+  getScopedXeroAuthorisationMetadata: mocks.metadata,
   scopedTo: mocks.scopedTo,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      $transaction: vi.fn((callback) =>
+        callback({
+          auditEvent: { create: mocks.auditCreate },
+          failedRecord: { findFirst: mocks.failedRecordFindFirst },
+        })
+      ),
+      auditEvent: { create: mocks.auditCreate, findMany: mocks.auditFindMany },
+      failedRecord: {
+        count: mocks.failedRecordCount,
+        findFirst: mocks.failedRecordFindFirst,
+        findMany: mocks.failedRecordFindMany,
+      },
+      syncRun: {
+        findFirst: mocks.syncRunFindFirst,
+        findMany: mocks.syncRunFindMany,
+        groupBy: mocks.syncRunGroupBy,
+      },
+      xeroConnection: {
+        findFirst: mocks.xeroTenantFindFirst,
+        findMany: mocks.xeroTenantFindMany,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        $transaction: vi.fn((callback) =>
+          callback({
+            auditEvent: { create: mocks.auditCreate },
+            failedRecord: { findFirst: mocks.failedRecordFindFirst },
+          })
+        ),
+        auditEvent: {
+          create: mocks.auditCreate,
+          findMany: mocks.auditFindMany,
+        },
+        failedRecord: {
+          count: mocks.failedRecordCount,
+          findFirst: mocks.failedRecordFindFirst,
+          findMany: mocks.failedRecordFindMany,
+        },
+        syncRun: {
+          findFirst: mocks.syncRunFindFirst,
+          findMany: mocks.syncRunFindMany,
+          groupBy: mocks.syncRunGroupBy,
+        },
+        xeroConnection: {
+          findFirst: mocks.xeroTenantFindFirst,
+          findMany: mocks.xeroTenantFindMany,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 vi.mock("./sync-events", () => ({
   dispatchCancelSyncRun: vi.fn(),
@@ -152,6 +192,24 @@ function mockSummaryRuns(runs: ReturnType<typeof completedRunFixture>[]): void {
 describe("sync-monitor-service", () => {
   afterEach(() => {
     vi.useRealTimers();
+  });
+  it("loads grant health only through the scoped metadata helper", async () => {
+    mocks.xeroTenantFindMany.mockResolvedValue([
+      {
+        id: "tenant_metadata",
+        status: "active",
+        tenant_name: "Metadata company",
+      },
+    ]);
+    await listTenantSummaries(baseInput);
+    expect(mocks.xeroTenantFindMany).toHaveBeenCalledWith(
+      expect.not.objectContaining({ include: expect.anything() })
+    );
+    expect(mocks.metadata).toHaveBeenCalledWith({
+      clerkOrgId: baseInput.clerkOrgId,
+      connectionId: "tenant_metadata",
+      organisationId: baseInput.organisationId,
+    });
   });
   beforeEach(() => {
     vi.clearAllMocks();

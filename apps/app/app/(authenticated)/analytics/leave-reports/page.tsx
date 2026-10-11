@@ -5,7 +5,7 @@ import {
   type DateRangePreset,
   resolveDateRange,
 } from "@repo/availability";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import {
   Card,
   CardContent,
@@ -72,7 +72,7 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
 
   const { clerkOrgId, organisationId } =
     await requireActiveOrgPageContext(orgParam);
-  const organisation = await database.organisation.findFirst({
+  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
     select: { timezone: true },
     where: {
       archived_at: null,

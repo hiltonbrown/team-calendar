@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import type { StageInput, WizardInputs } from "./wizard-rules";
 
 export interface WizardContext {
@@ -32,7 +32,7 @@ export async function loadWizardInputs(
   try {
     const [organisation, connection, pendingMatches, person] =
       await Promise.all([
-        database.organisation.findFirst({
+        tenantDatabase(ctx.clerkOrgId).organisation.findFirst({
           select: {
             onboarding_completed_at: true,
             onboarding_step: true,
@@ -45,7 +45,7 @@ export async function loadWizardInputs(
             id: ctx.organisationId,
           },
         }),
-        database.xeroConnection.findFirst({
+        tenantDatabase(ctx.clerkOrgId).xeroConnection.findFirst({
           select: {
             id: true,
             initial_sync_requested_at: true,
@@ -55,10 +55,10 @@ export async function loadWizardInputs(
           },
           where: { ...scope, status: { in: ["active", "reconnect_required"] } },
         }),
-        database.xeroPersonMatch.count({
+        tenantDatabase(ctx.clerkOrgId).xeroPersonMatch.count({
           where: { ...scope, status: "pending" },
         }),
-        database.person.findFirst({
+        tenantDatabase(ctx.clerkOrgId).person.findFirst({
           select: { id: true },
           where: { ...scope, archived_at: null, clerk_user_id: ctx.userId },
         }),
@@ -73,7 +73,7 @@ export async function loadWizardInputs(
     let connectionInputs: WizardInputs["connection"] = null;
     if (connection) {
       const requestedAt = connection.initial_sync_requested_at;
-      const runs = await database.syncRun.findMany({
+      const runs = await tenantDatabase(ctx.clerkOrgId).syncRun.findMany({
         orderBy: { started_at: "desc" },
         select: { run_type: true, status: true },
         take: 30,

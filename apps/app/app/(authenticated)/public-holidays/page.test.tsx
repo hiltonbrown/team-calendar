@@ -17,8 +17,10 @@ vi.mock("@repo/availability", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
 vi.mock("@repo/database", () => ({
-  database: { location: { findMany: mocks.locationFindMany } },
   scopedQuery: mocks.scopedQuery,
+  tenantDatabase: vi.fn(() => ({
+    location: { findMany: mocks.locationFindMany },
+  })),
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,

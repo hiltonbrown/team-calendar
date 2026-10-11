@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ database: {} }));
+vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
 
 const mocks = vi.hoisted(() => ({
   count: vi.fn(),
@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   personFindFirst: vi.fn(),
   preferenceFindUnique: vi.fn(),
   publish: vi.fn(),
+  tenantDatabase: vi.fn(),
 }));
 
 vi.mock("./sse/broker", () => ({
@@ -55,6 +56,7 @@ const input = {
 describe("dispatchNotification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.tenantDatabase.mockReturnValue(client);
     mocks.count.mockResolvedValue(1);
     mocks.emailCreate.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000201",
@@ -66,6 +68,15 @@ describe("dispatchNotification", () => {
     mocks.personFindFirst.mockResolvedValue({ email: "ava@example.com" });
     mocks.preferenceFindUnique.mockResolvedValue(null);
     mocks.publish.mockResolvedValue(undefined);
+  });
+
+  it("delivers notifications through the account-bound default client", async () => {
+    const result = await dispatchNotification(input);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { emailQueued: true, inAppDelivered: true },
+    });
+    expect(mocks.tenantDatabase).toHaveBeenCalledWith(input.clerkOrgId);
   });
 
   it("creates in-app rows and queues email when defaults allow both", async () => {
@@ -163,6 +174,7 @@ describe("dispatchNotification", () => {
 describe("publishPersistedNotification", () => {
   it("reads the committed scoped row and publishes without creating rows", async () => {
     vi.clearAllMocks();
+    mocks.tenantDatabase.mockReturnValue(client);
     mocks.notificationFindFirst.mockResolvedValue({
       action_url: input.actionUrl,
       body: input.body,
@@ -206,6 +218,7 @@ describe("publishPersistedNotification", () => {
   });
   it("does not publish a row absent from the committed scope", async () => {
     vi.clearAllMocks();
+    mocks.tenantDatabase.mockReturnValue(client);
     mocks.notificationFindFirst.mockResolvedValue(null);
     await publishPersistedNotification(
       {

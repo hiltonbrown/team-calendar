@@ -1,6 +1,6 @@
 import "server-only";
 
-import { database } from "@repo/database";
+import { tenantDatabase } from "@repo/database";
 import { getSettings } from "./organisation-settings-service";
 
 export async function managerScopePersonIds(input: {
@@ -14,7 +14,7 @@ export async function managerScopePersonIds(input: {
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
     }),
-    database.person.findMany({
+    tenantDatabase(input.clerkOrgId).person.findMany({
       orderBy: { id: "asc" },
       select: { id: true, manager_person_id: true },
       where: {

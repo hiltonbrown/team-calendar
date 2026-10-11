@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   ensureDefaultOrganisation: vi.fn(),
   getActiveOrgContext: vi.fn(),
-  listOrganisationsByClerkOrg: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
   requireOrg: vi.fn(),
+  resolveAccountCompanies: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -16,8 +16,8 @@ vi.mock("@repo/auth/helpers", () => ({
   requireOrg: mocks.requireOrg,
 }));
 
-vi.mock("@repo/database/queries/organisations", () => ({
-  listOrganisationsByClerkOrg: mocks.listOrganisationsByClerkOrg,
+vi.mock("@repo/database/queries/account-companies", () => ({
+  resolveAccountCompanies: mocks.resolveAccountCompanies,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -46,18 +46,15 @@ describe("requireActiveOrgPageContext", () => {
 
   it("resolves missing org from Clerk cookie state without redirecting", async () => {
     mocks.requireOrg.mockResolvedValue(clerkOrgId);
-    mocks.listOrganisationsByClerkOrg.mockResolvedValue({
-      ok: true,
-      value: [
-        {
-          countryCode: "AU",
-          createdAt: new Date("2026-01-01T00:00:00.000Z"),
-          id: organisationId,
-          name: "Alpha",
-          updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-        },
-      ],
-    });
+    mocks.resolveAccountCompanies.mockResolvedValue([
+      {
+        countryCode: "AU",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        id: organisationId,
+        name: "Alpha",
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ]);
 
     await expect(requireActiveOrgPageContext()).resolves.toEqual({
       clerkOrgId,
@@ -99,24 +96,12 @@ describe("requireActiveOrgPageContext", () => {
     expect(mocks.notFound).toHaveBeenCalledTimes(1);
   });
 
-  it("creates a default internal organisation when cookie state has none", async () => {
+  it("returns notFound without creating a company when the account has none", async () => {
     mocks.requireOrg.mockResolvedValue(clerkOrgId);
-    mocks.listOrganisationsByClerkOrg.mockResolvedValue({
-      ok: true,
-      value: [],
-    });
-    mocks.ensureDefaultOrganisation.mockResolvedValue({
-      clerkOrgId,
-      organisationId,
-    });
-
-    await expect(requireActiveOrgPageContext()).resolves.toEqual({
-      clerkOrgId,
-      organisationId,
-      orgQueryValue: null,
-      orgSource: "clerk_cookie",
-    });
-    expect(mocks.ensureDefaultOrganisation).toHaveBeenCalledWith(clerkOrgId);
-    expect(mocks.notFound).not.toHaveBeenCalled();
+    mocks.resolveAccountCompanies.mockResolvedValue([]);
+    await expect(requireActiveOrgPageContext()).rejects.toThrow(
+      "NEXT_NOT_FOUND"
+    );
+    expect(mocks.ensureDefaultOrganisation).not.toHaveBeenCalled();
   });
 });

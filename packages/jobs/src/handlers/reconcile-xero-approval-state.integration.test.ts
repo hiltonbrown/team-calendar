@@ -46,7 +46,7 @@ describe("local persistence integration", async () => {
   const fixture = allocateLiveTestFixture(
     "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts"
   );
-  const { database } = await import("@repo/database");
+  const { systemDatabase: database } = await import("@repo/database");
   const { reconcileXeroApprovalState } = await import(
     "./reconcile-xero-approval-state"
   );

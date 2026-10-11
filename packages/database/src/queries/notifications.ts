@@ -1,7 +1,7 @@
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import type { notification_type } from "../../generated/enums";
-import { database } from "../client";
+import { tenantDatabase } from "../tenant-client";
 
 export interface NotificationData {
   actionUrl: string | null;
@@ -41,7 +41,9 @@ export async function listNotificationsForUser(
   filters?: NotificationFilters
 ): Promise<Result<NotificationData[]>> {
   try {
-    const notifications = await database.notification.findMany({
+    const notifications = await tenantDatabase(
+      clerkOrgId
+    ).notification.findMany({
       orderBy: { created_at: "desc" },
       select: {
         action_url: true,
@@ -96,7 +98,7 @@ export async function countUnreadNotifications(
   userId: string
 ): Promise<Result<number>> {
   try {
-    const count = await database.notification.count({
+    const count = await tenantDatabase(clerkOrgId).notification.count({
       where: {
         clerk_org_id: clerkOrgId,
         organisation_id: organisationId,
@@ -120,7 +122,7 @@ export async function markNotificationRead(
   notificationId: string
 ): Promise<Result<void>> {
   try {
-    await database.notification.updateMany({
+    await tenantDatabase(clerkOrgId).notification.updateMany({
       data: { read_at: new Date() },
       where: {
         clerk_org_id: clerkOrgId,
@@ -145,7 +147,7 @@ export async function markAllNotificationsRead(
   userId: string
 ): Promise<Result<{ updatedCount: number }>> {
   try {
-    const result = await database.notification.updateMany({
+    const result = await tenantDatabase(clerkOrgId).notification.updateMany({
       data: { read_at: new Date() },
       where: {
         clerk_org_id: clerkOrgId,
@@ -169,7 +171,9 @@ export async function listNotificationPreferencesForUser(
   userId: string
 ): Promise<Result<NotificationPreferenceData[]>> {
   try {
-    const preferences = await database.notificationPreference.findMany({
+    const preferences = await tenantDatabase(
+      clerkOrgId
+    ).notificationPreference.findMany({
       orderBy: { notification_type: "asc" },
       select: {
         clerk_org_id: true,
@@ -222,7 +226,9 @@ export async function upsertNotificationPreference(
   }
 ): Promise<Result<NotificationPreferenceData>> {
   try {
-    const preference = await database.notificationPreference.upsert({
+    const preference = await tenantDatabase(
+      clerkOrgId
+    ).notificationPreference.upsert({
       create: {
         clerk_org_id: clerkOrgId,
         email_enabled: input.emailEnabled,

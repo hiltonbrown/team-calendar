@@ -23,11 +23,24 @@ const db = vi.hoisted(() => {
 });
 
 vi.mock("@repo/database", () => ({
-  database: db,
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   })),
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return db;
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return db.$transaction(transactionCallback, options);
+    }
+  ),
 }));
 
 vi.mock("@repo/core", async (importOriginal) => ({

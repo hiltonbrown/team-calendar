@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, database } from "@repo/database";
+import { type Database, tenantDatabase } from "@repo/database";
 import type { notification_type } from "@repo/database/generated/enums";
 import { z } from "zod";
 import { enqueueNotificationEmail } from "./email-queue-service";
@@ -34,6 +34,13 @@ export interface NotificationDispatchDatabase {
   person: Pick<Database["person"], "findFirst">;
 }
 
+function resolveDispatchClient(
+  clerkOrgId: string,
+  providedClient?: NotificationDispatchDatabase
+): NotificationDispatchDatabase {
+  return providedClient ?? tenantDatabase(clerkOrgId);
+}
+
 const DispatchSchema = z.object({
   actionUrl: z.string().min(1).nullable().optional(),
   actorUserId: z.string().min(1).nullable().optional(),
@@ -50,13 +57,14 @@ const DispatchSchema = z.object({
 
 export async function dispatchNotification(
   input: z.input<typeof DispatchSchema>,
-  client: NotificationDispatchDatabase = database,
+  providedClient?: NotificationDispatchDatabase,
   options: { publishRealtime?: boolean } = {}
 ): Promise<Result<DispatchNotificationResult, DispatchNotificationError>> {
   const parsed = DispatchSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  const client = resolveDispatchClient(parsed.data.clerkOrgId, providedClient);
   if (!isKnownNotificationType(parsed.data.type)) {
     return {
       error: { code: "invalid_type", message: "Unknown notification type." },
@@ -254,7 +262,7 @@ export async function publishPersistedNotification(
   input: { clerkOrgId: string; organisationId: string; notificationId: string },
   client: {
     notification: Pick<Database["notification"], "findFirst" | "count">;
-  } = database
+  } = tenantDatabase(input.clerkOrgId)
 ): Promise<void> {
   const row = await client.notification.findFirst({
     where: {

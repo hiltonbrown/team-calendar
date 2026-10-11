@@ -8,12 +8,29 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    auditEvent: {
-      create: mocks.auditCreate,
-    },
-  },
   getOrCreateOrganisationSettings: mocks.getOrCreateOrganisationSettings,
+  tenantDatabase: vi.fn((accountId: string) => {
+    if (!accountId) {
+      throw new Error("Missing tenant context");
+    }
+    return {
+      auditEvent: {
+        create: mocks.auditCreate,
+      },
+    };
+  }),
+  tenantTransaction: vi.fn(
+    (accountId: string, transactionCallback: unknown, options?: unknown) => {
+      if (!accountId) {
+        throw new Error("Missing tenant context");
+      }
+      return {
+        auditEvent: {
+          create: mocks.auditCreate,
+        },
+      }.$transaction(transactionCallback, options);
+    }
+  ),
   updateOrganisationSettings: mocks.updateOrganisationSettings,
 }));
 

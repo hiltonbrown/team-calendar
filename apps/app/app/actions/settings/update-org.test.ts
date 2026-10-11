@@ -14,11 +14,11 @@ vi.mock("@repo/auth/server", () => ({
   clerkClient: mocks.clerkClient,
 }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     organisation: {
       updateMany: mocks.updateMany,
     },
-  },
+  })),
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,

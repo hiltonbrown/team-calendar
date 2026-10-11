@@ -5,7 +5,7 @@ import {
   type PeopleRole,
   type PersonProfile,
 } from "@repo/availability";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -71,7 +71,7 @@ async function loadProfileViewModel(
     notFound();
   }
 
-  const actingPerson = await database.person.findFirst({
+  const actingPerson = await tenantDatabase(clerkOrgId).person.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(clerkOrgId, organisationId),

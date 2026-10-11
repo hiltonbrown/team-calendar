@@ -1,6 +1,10 @@
 import "server-only";
 import type { Result } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  scopedTo as scoped,
+  tenantDatabase,
+  tenantTransaction,
+} from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
@@ -24,6 +28,7 @@ import {
   XeroSyncRunFencedError,
 } from "./sync-run-lifecycle";
 import {
+  isCurrentXeroSyncBinding,
   rejectRetryableSyncResult,
   resolveSyncTenant,
   syncFailureReason,
@@ -70,10 +75,15 @@ interface Counts {
   skipped: number;
   upserted: number;
 }
-type SyncStatus = "cancelled" | "failed" | "partial_success" | "succeeded";
+type SyncStatus =
+  | "ignored"
+  | "cancelled"
+  | "failed"
+  | "partial_success"
+  | "succeeded";
 type SyncXeroLeaveBalancesResult = Result<
   Counts & {
-    runId: string;
+    runId: string | null;
     status: SyncStatus;
     hasMore?: boolean;
   },
@@ -133,6 +143,9 @@ async function syncXeroLeaveBalancesInternal(
   const startedAt = new Date();
   let runId: string | null = null;
   try {
+    if (!(await isCurrentXeroSyncBinding(context))) {
+      return { ok: true, value: emptyResult(null, "ignored") };
+    }
     const runAcquisition = await acquireSyncRun(
       context,
       "leave_balances",
@@ -182,7 +195,9 @@ async function syncXeroLeaveBalancesInternal(
     let initialCursorValue: string | null = null;
     let nextCursorValue: string | null = null;
     if (isTargetedPerson) {
-      peopleToProcess = await database.person.findMany({
+      peopleToProcess = await tenantDatabase(
+        context.clerkOrgId
+      ).person.findMany({
         select: { id: true, xero_employee_id: true },
         where: {
           ...scoped(context),
@@ -192,7 +207,9 @@ async function syncXeroLeaveBalancesInternal(
         },
       });
     } else {
-      cursorRecord = await database.xeroConnection.findFirst({
+      cursorRecord = await tenantDatabase(
+        context.clerkOrgId
+      ).xeroConnection.findFirst({
         select: {
           balance_next_person_id: true,
           balance_sweep_failed: true,
@@ -204,7 +221,9 @@ async function syncXeroLeaveBalancesInternal(
         },
       });
       initialCursorValue = cursorRecord?.balance_next_person_id ?? null;
-      const candidatePeople = await database.person.findMany({
+      const candidatePeople = await tenantDatabase(
+        context.clerkOrgId
+      ).person.findMany({
         orderBy: { id: "asc" },
         select: { id: true, xero_employee_id: true },
         take: PROBE_PAGE_SIZE,
@@ -518,7 +537,7 @@ function makeHeartbeat(
       return;
     }
     lastBeatAt = now;
-    await database.syncRun.updateMany({
+    await tenantDatabase(context.clerkOrgId).syncRun.updateMany({
       data: { updated_at: new Date() },
       where: { ...scoped(context), id: runId, status: "running" },
     });
@@ -528,7 +547,7 @@ async function cancellationRequested(
   context: SyncXeroLeaveBalancesInput,
   runId: string
 ): Promise<boolean> {
-  const runState = await database.syncRun.findFirst({
+  const runState = await tenantDatabase(context.clerkOrgId).syncRun.findFirst({
     select: { cancel_requested_at: true },
     where: { ...scoped(context), id: runId },
   });
@@ -626,7 +645,7 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await database.failedRecord.create({
+  await tenantDatabase(context.clerkOrgId).failedRecord.create({
     data: {
       ...scoped(context),
       entity_type: "leave_balances",
@@ -673,7 +692,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await persist(database);
+    await tenantTransaction(context.clerkOrgId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }
@@ -685,7 +704,7 @@ function emptyCounts(): Counts {
     upserted: 0,
   };
 }
-function emptyResult(runId: string, status: SyncStatus) {
+function emptyResult(runId: string | null, status: SyncStatus) {
   return {
     ...emptyCounts(),
     runId,

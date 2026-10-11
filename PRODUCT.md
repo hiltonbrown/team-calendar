@@ -143,7 +143,7 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 | Concept | Role |
 |---|---|
 | Clerk Organisation | Top-level tenant boundary; billing anchor. Identified by Clerk's `org_id` (stored as `clerk_org_id`). One Clerk Organisation = one country code. |
-| Organisation | Legal or payroll entity within a Clerk Organisation (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns at most one XeroConnection, its own People and Feeds. |
+| Organisation | Legal or payroll entity within a Clerk Organisation (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns at most one XeroConnection and its own People. Account feeds span the account; company feeds may retain a company scope. |
 | XeroConnection | One per Organisation. Contains both tenancy keys, external tenant and remote connection IDs, payroll region, status and sync health/progress; references its canonical authorisation. |
 | XeroAuthorisation | One per verified Xero user and provider app. Sole AES-256-GCM encrypted token owner; may support several scoped connections. |
 | User | Authenticated identity via Clerk. Managed entirely by Clerk; no local users table. |
@@ -158,12 +158,16 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 - Every active XeroConnection references a canonical XeroAuthorisation; one verified grant may support multiple scoped connections.
 - A Clerk Organisation with multiple payroll entities (e.g. two AU Xero files) has multiple Organisation rows, each with its own scoped XeroConnection.
 - Billing, plan limits, and usage are enforced at the Clerk Organisation level.
-- **All database queries must filter by `clerk_org_id`**, sourced from `auth().orgId` in server context.
+- **All database queries must filter by `clerk_org_id`**, sourced from `auth().orgId` in server context, and run through the restricted tenant client. PostgreSQL RLS also checks account and company ownership.
+- An unreleased Xero tenant has exactly one account owner, including while disconnected. Disconnect retains ownership. Owner-confirmed Remove company releases ownership after confirmed remote deletion and archives the company and Xero-owned history.
+- Starter allows one payroll company, Premium up to five, and Enterprise unlimited. Creation checks the current account entitlement under an account-level transaction lock.
+- Calendars default to all active companies in the account. A company filter validates against the server-resolved owned set; unknown company IDs are validation errors. Each record uses its source company's settings and acting-user Person.
+- Default feeds are account-wide. Adding a company neither creates another default feed nor changes the existing feed URL. Self and manager-team feeds resolve the user's Person in every company.
 
 ### Auth integration
 
 - Personal Accounts are disabled in the Clerk dashboard. Every user must belong to at least one Clerk Organisation.
-- In-app switching between multiple Organisations is not currently implemented. `CustomUserButton` (`apps/app/app/(authenticated)/components/custom-user-button.tsx`) exposes only Clerk's organisation-profile action (`openOrganizationProfile()`). Adding `<OrganizationSwitcher />` or an equivalent control is an open product gap, not a shipped mechanism.
+- Company selectors choose a payroll Organisation inside the current account on company-scoped pages. The calendar company filter defaults to all companies. This differs from switching the top-level Clerk account; Clerk membership and role checks remain the account boundary.
 - Roles are defined once as custom roles in the Clerk dashboard and apply across all Clerk Organisations.
 - The `auth()` helper (server) and `useAuth()` / `useOrganization()` hooks (client) provide `orgId` and role context.
 - For background fetches (Inngest jobs, API routes not initiated from the active tab), call `getToken()` and pass the result in the `Authorization` header. Do not rely on the session cookie alone in background contexts.
@@ -173,7 +177,7 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 | Role | Scope |
 |---|---|
 | owner | Full Clerk Organisation access |
-| admin | Full Organisation (payroll entity) access |
+| admin | Manage all payroll companies in the current Clerk account |
 | manager | Team and direct-report access |
 | viewer | Read-only filtered access |
 
@@ -376,7 +380,7 @@ The full Prisma schema is the authoritative reference and lives at `packages/dat
 
 ### Tenant isolation
 
-Every tenant-scoped table carries `clerk_org_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. It is the first line of tenant isolation before any Organisation-level filtering.
+Every tenant-scoped table carries `clerk_org_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. Application filters and PostgreSQL RLS both enforce this boundary. Tenant clients use `DATABASE_APP_URL`, a non-owner role, and transaction-local `app.clerk_org_id`; missing context denies access. `DATABASE_URL` is reserved for migrations and narrowly allowlisted system discovery/grant operations.
 
 The join tables `feed_tokens`, `feed_scopes`, and `availability_publications` now carry their own `clerk_org_id` column for direct tenant isolation.
 
@@ -406,7 +410,7 @@ System grant rows, unique on `(provider_app_id, xero_user_id)`. Hold the encrypt
 
 ### `xero_connections`
 
-One row per Organisation, with both tenancy keys and a scoped Organisation FK. Contains the unique external Xero tenant ID, remote connection ID, region, connection status, sync health timestamps and roster progress. References the canonical authorisation. Lifecycle history remains in `audit_events`; tokens are not copied here.
+One row per Organisation, with both tenancy keys and a scoped Organisation FK. Contains the external Xero tenant ID, remote connection ID, region, connection status, sync health timestamps and roster progress. Partial unique indexes enforce external tenant and remote connection ownership while `released_at IS NULL`. References the canonical authorisation. Lifecycle history remains in `audit_events`; tokens are not copied here.
 
 ### `xero_oauth_sessions`
 
@@ -464,11 +468,11 @@ ICS calendar feeds. `organisation_id` is nullable: a null value means the feed s
 
 ### `feed_scopes`
 
-Normalised scope rules per feed. Each row is one include rule. Carries `clerk_org_id` for direct tenant isolation.
+Normalised scope rules per feed. Each row is one include rule. Carries `clerk_org_id` for direct tenant isolation; `organisation_id` is nullable for account feeds. Account self/team rules follow the same Clerk user across company Person rows.
 
 ### `feed_tokens`
 
-Signed, revocable tokens. `token_hash` stores per-token signing material; the plaintext bearer token is reconstructed only after feed visibility checks and is never persisted. Existing legacy random tokens remain valid through hash lookup. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 410. Carries `clerk_org_id` for direct tenant isolation.
+Signed, revocable tokens. `token_hash` stores per-token signing material; the plaintext bearer token is reconstructed only after feed visibility checks and is never persisted. Existing legacy random tokens remain valid through hash lookup. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 404 without a cached body. Carries `clerk_org_id` for direct tenant isolation and nullable `organisation_id` for account feeds. Default feed, token, scope and publication identities migrate in place, preserving active URLs.
 
 #### Calendar feed URL presentation
 
@@ -579,11 +583,9 @@ Connect Xero validates the current account, user, management role and short-live
 state before exchanging its code once. Only authorised organisation tenants are
 eligible; the verified authorisation event highlights current consent while
 earlier authorised files remain available.
-A single eligible Xero organisation connects directly when its Team Calendar
-target is known or unambiguous. Multiple eligible Xero organisations use the
-scoped selection page; a single file needs only a Team Calendar target choice
-when that account has several payroll organisations. Completing connection
-consumes the temporary session and persists one initial full-import request. Its Inngest job imports people, leave and the entire provider balance roster in order; scheduler recovery redispatches an uncompleted request. Only the job whose `requestedAt` still matches `initial_sync_requested_at` can set `initial_sync_completed_at`. Reconnect preserves canonical IDs and feeds and requests a new full reconciliation.
+An explicit first-run or reconnect target keeps its existing company. Add company starts without a company target and presents a checkbox picker for available and already-owned Xero files. One provider inventory read verifies selection, then each file completes in its own transaction with an ownership lock and entitlement check. Files owned by another account receive a neutral conflict message without identifying that account. Mixed selections return per-file outcomes; successful files remain connected if another fails. Repeated completion does not create duplicate companies.
+
+Each successful connection persists one initial full-import request. Its Inngest job imports people, leave and the entire provider balance roster in order; scheduler recovery redispatches an uncompleted request. Only the job whose `requestedAt` still matches `initial_sync_requested_at` can set `initial_sync_completed_at`. Reconnect preserves canonical IDs and feeds and requests a new full reconciliation.
 
 Any current Team Calendar owner/admin with suitable Xero permissions may reconnect
 the Organisation, even when its previous application user or Xero authorisation
@@ -751,7 +753,7 @@ Revoked or expired tokens return `410 Gone`.
 - Organisation scoping on all data access (filter by `organisation_id` within the Clerk Org).
 - Clerk auth on all authenticated routes.
 - Xero OAuth tokens encrypted at rest using AES-256-GCM. The encryption key is stored in `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded). Tokens are never stored in plaintext.
-- Feed tokens signed and revocable; plaintext never persisted. The complete active subscribe URL is intentionally returned to authorised viewers. Revoked and expired tokens return 410.
+- Feed tokens signed and revocable; plaintext never persisted. The complete active subscribe URL is intentionally returned to authorised viewers. Revoked and expired tokens return 404 without a cached body.
 - Audit logs for all admin actions.
 - No Xero tokens, internal feed token hashes, signing material, or raw payloads are exposed to the client.
 - No secrets in client bundles.
@@ -838,3 +840,17 @@ Provider-confirmed loss of a connection requires reconnect and stops scheduled
 sync; a permission error or unavailable inventory does not prove revocation.
 Lifecycle follows explicit customer actions and authoritative provider events,
 with no activity heuristics, separate remote-cleanup worker or management token.
+
+### Multi-company identifier map
+
+| Identifier | Boundary and use |
+|---|---|
+| `clerk_org_id` | Customer account, membership, roles, billing and RLS context |
+| `organisation_id` / company ID | Internal payroll company; settings, people and canonical records |
+| `xero_tenant_id` | External Xero file; one unreleased owner globally |
+| `remote_connection_id` | Exact provider connection deleted before local disconnect or release |
+| `xero_authorisation_id` | Canonical verified grant shared by connections; credentials remain server-only |
+| Xero employee/leave IDs | Scoped to their source company; never global canonical identities |
+| Feed ID/token ID | Stable subscription identities; null company scope spans the account |
+
+Remove company is owner-only. Provider 204/404 allows local release, archive, absent-publication marking, feed-cache invalidation and audit. Uncertain provider outcomes preserve ownership and retryable state. A previously completed disconnect can be removed without another provider call only after a locked check of its confirmed-disconnect audit. Company-scoped feeds are archived and their tokens revoked; account feeds remain active and exclude the removed company. Sibling companies and shared grants survive. A grant is removed only when no connection and no unexpired selecting OAuth session references it; removal does not revoke the whole grant. Jobs re-resolve both tenancy keys and reject released connections before provider access.

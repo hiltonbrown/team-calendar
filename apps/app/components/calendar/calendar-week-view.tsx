@@ -101,7 +101,11 @@ export function CalendarWeekView({
                       <CalendarEventChip
                         event={event}
                         orgQueryValue={orgQueryValue}
-                        timezone={data.range.timezone}
+                        timezone={
+                          data.companies.find(
+                            (company) => company.id === event.companyId
+                          )?.timezone ?? data.range.timezone
+                        }
                       />
                     </li>
                   ))}

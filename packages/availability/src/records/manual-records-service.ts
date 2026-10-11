@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { type AppError, appError, type Result } from "@repo/core";
-import { database, scopedQuery } from "@repo/database";
+import { scopedQuery, tenantDatabase } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import { log } from "@repo/observability/log";
@@ -195,7 +195,9 @@ export const listAvailabilityRecords = async (
   tenant: TenantContext,
   range?: { startsBefore?: Date; endsAfter?: Date; personId?: string }
 ): Promise<AvailabilityRecordView[]> => {
-  const records = await database.availabilityRecord.findMany({
+  const records = await tenantDatabase(
+    tenant.clerkOrgId
+  ).availabilityRecord.findMany({
     include: { person: true },
     orderBy: [{ starts_at: "asc" }, { title: "asc" }],
     where: {
@@ -238,7 +240,7 @@ export const createManualAvailability = async (
     };
   }
 
-  const person = await database.person.findFirst({
+  const person = await tenantDatabase(tenant.clerkOrgId).person.findFirst({
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
       archived_at: null,
@@ -259,7 +261,9 @@ export const createManualAvailability = async (
     return authorisation;
   }
 
-  const duplicate = await database.availabilityRecord.findFirst({
+  const duplicate = await tenantDatabase(
+    tenant.clerkOrgId
+  ).availabilityRecord.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
@@ -282,7 +286,9 @@ export const createManualAvailability = async (
 
   const id = randomUUID();
   try {
-    const record = await database.availabilityRecord.create({
+    const record = await tenantDatabase(
+      tenant.clerkOrgId
+    ).availabilityRecord.create({
       data: {
         all_day: parsed.data.allDay,
         approval_status: "approved",
@@ -349,7 +355,9 @@ export const updateManualAvailability = async (
     };
   }
 
-  const existing = await database.availabilityRecord.findFirst({
+  const existing = await tenantDatabase(
+    tenant.clerkOrgId
+  ).availabilityRecord.findFirst({
     select: {
       all_day: true,
       contactability: true,
@@ -413,7 +421,9 @@ export const updateManualAvailability = async (
     };
   }
 
-  const duplicate = await database.availabilityRecord.findFirst({
+  const duplicate = await tenantDatabase(
+    tenant.clerkOrgId
+  ).availabilityRecord.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
@@ -436,7 +446,9 @@ export const updateManualAvailability = async (
   }
 
   try {
-    const record = await database.availabilityRecord.update({
+    const record = await tenantDatabase(
+      tenant.clerkOrgId
+    ).availabilityRecord.update({
       data: {
         all_day: merged.data.allDay,
         contactability: merged.data.contactability,
@@ -479,7 +491,9 @@ export const archiveManualAvailability = async (
   recordId: string,
   actor: ManualAvailabilityActor
 ): Promise<Result<void, ManualAvailabilityServiceError>> => {
-  const existing = await database.availabilityRecord.findFirst({
+  const existing = await tenantDatabase(
+    tenant.clerkOrgId
+  ).availabilityRecord.findFirst({
     select: {
       person: {
         select: {
@@ -510,7 +524,7 @@ export const archiveManualAvailability = async (
     return authorisation;
   }
 
-  await database.availabilityRecord.update({
+  await tenantDatabase(tenant.clerkOrgId).availabilityRecord.update({
     data: {
       archived_at: new Date(),
       publish_status: "archived",
@@ -559,14 +573,16 @@ async function authoriseManualAvailabilityActor(
     return { ok: true, value: undefined };
   }
 
-  const actingPerson = await database.person.findFirst({
-    select: { id: true },
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      clerk_user_id: actor.userId,
-    },
-  });
+  const actingPerson = await tenantDatabase(tenant.clerkOrgId).person.findFirst(
+    {
+      select: { id: true },
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        clerk_user_id: actor.userId,
+      },
+    }
+  );
 
   const isOwner = targetPerson.clerk_user_id === actor.userId;
   const isDirectManager = targetPerson.manager_person_id === actingPerson?.id;

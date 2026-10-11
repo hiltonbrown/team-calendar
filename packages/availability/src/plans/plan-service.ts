@@ -2,9 +2,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getAvailabilityRecordLabel, type Result } from "@repo/core";
 import {
-  database,
   hasUnresolvedSubmitOperation,
   scopedTo,
+  tenantDatabase,
+  tenantTransaction,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
@@ -442,7 +443,7 @@ export async function createRecord(
   try {
     const [targetPerson, actingPerson, xeroStateResult, settingsResult] =
       await Promise.all([
-        database.person.findFirst({
+        tenantDatabase(input.clerkOrgId).person.findFirst({
           select: personSelect,
           where: {
             ...scopedTo({
@@ -508,50 +509,53 @@ export async function createRecord(
       stableSourceKey: id,
       startsAt: parsed.data.startsAt,
     });
-    const record = await database.$transaction(async (tx) => {
-      const created = await tx.availabilityRecord.create({
-        data: {
-          all_day: parsed.data.allDay,
-          approval_status: routing.approvalStatus,
-          approved_at:
-            routing.approvalStatus === "approved" ? new Date() : null,
-          clerk_org_id: parsed.data.clerkOrgId,
-          contactability: parsed.data.contactabilityStatus,
-          created_by_user_id: parsed.data.createdByUserId,
-          derived_sequence: 0,
-          derived_uid_key: derivedUidKey,
-          ends_at: parsed.data.endsAt,
-          id,
-          notes_internal: emptyToNull(parsed.data.notesInternal),
-          organisation_id: parsed.data.organisationId,
-          person_id: parsed.data.personId,
-          privacy_mode: privacyMode,
-          record_type: parsed.data.recordType,
-          source_type: routing.sourceType,
-          starts_at: parsed.data.startsAt,
-          title: getAvailabilityRecordLabel(parsed.data.recordType),
-          updated_by_user_id: parsed.data.createdByUserId,
-        },
-        include: recordInclude,
-      });
-      await tx.auditEvent.create({
-        data: {
-          action: "availability_records.created",
-          actor_user_id: parsed.data.createdByUserId,
-          clerk_org_id: parsed.data.clerkOrgId,
-          organisation_id: parsed.data.organisationId,
-          payload: {
-            approvalStatus: routing.approvalStatus,
-            recordType: parsed.data.recordType,
-            sourceType: routing.sourceType,
-            xeroConnectionState,
+    const record = await tenantTransaction(
+      parsed.data.clerkOrgId,
+      async (tx) => {
+        const created = await tx.availabilityRecord.create({
+          data: {
+            all_day: parsed.data.allDay,
+            approval_status: routing.approvalStatus,
+            approved_at:
+              routing.approvalStatus === "approved" ? new Date() : null,
+            clerk_org_id: parsed.data.clerkOrgId,
+            contactability: parsed.data.contactabilityStatus,
+            created_by_user_id: parsed.data.createdByUserId,
+            derived_sequence: 0,
+            derived_uid_key: derivedUidKey,
+            ends_at: parsed.data.endsAt,
+            id,
+            notes_internal: emptyToNull(parsed.data.notesInternal),
+            organisation_id: parsed.data.organisationId,
+            person_id: parsed.data.personId,
+            privacy_mode: privacyMode,
+            record_type: parsed.data.recordType,
+            source_type: routing.sourceType,
+            starts_at: parsed.data.startsAt,
+            title: getAvailabilityRecordLabel(parsed.data.recordType),
+            updated_by_user_id: parsed.data.createdByUserId,
           },
-          resource_id: id,
-          resource_type: "availability_record",
-        },
-      });
-      return created;
-    });
+          include: recordInclude,
+        });
+        await tx.auditEvent.create({
+          data: {
+            action: "availability_records.created",
+            actor_user_id: parsed.data.createdByUserId,
+            clerk_org_id: parsed.data.clerkOrgId,
+            organisation_id: parsed.data.organisationId,
+            payload: {
+              approvalStatus: routing.approvalStatus,
+              recordType: parsed.data.recordType,
+              sourceType: routing.sourceType,
+              xeroConnectionState,
+            },
+            resource_id: id,
+            resource_type: "availability_record",
+          },
+        });
+        return created;
+      }
+    );
     await materialisePlanPublication({
       availabilityRecordId: record.id,
       clerkOrgId: parsed.data.clerkOrgId,
@@ -662,7 +666,7 @@ export async function updateRecord(
       stableSourceKey: existing.id,
       startsAt: nextStartsAt,
     });
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const updated = await tx.availabilityRecord.updateMany({
         data: {
           ...(patch.allDay !== undefined && { all_day: patch.allDay }),
@@ -788,7 +792,7 @@ export async function deleteDraftRecord(
         ok: false,
       };
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const deleted = await tx.availabilityRecord.deleteMany({
         where: {
           ...scopedTo({
@@ -870,7 +874,7 @@ export async function archiveRecord(
         ok: false,
       };
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
       const archived = await tx.availabilityRecord.updateMany({
         data: {
           archived_at: new Date(),
@@ -940,7 +944,7 @@ export async function restoreRecord(
         ok: false,
       };
     }
-    await database.$transaction(async (tx) => {
+    await tenantTransaction(input.clerkOrgId, async (tx) => {
       const restored = await tx.availabilityRecord.updateMany({
         data: {
           archived_at: null,
@@ -1061,7 +1065,7 @@ async function listRecordsPageForScope(input: {
   const cursor = decodePlanCursor(input.cursor ?? null);
   const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
   const [rows, totalCount, xeroStateResult] = await Promise.all([
-    database.availabilityRecord.findMany({
+    tenantDatabase(input.clerkOrgId).availabilityRecord.findMany({
       include: recordInclude,
       orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
       take: pageSize + 1,
@@ -1087,7 +1091,7 @@ async function listRecordsPageForScope(input: {
           }
         : where,
     }),
-    database.availabilityRecord.count({ where }),
+    tenantDatabase(input.clerkOrgId).availabilityRecord.count({ where }),
     getXeroConnectionStateForScope({
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
@@ -1099,7 +1103,7 @@ async function listRecordsPageForScope(input: {
   const hasXero = connectionActionGate(xeroConnectionState);
   const page = rows.slice(0, pageSize);
   const balances = page.length
-    ? await database.leaveBalance.findMany({
+    ? await tenantDatabase(input.clerkOrgId).leaveBalance.findMany({
         orderBy: { updated_at: "desc" },
         where: {
           ...scopedTo(input),
@@ -1234,7 +1238,7 @@ async function listRecordsForScope({
     ? xeroStateResult.value.state
     : "unavailable";
   const hasXero = connectionActionGate(xeroConnectionState);
-  const records = await database.availabilityRecord.findMany({
+  const records = await tenantDatabase(clerkOrgId).availabilityRecord.findMany({
     orderBy: [{ starts_at: "asc" }, { created_at: "asc" }],
     select: { id: true },
     where: {
@@ -1292,7 +1296,9 @@ async function balanceChipForRecord(
       unit: null,
     };
   }
-  const balance = await database.leaveBalance.findFirst({
+  const balance = await tenantDatabase(
+    record.clerk_org_id
+  ).leaveBalance.findFirst({
     orderBy: { updated_at: "desc" },
     select: {
       balance: true,
@@ -1331,7 +1337,7 @@ function loadScopedRecord(
   organisationId: string,
   recordId: string
 ) {
-  return database.availabilityRecord.findFirst({
+  return tenantDatabase(clerkOrgId).availabilityRecord.findFirst({
     include: recordInclude,
     where: {
       ...scopedTo({ clerkOrgId, organisationId }),
@@ -1370,7 +1376,7 @@ function resolvePersonForUser(
   organisationId: string,
   userId: string
 ) {
-  return database.person.findFirst({
+  return tenantDatabase(clerkOrgId).person.findFirst({
     select: personSelect,
     where: {
       ...scopedTo({ clerkOrgId, organisationId }),

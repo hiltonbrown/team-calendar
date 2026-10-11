@@ -10,10 +10,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
 vi.mock("@repo/database", () => ({
-  database: {
+  tenantDatabase: vi.fn(() => ({
     person: { findMany: mocks.personFindMany },
     team: { findMany: mocks.teamFindMany },
-  },
+  })),
 }));
 vi.mock("@repo/feeds", () => ({
   normaliseRole: (role: string | null) => role,

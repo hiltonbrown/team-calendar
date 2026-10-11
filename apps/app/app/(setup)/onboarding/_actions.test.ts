@@ -36,7 +36,9 @@ vi.mock("@repo/database/queries/onboarding", () => ({
   setXeroSetupSkipped: mocks.setXeroSetupSkipped,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
-vi.mock("@repo/database", () => ({ database: mocks.database }));
+vi.mock("@repo/database", () => ({
+  tenantDatabase: vi.fn(() => mocks.database),
+}));
 vi.mock("@/app/actions/settings/invite-member", () => ({
   inviteMember: mocks.inviteMember,
 }));
