@@ -58,6 +58,29 @@ describe("drainNotificationEmailQueue", () => {
     });
   });
 
+  it("drains later accounts before reporting an earlier account failure", async () => {
+    mocks.accounts.mockResolvedValueOnce([
+      { clerk_org_id: "org_a" },
+      { clerk_org_id: "org_b" },
+    ]);
+    mocks.sendQueuedNotificationEmails
+      .mockResolvedValueOnce({
+        error: { code: "unknown_error", message: "Queue read failed." },
+        ok: false,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { failed: 0, processed: 1, sent: 1 },
+      });
+
+    await expect(drainNotificationEmailQueue()).rejects.toThrow(
+      "Queue read failed."
+    );
+    expect(
+      mocks.sendQueuedNotificationEmails.mock.calls.map(([org]) => org)
+    ).toEqual(["org_a", "org_b"]);
+  });
+
   it("rejects the Inngest step with the sanitised service failure", async () => {
     mocks.sendQueuedNotificationEmails.mockResolvedValue({
       error: {
