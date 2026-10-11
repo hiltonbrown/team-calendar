@@ -123,11 +123,11 @@ let grantPresent: boolean;
 let busy: boolean;
 let auditEvents: Record<string, unknown>[];
 const tx = {
+  $executeRaw: mocks.feedPublicationUpdate,
   auditEvent: { create: mocks.audit },
   availabilityPublication: { deleteMany: mocks.publicationDelete },
   availabilityRecord: mocks.availability,
   feed: { findMany: mocks.feed, updateMany: mocks.feedUpdate },
-  feedEventPublication: { updateMany: mocks.feedPublicationUpdate },
   feedToken: { updateMany: mocks.tokenRevoke },
   leaveBalance: { deleteMany: mocks.leaveBalance },
   organisation: { updateMany: mocks.organisationArchive },
