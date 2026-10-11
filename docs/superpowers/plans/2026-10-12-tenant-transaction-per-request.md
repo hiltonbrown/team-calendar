@@ -11,6 +11,8 @@
 - Option B is adopted with carve-outs, not as a blanket change. The literal Option B breaks three `AGENTS.md` rules (outbound idempotency, isolated inbound record failures, long-lived and concurrent entry points); the carve-outs below keep them.
 - `tx` is passed explicitly. `AsyncLocalStorage` is used only as a guard that detects nested or missing threading; it never supplies a client.
 - Option H (measurement on a Neon preview branch) runs first as Stage 0.
+- Request transactions use a 15 s timeout (`TENANT_REQUEST_OPTIONS`); account-wide reads keep 30 s.
+- A failed fire-and-forget `afterTenantCommit` effect is retried once immediately, then logged and reported to Sentry if it fails again.
 
 **Architecture:** A new `withTenantDb(clerkOrgId, fn)` opens one interactive transaction, sets `app.clerk_org_id` once (transaction-local, as today), and hands `fn` a branded `TenantDb`. Every service and query helper takes `db: TenantDb` as its last parameter and asserts it belongs to the `clerkOrgId` it was given. Fire-and-forget side effects (KV invalidation, SSE publish, notification fan-out) register through `afterTenantCommit(db, effect)` and run only after commit. Result-bearing side effects, whose outcome the user sees (for example an Inngest send that can return `dispatch_failed`), run in the entry point after `withTenantDb` returns, and their `Result` is returned to the caller. Parallel fan-out happens only at entry points, never inside a service that holds a `db`. Phased flows call `assertNoTenantTransaction()` and open one `withTenantDb` per phase. Migration is expand then contract: functions first accept an optional `db`, entry points then supply it, and finally `db` becomes required and `tenantDatabase` / `tenantTransaction` are deleted.
 
@@ -108,7 +110,8 @@ export function withTenantDb<T>(
 //      return fn(tx as TenantDb);
 //    }, options))
 // 4. after commit, outside the ALS scope, run pending effects in order;
-//    an effect failure is logged and reported to Sentry, never rethrown
+//    a failed effect is retried once immediately; a second failure is
+//    logged and reported to Sentry, never rethrown
 //    into the committed request
 
 export function withTenantResult<T, E>(
@@ -200,7 +203,7 @@ Present the measurements document. Proceed to Stage 1 only on explicit confirmat
   - `withTenantDb` sets context once, passes the transaction client, returns `fn`'s value.
   - Calling `withTenantDb` inside `withTenantDb` throws `TenantNestingError`.
   - `assertTenantDb` passes for the owning account, throws `TenantMismatchError` for another account and for an unregistered client.
-  - `afterTenantCommit` effects run after commit, in order, outside the scope (an effect may itself call `withTenantDb`); they never run when `fn` throws; an effect failure is logged and does not reject the call.
+  - `afterTenantCommit` effects run after commit, in order, outside the scope (an effect may itself call `withTenantDb`); they never run when `fn` throws; a failing effect is retried exactly once; an effect that fails twice is logged and reported to Sentry and does not reject the call; an effect that succeeds on retry is not reported.
   - `withTenantResult` rolls back and returns the same `Result` object on `ok: false`; commits on `ok: true`.
   - `assertNoTenantTransaction` throws inside a scope and passes outside.
   - `withTenantReads` runs branches concurrently in separate transactions and returns keyed results.
@@ -399,7 +402,7 @@ Each slice converts every entry point in one area so the detector from Task 1.3 
 - **Split services.** Tasks 2.2 and 2.3 change the shape of some service functions before Stage 3 starts. Each split keeps a test proving the composed result matches the original.
 - **Scope of churn.** Roughly 109 files change signatures; every slice must leave `main` green.
 
-## 12. Open questions for the owner
+## 12. Resolved questions (12 October 2026)
 
-1. Request timeout preset: is 15 s acceptable for server actions and page loaders, given Vercel function limits on the `app` project?
-2. Should a failed `afterTenantCommit` effect (a fire-and-forget effect such as a KV invalidation or notification fan-out) be retried inline once, or only logged and left to the scheduled reconcilers?
+1. Request timeout preset: 15 s for server actions and page loaders.
+2. Failed fire-and-forget `afterTenantCommit` effects: retry once inline, then log and report to Sentry; the scheduled reconcilers remain the backstop.
