@@ -106,10 +106,29 @@ async function clean() {
   await database.person.deleteMany({ where: ownedScopes });
   await database.organisation.deleteMany({ where: ownedScopes });
   await database.clerkOrgSubscription.deleteMany({ where: ownedScopes });
+  await database.planLimit.deleteMany({ where: { plan_id: premiumPlanId } });
+  await database.plan.deleteMany({ where: { id: premiumPlanId } });
 
   await database.xeroAuthorisation.deleteMany({
     where: { id: { in: ownedGrants } },
   });
+}
+// A fixture-owned plan with Premium's five-company allowance keeps these tests
+// independent of seeded catalogue rows.
+const premiumPlanId = allocation.globalKey("plan_id");
+async function premiumPlan(): Promise<string> {
+  const key = allocation.globalKey("plan_key");
+  await database.plan.create({
+    data: { id: premiumPlanId, key, name: "Fixture Premium", plan_key: key },
+  });
+  await database.planLimit.create({
+    data: {
+      limit_type: "payroll_entities",
+      limit_value: 5,
+      plan_id: premiumPlanId,
+    },
+  });
+  return key;
 }
 function tokens(access = "expired-access-token", refresh = "refresh-token") {
   const a = crypto.encryptXeroToken(access),
@@ -475,7 +494,7 @@ describe("canonical OAuth persistence", () => {
     await database.clerkOrgSubscription.create({
       data: {
         clerk_org_id: fixture.clerkOrgId,
-        plan_key: "premium",
+        plan_key: await premiumPlan(),
         status: "active",
       },
     });
@@ -506,6 +525,7 @@ describe("canonical OAuth persistence", () => {
       clerkOrgId: fixture.clerkOrgId,
       sessionId: fixture.sessionId,
       tenantIds: tenants.map((tenant) => tenant.tenantId),
+      timezone: "Australia/Perth",
       userId: "user_integration_1",
     };
     const first = await service.completeXeroTenantSelection(input);
@@ -524,6 +544,12 @@ describe("canonical OAuth persistence", () => {
         where: { clerk_org_id: fixture.clerkOrgId },
       })
     ).toBe(3);
+    expect(
+      await database.organisation.findMany({
+        select: { timezone: true },
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toEqual(tenants.map(() => ({ timezone: "Australia/Perth" })));
     const connections = await database.xeroConnection.findMany({
       where: { clerk_org_id: fixture.clerkOrgId },
     });
@@ -575,6 +601,7 @@ describe("canonical OAuth persistence", () => {
         clerkOrgId: fixture.clerkOrgId,
         sessionId: fixture.sessionId,
         tenantIds: tenants.map((tenant) => tenant.tenantId),
+        timezone: "Australia/Perth",
         userId: "user_integration_1",
       })
     ).toMatchObject({
@@ -641,6 +668,7 @@ describe("canonical OAuth persistence", () => {
       clerkOrgId: fixture.clerkOrgId,
       sessionId: fixture.sessionId,
       tenantIds: tenants.map((tenant) => tenant.tenantId),
+      timezone: "Australia/Perth",
       userId: "user_integration_1",
     });
     expect(result).toMatchObject({
@@ -693,6 +721,7 @@ describe("canonical OAuth persistence", () => {
         clerkOrgId: fixture.clerkOrgId,
         sessionId: fixture.sessionId,
         tenantIds: [fixture.externalId],
+        timezone: "Australia/Perth",
         userId: "user_integration_1",
       })
     ).toMatchObject({
@@ -778,6 +807,7 @@ describe("canonical OAuth persistence", () => {
       clerkOrgId: fixture.clerkOrgId,
       sessionId: fixture.sessionId,
       tenantIds: [fixture.externalId],
+      timezone: "Australia/Perth",
       userId: "user_integration_1",
     });
     await inventoryReady;
@@ -789,7 +819,7 @@ describe("canonical OAuth persistence", () => {
     expect(await pending).toMatchObject({
       ok: true,
       value: {
-        outcomes: [{ error: { code: "tenant_binding_conflict" }, ok: false }],
+        outcomes: [{ error: { code: "connection_changed" }, ok: false }],
       },
     });
     expect(
@@ -815,7 +845,7 @@ describe("canonical OAuth persistence", () => {
         await database.clerkOrgSubscription.create({
           data: {
             clerk_org_id: fixture.clerkOrgId,
-            plan_key: "premium",
+            plan_key: await premiumPlan(),
             status: "active",
           },
         });
@@ -874,6 +904,7 @@ describe("canonical OAuth persistence", () => {
         clerkOrgId: fixture.clerkOrgId,
         sessionId: fixture.sessionId,
         tenantIds: [fixture.externalId],
+        timezone: "Australia/Perth",
         userId: "user_integration_1",
       });
       await inventoryReady;
@@ -885,7 +916,7 @@ describe("canonical OAuth persistence", () => {
       expect(await pending).toMatchObject({
         ok: true,
         value: {
-          outcomes: [{ error: { code: "tenant_binding_conflict" }, ok: false }],
+          outcomes: [{ error: { code: "connection_changed" }, ok: false }],
         },
       });
       expect(

@@ -1143,6 +1143,34 @@ function tenantSelectionFailureCode(
     : "tenant_binding_conflict";
 }
 
+const MULTI_TENANT_SELECTION_FAILURE_MESSAGES = {
+  connection_changed:
+    "This Xero file changed while it was being connected. Try again.",
+  connection_inactive: "Start connecting Xero again.",
+  invalid_country: "This Xero file cannot be connected to this account.",
+  plan_limit_exceeded: "Your current plan has reached its Xero file limit.",
+  session_not_found: "Start connecting Xero again.",
+  tenant_binding_conflict:
+    "This Xero file cannot be connected to this account.",
+  tenant_replacement_required:
+    "This Xero file cannot be connected to this account.",
+  unknown_error: "This Xero file could not be connected. Try again.",
+} as const satisfies Partial<Record<XeroOAuthError["code"], string>>;
+
+type MultiTenantSelectionFailureCode =
+  keyof typeof MULTI_TENANT_SELECTION_FAILURE_MESSAGES;
+
+// Only an ownership conflict may be reported as one; retryable races and
+// infrastructure failures must not tell the admin another account owns the file.
+function multiTenantSelectionFailureCode(
+  error: unknown
+): MultiTenantSelectionFailureCode {
+  const reason = error instanceof Error ? error.message : "";
+  return Object.hasOwn(MULTI_TENANT_SELECTION_FAILURE_MESSAGES, reason)
+    ? (reason as MultiTenantSelectionFailureCode) // narrowed by the own-key check above
+    : "unknown_error";
+}
+
 async function completeSingleXeroTenantSelection(input: {
   clerkOrgId: string;
   organisationId?: string | null;
@@ -1555,7 +1583,7 @@ interface SelectionScope {
   userId: string;
 }
 export function completeXeroTenantSelection(
-  input: SelectionScope & { tenantIds: string[] }
+  input: SelectionScope & { tenantIds: string[]; timezone: string }
 ): Promise<Result<XeroMultiTenantSelectionResult, XeroOAuthError>>;
 export function completeXeroTenantSelection(
   input: SelectionScope & { tenantId: string }
@@ -1566,7 +1594,8 @@ export function completeXeroTenantSelection(
   >
 >;
 export function completeXeroTenantSelection(
-  input: SelectionScope & ({ tenantIds: string[] } | { tenantId: string })
+  input: SelectionScope &
+    ({ tenantIds: string[]; timezone: string } | { tenantId: string })
 ): Promise<
   Result<
     | XeroMultiTenantSelectionResult
@@ -1604,7 +1633,7 @@ function readSelectionOutcomes(value: unknown): XeroTenantSelectionOutcome[] {
 }
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Each selected file has an isolated result while the session and canonical grant retain one inventory read.
 async function completeMultiXeroTenantSelection(
-  input: SelectionScope & { tenantIds: string[] }
+  input: SelectionScope & { tenantIds: string[]; timezone: string }
 ): Promise<Result<XeroMultiTenantSelectionResult, XeroOAuthError>> {
   const ids = z
     .array(z.string().min(1))
@@ -1682,7 +1711,9 @@ async function completeMultiXeroTenantSelection(
       ok: false,
     };
   }
-  const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
+  // Each provider phase (inventory, then each file's region probe) gets its own
+  // budget so a multi-file selection does not starve later files.
+  let deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
   const grantId = grant.id;
   const resolveBootstrapAccess = async (): Promise<
     Result<{ accessToken: string; grant: XeroAuthorisation }, XeroOAuthError>
@@ -1769,6 +1800,7 @@ async function completeMultiXeroTenantSelection(
     );
     let outcome: XeroTenantSelectionOutcome;
     if (selected) {
+      deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
       const region = await inferPayrollRegionForTenant({
         accessToken: "",
         deadline,
@@ -1905,7 +1937,7 @@ async function completeMultiXeroTenantSelection(
                   clerkOrgId: input.clerkOrgId,
                   countryCode: "AU",
                   name: selected.tenantName,
-                  timezone: "Australia/Brisbane",
+                  timezone: input.timezone,
                 },
                 tx
               );
@@ -2016,22 +2048,11 @@ async function completeMultiXeroTenantSelection(
             return result;
           });
         } catch (error) {
-          const reason = error instanceof Error ? error.message : "";
-          let code: XeroOAuthError["code"] = "tenant_binding_conflict";
-          if (
-            reason === "plan_limit_exceeded" ||
-            reason === "invalid_country" ||
-            reason === "tenant_replacement_required"
-          ) {
-            code = reason;
-          }
+          const code = multiTenantSelectionFailureCode(error);
           outcome = {
             error: {
               code,
-              message:
-                code === "plan_limit_exceeded"
-                  ? "Your current plan has reached its Xero file limit."
-                  : "This Xero file cannot be connected to this account.",
+              message: MULTI_TENANT_SELECTION_FAILURE_MESSAGES[code],
             },
             ok: false,
             tenantId,

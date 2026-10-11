@@ -63,6 +63,7 @@ const { completeTenantSelectionAction } = await import("./_actions");
 const validInput = {
   sessionId: "11111111-1111-4111-8111-111111111111",
   tenantIds: ["xero-tenant-abc"],
+  timezone: "Australia/Perth",
 };
 describe("completeTenantSelectionAction", () => {
   beforeEach(() => {
@@ -121,11 +122,23 @@ describe("completeTenantSelectionAction", () => {
         expect.objectContaining({
           clerkOrgId: "org_1",
           tenantIds: validInput.tenantIds,
+          timezone: "Australia/Perth",
           userId: "user_1",
         })
       );
     }
   );
+  it("rejects a time zone that is not a valid IANA zone", async () => {
+    const result = await completeTenantSelectionAction({
+      ...validInput,
+      timezone: "Mars/Olympus_Mons",
+    });
+    expect(result).toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
+    expect(mocks.completeXeroTenantSelection).not.toHaveBeenCalled();
+  });
   it.each(["org:viewer", "org:manager"])(
     "refuses %s before input validation and account lookup",
     async (orgRole) => {
@@ -133,6 +146,7 @@ describe("completeTenantSelectionAction", () => {
       const result = await completeTenantSelectionAction({
         sessionId: "invalid",
         tenantIds: [],
+        timezone: "",
       });
       expect(result).toMatchObject({
         error: { code: "not_authorised" },
@@ -168,7 +182,7 @@ describe("completeTenantSelectionAction", () => {
       },
     });
     const result = await completeTenantSelectionAction({
-      sessionId: validInput.sessionId,
+      ...validInput,
       tenantIds: ["file-a", "file-b"],
     });
     expect(result.ok).toBe(true);

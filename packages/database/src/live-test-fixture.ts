@@ -74,7 +74,7 @@ export const LIVE_FIXTURE_SUITES = {
     tenants: 2,
   },
   "packages/xero/src/oauth/service.integration.test.ts": {
-    globalKeys: { authorisation: 1, provider_app: 1 },
+    globalKeys: { authorisation: 1, plan_id: 1, plan_key: 1, provider_app: 1 },
     tenants: 2,
   },
   "packages/xero/src/rate-limit/shared-store.integration.test.ts": {

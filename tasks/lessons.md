@@ -73,6 +73,9 @@ Keep one-off task evidence in that task's review, not here.
 - An approval to run a specific provider campaign is not a general rate-limit
   exemption. Preserve shared limits, counters, cooldowns and `Retry-After`, and
   never report unknown prior provider usage as zero.
+- When Team Calendar creates a company, default its time zone to the acting
+  user's time zone (sent from the browser and validated as IANA). Do not
+  hard-code a zone or substitute the Xero organisation's zone.
 
 ## Tenancy and configuration
 

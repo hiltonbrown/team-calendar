@@ -59,6 +59,7 @@ describe("Xero multi-company picker", () => {
         organisationId: undefined,
         sessionId: "session-1",
         tenantIds: ["file-1", "file-2"],
+        timezone: expect.any(String),
       })
     );
   });
@@ -135,6 +136,7 @@ describe("Xero multi-company picker", () => {
         organisationId: "company-1",
         sessionId: "session-1",
         tenantIds: ["file-1"],
+        timezone: expect.any(String),
       })
     );
   });
@@ -166,6 +168,7 @@ describe("Xero multi-company picker", () => {
         organisationId: "company-1",
         sessionId: "session-1",
         tenantIds: ["file-2"],
+        timezone: expect.any(String),
       })
     );
   });
