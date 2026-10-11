@@ -895,7 +895,7 @@ model Feed {
   created_at                DateTime                  @default(now())
   updated_at                DateTime                  @updatedAt
 
-  organisation       Organisation?          @relation(fields: [organisation_id], references: [id])
+  organisation       Organisation?          @relation(fields: [organisation_id], references: [id], onDelete: Restrict)
   event_publications FeedEventPublication[]
   scopes             FeedScope[]
   tokens             FeedToken[]
@@ -961,7 +961,7 @@ model FeedToken {
   created_at            DateTime          @default(now())
   updated_at            DateTime          @updatedAt
 
-  organisation       Organisation? @relation(fields: [organisation_id], references: [id])
+  organisation       Organisation? @relation(fields: [organisation_id], references: [id], onDelete: Restrict)
   feed               Feed          @relation(fields: [feed_id], references: [id])
   rotated_from_token FeedToken?    @relation("FeedTokenRotation", fields: [rotated_from_token_id], references: [id])
   rotated_tokens     FeedToken[]   @relation("FeedTokenRotation")
