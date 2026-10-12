@@ -177,9 +177,9 @@ export const runProductionPreflight = (
     return true;
   };
 
-  const checkEmail = (varName: string, fallbackDefault?: string) => {
+  const checkEmail = (varName: string) => {
     checkedVars.push(varName);
-    const val = envVars[varName]?.trim() || fallbackDefault;
+    const val = envVars[varName]?.trim();
     if (!val) {
       errors.push(`${varName} is missing or empty`);
       return false;
@@ -235,15 +235,6 @@ export const runProductionPreflight = (
     "BETTERSTACK_STATUS_PAGE_URL"
   );
   appendError(errors, betterStackError);
-
-  if (appName === "web") {
-    const supportEmail =
-      envVars.SUPPORT_EMAIL ||
-      envVars.NEXT_PUBLIC_SUPPORT_EMAIL ||
-      envVars.RESEND_FROM ||
-      "support@teamcalendar.online";
-    checkEmail("SUPPORT_EMAIL", supportEmail);
-  }
 
   if (appName === "app" || appName === "api") {
     checkPresent("DATABASE_URL");

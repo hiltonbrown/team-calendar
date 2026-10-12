@@ -220,7 +220,6 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | `api` | Required pair | Required pair |
 | `RESEND_TOKEN` / `RESEND_FROM` | `api` | Required | Required |
 | `EARLY_ACCESS_APPLICATION_RECIPIENT` | `api` | Required private mailbox | Required private mailbox |
-| `SUPPORT_EMAIL` (or `NEXT_PUBLIC_SUPPORT_EMAIL` / `RESEND_FROM`) | `web` | Optional email override (defaults to `support@teamcalendar.online`) | Optional email override (defaults to `support@teamcalendar.online`) |
 | `BETTERSTACK_API_KEY` / `BETTERSTACK_STATUS_PAGE_ID` / `BETTERSTACK_STATUS_PAGE_URL` | `web` | Optional complete trio (status is Unknown when absent) | Optional complete trio (status is Unknown when absent) |
 | `STRIPE_SECRET_KEY` | `app`, `api` | Optional (disabled) | Required |
 | `STRIPE_WEBHOOK_SECRET` | `api` | Optional (disabled) | Required |
@@ -249,10 +248,7 @@ it never supplies or overrides the deployed value. Run each project separately,
 rather than combining all three projects' environments.
 
 The API requires the runtime's `RESEND_TOKEN` name, a valid `RESEND_FROM`, and a
-private `EARLY_ACCESS_APPLICATION_RECIPIENT`. The web app uses `SUPPORT_EMAIL`,
-then `NEXT_PUBLIC_SUPPORT_EMAIL`, then `RESEND_FROM`, and
-finally `support@teamcalendar.online`; any configured value must be a valid
-email address. Required credential pairs must be complete: setting only one of
+private `EARLY_ACCESS_APPLICATION_RECIPIENT`. Required credential pairs must be complete: setting only one of
 `KV_REST_API_URL`/`KV_REST_API_TOKEN` or
 `INNGEST_EVENT_KEY`/`INNGEST_SIGNING_KEY` fails preflight.
 
