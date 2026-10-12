@@ -43,6 +43,7 @@
 | R11 | Other per-company settings | Decline reason and declined visibility follow each request's company |
 | R12 | Notifications | Rules unchanged |
 | R13 | Delivery | Interleaved by area with the tenant transaction refactor |
+| R14 | 'Sync Xero leave' on Leave approvals | Queues a sync for every connected company; one company's failure is shown without blocking the others |
 
 ### Outcome state on `main` (`1b4b3f1`)
 
@@ -215,7 +216,7 @@ Mismatch rule: a `TenantDb` for account A used with `clerkOrgId` B throws (the s
 
 ### Gate 0 (owner decision)
 
-Present the measurements document. Proceed to Stage 1 only on explicit confirmation. The gate decides the tenant transaction refactor only: if the owner stops it here, Stage 4 still runs every O step to deliver the three outcomes and skips the E and P steps. If no core page exceeds the 10% threshold, the spec recommends stopping at Option A; the owner decides whether Option B still proceeds for consistency.
+Present the measurements document. Proceed to Stage 1 only on explicit confirmation. The gate decides the tenant transaction refactor only: if the owner stops it here, Stage 4 still runs every O step to deliver the three outcomes and skips the E and P steps. New code in O steps (for example the Task 4.2 service) then uses the existing `tenantDatabase` and `tenantTransaction` helpers instead of `TenantDb`. If no core page exceeds the 10% threshold, the spec recommends stopping at Option A; the owner decides whether Option B still proceeds for consistency.
 
 ---
 
@@ -342,6 +343,8 @@ The remaining services are converted inside the area that uses them: Stage 4 for
 
 Each task below delivers one area of the three confirmed outcomes (section 1, "Outcome requirements") and, in the same task, converts that area to request transactions. Outcome steps (O) come first so the behaviour change is proved on today's data access before the refactor touches it; conversion then follows the shared expand steps (E) and entry-point steps (P) defined at the end of this section. If the owner stops the refactor at Gate 0, each task still runs its O steps and skips E and P.
 
+When a page shows all companies, the acting person (for manager scope and privacy relationships) is resolved by `clerk_user_id` across the account, not within one selected company; Tasks 4.3 to 4.6 each test this for a manager whose reports sit in another company.
+
 Every account-wide query in this stage follows the `AGENTS.md` pattern: resolve the owned company set with `resolveAccountCompanies(clerkOrgId)` and filter `organisation_id: { in: ownedIds }` explicitly, alongside `clerk_org_id`.
 
 Order matters: Task 4.1 changes the manager-scope contract every later task depends on, and Task 4.2 creates the cross-company manager links that Tasks 4.3 to 4.7 test against.
@@ -353,7 +356,7 @@ Outcomes served: 1 (visibility rules for managers) and 3 (managers approve direc
 **Today:** `manager_visibility_scope` is a column on `OrganisationSettings` (one row per company, `schema.prisma:347`). `managerScopePersonIds` (`packages/availability/src/settings/manager-scope.ts`) reads that company's setting and only the people of `input.organisationId`, so reports in another company are invisible to a manager. Callers: approvals, people, dashboard, plans, submit, out-of-office and leave reports.
 
 **Files:**
-- Modify: `packages/database/prisma/schema.prisma` (new model `AccountSettings`, table `account_settings`, `clerk_org_id` unique; holds `manager_visibility_scope`)
+- Modify: `packages/database/prisma/schema.prisma` (new model `AccountSettings`, table `account_settings`, following the database conventions in `AGENTS.md`: UUID `id`, `created_at`, `updated_at`, `clerk_org_id` not null, indexed and unique; holds `manager_visibility_scope`)
 - Create: a generated migration that creates the table, adds RLS policy and the `team_calendar_app` grant (per `AGENTS.md`: new tables need an explicit grant and policy review), and backfills one row per account using the most restrictive existing value (`direct_reports_only` if any company has it, otherwise `all_team_leave`)
 - Create: `packages/database/src/queries/account-settings.ts` and test
 - Modify: `packages/availability/src/settings/manager-scope.ts` and test; `packages/availability/src/settings/organisation-settings-service.ts`, `settings/shared.ts` and `packages/database/src/organisation-settings/repository.ts` (stop reading and writing the per-company value); `apps/app/app/(authenticated)/settings/leave-approval/page.tsx`, `_actions.ts` and `leave-approval-settings-client.tsx` (the field moves to an account-level control, owner and admin only)
@@ -390,7 +393,7 @@ Outcome served: 1. **Today:** the calendar is account-wide (`getCalendarRange` u
 
 **Files:**
 - Modify: `packages/availability/src/calendar/calendar-service.ts` and test; `packages/feeds/src/scope/feed-scope.ts` and test
-- Modify: `apps/app/app/(authenticated)/calendar/page.tsx`; feed entry points (`feeds/new/page.tsx`, `feeds/@modal/(.)new/page.tsx`, `feeds/_actions.ts`, `apps/api/app/api/feeds/route.ts`, `feeds/[feedId]/route.ts`, `feeds/[feedId]/rotate-token/route.ts`)
+- Modify: `apps/app/app/(authenticated)/calendar/page.tsx`; feed entry points (`feeds/page.tsx`, `feeds/[feedId]/page.tsx`, `feeds/@modal/(.)[feedId]/page.tsx`, `feeds/new/page.tsx`, `feeds/@modal/(.)new/page.tsx`, `feeds/_actions.ts`, `apps/api/app/api/feeds/route.ts`, `feeds/[feedId]/route.ts`, `feeds/[feedId]/rotate-token/route.ts`)
 
 - [ ] **O1:** Failing tests, with an account holding companies A and B: an owner, admin, manager and viewer employed in A each see B's approved leave on the calendar with the filter on "all"; private and masked records from B show to peers exactly as private and masked records from A do; a manager in A whose report is in B sees that report's leave with manager visibility, not peer masking; the default account feed and a `manager_team` feed for that manager include B's records.
 - [ ] **O2:** Fix whatever the tests show, expected at least in `relationshipToOwner` and the `manager_team` scope, by using the Task 4.1 account-wide manager scope.
@@ -413,7 +416,7 @@ Outcome served: 1. **Today:** `dashboard-body.tsx` and `dashboard-service.ts` sc
 
 Outcome served: 1. **Today:** `people/page.tsx` uses `requireActiveOrgPageContext` and filters by one `organisation_id`; `canAccessPerson` (`people-service.ts:230` to `250`) lets owner and admin see everyone, viewers only themselves, managers their scope within one company.
 
-**Files:** `packages/availability/src/people/people-service.ts`, `current-status.ts` and tests; `apps/app/app/(authenticated)/people/page.tsx`, `people/[personId]/page.tsx`, `people/@modal/(.)[personId]/page.tsx`, `people/_actions.ts` (Clerk calls phased, C6), `people/new/_actions.ts`, `lib/server/create-manual-person.ts`, `lib/server/load-onboarding-people.ts`
+**Files:** `packages/availability/src/people/people-service.ts`, `current-status.ts` and tests; `apps/app/app/(authenticated)/people/page.tsx`, `people/[personId]/page.tsx`, `people/@modal/(.)[personId]/page.tsx`, `people/_actions.ts` (Clerk calls phased, C6), `people/new/page.tsx`, `people/new/_actions.ts`, `lib/server/create-manual-person.ts`, `lib/server/load-onboarding-people.ts`
 
 - [ ] **O1:** Failing tests: owner and admin list every person in every company by default, each labelled with company; a company filter narrows the list; viewers still see only themselves; managers see their Task 4.1 scope across companies; `canAccessPerson` follows the same rules across companies.
 - [ ] **O2:** Implement with the same company selection as Task 4.4.
@@ -431,6 +434,7 @@ Outcome served: 3. **Today:** `leave-approvals/page.tsx` resolves one company wi
 - [ ] **O2:** Make `organisationId` absent from list, detail and summary inputs (account-wide); add the company id and name to `ApprovalListItem`; resolve the acting person by `clerk_user_id` across the account (one company per staff member is assumed, not enforced; see section 13).
 - [ ] **O3:** Approve, decline, retry and request-more-info actions take `recordId` only. The server loads the record within the account, derives `organisationId` from it, authorises against the Task 4.1 scope, then calls the existing phased C1 services with that company. A client cannot route a decision to another company.
 - [ ] **O4:** Update the page and components: drop the company switcher from Leave approvals, show the company label on each item, keep the existing status, person, type and date filters.
+- [ ] **O5:** 'Sync Xero leave' (admins, `leave-approvals-client.tsx:247`; `ReconciliationActionSchema`, `_actions.ts:36`) takes no company: it dispatches a leave sync for every company with an active connection. Each dispatch is result-bearing (Task 2.2), so the action collects one `Result` per company and the page shows which companies queued and which failed; one failure never prevents the others. Test with three companies where one dispatch fails.
 - [ ] **E:** Convert the non-Xero exports (`listForApprover`, `getApprovalDetail`, the split parts of `getApprovalSummaryCounts`, `requestMoreInfo`, the database parts of `dispatchApprovalReconciliation` and `dispatchXeroLeaveSync`); Xero write exports stay phased (C1).
 - [ ] **P:** Convert `leave-approvals/page.tsx` and the read paths in `_actions.ts`; decision actions call the phased services with no surrounding transaction.
 - [ ] **Commit:** `feat(approvals): one queue across every company`.
@@ -439,13 +443,13 @@ Outcome served: 3. **Today:** `leave-approvals/page.tsx` resolves one company wi
 
 Outcome served: 2. **Expected today, not yet proved:** submit, approve, decline and withdraw use the record's own `organisation_id` (for example `approval-service.ts:1592`, `1756`, `1795`), and each company's connection is resolved with both tenancy keys. Plan actions still accept `organisationId` from the client (`plans/_actions.ts:60` onwards).
 
-**Files:** `packages/availability/src/plans/plan-service.ts`, `submit-service.ts`, `submit-recovery-service.ts`, `write-operation.ts`, `xero-write-claim.ts` and tests; `apps/app/app/(authenticated)/plans/_actions.ts`, `plans/record-form-data.ts`; `packages/database/plan-sync-multi-company.integration.test.ts` (extend)
+**Files:** `packages/availability/src/plans/plan-service.ts`, `submit-service.ts`, `submit-side-effects.ts`, `submit-recovery-service.ts`, `write-operation.ts`, `xero-write-claim.ts` and tests; `apps/app/app/(authenticated)/plans/_actions.ts`, `plans/record-form-data.ts`; `packages/database/plan-sync-multi-company.integration.test.ts` (extend)
 
 - [ ] **O1:** Failing integration test with companies A and B, each with a fake Xero connection: a staff member employed in B creates and submits leave, and an admin and a cross-company manager approve it; every Xero call and `OutboundOperation` uses B's connection and tenant, never A's. A request whose client-supplied `organisationId` disagrees with the record's company is rejected and makes no Xero call.
 - [ ] **O2:** Fix whatever the test shows. At minimum, derive the company from the person or record on the server rather than trusting the client value.
 - [ ] **O3:** Confirm the manager notification on submission reaches a manager employed in another company. Notification rules stay as they are; if the current lookup filters the manager by the record's company, fix the lookup, not the rule.
-- [ ] **E:** Convert `plan-service.ts`, `listSubmitRecoveryCandidates` and `xero-write-claim.ts`; Xero write exports stay phased (C1).
-- [ ] **P:** Convert `plans/record-form-data.ts` and the read paths in `plans/_actions.ts`; submit and withdraw call phased services directly.
+- [ ] **E:** Convert `plan-service.ts`, `listSubmitRecoveryCandidates`, `xero-write-claim.ts` and the database parts of `submit-side-effects.ts` (its notification and sync dispatches follow the Task 2.2 split); Xero write exports stay phased (C1).
+- [ ] **P:** Convert `plans/page.tsx`, `plans/new/page.tsx`, `plans/[planId]/edit/page.tsx`, `plans/@modal/(.)new/page.tsx`, `plans/@modal/(.)[planId]/edit/page.tsx`, `plans/record-form-data.ts` and the read paths in `plans/_actions.ts`; submit and withdraw call phased services directly.
 - [ ] **Commit:** `test(plans): prove leave routes to the requester's company`.
 
 ### Shared expand steps (E)
@@ -471,10 +475,10 @@ No behaviour change. Each service row follows the E steps and each entry-point r
 
 | Task | Services (E) | Entry points (P) |
 |---|---|---|
-| 5.1 Reference data | `duration/working-days.ts` (4), `holidays/holiday-service.ts` (3), `holidays/holiday-preferences.ts` (2), `holidays/resolve-public-holidays.ts`, `settings/audit-log-service.ts` (5), `xero-connection-state.ts`, `team-coverage/team-coverage-minimums.ts` (one internal `tenantTransaction`) | `public-holidays/page.tsx`, `public-holidays/_actions.ts`, `public-holidays/holidays/new/form-data.ts`, `settings/holidays/page.tsx`, `settings/coverage/_actions.ts`, `settings/audit-log/_actions.ts` |
-| 5.2 Records, analytics, onboarding | `records/manual-records-service.ts` (10), `analytics/out-of-office-service.ts` (4), `analytics/leave-reports-service.ts` (4), `onboarding/wizard-state.ts` (5) | `apps/api/app/api/availability/route.ts`, `availability/[recordId]/route.ts`, `actions/availability/manual.ts`, `analytics/out-of-office/page.tsx`, `analytics/leave-reports/page.tsx` and `_actions.ts`, `(setup)/onboarding/_actions.ts`, `(setup)/welcome/_actions.ts`, `setup/_actions.ts`, `lib/server/load-onboarding-state.ts`, `lib/server/ensure-default-organisation.ts`, `lib/server/get-active-org-context.ts`, `lib/server/require-active-org-page-context.ts` |
-| 5.3 Settings and notifications | (services converted in Stage 3 and Task 4.1) | `settings/general/page.tsx` and `_actions.ts` (Clerk phased), `settings/billing/page.tsx` and `actions.ts` (Stripe phased), `settings/feeds/_actions.ts`, `actions/settings/*.ts`, `notifications/_actions.ts`, `actions/notifications/manage.ts`, `apps/api/app/api/notifications/[notificationId]/mark-read/route.ts`, SSE stream (C3: per-lookup transactions) |
-| 5.4 Sync monitor and integrations | `sync/sync-monitor-service.ts` (25; database parts only, using the Task 2.2 and 2.3 splits), `packages/xero/src/resolution/resolve-leave-type.ts` (2), `resolve-employee.ts` (2), `oauth/activation.ts` (1); OAuth service and disconnect stay phased (C6) | `settings/integrations/page.tsx`, `settings/integrations/xero/page.tsx`, `xero/_actions.ts`, `xero/connect/_actions.ts`, `xero/matches/page.tsx` and `_actions.ts`, `sync/_actions.ts`, `apps/api/app/api/sync/dispatch/route.ts`, `apps/api/app/api/xero/oauth/*` (phased, C6) |
+| 5.1 Reference data | `duration/working-days.ts` (4), `holidays/holiday-service.ts` (3), `holidays/holiday-preferences.ts` (2), `holidays/resolve-public-holidays.ts`, `settings/audit-log-service.ts` (5), `xero-connection-state.ts`, `team-coverage/team-coverage-minimums.ts` (one internal `tenantTransaction`) | `public-holidays/page.tsx`, `public-holidays/_actions.ts`, `public-holidays/holidays/new/page.tsx`, `public-holidays/@modal/(.)holidays/new/page.tsx`, `public-holidays/holidays/new/form-data.ts`, `settings/holidays/page.tsx`, `settings/coverage/page.tsx` and `_actions.ts`, `settings/audit-log/page.tsx` and `_actions.ts` |
+| 5.2 Records, analytics, onboarding | `records/manual-records-service.ts` (10), `analytics/out-of-office-service.ts` (4), `analytics/leave-reports-service.ts` (4), `onboarding/wizard-state.ts` (5) | `apps/api/app/api/availability/route.ts`, `availability/[recordId]/route.ts`, `actions/availability/manual.ts`, `analytics/out-of-office/page.tsx`, `analytics/leave-reports/page.tsx` and `_actions.ts`, `(setup)/onboarding/page.tsx` and `_actions.ts`, `(setup)/welcome/page.tsx` and `_actions.ts`, `setup/_actions.ts`, `settings/getting-started/page.tsx`, `(authenticated)/layout.tsx` (C7: its own transaction, separate from the page it wraps), `lib/server/load-onboarding-state.ts`, `lib/server/ensure-default-organisation.ts`, `lib/server/get-active-org-context.ts`, `lib/server/require-active-org-page-context.ts` |
+| 5.3 Settings and notifications | (services converted in Stage 3 and Task 4.1) | `settings/general/page.tsx` and `_actions.ts` (Clerk phased), `settings/billing/page.tsx` and `actions.ts` (Stripe phased), `settings/layout.tsx`, `settings/feeds/page.tsx` and `_actions.ts`, `actions/settings/*.ts`, `notifications/page.tsx` and `_actions.ts`, `actions/notifications/manage.ts`, `apps/api/app/api/notifications/[notificationId]/mark-read/route.ts`, SSE stream (C3: per-lookup transactions) |
+| 5.4 Sync monitor and integrations | `sync/sync-monitor-service.ts` (25; database parts only, using the Task 2.2 and 2.3 splits), `packages/xero/src/resolution/resolve-leave-type.ts` (2), `resolve-employee.ts` (2), `oauth/activation.ts` (1); OAuth service and disconnect stay phased (C6) | `settings/integrations/page.tsx`, `settings/integrations/xero/page.tsx`, `xero/_actions.ts`, `xero/connect/page.tsx` and `_actions.ts`, `xero/matches/page.tsx` and `_actions.ts`, `sync/page.tsx`, `sync/[runId]/page.tsx`, `sync/_actions.ts`, `apps/api/app/api/sync/dispatch/route.ts`, `apps/api/app/api/xero/oauth/*` (phased, C6) |
 | 5.5 Webhooks and support | (database helpers converted in Task 3.1) | `apps/api/app/webhooks/auth/route.ts`, `apps/api/lib/support/persist-support-submission-audit.ts`, `apps/api/app/api/support/github-issue/route.ts` (external call outside the transaction); `apps/api/app/webhooks/payments/route.ts` through `apps/api/lib/stripe-event-delivery.ts` (phased, C6: Stripe retrieval and the Inngest send run outside the transaction; tenant billing queries such as `upsertSubscriptionFromWebhook` run in their own `withTenantDb`). Routes with no tenant access stay unchanged: `contact`, `early-access`, `inngest`, `cron/keep-alive`, `health`, `apps/app/app/api/csp-report` and `apps/web/app/rss.xml` |
 | 5.6 Inngest, database-only steps | `handlers/sync-run-lifecycle.ts` (3), `handlers/recount-usage.ts` (3), `activation.ts` (3), `handlers/rebuild-feed-cache.ts` (2), `handlers/recover-xero-import-dispatch.ts` (1) | `recount-usage` (per account via `withTenantReads` if registered), `rebuild-feed-cache`, `send-notification-emails` (email send outside the transaction), `schedule-xero-syncs` `recover-xero-import-dispatch`: each `step.run` body opens one `withTenantDb` per account, with payload `clerk_org_id` and `organisation_id` as today. `reconcile-feed-publications` is phased (hazard 6; register its per-record function in Task 2.1): the candidate read runs in its own `withTenantDb`, then each `materialiseAvailabilityPublication` call keeps its own transaction with the existing per-record catch; add a test that a failure on one record leaves earlier and later records committed. Apply the same to any other catch-and-continue step E0 finds |
 | 5.7 Inngest, Xero steps (C2) | (none) | `sync-xero-leave-records.ts`, `sync-xero-people.ts`, `sync-xero-leave-balances.ts`, `reconcile-xero-approval-state.ts`, `initial-xero-sync.ts`, `apps/api/lib/sync/execute-local-sync-fallback.ts`: one `withTenantDb` per batch or persistence phase; no transaction spans a Xero call; add a test that a failure in batch 3 leaves batches 1 and 2 committed |
@@ -555,6 +559,7 @@ Commit each row as `refactor(<package>): one tenant transaction per <area> reque
 | R11 per-request settings follow the record's company | Task 4.6 |
 | R12 notification rules unchanged | Task 4.7 Step O3 |
 | R13 interleaved delivery | Stage 4 structure (O, then E and P steps per area) |
+| R14 'Sync Xero leave' syncs every company | Task 4.6 Step O5 |
 | Australian English, no em or en dashes in code comments and docs | All new text |
 
 ## 12. Risks and rollback
