@@ -31,6 +31,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Suite hooks import the full server action graph; under turbo's
+    // concurrent integration run that can exceed the 10s default.
+    hookTimeout: 30_000,
     passWithNoTests: false,
     testTimeout: 30_000,
   },
