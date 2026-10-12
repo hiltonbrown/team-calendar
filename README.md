@@ -109,7 +109,7 @@ Team Calendar is under active development and pre-launch. Core infrastructure, C
    cp apps/app/.env.example apps/app/.env.local
    cp apps/web/.env.example apps/web/.env.local
    ```
-   Fill in `DATABASE_URL`, `CLERK_SECRET_KEY`, and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a minimum.
+   Fill in `DATABASE_URL`, `DATABASE_APP_URL`, `CLERK_SECRET_KEY`, and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a minimum. `app` and `api` also need the same `XERO_TOKEN_ENCRYPTION_KEY`; generate one with `openssl rand -base64 32`. Copy `packages/database/.env.example` to `packages/database/.env` for migrations and seeding.
 
    **Optional GitHub support issue integration (`apps/api/.env.local`):**
    ```bash
@@ -210,6 +210,7 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `NEXT_PUBLIC_SENTRY_DSN` | All apps | Required (URL) | Required (URL) |
 | `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | All apps | Required for source-map upload | Required for source-map upload |
 | `DATABASE_URL` | `app`, `api` | Required | Required |
+| `DATABASE_APP_URL` | `app`, `api` | Required (restricted `team_calendar_app` URL) | Required (restricted `team_calendar_app` URL) |
 | `XERO_TOKEN_ENCRYPTION_KEY` | `app`, `api` | Required | Required |
 | `XERO_CLIENT_ID` / `XERO_CLIENT_SECRET` | `app`, `api` | Required | Required |
 | `XERO_APP_TIER` / `XERO_REDIRECT_URI` | `app`, `api` | Required commercial allowance / registered HTTPS callback | Required commercial allowance / registered HTTPS callback |
