@@ -1,6 +1,6 @@
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   executeRaw: vi.fn((_query: TemplateStringsArray) => Promise.resolve(1)),
@@ -16,7 +16,7 @@ vi.mock("../client", () => ({
     send: vi.fn(),
   },
 }));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     // Real scope ownership and effects are exercised against this area's delegate fake.
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
@@ -50,9 +50,9 @@ vi.mock("@repo/database", async () => {
     Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
   }
   mocks.scopeDatabase = exports.database;
-  const core = await vi.importActual<
-    typeof import("../../../database/src/tenant-db")
-  >("../../../database/src/tenant-db");
+  const core = await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  );
   return { ...mockedModule, ...core };
 });
 

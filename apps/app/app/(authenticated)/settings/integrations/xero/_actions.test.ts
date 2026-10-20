@@ -24,7 +24,7 @@ vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
 }));
-vi.mock("../../../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: vi.fn(
       async (executeTransaction: (client: unknown) => Promise<unknown>) =>
@@ -37,9 +37,9 @@ vi.mock("../../../../../../../packages/database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<
-    typeof import("../../../../../../../packages/database/src/tenant-db")
-  >("../../../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return mocks.database;
@@ -482,7 +482,7 @@ describe("xero settings integration server actions", () => {
         },
       });
       const { referenceDatabase } = await import(
-        "../../../../../../../packages/database/src/tenant-client"
+        "@repo/database/tenant-client"
       );
       expect(referenceDatabase.$transaction).toHaveBeenCalledTimes(2);
       expect(mocks.database.auditEvent.create).toHaveBeenCalledTimes(2);

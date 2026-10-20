@@ -12,15 +12,15 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run(buildTestDatabase()),
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-    "../../../database/src/tenant-db"
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
   )),
 
   scopedQuery: (clerkOrgId: string, organisationId: string) => ({

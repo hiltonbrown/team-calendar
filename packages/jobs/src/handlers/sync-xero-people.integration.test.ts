@@ -1,11 +1,11 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
-import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   withTenantDb as withTestTenantDb,
   withTenantResult as withTestTenantResult,
-} from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
+} from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
+import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const mockInngestSend = vi.hoisted(() =>

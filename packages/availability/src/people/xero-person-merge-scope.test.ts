@@ -1,7 +1,7 @@
 import type { Prisma } from "@repo/database/generated/client";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, expect, test, vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const state = vi.hoisted(() => ({
   audit: vi.fn(),
@@ -12,12 +12,12 @@ const state = vi.hoisted(() => ({
   updateMany: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: { $transaction: state.transaction },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-    "../../../database/src/tenant-db"
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
   )),
   lockPlanLimitMutations: vi.fn(),
   resolveAccountCompanies: async () => [

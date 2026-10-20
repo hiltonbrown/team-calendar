@@ -472,7 +472,7 @@ describe("support GitHub issue route", () => {
   });
 });
 
-vi.mock("../../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run({ $queryRaw: vi.fn(async () => []) }),

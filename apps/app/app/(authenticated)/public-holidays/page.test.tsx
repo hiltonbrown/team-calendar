@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/availability", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -34,9 +34,9 @@ vi.mock("../../../../../packages/database/src/tenant-client", () => ({
 }));
 vi.mock("@repo/database", async () => ({
   scopedQuery: mocks.scopedQuery,
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {

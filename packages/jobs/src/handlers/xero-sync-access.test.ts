@@ -9,12 +9,12 @@ const mocks = vi.hoisted(() => ({
   writes: vi.fn(async () => ({ count: 1 })),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: { $transaction: mocks.transaction },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-    "../../../database/src/tenant-db"
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
   )),
   getScopedXeroConnection: (bindingScope: { connectionId: string }) =>
     Promise.resolve({

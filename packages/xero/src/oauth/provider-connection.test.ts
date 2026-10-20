@@ -172,7 +172,7 @@ describe("confirmed selected provider connection", () => {
   });
 });
 
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run({ $queryRaw: vi.fn(async () => []) }),

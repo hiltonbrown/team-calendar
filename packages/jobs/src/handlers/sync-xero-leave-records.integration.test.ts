@@ -1,8 +1,8 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const afterSnapshotRead = vi.fn<() => Promise<void>>();
@@ -20,11 +20,9 @@ vi.mock("../client", () => ({
   },
 }));
 // Extend the restricted pool's query hook without changing the transaction client's identity.
-vi.mock("../../../database/src/tenant-client", async (importOriginal) => {
+vi.mock("@repo/database/tenant-client", async (importOriginal) => {
   const original =
-    await importOriginal<
-      typeof import("../../../database/src/tenant-client")
-    >();
+    await importOriginal<typeof import("@repo/database/tenant-client")>();
   return {
     ...original,
     referenceDatabase: new Proxy(original.referenceDatabase, {

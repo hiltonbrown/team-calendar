@@ -12,7 +12,7 @@ const tenantPoolMocks = vi.hoisted(() => ({
     )
   ),
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: (run: (client: unknown) => Promise<unknown>) =>
       run({
@@ -47,9 +47,9 @@ vi.mock("@repo/database", async () => ({
     typeof import("../../../../../packages/database/src/queries/account-companies")
   >("../../../../../packages/database/src/queries/account-companies")),
 
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
   ...(await vi.importActual<
     typeof import("../../../../../packages/database/src/queries/organisations")
   >("../../../../../packages/database/src/queries/organisations")),

@@ -1,7 +1,7 @@
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const ids = {
   clerkOrg: "org_1",
@@ -33,14 +33,14 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: (run: (db: unknown) => Promise<unknown>, options: unknown) =>
       mocks.poolTransaction(run, options),
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual("../../../database/src/tenant-db")),
+  ...(await vi.importActual("@repo/database/tenant-db")),
   getAccountSettings: async (account: string, db: unknown) => {
     const settings = await mocks.getSettings(
       { clerkOrgId: account, organisationId: ids.org },

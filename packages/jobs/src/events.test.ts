@@ -184,7 +184,7 @@ it("rejects a sync event missing its local connection ID before queueing", async
   expect(mocks.send).not.toHaveBeenCalled();
 });
 
-vi.mock("../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run({ $queryRaw: vi.fn(async () => []) }),

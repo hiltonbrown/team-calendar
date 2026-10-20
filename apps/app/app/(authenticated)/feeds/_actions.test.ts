@@ -60,7 +60,7 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -82,9 +82,9 @@ vi.mock("@repo/database", async () => ({
       ? { ok: true, value: { id: scopedOrganisationId } }
       : context;
   },
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return mocks.database;

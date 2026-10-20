@@ -1,6 +1,6 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   companies: vi.fn(async () => [
@@ -15,7 +15,7 @@ vi.mock("server-only", () => ({}));
 const tenantTestState = vi.hoisted(() => ({
   client: null as Record<string, unknown> | null,
 }));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -43,8 +43,8 @@ vi.mock("@repo/database", async () => {
       manager_visibility_scope: "direct_reports_only",
     }),
     resolveAccountCompanies: mocks.companies,
-    ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-      "../../../database/src/tenant-db"
+    ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
     )),
   };
 });

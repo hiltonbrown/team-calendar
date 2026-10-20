@@ -46,7 +46,7 @@ vi.mock("@repo/xero", () => ({
 vi.mock("@repo/database/queries/xero-connection-state", () => ({
   getXeroConnectionState: mocks.getXeroConnectionState,
 }));
-vi.mock("../../../../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -59,9 +59,9 @@ vi.mock("../../../../../../../../packages/database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<
-    typeof import("../../../../../../../../packages/database/src/tenant-db")
-  >("../../../../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {

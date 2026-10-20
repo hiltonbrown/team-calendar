@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual("../../../database/src/tenant-db")),
+  ...(await vi.importActual("@repo/database/tenant-db")),
   markSubmitCompleted: mocks.completed,
   markSubmitDefinitiveFailure: mocks.failure,
   markSubmitDispatchStarted: mocks.start,
@@ -166,7 +166,7 @@ it("marks a first write stopped before dispatch as definitively unprocessed", as
   expect(mocks.unknown).not.toHaveBeenCalled();
 });
 
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run({ $queryRaw: vi.fn(async () => []) }),

@@ -1,6 +1,6 @@
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantDb as withTestTenantDb } from "../../../../packages/database/src/tenant-db";
-import { tenantTestAccount } from "../../../../packages/database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   feedCount: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/availability", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
-vi.mock("../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -24,9 +24,9 @@ vi.mock("../../../../packages/database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<
-    typeof import("../../../../packages/database/src/tenant-db")
-  >("../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {

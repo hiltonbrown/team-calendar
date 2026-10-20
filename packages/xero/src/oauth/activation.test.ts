@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 const tenantTestState = vi.hoisted(() => ({ client: null as object | null }));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -28,8 +28,8 @@ vi.mock("../../../database/src/tenant-client", () => ({
 }));
 vi.mock("@repo/database", async () => {
   const actualTenantCore = await vi.importActual<
-    typeof import("../../../database/src/tenant-db")
-  >("../../../database/src/tenant-db");
+    typeof import("@repo/database/tenant-db")
+  >("@repo/database/tenant-db");
 
   const exports = {
     database: { xeroConnection: { findFirst: mocks.findFirst } },

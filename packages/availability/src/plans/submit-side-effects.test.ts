@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   publish: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) => {
       const result = await run(buildTestDatabase());
@@ -20,8 +20,8 @@ vi.mock("../../../database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-    "../../../database/src/tenant-db"
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
   )),
 
   fenceSubmitRecoverySideEffectClaim: mocks.fence,

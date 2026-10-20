@@ -1,6 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository's .integration.test.ts convention.
 import type { ExternalWritePort, ProviderWriteCertainty } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import {
   afterAll,
   afterEach,
@@ -11,8 +13,6 @@ import {
   it,
   vi,
 } from "vitest";
-import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 vi.mock("./identity", () => ({

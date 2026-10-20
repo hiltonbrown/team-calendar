@@ -10,13 +10,12 @@ const state = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/helpers", () => ({ requireOrg: state.auth }));
-vi.mock("../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: { $transaction: state.transaction },
 }));
 vi.mock(
   "@repo/database",
-  async () =>
-    await vi.importActual("../../../../packages/database/src/tenant-db")
+  async () => await vi.importActual("@repo/database/tenant-db")
 );
 vi.mock("@repo/database/queries/account-companies", () => ({
   resolveAccountCompanies: state.companies,

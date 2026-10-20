@@ -31,7 +31,7 @@ vi.mock("@repo/auth/server", () => ({
 vi.mock("@repo/availability", () => ({
   getBillingSummary: mocks.getBillingSummary,
 }));
-vi.mock("../../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -48,9 +48,9 @@ vi.mock("@repo/database", async () => ({
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
   getUnresolvedStripeEventsForOrg: mocks.getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
-  ...(await vi.importActual<
-    typeof import("../../../../../../packages/database/src/tenant-db")
-  >("../../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return { auditEvent: { create: mocks.auditCreate } };

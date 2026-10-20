@@ -33,7 +33,7 @@ vi.mock("@repo/availability", () => ({
   }),
   isXeroLeaveType: (value: string) => value === "annual_leave",
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -53,9 +53,9 @@ vi.mock("@repo/database", async () => ({
     clerk_org_id: clerkOrgId,
     organisation_id: payrollOrganisationId,
   }),
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {

@@ -1,6 +1,6 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../database/src/tenant-db";
-import { tenantTestAccount } from "../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("server-only", () => ({}));
@@ -53,7 +53,7 @@ describe("getXeroConnectionStateForScope", () => {
   });
 });
 
-vi.mock("../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run({ $queryRaw: vi.fn(async () => []) }),

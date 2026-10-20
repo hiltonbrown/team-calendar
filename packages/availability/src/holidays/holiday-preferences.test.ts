@@ -1,7 +1,7 @@
+import { referenceDatabase } from "@repo/database/tenant-client";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { vi } from "vitest";
-import { referenceDatabase } from "../../../database/src/tenant-client";
-import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 
@@ -25,7 +25,7 @@ const db = vi.hoisted(() => {
   };
 });
 
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: vi.fn(async (run: (db: unknown) => Promise<unknown>) =>
       run(buildTestDatabase())
@@ -33,8 +33,8 @@ vi.mock("../../../database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-    "../../../database/src/tenant-db"
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
   )),
 
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({

@@ -1,7 +1,7 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });

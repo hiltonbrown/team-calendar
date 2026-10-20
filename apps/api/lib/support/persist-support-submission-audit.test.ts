@@ -1,7 +1,7 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../../../packages/database/src/tenant-db";
-import { tenantTestAccount } from "../../../../packages/database/src/test-fixtures/tenant-scope";
 
 const clerkOrgId = "org_clerk_123" as ClerkOrgId;
 const organisationId = "00000000-0000-4000-8000-000000000001" as OrganisationId;
@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
 }));
 
-vi.mock("../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -23,9 +23,9 @@ vi.mock("../../../../packages/database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<
-    typeof import("../../../../packages/database/src/tenant-db")
-  >("../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {

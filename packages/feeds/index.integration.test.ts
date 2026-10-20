@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { executeRedisRestCommand } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
-import { withTenantResult as withTestTenantResult } from "../database/src/tenant-db";
-import { tenantTestAccount } from "../database/src/test-fixtures/tenant-scope";
 
 // Mirrors deriveAvailabilityUidKey in @repo/availability, which depends on this
 // package and so cannot be imported here.

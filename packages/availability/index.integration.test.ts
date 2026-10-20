@@ -1,7 +1,7 @@
 const tenantQueryCounter = vi.hoisted(() => ({ active: false, count: 0 }));
-vi.mock("../database/src/tenant-client", async (importOriginal) => {
+vi.mock("@repo/database/tenant-client", async (importOriginal) => {
   const original =
-    await importOriginal<typeof import("../database/src/tenant-client")>();
+    await importOriginal<typeof import("@repo/database/tenant-client")>();
   return {
     ...original,
     referenceDatabase: new Proxy(original.referenceDatabase, {
@@ -35,6 +35,11 @@ vi.mock("../database/src/tenant-client", async (importOriginal) => {
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
+import {
   afterAll,
   afterEach,
   beforeEach,
@@ -43,11 +48,6 @@ import {
   test,
   vi,
 } from "vitest";
-import {
-  withTenantDb as withTestTenantDb,
-  withTenantResult as withTestTenantResult,
-} from "../database/src/tenant-db";
-import { tenantTestAccount } from "../database/src/test-fixtures/tenant-scope";
 import type { TenantContext } from "./index";
 
 vi.mock("server-only", () => ({}));

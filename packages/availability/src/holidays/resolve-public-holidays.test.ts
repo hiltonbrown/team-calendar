@@ -1,10 +1,10 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { vi } from "vitest";
-import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
-import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual("../../../database/src/tenant-db")),
+  ...(await vi.importActual("@repo/database/tenant-db")),
   loadHolidayResolutionData: vi.fn(),
 }));
 
@@ -139,7 +139,7 @@ describe("loadHolidaySettings", () => {
   });
 });
 
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (run: (db: unknown) => Promise<unknown>) =>
       run({ $queryRaw: vi.fn(async () => []) }),

@@ -1,5 +1,5 @@
+import { referenceDatabase } from "@repo/database/tenant-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { referenceDatabase } from "../../../../../packages/database/src/tenant-client";
 
 const mocks = vi.hoisted(() => ({
   addAlternativeContact: vi.fn(),
@@ -52,7 +52,7 @@ vi.mock("@repo/availability", () => ({
   setManualLeaveBalance: mocks.setManualLeaveBalance,
   updateAlternativeContact: mocks.updateAlternativeContact,
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: vi.fn(
       async (executeTransaction: (client: unknown) => Promise<unknown>) =>
@@ -72,9 +72,9 @@ vi.mock("@repo/database", async () => ({
     clerk_org_id: cOrgId,
     organisation_id: orgId,
   }),
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return mocks.database;

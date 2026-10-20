@@ -15,7 +15,7 @@ vi.mock("server-only", () => ({}));
 const tenantTestState = vi.hoisted(() => ({
   client: null as Record<string, unknown> | null,
 }));
-vi.mock("../../../database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -40,8 +40,8 @@ vi.mock("@repo/database", async () => {
   tenantTestState.client = client;
   return {
     systemDatabase: client,
-    ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
-      "../../../database/src/tenant-db"
+    ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
     )),
   };
 });

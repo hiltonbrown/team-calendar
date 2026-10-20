@@ -1,5 +1,5 @@
+import { referenceDatabase } from "@repo/database/tenant-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { referenceDatabase } from "../../../../../packages/database/src/tenant-client";
 
 const uuidV5Pattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -28,7 +28,7 @@ vi.mock("@repo/analytics/server", () => ({
 vi.mock("@repo/availability", () => ({
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: vi.fn(
       async (executeTransaction: (client: unknown) => Promise<unknown>) =>
@@ -41,9 +41,9 @@ vi.mock("../../../../../packages/database/src/tenant-client", () => ({
   },
 }));
 vi.mock("@repo/database", async () => ({
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {

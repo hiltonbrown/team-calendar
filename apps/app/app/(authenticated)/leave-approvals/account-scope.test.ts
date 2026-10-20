@@ -11,13 +11,13 @@ const state = vi.hoisted(() => ({
   transaction: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: { $transaction: state.transaction },
 }));
 vi.mock("@repo/database", async () => {
-  const core = await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db");
+  const core = await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  );
   return {
     ...core,
     resolveAccountCompanies: async (

@@ -25,7 +25,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
 }));
-vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
       executeTransaction: (client: unknown) => Promise<unknown>
@@ -41,9 +41,9 @@ vi.mock("@repo/database", async () => ({
   resolveAccountCompanies: async () => [
     { id: validInput.organisationId, name: "Company A" },
   ],
-  ...(await vi.importActual<
-    typeof import("../../../../../packages/database/src/tenant-db")
-  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
 function buildTenantTestDatabase() {
   return {
