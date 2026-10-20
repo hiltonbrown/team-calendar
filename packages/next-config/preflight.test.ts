@@ -44,7 +44,6 @@ const validApiVars = {
 
 const validWebVars = {
   ...validCommonVars,
-  SUPPORT_EMAIL: "support@teamcalendar.online",
 };
 
 const validPaidVars = {
@@ -81,6 +80,15 @@ describe("production preflight validation", () => {
     });
     expect(result.ok).toBe(true);
     expect(result.launchMode).toBe("early_access");
+  });
+
+  it("does not check a support email the web app never reads", () => {
+    const result = runProductionPreflight({
+      appName: "web",
+      envVars: { ...validWebVars, SUPPORT_EMAIL: "not-an-email" },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).not.toContain("SUPPORT_EMAIL");
   });
 
   it("passes for valid paid app deployment when all Stripe keys exist", () => {
