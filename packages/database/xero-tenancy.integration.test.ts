@@ -12,7 +12,6 @@ import {
   withTenantDb,
   withTenantDb as withTestTenantDb,
 } from "./src/tenant-db";
-import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 import {
   createXeroAuthorisationFixture,
   createXeroConnectionFixture,
@@ -400,10 +399,10 @@ test("concurrent first watermark writes return one success without a unique-key 
       scope,
     };
     const outcomes = await Promise.all([
-      withTestTenantDb(tenantTestAccount(input), (db) =>
+      withTestTenantDb(scope.clerkOrgId, (db) =>
         advanceXeroSyncCursor(input, db)
       ),
-      withTestTenantDb(tenantTestAccount(input), (db) =>
+      withTestTenantDb(scope.clerkOrgId, (db) =>
         advanceXeroSyncCursor(input, db)
       ),
     ]);
@@ -443,6 +442,12 @@ async function withCommittedConnection(
   try {
     await work(fixture.connection);
   } finally {
+    await database.xeroSyncCursor.deleteMany({
+      where: { xero_connection_id: fixture.connection.id },
+    });
+    await database.xeroConnection.delete({
+      where: { id: fixture.connection.id },
+    });
     await database.organisation.delete({
       where: { id: fixture.organisation.id },
     });

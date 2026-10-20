@@ -33,6 +33,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/database/row-level-security.integration.test.ts",
   "packages/database/src/seed/seed.integration.test.ts",
   "packages/database/teams.integration.test.ts",
+  "packages/database/tenant-statement-counts.integration.test.ts",
   "packages/database/xero-authorisation-locks.integration.test.ts",
   "packages/database/xero-ownership.integration.test.ts",
   "packages/database/xero-provider-fence.integration.test.ts",
