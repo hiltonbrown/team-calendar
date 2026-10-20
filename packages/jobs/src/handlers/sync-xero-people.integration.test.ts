@@ -32,45 +32,40 @@ vi.mock("@repo/database", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/database")>();
   return {
     ...original,
+    // Hooks are installed on the registered client itself: a wrapper object
+    // would not be recognised by assertTenantDb.
     withTenantDb: (clerkOrgId, operation, options) =>
       original.withTenantDb(
         clerkOrgId,
-        async (tx) =>
-          operation(
-            new Proxy(tx, {
-              get(transaction, delegateName, transactionReceiver) {
-                if (delegateName !== "person") {
-                  return Reflect.get(
-                    transaction,
-                    delegateName,
-                    transactionReceiver
-                  );
-                }
-                return new Proxy(transaction.person, {
-                  get(delegate, method, delegateReceiver) {
-                    if (method === "updateMany") {
-                      return async (
-                        args: import("@repo/database").Prisma.PersonUpdateManyArgs
-                      ) => {
-                        const result = await delegate.updateMany(args);
-                        await afterPersonUpdateMany(args, transaction);
-                        return result;
-                      };
-                    }
-                    if (method !== "upsert") {
-                      return Reflect.get(delegate, method, delegateReceiver);
-                    }
-                    return async (
-                      args: import("@repo/database").Prisma.PersonUpsertArgs
-                    ) => {
-                      await beforePersonUpsert(args);
-                      return delegate.upsert(args);
-                    };
-                  },
-                });
-              },
-            })
-          ),
+        async (tx) => {
+          const { person } = tx;
+          const { updateMany, upsert } = person;
+          Reflect.set(
+            person,
+            "updateMany",
+            async (
+              args: import("@repo/database").Prisma.PersonUpdateManyArgs
+            ) => {
+              const result = await updateMany.call(person, args);
+              await afterPersonUpdateMany(args, tx);
+              return result;
+            }
+          );
+          Reflect.set(
+            person,
+            "upsert",
+            async (args: import("@repo/database").Prisma.PersonUpsertArgs) => {
+              await beforePersonUpsert(args);
+              return upsert.call(person, args);
+            }
+          );
+          try {
+            return await operation(tx);
+          } finally {
+            Reflect.set(person, "updateMany", updateMany);
+            Reflect.set(person, "upsert", upsert);
+          }
+        },
         options
       ),
   };

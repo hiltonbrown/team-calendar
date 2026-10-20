@@ -12,11 +12,14 @@ import {
 } from "vitest";
 
 vi.mock("server-only", () => ({}));
+const feeds = vi.hoisted(() => ({
+  ensureDefaultCalendarFeed: vi.fn(),
+  invalidateAccountFeedCaches: vi.fn(),
+  invalidateFeedCache: vi.fn(),
+}));
 vi.mock("@repo/feeds", () => ({
   ALL_PRIVACY_MODES: ["named", "anonymous", "hidden"],
-  ensureDefaultCalendarFeed: vi.fn().mockResolvedValue({ ok: true, value: {} }),
-  invalidateAccountFeedCaches: vi.fn().mockResolvedValue(undefined),
-  invalidateFeedCache: vi.fn().mockResolvedValue(undefined),
+  ...feeds,
 }));
 vi.mock("@repo/availability", () => ({
   XERO_WRITE_CLAIM_LEASE_MS: 5 * 60 * 1000,
@@ -77,6 +80,13 @@ beforeAll(async () => {
 beforeEach(async () => {
   await clean();
   vi.resetAllMocks();
+  // resetAllMocks clears factory values, so feed results are restored here.
+  feeds.ensureDefaultCalendarFeed.mockResolvedValue({ ok: true, value: {} });
+  feeds.invalidateAccountFeedCaches.mockResolvedValue({
+    ok: true,
+    value: { feedIds: [] },
+  });
+  feeds.invalidateFeedCache.mockResolvedValue(undefined);
   process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION = "1";
   delete process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON;
   identity.verify.mockResolvedValue({

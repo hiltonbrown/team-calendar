@@ -1,6 +1,4 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
-import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
-import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -74,9 +72,7 @@ vi.mock("./sync-run-lifecycle", async (importOriginal) => {
       ...args: Parameters<typeof original.assertRunActive>
     ) => {
       await beforeRunActiveCheck(...args);
-      await withTestTenantDb(tenantTestAccount(...args), (db) =>
-        original.assertRunActive(...args, undefined, db)
-      );
+      await original.assertRunActive(...args);
     },
   };
 });
