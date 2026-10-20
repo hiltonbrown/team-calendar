@@ -10,26 +10,22 @@ const select = {
 } as const;
 
 export async function getAccountSettings(clerkOrgId: string, db: TenantDb) {
-  {
-    assertTenantDb(db, clerkOrgId);
-    const tenantDb = db;
-
-    const existing = await tenantDb.accountSettings.findFirst({
-      select,
-      where: { clerk_org_id: clerkOrgId },
-    });
-    if (existing) {
-      return existing;
-    }
-    await tenantDb.accountSettings.createMany({
-      data: { clerk_org_id: clerkOrgId },
-      skipDuplicates: true,
-    });
-    return tenantDb.accountSettings.findFirstOrThrow({
-      select,
-      where: { clerk_org_id: clerkOrgId },
-    });
+  assertTenantDb(db, clerkOrgId);
+  const existing = await db.accountSettings.findFirst({
+    select,
+    where: { clerk_org_id: clerkOrgId },
+  });
+  if (existing) {
+    return existing;
   }
+  await db.accountSettings.createMany({
+    data: { clerk_org_id: clerkOrgId },
+    skipDuplicates: true,
+  });
+  return db.accountSettings.findFirstOrThrow({
+    select,
+    where: { clerk_org_id: clerkOrgId },
+  });
 }
 
 export async function updateAccountSettings(
@@ -37,18 +33,14 @@ export async function updateAccountSettings(
   managerVisibilityScope: ManagerVisibilityScope,
   db: TenantDb
 ) {
-  {
-    assertTenantDb(db, clerkOrgId);
-    const tenantDb2 = db;
-
-    await getAccountSettings(clerkOrgId, tenantDb2);
-    await tenantDb2.accountSettings.updateMany({
-      data: { manager_visibility_scope: managerVisibilityScope },
-      where: { clerk_org_id: clerkOrgId },
-    });
-    return tenantDb2.accountSettings.findFirstOrThrow({
-      select,
-      where: { clerk_org_id: clerkOrgId },
-    });
-  }
+  assertTenantDb(db, clerkOrgId);
+  await getAccountSettings(clerkOrgId, db);
+  await db.accountSettings.updateMany({
+    data: { manager_visibility_scope: managerVisibilityScope },
+    where: { clerk_org_id: clerkOrgId },
+  });
+  return db.accountSettings.findFirstOrThrow({
+    select,
+    where: { clerk_org_id: clerkOrgId },
+  });
 }

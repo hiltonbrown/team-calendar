@@ -26,38 +26,32 @@ export async function persistSupportSubmissionAudit(
   db: TenantDb
 ): Promise<Result<void>> {
   assertTenantDb(db, input.clerkOrgId);
-  const run = async (client: TenantDb): Promise<Result<void>> => {
-    const issueId = String(input.issueNumber);
+  const issueId = String(input.issueNumber);
 
-    await client.auditEvent.create({
-      data: {
-        action: "support_submissions.github_issue_created",
-        actor_user_id: input.userId,
-        clerk_org_id: input.clerkOrgId,
-        entity_id: issueId,
-        entity_type: "support_submission",
-        organisation_id: input.organisationId,
-        payload: {
-          category: input.category,
-          issueNumber: input.issueNumber,
-          issueUrl: input.issueUrl,
-          labelAssignmentSucceeded: input.labelAssignmentSucceeded,
-          labelsAttempted: [...input.labelsAttempted],
-          status: input.status,
-          subject: input.subject,
-        },
-        resource_id: issueId,
-        resource_type: "support_submission",
+  await db.auditEvent.create({
+    data: {
+      action: "support_submissions.github_issue_created",
+      actor_user_id: input.userId,
+      clerk_org_id: input.clerkOrgId,
+      entity_id: issueId,
+      entity_type: "support_submission",
+      organisation_id: input.organisationId,
+      payload: {
+        category: input.category,
+        issueNumber: input.issueNumber,
+        issueUrl: input.issueUrl,
+        labelAssignmentSucceeded: input.labelAssignmentSucceeded,
+        labelsAttempted: [...input.labelsAttempted],
+        status: input.status,
+        subject: input.subject,
       },
-    });
+      resource_id: issueId,
+      resource_type: "support_submission",
+    },
+  });
 
-    return {
-      ok: true,
-      value: undefined,
-    };
+  return {
+    ok: true,
+    value: undefined,
   };
-  return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
-    return await run(db);
-  })();
 }
