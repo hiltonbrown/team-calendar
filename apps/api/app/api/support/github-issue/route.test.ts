@@ -464,10 +464,42 @@ describe("support GitHub issue route", () => {
       "Failed to persist support submission audit event",
       {
         clerkOrgId: "org_clerk_123",
+        error: {
+          code: "internal",
+          message: "Failed to persist the support audit event.",
+        },
         issueNumber: 123,
         organisationId: "00000000-0000-4000-8000-000000000001",
         userId: "user_123",
       }
+    );
+  });
+
+  it("returns success when the audit write throws after the GitHub issue is created", async () => {
+    const failure = new Error("connection reset");
+    mocks.persistSupportSubmissionAudit.mockRejectedValue(failure);
+
+    const response = await POST(
+      new Request("http://api.test/api/support/github-issue", {
+        body: JSON.stringify({
+          category: "support",
+          message: "The calendar is missing one leave entry.",
+          page_url:
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001",
+          priority: "normal",
+          subject: "Missing leave entry",
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.logError).toHaveBeenCalledWith(
+      "Failed to persist support submission audit event",
+      expect.objectContaining({ error: failure, issueNumber: 123 })
     );
   });
 });

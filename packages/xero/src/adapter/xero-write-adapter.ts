@@ -19,7 +19,10 @@ import {
   fetchLeaveForEmployeeForRegion,
   fetchLeaveRecordsForRegion,
 } from "../read/dispatch";
-import { resolveXeroEmployeeId } from "../resolution/resolve-employee";
+import {
+  type ResolutionError,
+  resolveXeroEmployeeId,
+} from "../resolution/resolve-employee";
 import { resolveXeroLeaveTypeId } from "../resolution/resolve-leave-type";
 import {
   approveLeaveApplicationForRegion,
@@ -446,19 +449,32 @@ function missingMutationIdentity(): Result<never, ProviderWriteError> {
   };
 }
 
+// Mapping reads keep the adapter's Result contract even if the transaction fails.
+function resolutionFailure(message: string): Result<never, ResolutionError> {
+  return { error: { code: "unknown_error", message }, ok: false };
+}
+
 export async function resolveWriteEmployeeId(
   input: Parameters<typeof resolveXeroEmployeeId>[0]
 ) {
   assertNoTenantTransaction("resolveWriteEmployeeId");
-  return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
-    resolveXeroEmployeeId(input, db)
-  );
+  try {
+    return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
+      resolveXeroEmployeeId(input, db)
+    );
+  } catch {
+    return resolutionFailure("Failed to resolve Xero employee mapping.");
+  }
 }
 export async function resolveWriteLeaveTypeId(
   input: Parameters<typeof resolveXeroLeaveTypeId>[0]
 ) {
   assertNoTenantTransaction("resolveWriteLeaveTypeId");
-  return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
-    resolveXeroLeaveTypeId(input, db)
-  );
+  try {
+    return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
+      resolveXeroLeaveTypeId(input, db)
+    );
+  } catch {
+    return resolutionFailure("Failed to resolve Xero leave type mapping.");
+  }
 }

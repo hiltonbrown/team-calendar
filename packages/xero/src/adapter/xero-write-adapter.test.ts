@@ -78,7 +78,8 @@ vi.mock("../read/dispatch", () => ({
   fetchLeaveForEmployeeForRegion: mocks.fetchLeaveForEmployeeForRegion,
   fetchLeaveRecordsForRegion: mocks.fetchLeaveRecordsForRegion,
 }));
-const { XeroWriteAdapter } = await import("./xero-write-adapter");
+const { resolveWriteEmployeeId, resolveWriteLeaveTypeId, XeroWriteAdapter } =
+  await import("./xero-write-adapter");
 const { toPlainLanguageMessage } = await import("../write/types");
 const submitInput = withPortMutation("create", {
   clerkOrgId: "org_1",
@@ -314,6 +315,36 @@ describe("safe neutral resolution failures", () => {
       expect(result.error).not.toHaveProperty("dispatchPhase");
       expect(result.error).not.toHaveProperty("certainty");
       expect(result.error).not.toHaveProperty("correlationId");
+    }
+  );
+});
+describe("mapping read failures", () => {
+  it.each([
+    [resolveWriteEmployeeId, "Failed to resolve Xero employee mapping."],
+    [resolveWriteLeaveTypeId, "Failed to resolve Xero leave type mapping."],
+  ] as const)(
+    "keeps the Result contract when the mapping read throws (%#)",
+    async (resolve, message) => {
+      const saved = tenantTestState.client;
+      tenantTestState.client = {
+        person: {
+          findFirst: vi.fn().mockRejectedValue(new Error("connection reset")),
+        },
+      };
+      try {
+        await expect(
+          resolve({
+            personId: "person-1",
+            recordType: "annual_leave",
+            xeroConnection: buildTenant("connection-1"),
+          })
+        ).resolves.toEqual({
+          error: { code: "unknown_error", message },
+          ok: false,
+        });
+      } finally {
+        tenantTestState.client = saved;
+      }
     }
   );
 });

@@ -121,13 +121,15 @@ export async function POST(request: Request): Promise<Response> {
         subject: parsedBody.data.subject,
         userId: user.id,
       } satisfies Parameters<typeof persistSupportSubmissionAudit>[0];
+      // The issue already exists, so an audit failure is logged, never surfaced.
       const auditResult = await withTenantResult(phaseInput1.clerkOrgId, (db) =>
         persistSupportSubmissionAudit(phaseInput1, db)
-      );
+      ).catch((error: unknown) => ({ error, ok: false as const }));
 
       if (!auditResult.ok) {
         log.error("Failed to persist support submission audit event", {
           clerkOrgId,
+          error: auditResult.error,
           issueNumber: result.value.issueNumber,
           organisationId: organisationContext.value.organisationId,
           userId: user.id,

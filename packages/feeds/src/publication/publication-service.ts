@@ -92,6 +92,8 @@ async function upsertPublication(
 
   let existing = record.publication;
   if (!existing) {
+    // The 1:1 `availability_record_id` unique index is the atomic backstop: a
+    // concurrent losing insert is skipped, reloaded and takes the update path.
     const inserted = await client.availabilityPublication.createMany({
       data: {
         availability_record_id: record.id,
@@ -171,10 +173,6 @@ async function upsertPublication(
   });
   return { changed: true, publication: updated };
 }
-
-// The 1:1 `availability_record_id` unique index is the atomic backstop: when two
-// callers materialise the same record concurrently, the losing insert surfaces
-// here as P2002 so we can reload and take the update path instead of failing.
 
 function projectPublishedRecord(record: RecordRow): {
   allDay: boolean;

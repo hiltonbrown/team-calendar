@@ -43,7 +43,7 @@ export async function feedIdsForPeople(
     if (!preloadedResult.ok) {
       throw new Error(preloadedResult.error.message);
     }
-    const preloaded = preloadedResult.ok ? preloadedResult.value : undefined;
+    const preloaded = preloadedResult.value;
 
     const wanted = new Set(input.personIds);
     const feeds = await client.feed.findMany({
