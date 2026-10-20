@@ -22,7 +22,17 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   fenceSubmitRecoverySideEffectClaim: mocks.hasSideEffectClaim,
   getSubmitOperation: mocks.getSubmitOperation,
@@ -35,59 +45,34 @@ vi.mock("@repo/database", () => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
   }),
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
-      $transaction: async (callback: (client: unknown) => unknown) =>
-        await callback({
-          auditEvent: {
-            create: mocks.auditCreate,
-            findFirst: mocks.auditFindFirst,
-          },
-          availabilityRecord: {
-            findFirst: mocks.availabilityFindFirst,
-            update: mocks.availabilityUpdate,
-            updateMany: mocks.availabilityUpdateMany,
-          },
-        }),
+}));
+function buildTestDatabase() {
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       auditEvent: {
-        create: mocks.auditCreate,
-        findFirst: mocks.auditFindFirst,
-      },
-      availabilityRecord: { findFirst: mocks.availabilityFindFirst },
-      person: { findFirst: mocks.personFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: async (callback: (client: unknown) => unknown) =>
-          await callback({
-            auditEvent: {
-              create: mocks.auditCreate,
-              findFirst: mocks.auditFindFirst,
-            },
-            availabilityRecord: {
-              findFirst: mocks.availabilityFindFirst,
-              update: mocks.availabilityUpdate,
-              updateMany: mocks.availabilityUpdateMany,
-            },
-          }),
-        auditEvent: {
+        ...{
           create: mocks.auditCreate,
           findFirst: mocks.auditFindFirst,
         },
-        availabilityRecord: { findFirst: mocks.availabilityFindFirst },
-        person: { findFirst: mocks.personFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+        ...{
+          create: mocks.auditCreate,
+          findFirst: mocks.auditFindFirst,
+        },
+      },
+      availabilityRecord: {
+        ...{ findFirst: mocks.availabilityFindFirst },
+        ...{
+          findFirst: mocks.availabilityFindFirst,
+          update: mocks.availabilityUpdate,
+          updateMany: mocks.availabilityUpdateMany,
+        },
+      },
+      person: { findFirst: mocks.personFindFirst },
+    },
+  };
+}
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialise,
 }));
@@ -253,7 +238,7 @@ describe("submit recovery service", () => {
     expect(result.ok).toBe(true);
     expect(mocks.markSubmitCompleted).toHaveBeenCalledWith(
       expect.objectContaining({ action: "approve" }),
-      expect.anything()
+      expect.any(Object)
     );
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -346,11 +331,12 @@ describe("submit recovery service", () => {
     expect(result.ok).toBe(true);
     expect(mocks.markSubmitProviderAccepted).toHaveBeenCalledWith(
       expect.objectContaining({ attemptGeneration: 1 }),
-      "remote_1"
+      "remote_1",
+      expect.any(Object)
     );
     expect(mocks.markSubmitCompleted).toHaveBeenCalledWith(
       expect.objectContaining({ attemptGeneration: 1 }),
-      expect.anything()
+      expect.any(Object)
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -602,7 +588,8 @@ describe("submit recovery service", () => {
     );
     expect(retry.ok).toBe(true);
     expect(mocks.materialise).toHaveBeenLastCalledWith(
-      expect.objectContaining({ availabilityRecordId: duplicate.id })
+      expect.objectContaining({ availabilityRecordId: duplicate.id }),
+      expect.any(Object)
     );
   });
 
@@ -907,7 +894,7 @@ describe("administrator imported leave transition recovery", () => {
       );
       expect(mocks.markSubmitCompleted).toHaveBeenCalledWith(
         expect.objectContaining({ action, attemptGeneration: 1 }),
-        expect.anything()
+        expect.any(Object)
       );
       expect(mocks.auditCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({

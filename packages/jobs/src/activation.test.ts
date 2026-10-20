@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../../database/src/tenant-db";
+import { tenantTestAccount } from "../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
@@ -10,13 +12,35 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.capture, flush: mocks.flush },
 }));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({ client: null as object | null }));
+vi.mock("../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
+  const actualTenantCore = await vi.importActual<
+    typeof import("../../database/src/tenant-db")
+  >("../../database/src/tenant-db");
+
   const exports = {
     database: {
       xeroConnection: { findFirst: mocks.connection },
       xeroPersonMatch: { count: mocks.matches },
     },
   };
+  tenantTestState.client = exports.database;
   return {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
@@ -27,12 +51,8 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
+
+    ...actualTenantCore,
   };
 });
 vi.mock("@repo/observability/log", () => ({ log: { warn: vi.fn() } }));
@@ -51,9 +71,13 @@ describe("persisted complete initial import", () => {
     mocks.connection.mockResolvedValue({ initial_sync_completed_at: null });
   });
   it("never advertises completion for a successful but partial balance sweep", async () => {
-    expect((await checkXeroImportReadiness(scope)).isInitialSyncCompleted).toBe(
-      false
-    );
+    expect(
+      (
+        await withTestTenantDb(tenantTestAccount(scope), (db) =>
+          checkXeroImportReadiness(scope, db)
+        )
+      ).isInitialSyncCompleted
+    ).toBe(false);
     await captureInitialSyncCompleted(scope);
     expect(mocks.capture).not.toHaveBeenCalled();
   });
@@ -63,7 +87,11 @@ describe("persisted complete initial import", () => {
       initial_sync_completed_at: completedAt,
     });
     mocks.matches.mockResolvedValue(3);
-    expect(await checkXeroImportReadiness(scope)).toEqual({
+    expect(
+      await withTestTenantDb(tenantTestAccount(scope), (db) =>
+        checkXeroImportReadiness(scope, db)
+      )
+    ).toEqual({
       completedAt,
       hasUnresolvedPeople: true,
       isInitialSyncCompleted: true,

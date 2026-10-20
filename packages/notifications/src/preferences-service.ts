@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, tenantDatabase } from "@repo/database";
+import { assertTenantDb, type Database, type TenantDb } from "@repo/database";
 import type { notification_type } from "@repo/database/generated/enums";
 import { z } from "zod";
 import {
@@ -54,15 +54,14 @@ const ChannelSchema = ScopedUserSchema.extend({
 
 export async function listPreferences(
   input: z.input<typeof ScopedUserSchema>,
-  providedClient?: PreferencesServiceDatabase
+  db: TenantDb
 ): Promise<Result<NotificationPreferenceRow[], PreferencesServiceError>> {
   const parsed = ScopedUserSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
-
-  try {
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof listPreferences> => {
     const storedRows = await client.notificationPreference.findMany({
       select: {
         email_enabled: true,
@@ -93,34 +92,34 @@ export async function listPreferences(
         };
       }),
     };
-  } catch {
-    return unknownError("Failed to load notification preferences.");
-  }
+  };
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  return await run(db);
 }
 
 export async function upsertPreference(
   input: z.input<typeof UpsertSchema>,
-  providedClient?: PreferencesServiceDatabase
+  db: TenantDb
 ): Promise<Result<NotificationPreferenceRow, PreferencesServiceError>> {
   const parsed = UpsertSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
-  if (!isKnownNotificationType(parsed.data.notificationType)) {
-    return invalidType();
-  }
-  if (!(parsed.data.inAppEnabled || parsed.data.emailEnabled)) {
-    return {
-      error: {
-        code: "at_least_one_channel_required",
-        message: "At least one notification channel must be enabled.",
-      },
-      ok: false,
-    };
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof upsertPreference> => {
+    if (!isKnownNotificationType(parsed.data.notificationType)) {
+      return invalidType();
+    }
+    if (!(parsed.data.inAppEnabled || parsed.data.emailEnabled)) {
+      return {
+        error: {
+          code: "at_least_one_channel_required",
+          message: "At least one notification channel must be enabled.",
+        },
+        ok: false,
+      };
+    }
 
-  try {
     const row = await client.notificationPreference.upsert({
       create: {
         clerk_org_id: parsed.data.clerkOrgId,
@@ -155,25 +154,29 @@ export async function upsertPreference(
         isDefault: false,
       }),
     };
-  } catch {
-    return unknownError("Failed to update notification preference.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function shouldDeliverToChannel(
   input: z.input<typeof ChannelSchema>,
-  providedClient?: PreferencesServiceDatabase
+  db: TenantDb
 ): Promise<Result<boolean, PreferencesServiceError>> {
   const parsed = ChannelSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
-  if (!isKnownNotificationType(parsed.data.notificationType)) {
-    return invalidType();
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof shouldDeliverToChannel> => {
+    if (!isKnownNotificationType(parsed.data.notificationType)) {
+      return invalidType();
+    }
 
-  try {
     const row = await client.notificationPreference.findUnique({
       select: {
         email_enabled: true,
@@ -201,9 +204,9 @@ export async function shouldDeliverToChannel(
       ok: true,
       value: parsed.data.channel === "in_app" ? defaults.inApp : defaults.email,
     };
-  } catch {
-    return unknownError("Failed to check notification preference.");
-  }
+  };
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  return await run(db);
 }
 
 function toPreferenceRow(
@@ -247,8 +250,4 @@ function validationError(
     },
     ok: false,
   };
-}
-
-function unknownError(message: string): Result<never, PreferencesServiceError> {
-  return { error: { code: "unknown_error", message }, ok: false };
 }

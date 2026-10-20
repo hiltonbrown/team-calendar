@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   unknown: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual("../../../database/src/tenant-db")),
   markSubmitCompleted: mocks.completed,
   markSubmitDefinitiveFailure: mocks.failure,
   markSubmitDispatchStarted: mocks.start,
@@ -77,7 +78,8 @@ it("persists the exact provider descriptor before dispatch and returns the froze
   );
   expect(mocks.start).toHaveBeenCalledWith(
     expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
-    expect.anything()
+    expect.anything(),
+    expect.any(Object)
   );
   expect(mocks.prepare.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.start.mock.invocationCallOrder[0]
@@ -163,3 +165,10 @@ it("marks a first write stopped before dispatch as definitively unprocessed", as
   expect(mocks.failure).toHaveBeenCalled();
   expect(mocks.unknown).not.toHaveBeenCalled();
 });
+
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

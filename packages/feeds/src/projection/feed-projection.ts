@@ -11,10 +11,10 @@ import {
   toDateOnly,
 } from "@repo/core";
 import {
+  assertTenantDb,
   loadHolidayResolutionData,
   resolveAccountCompanies,
-  TENANT_READ_TRANSACTION_OPTIONS,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
@@ -56,7 +56,6 @@ export interface FeedProjectionContext {
   actingPersonId?: string | null;
   actingRole: FeedRole;
   clerkOrgId: string;
-  client?: Prisma.TransactionClient;
   feedId: string;
   horizonDays: number;
   organisationId: string | null;
@@ -70,17 +69,14 @@ const FEED_SOURCE_TYPES = [
 ] as const;
 
 export async function projectFeedEvents(
-  input: FeedProjectionContext
+  input: FeedProjectionContext,
+  db: TenantDb
 ): Promise<Result<PreviewEvent[], FeedProjectionError>> {
-  try {
-    if (!input.client) {
-      return await tenantTransaction(
-        input.clerkOrgId,
-        (tx) => projectFeedEvents({ ...input, client: tx }),
-        TENANT_READ_TRANSACTION_OPTIONS
-      );
-    }
-    const { client } = input;
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
     const feed = await client.feed.findFirst({
       select: feedProjectionSelect,
       where: {
@@ -107,23 +103,28 @@ export async function projectFeedEvents(
     );
     if (!companyIds) {
       return {
-        error: { code: "feed_not_found", message: "Active company not found." },
+        error: {
+          code: "feed_not_found",
+          message: "Active company not found.",
+        },
         ok: false,
       };
     }
     const privacyMode = input.privacyMode ?? feed.privacy_mode;
-    const peopleResult = await resolvePeopleForFeed({
-      actingPersonId: input.actingPersonId ?? null,
-      clerkOrgId: input.clerkOrgId,
-      client: input.client,
-      companyIds,
-      createdByUserId: feed.created_by_user_id,
-      organisationId: input.organisationId,
-      scopes: feed.scopes.map((scope) => ({
-        scopeType: scope.scope_type,
-        scopeValue: scope.scope_value,
-      })),
-    });
+    const peopleResult = await resolvePeopleForFeed(
+      {
+        actingPersonId: input.actingPersonId ?? null,
+        clerkOrgId: input.clerkOrgId,
+        companyIds,
+        createdByUserId: feed.created_by_user_id,
+        organisationId: input.organisationId,
+        scopes: feed.scopes.map((scope) => ({
+          scopeType: scope.scope_type,
+          scopeValue: scope.scope_value,
+        })),
+      },
+      client
+    );
     if (!peopleResult.ok) {
       return { error: peopleResult.error, ok: false };
     }
@@ -165,32 +166,20 @@ export async function projectFeedEvents(
     );
 
     if (feed.includes_public_holidays) {
-      for (const organisationId of companyIds) {
-        const companyPeople =
-          input.organisationId === null
-            ? people.filter(
-                (person) => person.organisationId === organisationId
-              )
-            : people;
-        if (companyPeople.length === 0) {
-          continue;
-        }
-        events.push(
-          ...(await projectPublicHolidays({
-            accountFeed: input.organisationId === null,
-            clerkOrgId: input.clerkOrgId,
-            client,
+      events.push(
+        ...(await projectScopedFeedHolidays(
+          {
+            companyIds,
+            feed,
             horizonEnd,
             horizonStart,
-            lastRenderedAt: feed.last_rendered_at,
-            organisationId,
-            personLocations: new Map(
-              companyPeople.map((person) => [person.id, person.location])
-            ),
+            input,
+            people,
             privacyMode,
-          }))
-        );
-      }
+          },
+          client
+        ))
+      );
     }
 
     return {
@@ -200,17 +189,6 @@ export async function projectFeedEvents(
           first.startsAt.getTime() - second.startsAt.getTime() ||
           first.summary.localeCompare(second.summary)
       ),
-    };
-  } catch (error) {
-    if (input.client) {
-      throw error;
-    }
-    return {
-      error: {
-        code: "unknown_error",
-        message: "Failed to project feed events.",
-      },
-      ok: false,
     };
   }
 }
@@ -305,7 +283,7 @@ function projectAvailabilityRecord(
 
 async function projectPublicHolidays(input: {
   lastRenderedAt: Date | null;
-  client: Prisma.TransactionClient;
+  client: TenantDb;
   clerkOrgId: string;
   horizonEnd: Date;
   horizonStart: Date;
@@ -480,4 +458,55 @@ function companyIdsForFeed(
     return ownedCompanyIds;
   }
   return ownedCompanyIds.includes(organisationId) ? [organisationId] : null;
+}
+
+async function projectScopedFeedHolidays(
+  {
+    input,
+    feed,
+    people,
+    companyIds,
+    horizonStart,
+    horizonEnd,
+    privacyMode,
+  }: {
+    input: FeedProjectionContext;
+    feed: Prisma.FeedGetPayload<{ select: typeof feedProjectionSelect }>;
+    people: Extract<
+      Awaited<ReturnType<typeof resolvePeopleForFeed>>,
+      { ok: true }
+    >["value"];
+    companyIds: string[];
+    horizonStart: Date;
+    horizonEnd: Date;
+    privacyMode: availability_privacy_mode;
+  },
+  client: TenantDb
+): Promise<PreviewEvent[]> {
+  const events: PreviewEvent[] = [];
+  for (const organisationId of companyIds) {
+    const companyPeople =
+      input.organisationId === null
+        ? people.filter((person) => person.organisationId === organisationId)
+        : people;
+    if (companyPeople.length === 0) {
+      continue;
+    }
+    events.push(
+      ...(await projectPublicHolidays({
+        accountFeed: input.organisationId === null,
+        clerkOrgId: input.clerkOrgId,
+        client,
+        horizonEnd,
+        horizonStart,
+        lastRenderedAt: feed.last_rendered_at,
+        organisationId,
+        personLocations: new Map(
+          companyPeople.map((person) => [person.id, person.location])
+        ),
+        privacyMode,
+      }))
+    );
+  }
+  return events;
 }

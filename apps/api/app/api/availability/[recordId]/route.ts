@@ -7,9 +7,12 @@ import type {
   AvailabilityRecordId,
   ClerkOrgId,
   OrganisationId,
+  Result,
 } from "@repo/core";
+import { withTenantResult } from "@repo/database";
 import { getAvailabilityRecordById } from "@repo/database/queries/availability-records";
 import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 
@@ -34,6 +37,7 @@ export async function PATCH(
     }>;
   }
 ): Promise<Response> {
+  assertNoTenantTransaction("PATCH");
   try {
     const rawParams = await params;
     const parsedParams = RouteParamsSchema.safeParse(rawParams);
@@ -105,35 +109,49 @@ export async function PATCH(
     const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
     const scopedOrgId = organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
-    // Validate organisation exists
-    const orgResult = await getOrganisationById(scopedClerkOrgId, scopedOrgId);
-    if (!orgResult.ok) {
-      return Response.json(
-        { error: orgResult.error, ok: false },
-        { status: orgResult.error.code === "not_found" ? 404 : 500 }
-      );
-    }
     const authResult = await auth();
-    // Call availability service to update record
-    const updateResult = await (() =>
-      updateManualAvailability(
-        {
-          clerkOrgId: scopedClerkOrgId,
-          organisationId: scopedOrgId,
-        },
-        scopedRecordId,
-        patch,
-        { orgRole: authResult.orgRole, userId: user.id }
-      ))();
-    if (!updateResult.ok) {
-      return Response.json(
-        { error: updateResult.error, ok: false },
-        {
-          status: statusForUpdateError(updateResult.error.code),
+    const prepared = await withTenantResult(
+      scopedClerkOrgId,
+      async (db): Promise<Result<HttpDescriptor, HttpDescriptor>> => {
+        // Validate organisation exists
+        const orgResult = await getOrganisationById(
+          scopedClerkOrgId,
+          scopedOrgId,
+          db
+        );
+        if (!orgResult.ok) {
+          return httpDescriptor(
+            { error: orgResult.error, ok: false },
+            { status: orgResult.error.code === "not_found" ? 404 : 500 }
+          );
         }
-      );
-    }
-    return Response.json({ ok: true, value: updateResult.value });
+        // Call availability service to update record
+        const updateResult = await (() =>
+          updateManualAvailability(
+            {
+              clerkOrgId: scopedClerkOrgId,
+              organisationId: scopedOrgId,
+            },
+            scopedRecordId,
+            patch,
+            { orgRole: authResult.orgRole, userId: user.id },
+            db
+          ))();
+        if (!updateResult.ok) {
+          return httpDescriptor(
+            { error: updateResult.error, ok: false },
+            {
+              status: statusForUpdateError(updateResult.error.code),
+            }
+          );
+        }
+        return httpDescriptor({ ok: true, value: updateResult.value });
+      }
+    );
+    const descriptor = prepared.ok ? prepared.value : prepared.error;
+    return descriptor.status === 204
+      ? new Response(null, { status: 204 })
+      : Response.json(descriptor.body, { status: descriptor.status });
   } catch (error) {
     log.error("Error updating availability record", { error });
     return Response.json(
@@ -173,6 +191,7 @@ export async function DELETE(
     }>;
   }
 ): Promise<Response> {
+  assertNoTenantTransaction("DELETE");
   try {
     const rawParams = await params;
     const parsedParams = RouteParamsSchema.safeParse(rawParams);
@@ -244,60 +263,75 @@ export async function DELETE(
     const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
     const scopedOrgId = data.organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
-    // Validate organisation exists
-    const orgResult = await getOrganisationById(scopedClerkOrgId, scopedOrgId);
-    if (!orgResult.ok) {
-      return Response.json(
-        { error: orgResult.error, ok: false },
-        { status: orgResult.error.code === "not_found" ? 404 : 500 }
-      );
-    }
-    // Get record to verify it exists and is editable
-    const recordResult = await getAvailabilityRecordById(
-      scopedClerkOrgId,
-      scopedOrgId,
-      scopedRecordId
-    );
-    if (!recordResult.ok) {
-      return Response.json(
-        { error: recordResult.error, ok: false },
-        { status: recordResult.error.code === "not_found" ? 404 : 500 }
-      );
-    }
-    const record = recordResult.value;
     const authResult = await auth();
-    // Check if record is Xero-sourced (read-only)
-    if (record.sourceType !== "manual") {
-      return Response.json(
-        {
-          error: {
-            code: "forbidden",
-            message: "Xero-sourced records cannot be deleted",
-          },
-          ok: false,
-        },
-        { status: 403 }
-      );
-    }
-    // Call availability service to archive record (soft delete)
-    const deleteResult = await (() =>
-      archiveManualAvailability(
-        {
-          clerkOrgId: scopedClerkOrgId,
-          organisationId: scopedOrgId,
-        },
-        scopedRecordId,
-        { orgRole: authResult.orgRole, userId: user.id }
-      ))();
-    if (!deleteResult.ok) {
-      return Response.json(
-        { error: deleteResult.error, ok: false },
-        {
-          status: deleteResult.error.code === "not_authorised" ? 403 : 500,
+    const prepared = await withTenantResult(
+      scopedClerkOrgId,
+      async (db): Promise<Result<HttpDescriptor, HttpDescriptor>> => {
+        // Validate organisation exists
+        const orgResult = await getOrganisationById(
+          scopedClerkOrgId,
+          scopedOrgId,
+          db
+        );
+        if (!orgResult.ok) {
+          return httpDescriptor(
+            { error: orgResult.error, ok: false },
+            { status: orgResult.error.code === "not_found" ? 404 : 500 }
+          );
         }
-      );
-    }
-    return new Response(null, { status: 204 });
+        // Get record to verify it exists and is editable
+        const recordResult = await getAvailabilityRecordById(
+          scopedClerkOrgId,
+          scopedOrgId,
+          scopedRecordId,
+          db
+        );
+        if (!recordResult.ok) {
+          return httpDescriptor(
+            { error: recordResult.error, ok: false },
+            { status: recordResult.error.code === "not_found" ? 404 : 500 }
+          );
+        }
+        const record = recordResult.value;
+        // Check if record is Xero-sourced (read-only)
+        if (record.sourceType !== "manual") {
+          return httpDescriptor(
+            {
+              error: {
+                code: "forbidden",
+                message: "Xero-sourced records cannot be deleted",
+              },
+              ok: false,
+            },
+            { status: 403 }
+          );
+        }
+        // Call availability service to archive record (soft delete)
+        const deleteResult = await (() =>
+          archiveManualAvailability(
+            {
+              clerkOrgId: scopedClerkOrgId,
+              organisationId: scopedOrgId,
+            },
+            scopedRecordId,
+            { orgRole: authResult.orgRole, userId: user.id },
+            db
+          ))();
+        if (!deleteResult.ok) {
+          return httpDescriptor(
+            { error: deleteResult.error, ok: false },
+            {
+              status: deleteResult.error.code === "not_authorised" ? 403 : 500,
+            }
+          );
+        }
+        return { ok: true, value: { body: null, status: 204 } };
+      }
+    );
+    const descriptor = prepared.ok ? prepared.value : prepared.error;
+    return descriptor.status === 204
+      ? new Response(null, { status: 204 })
+      : Response.json(descriptor.body, { status: descriptor.status });
   } catch (error) {
     log.error("Error deleting availability record", { error });
     return Response.json(
@@ -311,4 +345,18 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+interface HttpDescriptor {
+  body: unknown;
+  status: number;
+}
+function httpDescriptor(
+  body: unknown,
+  init?: { status: number }
+): Result<HttpDescriptor, HttpDescriptor> {
+  const descriptor = { body, status: init?.status ?? 200 };
+  return descriptor.status >= 400
+    ? { error: descriptor, ok: false }
+    : { ok: true, value: descriptor };
 }

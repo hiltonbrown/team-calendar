@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const AUDIT_FILENAME_PATTERN = /^audit-log-\d{4}-\d{2}-\d{2}-/;
 
@@ -10,36 +12,32 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       auditEvent: {
         count: mocks.auditCount,
         create: mocks.auditCreate,
         findFirst: mocks.auditFindFirst,
         findMany: mocks.auditFindMany,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        auditEvent: {
-          count: mocks.auditCount,
-          create: mocks.auditCreate,
-          findFirst: mocks.auditFindFirst,
-          findMany: mocks.auditFindMany,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 
 const { exportCsv, getEventDetail, listEvents } = await import(
   "./audit-log-service"
@@ -84,15 +82,30 @@ describe("audit-log-service", () => {
   });
 
   it("lists events with filters and pagination", async () => {
-    const result = await listEvents({
-      ...baseInput,
-      filters: {
-        actionPrefix: "organisation_settings.",
-        actorUserId: ["user_1"],
-        entityType: ["organisation_settings"],
-      },
-      pagination: { pageSize: 50 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        filters: {
+          actionPrefix: "organisation_settings.",
+          actorUserId: ["user_1"],
+          entityType: ["organisation_settings"],
+        },
+        pagination: { pageSize: 50 },
+      }),
+      (db) =>
+        listEvents(
+          {
+            ...baseInput,
+            filters: {
+              actionPrefix: "organisation_settings.",
+              actorUserId: ["user_1"],
+              entityType: ["organisation_settings"],
+            },
+            pagination: { pageSize: 50 },
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -120,10 +133,20 @@ describe("audit-log-service", () => {
   });
 
   it("loads detail and strips xero_write_error_raw", async () => {
-    const result = await getEventDetail({
-      ...baseInput,
-      eventId: eventRow.id,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        eventId: eventRow.id,
+      }),
+      (db) =>
+        getEventDetail(
+          {
+            ...baseInput,
+            eventId: eventRow.id,
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -143,10 +166,20 @@ describe("audit-log-service", () => {
   });
 
   it("exports CSV without before or after values", async () => {
-    const result = await exportCsv({
-      ...baseInput,
-      filters: {},
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        filters: {},
+      }),
+      (db) =>
+        exportCsv(
+          {
+            ...baseInput,
+            filters: {},
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -170,12 +203,24 @@ describe("audit-log-service", () => {
   });
 
   it("rejects non-admin and non-owner callers", async () => {
-    const result = await listEvents({
-      ...baseInput,
-      actingRole: "viewer",
-      filters: {},
-      pagination: { pageSize: 50 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingRole: "viewer",
+        filters: {},
+        pagination: { pageSize: 50 },
+      }),
+      (db) =>
+        listEvents(
+          {
+            ...baseInput,
+            actingRole: "viewer",
+            filters: {},
+            pagination: { pageSize: 50 },
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "not_authorised" },

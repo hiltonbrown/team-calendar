@@ -31,6 +31,7 @@ import {
   type CalendarFilterInput,
   CalendarFilterSchema,
 } from "../../app/(authenticated)/calendar/_schemas";
+import { CompanyFilter } from "./company-filter";
 
 interface Option {
   id: string;
@@ -66,17 +67,6 @@ export function CalendarToolbar({
 
   const update = (patch: Partial<CalendarFilterInput>) => {
     setFilterParams(patch);
-  };
-
-  const changeCompany = (value: string) => {
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
-    for (const key of ["org", "companyIds", "scopeType", "scopeValue"]) {
-      params.delete(key);
-    }
-    if (value !== "all") {
-      params.set("companyIds", value);
-    }
-    router.push(`/calendar?${params.toString()}`);
   };
 
   const shift = (direction: -1 | 1) => {
@@ -164,26 +154,10 @@ export function CalendarToolbar({
             </SelectContent>
           </Select>
 
-          {companies.length > 1 ? (
-            <Select
-              onValueChange={changeCompany}
-              value={
-                filters.companyIds?.length === 1 ? filters.companyIds[0] : "all"
-              }
-            >
-              <SelectTrigger aria-label="Company" className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All companies</SelectItem>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
+          <CompanyFilter
+            companies={companies}
+            companyIds={filters.companyIds}
+          />
 
           <ScopeSelect
             filters={filters}

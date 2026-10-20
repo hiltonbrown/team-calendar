@@ -1,8 +1,7 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
-import { tenantDatabase } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { pollNotificationStream } from "@repo/notifications";
 import { log } from "@repo/observability/log";
-import { z } from "zod";
 
 type StreamEntry = Awaited<ReturnType<typeof pollNotificationStream>>[number];
 
@@ -13,10 +12,6 @@ const KEEP_ALIVE_INTERVAL_MS = 25_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
 
 const REDIS_STREAM_ID_PATTERN = /^\d+-\d+$/;
-
-const QuerySchema = z.object({
-  organisationId: z.string().uuid(),
-});
 
 const encoder = new TextEncoder();
 
@@ -67,7 +62,6 @@ function resolveInitialLastId(lastEventIdHeader: string | null): string {
 interface StreamContext {
   clerkOrgId: string;
   initialLastId: string;
-  organisationId: string;
   userId: string;
 }
 
@@ -168,7 +162,7 @@ class NotificationStreamSession {
   private async performPoll(): Promise<void> {
     const events = await pollNotificationStream(
       {
-        organisationId: this.context.organisationId,
+        clerkOrgId: this.context.clerkOrgId,
         userId: this.context.userId,
       },
       this.lastId
@@ -199,7 +193,6 @@ class NotificationStreamSession {
       clerkOrgId: this.context.clerkOrgId,
       consecutiveFailures: this.consecutiveFailures,
       error: error instanceof Error ? error.message : String(error),
-      organisationId: this.context.organisationId,
       userId: this.context.userId,
     });
 
@@ -207,7 +200,6 @@ class NotificationStreamSession {
       log.error("Notification stream closing after consecutive poll failures", {
         clerkOrgId: this.context.clerkOrgId,
         consecutiveFailures: this.consecutiveFailures,
-        organisationId: this.context.organisationId,
         userId: this.context.userId,
       });
       this.terminateWithError(error);
@@ -228,6 +220,7 @@ class NotificationStreamSession {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  assertNoTenantTransaction("GET");
   let clerkOrgId: string;
   try {
     clerkOrgId = await requireOrg();
@@ -249,33 +242,6 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
-  const parsed = QuerySchema.safeParse(
-    Object.fromEntries(new URL(request.url).searchParams.entries())
-  );
-  if (!parsed.success) {
-    return Response.json(
-      { error: { code: "bad_request", message: "Invalid stream" }, ok: false },
-      { status: 400 }
-    );
-  }
-
-  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
-    select: { id: true },
-    where: {
-      clerk_org_id: clerkOrgId,
-      id: parsed.data.organisationId,
-    },
-  });
-  if (!organisation) {
-    return Response.json(
-      {
-        error: { code: "forbidden", message: "Invalid organisation" },
-        ok: false,
-      },
-      { status: 403 }
-    );
-  }
-
   let session: NotificationStreamSession | null = null;
   const stream = new ReadableStream<Uint8Array>({
     cancel() {
@@ -288,7 +254,6 @@ export async function GET(request: Request): Promise<Response> {
           initialLastId: resolveInitialLastId(
             request.headers.get("last-event-id")
           ),
-          organisationId: organisation.id,
           userId: user.id,
         },
         controller

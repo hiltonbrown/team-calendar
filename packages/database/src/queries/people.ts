@@ -1,6 +1,6 @@
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 export interface PersonData {
@@ -29,51 +29,63 @@ interface PeopleFilters {
 export async function listPeopleForOrganisation(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  filters?: PeopleFilters
+  filters: PeopleFilters | undefined,
+  db: TenantDb
 ): Promise<Result<PersonData[]>> {
-  try {
-    const people = await tenantDatabase(clerkOrgId).person.findMany({
-      orderBy: { first_name: "asc" },
-      select: {
-        clerk_org_id: true,
-        created_at: true,
-        email: true,
-        employment_type: true,
-        first_name: true,
-        id: true,
-        is_active: true,
-        last_name: true,
-        location_id: true,
-        organisation_id: true,
-        source_person_key: true,
-        source_system: true,
-        team_id: true,
-        updated_at: true,
-      },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        ...(filters?.teamId && { team_id: filters.teamId }),
-        ...(filters?.locationId && { location_id: filters.locationId }),
-        ...(filters?.isActive !== undefined && { is_active: filters.isActive }),
-      },
-    });
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb = db;
 
-    return {
-      ok: true,
-      value: people.map(toPerson),
-    };
-  } catch {
-    return {
-      error: appError("internal", "Failed to list people"),
-      ok: false,
-    };
+    try {
+      const people = await tenantDb.person.findMany({
+        orderBy: { first_name: "asc" },
+        select: {
+          clerk_org_id: true,
+          created_at: true,
+          email: true,
+          employment_type: true,
+          first_name: true,
+          id: true,
+          is_active: true,
+          last_name: true,
+          location_id: true,
+          organisation_id: true,
+          source_person_key: true,
+          source_system: true,
+          team_id: true,
+          updated_at: true,
+        },
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          ...(filters?.teamId && { team_id: filters.teamId }),
+          ...(filters?.locationId && { location_id: filters.locationId }),
+          ...(filters?.isActive !== undefined && {
+            is_active: filters.isActive,
+          }),
+        },
+      });
+
+      return {
+        ok: true,
+        value: people.map(toPerson),
+      };
+    } catch (error) {
+      if (tenantDb) {
+        throw error;
+      }
+      return {
+        error: appError("internal", "Failed to list people"),
+        ok: false,
+      };
+    }
   }
 }
 
 export async function getPersonProfile(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  personId: PersonId
+  personId: PersonId,
+  db: TenantDb
 ): Promise<
   Result<
     PersonData & {
@@ -82,62 +94,70 @@ export async function getPersonProfile(
     }
   >
 > {
-  try {
-    const person = await tenantDatabase(clerkOrgId).person.findFirst({
-      select: {
-        clerk_org_id: true,
-        created_at: true,
-        email: true,
-        employment_type: true,
-        first_name: true,
-        id: true,
-        is_active: true,
-        last_name: true,
-        location: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        location_id: true,
-        organisation_id: true,
-        source_person_key: true,
-        source_system: true,
-        team: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        team_id: true,
-        updated_at: true,
-      },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        id: personId,
-      },
-    });
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb2 = db;
 
-    if (!person) {
+    try {
+      const person = await tenantDb2.person.findFirst({
+        select: {
+          clerk_org_id: true,
+          created_at: true,
+          email: true,
+          employment_type: true,
+          first_name: true,
+          id: true,
+          is_active: true,
+          last_name: true,
+          location: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          location_id: true,
+          organisation_id: true,
+          source_person_key: true,
+          source_system: true,
+          team: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          team_id: true,
+          updated_at: true,
+        },
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          id: personId,
+        },
+      });
+
+      if (!person) {
+        return {
+          error: appError("not_found", "Person not found"),
+          ok: false,
+        };
+      }
+
       return {
-        error: appError("not_found", "Person not found"),
+        ok: true,
+        value: {
+          ...toPerson(person),
+          location: person.location,
+          team: person.team,
+        },
+      };
+    } catch (error) {
+      if (tenantDb2) {
+        throw error;
+      }
+      return {
+        error: appError("internal", "Failed to get person profile"),
         ok: false,
       };
     }
-
-    return {
-      ok: true,
-      value: {
-        ...toPerson(person),
-        location: person.location,
-        team: person.team,
-      },
-    };
-  } catch {
-    return {
-      error: appError("internal", "Failed to get person profile"),
-      ok: false,
-    };
   }
 }
 

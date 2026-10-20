@@ -13,13 +13,31 @@ vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   clerkClient: mocks.clerkClient,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
     organisation: {
+      findFirst: vi.fn(() => Promise.resolve({ id: organisationId })),
       updateMany: mocks.updateMany,
     },
-  })),
-}));
+  };
+}
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));

@@ -1,10 +1,20 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
-import { getXeroConnectionStateForScope, listPeople } from "@repo/availability";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import {
+  getXeroConnectionStateForScope,
+  listPeople,
+  selectCalendarCompanies,
+} from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
+import {
+  resolveAccountCompanies,
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantDb,
+} from "@repo/database";
 import type { Metadata } from "next";
+import { notFound, redirect } from "next/navigation";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { PeopleFilterSchema } from "./_schemas";
@@ -21,8 +31,8 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(orgParam);
+  // The account comes from Clerk before database preparation.
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
   const { orgRole, userId } = await auth();
   const canIncludeArchived = orgRole === "org:admin" || orgRole === "org:owner";
   const parsedFilters = parseFilterParams(filterParams, PeopleFilterSchema) ?? {
@@ -44,50 +54,112 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
   } else if (orgRole === "org:owner") {
     peopleRole = "owner";
   }
-  const actingPerson = userId
-    ? await tenantDatabase(clerkOrgId).person.findFirst({
-        select: { id: true },
-        where: {
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: userId,
-          organisation_id: organisationId,
+  const {
+    peopleResult,
+    teams,
+    locations,
+    xeroConnection,
+    xeroStateResult,
+    organisationId,
+    orgQueryValue,
+    companies,
+    companyIds,
+  } = await withTenantDb(
+    clerkOrgId,
+    async (db) => {
+      const preparedCompanies = await resolveAccountCompanies(clerkOrgId, db);
+      if (!preparedCompanies.length) {
+        redirect("/onboarding");
+      }
+      const preparedCompanyIds =
+        filters.companyIds ?? (orgParam ? [orgParam] : undefined);
+      const selection = selectCalendarCompanies(
+        { companyIds: preparedCompanyIds },
+        preparedCompanies
+      );
+      if (!selection.ok) {
+        notFound();
+      }
+      const selectedIds = selection.value.map((company) => company.id);
+      const scopedOrganisationId = selectedIds[0] ?? preparedCompanies[0]?.id;
+      if (!scopedOrganisationId) {
+        redirect("/onboarding");
+      }
+      const preparedOrgQueryValue =
+        selectedIds.length === 1 ? scopedOrganisationId : null;
+      const actingPerson = userId
+        ? await db.person.findFirst({
+            orderBy: [{ created_at: "asc" }, { id: "asc" }],
+            select: { id: true },
+            where: {
+              archived_at: null,
+              clerk_org_id: clerkOrgId,
+              clerk_user_id: userId,
+              organisation_id: {
+                in: preparedCompanies.map((company) => company.id),
+              },
+            },
+          })
+        : null;
+      const preparedPeopleResult = await listPeople(
+        {
+          actingPersonId: actingPerson?.id,
+          clerkOrgId,
+          companyIds: preparedCompanyIds,
+          filters,
+          pagination: { cursor: filters.cursor, pageSize: filters.pageSize },
+          role: peopleRole,
         },
-      })
-    : null;
-  const [peopleResult, teams, locations, xeroConnection, xeroStateResult] =
-    await Promise.all([
-      listPeople({
-        actingPersonId: actingPerson?.id,
-        clerkOrgId,
-        filters,
-        organisationId,
-        pagination: {
-          cursor: filters.cursor,
-          pageSize: filters.pageSize,
-        },
-        role: peopleRole,
-      }),
-      tenantDatabase(clerkOrgId).team.findMany({
+        db
+      );
+      const preparedTeams = await db.team.findMany({
         orderBy: { name: "asc" },
         select: { id: true, name: true },
-        where: scopedQuery(clerkOrgId, organisationId),
-      }),
-      tenantDatabase(clerkOrgId).location.findMany({
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-        where: scopedQuery(clerkOrgId, organisationId),
-      }),
-      tenantDatabase(clerkOrgId).xeroConnection.findFirst({
-        select: {
-          id: true,
-        },
         where: {
           clerk_org_id: clerkOrgId,
-          organisation_id: organisationId,
+          organisation_id: { in: selectedIds },
         },
-      }),
-      getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
-    ]);
+      });
+      const preparedLocations = await db.location.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+        where: {
+          clerk_org_id: clerkOrgId,
+          organisation_id: { in: selectedIds },
+        },
+      });
+      const preparedXeroConnection =
+        selectedIds.length === 1
+          ? await db.xeroConnection.findFirst({
+              select: { id: true },
+              where: {
+                archived_at: null,
+                clerk_org_id: clerkOrgId,
+                organisation_id: scopedOrganisationId,
+              },
+            })
+          : null;
+      const preparedXeroStateResult =
+        selectedIds.length === 1
+          ? await getXeroConnectionStateForScope(
+              { clerkOrgId, organisationId: scopedOrganisationId },
+              db
+            )
+          : { ok: true as const, value: { state: "not_connected" as const } };
+      return {
+        companies: preparedCompanies,
+        companyIds: preparedCompanyIds,
+        locations: preparedLocations,
+        organisationId: scopedOrganisationId,
+        orgQueryValue: preparedOrgQueryValue,
+        peopleResult: preparedPeopleResult,
+        teams: preparedTeams,
+        xeroConnection: preparedXeroConnection,
+        xeroStateResult: preparedXeroStateResult,
+      };
+    },
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
   const xeroConnectionState = xeroStateResult.ok
     ? xeroStateResult.value.state
     : "unavailable";
@@ -108,7 +180,9 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <PeopleClient
           canIncludeArchived={canIncludeArchived}
-          canManageClerkAccess={canIncludeArchived}
+          canManageClerkAccess={canIncludeArchived && orgQueryValue !== null}
+          companies={companies}
+          companyIds={companyIds}
           connectionId={connectionId}
           filters={filters}
           locations={locations}

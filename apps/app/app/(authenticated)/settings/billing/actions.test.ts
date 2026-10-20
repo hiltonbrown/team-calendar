@@ -13,6 +13,7 @@ vi.mock("@/lib/auth/require-page-role", () => ({
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("@repo/billing", () => ({
   createCheckoutSession: mocks.createCheckoutSession,

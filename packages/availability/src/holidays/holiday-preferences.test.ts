@@ -1,4 +1,7 @@
 import { vi } from "vitest";
+import { referenceDatabase } from "../../../database/src/tenant-client";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 
@@ -8,10 +11,10 @@ const db = vi.hoisted(() => {
     location: { findFirst: vi.fn() },
     publicHoliday: { findFirst: vi.fn() },
     publicHolidayPreference: {
-      create: vi.fn(),
+      createMany: vi.fn(),
       deleteMany: vi.fn(),
       findFirst: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   };
   return {
@@ -22,26 +25,31 @@ const db = vi.hoisted(() => {
   };
 });
 
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: vi.fn(async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase())
+    ),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   })),
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return db;
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return db.$transaction(transactionCallback, options);
-    }
-  ),
 }));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...db,
+  };
+}
 
 vi.mock("@repo/core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@repo/core")>()),
@@ -56,7 +64,6 @@ vi.mock("@repo/core", async (importOriginal) => ({
   }),
 }));
 
-import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   hidePublicHoliday,
@@ -80,34 +87,59 @@ describe("holiday preferences", () => {
     vi.clearAllMocks();
     db.location.findFirst.mockResolvedValue({ id: LOCATION, name: "Brisbane" });
     db.publicHolidayPreference.findFirst.mockResolvedValue(null);
+    db.publicHolidayPreference.createMany.mockResolvedValue({ count: 1 });
+    db.publicHolidayPreference.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it("rejects people who are not owners or admins", async () => {
-    const result = await hidePublicHoliday({
-      ...base,
-      actingRole: "manager",
-      holidayKey: CHRISTMAS,
-      locationId: null,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        actingRole: "manager",
+        holidayKey: CHRISTMAS,
+        locationId: null,
+      }),
+      (tenantDb) =>
+        hidePublicHoliday(
+          {
+            ...base,
+            actingRole: "manager",
+            holidayKey: CHRISTMAS,
+            locationId: null,
+          },
+          tenantDb
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
     });
-    expect(db.publicHolidayPreference.create).not.toHaveBeenCalled();
+    expect(db.publicHolidayPreference.createMany).not.toHaveBeenCalled();
   });
 
   it("hides a holiday organisation-wide and records an audit event in the same transaction", async () => {
-    const result = await hidePublicHoliday({
-      ...base,
-      holidayKey: CHRISTMAS,
-      locationId: null,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        holidayKey: CHRISTMAS,
+        locationId: null,
+      }),
+      (tenantDb) =>
+        hidePublicHoliday(
+          {
+            ...base,
+            holidayKey: CHRISTMAS,
+            locationId: null,
+          },
+          tenantDb
+        )
+    );
     expect(result).toEqual({
       ok: true,
       value: { holidayName: "Christmas Day", locationName: null },
     });
-    expect(db.$transaction).toHaveBeenCalledTimes(1);
-    expect(db.publicHolidayPreference.create).toHaveBeenCalledWith({
+    expect(referenceDatabase.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.publicHolidayPreference.createMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
         clerk_org_id: "org_a",
         holiday_key: CHRISTMAS,
@@ -115,6 +147,7 @@ describe("holiday preferences", () => {
         organisation_id: base.organisationId,
         setting: "hidden",
       }),
+      skipDuplicates: true,
     });
     expect(db.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -129,17 +162,33 @@ describe("holiday preferences", () => {
       id: "pref-1",
       setting: "non_working",
     });
-    await setPublicHolidayClassification({
-      ...base,
-      classification: "working",
-      holidayKey: CHRISTMAS,
-      locationId: LOCATION,
-    });
-    expect(db.publicHolidayPreference.update).toHaveBeenCalledWith({
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        classification: "working",
+        holidayKey: CHRISTMAS,
+        locationId: LOCATION,
+      }),
+      (tenantDb) =>
+        setPublicHolidayClassification(
+          {
+            ...base,
+            classification: "working",
+            holidayKey: CHRISTMAS,
+            locationId: LOCATION,
+          },
+          tenantDb
+        )
+    );
+    expect(db.publicHolidayPreference.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({ setting: "working" }),
-      where: { id: "pref-1" },
+      where: expect.objectContaining({
+        clerk_org_id: base.clerkOrgId,
+        id: "pref-1",
+        organisation_id: base.organisationId,
+      }),
     });
-    expect(db.publicHolidayPreference.create).not.toHaveBeenCalled();
+    expect(db.publicHolidayPreference.createMany).not.toHaveBeenCalled();
     expect(db.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: "public_holidays.classification_changed",
@@ -147,28 +196,38 @@ describe("holiday preferences", () => {
     });
   });
 
-  it("retries once and updates when a concurrent insert wins the unique index", async () => {
+  it("updates the concurrent winner without aborting the tenant transaction", async () => {
     db.publicHolidayPreference.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "pref-race", setting: "hidden" });
-    db.publicHolidayPreference.create.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint", {
-        clientVersion: "test",
-        code: "P2002",
-      })
+    db.publicHolidayPreference.createMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        holidayKey: CHRISTMAS,
+        locationId: null,
+      }),
+      (tenantDb) =>
+        hidePublicHoliday(
+          {
+            ...base,
+            holidayKey: CHRISTMAS,
+            locationId: null,
+          },
+          tenantDb
+        )
     );
 
-    const result = await hidePublicHoliday({
-      ...base,
-      holidayKey: CHRISTMAS,
-      locationId: null,
-    });
-
     expect(result).toMatchObject({ ok: true });
-    expect(db.$transaction).toHaveBeenCalledTimes(2);
-    expect(db.publicHolidayPreference.update).toHaveBeenCalledWith({
+    expect(referenceDatabase.$transaction).toHaveBeenCalledTimes(1);
+    expect(db.publicHolidayPreference.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({ setting: "hidden" }),
-      where: { id: "pref-race" },
+      where: expect.objectContaining({
+        clerk_org_id: base.clerkOrgId,
+        id: "pref-race",
+        organisation_id: base.organisationId,
+      }),
     });
   });
 
@@ -177,20 +236,32 @@ describe("holiday preferences", () => {
       id: "pref-1",
       setting: "working",
     });
-    await setPublicHolidayClassification({
-      ...base,
-      classification: "non_working",
-      holidayKey: CHRISTMAS,
-      locationId: LOCATION,
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        classification: "non_working",
+        holidayKey: CHRISTMAS,
+        locationId: LOCATION,
+      }),
+      (tenantDb) =>
+        setPublicHolidayClassification(
+          {
+            ...base,
+            classification: "non_working",
+            holidayKey: CHRISTMAS,
+            locationId: LOCATION,
+          },
+          tenantDb
+        )
+    );
     expect(db.publicHolidayPreference.deleteMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         holiday_key: CHRISTMAS,
         location_id: LOCATION,
       }),
     });
-    expect(db.publicHolidayPreference.update).not.toHaveBeenCalled();
-    expect(db.publicHolidayPreference.create).not.toHaveBeenCalled();
+    expect(db.publicHolidayPreference.updateMany).not.toHaveBeenCalled();
+    expect(db.publicHolidayPreference.createMany).not.toHaveBeenCalled();
     expect(db.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         action: "public_holidays.classification_changed",
@@ -200,22 +271,44 @@ describe("holiday preferences", () => {
 
   it("rejects unknown holiday keys and custom holidays from another organisation", async () => {
     expect(
-      await hidePublicHoliday({
-        ...base,
-        holidayKey: "au-qld-2099-01-01-nope",
-        locationId: null,
-      })
+      await withTestTenantResult(
+        tenantTestAccount({
+          ...base,
+          holidayKey: "au-qld-2099-01-01-nope",
+          locationId: null,
+        }),
+        (tenantDb) =>
+          hidePublicHoliday(
+            {
+              ...base,
+              holidayKey: "au-qld-2099-01-01-nope",
+              locationId: null,
+            },
+            tenantDb
+          )
+      )
     ).toMatchObject({
       error: { code: "validation_error" },
       ok: false,
     });
 
     db.publicHoliday.findFirst.mockResolvedValue(null);
-    const custom = await hidePublicHoliday({
-      ...base,
-      holidayKey: "custom:33333333-3333-4333-8333-333333333333",
-      locationId: null,
-    });
+    const custom = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        holidayKey: "custom:33333333-3333-4333-8333-333333333333",
+        locationId: null,
+      }),
+      (tenantDb) =>
+        hidePublicHoliday(
+          {
+            ...base,
+            holidayKey: "custom:33333333-3333-4333-8333-333333333333",
+            locationId: null,
+          },
+          tenantDb
+        )
+    );
     expect(custom).toMatchObject({
       error: { code: "validation_error" },
       ok: false,
@@ -229,12 +322,24 @@ describe("holiday preferences", () => {
 
   it("rejects a location outside the organisation", async () => {
     db.location.findFirst.mockResolvedValue(null);
-    const result = await setPublicHolidayClassification({
-      ...base,
-      classification: "working",
-      holidayKey: CHRISTMAS,
-      locationId: LOCATION,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        classification: "working",
+        holidayKey: CHRISTMAS,
+        locationId: LOCATION,
+      }),
+      (tenantDb) =>
+        setPublicHolidayClassification(
+          {
+            ...base,
+            classification: "working",
+            holidayKey: CHRISTMAS,
+            locationId: LOCATION,
+          },
+          tenantDb
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "validation_error" },
       ok: false,
@@ -247,21 +352,34 @@ describe("holiday preferences", () => {
   });
 
   it("switches local days on and off per location only", async () => {
-    const on = await setLocalHolidayEnabled({
-      ...base,
-      enabled: true,
-      holidayKey: SHOW,
-      locationId: LOCATION,
-    });
+    const on = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        enabled: true,
+        holidayKey: SHOW,
+        locationId: LOCATION,
+      }),
+      (tenantDb) =>
+        setLocalHolidayEnabled(
+          {
+            ...base,
+            enabled: true,
+            holidayKey: SHOW,
+            locationId: LOCATION,
+          },
+          tenantDb
+        )
+    );
     expect(on).toEqual({
       ok: true,
       value: { holidayName: "Royal Queensland Show", locationName: "Brisbane" },
     });
-    expect(db.publicHolidayPreference.create).toHaveBeenCalledWith({
+    expect(db.publicHolidayPreference.createMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
         location_id: LOCATION,
         setting: "non_working",
       }),
+      skipDuplicates: true,
     });
     expect(db.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -269,12 +387,24 @@ describe("holiday preferences", () => {
       }),
     });
 
-    await setLocalHolidayEnabled({
-      ...base,
-      enabled: false,
-      holidayKey: SHOW,
-      locationId: LOCATION,
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        enabled: false,
+        holidayKey: SHOW,
+        locationId: LOCATION,
+      }),
+      (tenantDb) =>
+        setLocalHolidayEnabled(
+          {
+            ...base,
+            enabled: false,
+            holidayKey: SHOW,
+            locationId: LOCATION,
+          },
+          tenantDb
+        )
+    );
     expect(db.publicHolidayPreference.deleteMany).toHaveBeenCalledWith({
       where: expect.objectContaining({
         holiday_key: SHOW,
@@ -283,12 +413,24 @@ describe("holiday preferences", () => {
       }),
     });
 
-    const notLocal = await setLocalHolidayEnabled({
-      ...base,
-      enabled: true,
-      holidayKey: CHRISTMAS,
-      locationId: LOCATION,
-    });
+    const notLocal = await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        enabled: true,
+        holidayKey: CHRISTMAS,
+        locationId: LOCATION,
+      }),
+      (tenantDb) =>
+        setLocalHolidayEnabled(
+          {
+            ...base,
+            enabled: true,
+            holidayKey: CHRISTMAS,
+            locationId: LOCATION,
+          },
+          tenantDb
+        )
+    );
     expect(notLocal).toMatchObject({
       error: { code: "validation_error" },
       ok: false,
@@ -296,11 +438,22 @@ describe("holiday preferences", () => {
   });
 
   it("restores by removing the preference at that scope", async () => {
-    await restorePublicHoliday({
-      ...base,
-      holidayKey: CHRISTMAS,
-      locationId: null,
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...base,
+        holidayKey: CHRISTMAS,
+        locationId: null,
+      }),
+      (tenantDb) =>
+        restorePublicHoliday(
+          {
+            ...base,
+            holidayKey: CHRISTMAS,
+            locationId: null,
+          },
+          tenantDb
+        )
+    );
     expect(db.publicHolidayPreference.deleteMany).toHaveBeenCalledWith({
       where: {
         clerk_org_id: "org_a",

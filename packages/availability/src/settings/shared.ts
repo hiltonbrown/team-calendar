@@ -10,7 +10,6 @@ export const OrganisationSettingsSchema = z.object({
   defaultPrivacyMode: z.enum(["named", "masked", "private"]),
   feedsIncludePublicHolidaysDefault: z.boolean(),
   id: z.string().uuid(),
-  managerVisibilityScope: z.enum(["all_team_leave", "direct_reports_only"]),
   notifyManagersOnStatusChange: z.boolean(),
   organisationId: z.string().uuid(),
   requireDeclineReason: z.boolean(),
@@ -25,9 +24,6 @@ export const OrganisationSettingsPatchSchema = z
     defaultLeaveRequestAdvanceDays: z.coerce.number().int().min(0).optional(),
     defaultPrivacyMode: z.enum(["named", "masked", "private"]).optional(),
     feedsIncludePublicHolidaysDefault: z.boolean().optional(),
-    managerVisibilityScope: z
-      .enum(["all_team_leave", "direct_reports_only"])
-      .optional(),
     notifyManagersOnStatusChange: z.boolean().optional(),
     requireDeclineReason: z.literal(true).optional(),
     showDeclinedOnApprovals: z.boolean().optional(),
@@ -51,7 +47,6 @@ export function mapOrganisationSettingsRow(input: {
   default_privacy_mode: "masked" | "named" | "private";
   feeds_include_public_holidays_default: boolean;
   id: string;
-  manager_visibility_scope: string;
   notify_managers_on_status_change: boolean;
   organisation_id: string;
   require_decline_reason: boolean;
@@ -68,10 +63,6 @@ export function mapOrganisationSettingsRow(input: {
     feedsIncludePublicHolidaysDefault:
       input.feeds_include_public_holidays_default,
     id: input.id,
-    // Stored as plain string in DB; cast to enum type
-    managerVisibilityScope: input.manager_visibility_scope as
-      | "all_team_leave"
-      | "direct_reports_only",
     notifyManagersOnStatusChange: input.notify_managers_on_status_change,
     organisationId: input.organisation_id,
     requireDeclineReason: input.require_decline_reason,

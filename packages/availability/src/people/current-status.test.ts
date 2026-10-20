@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   availabilityFindMany: vi.fn(),
@@ -13,37 +15,34 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       availabilityRecord: { findMany: mocks.availabilityFindMany },
       location: {
         findFirst: mocks.locationFindFirst,
         findMany: mocks.locationFindMany,
       },
       organisation: { findFirst: mocks.organisationFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        availabilityRecord: { findMany: mocks.availabilityFindMany },
-        location: {
-          findFirst: mocks.locationFindFirst,
-          findMany: mocks.locationFindMany,
-        },
-        organisation: { findFirst: mocks.organisationFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("../holidays/resolve-public-holidays", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
@@ -126,9 +125,11 @@ describe("current-status", () => {
       ok: false,
     });
 
-    await expect(computeCurrentStatus(baseInput)).rejects.toThrow(
-      "Failed to resolve public holidays"
-    );
+    await expect(
+      withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+        computeCurrentStatus(baseInput, db)
+      )
+    ).rejects.toThrow("Failed to resolve public holidays");
   });
 
   it("treats an unknown organisation as having no holidays", async () => {
@@ -137,7 +138,11 @@ describe("current-status", () => {
       ok: false,
     });
 
-    await expect(computeCurrentStatus(baseInput)).resolves.toMatchObject({
+    await expect(
+      withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+        computeCurrentStatus(baseInput, db)
+      )
+    ).resolves.toMatchObject({
       activePublicHoliday: null,
     });
   });
@@ -154,12 +159,24 @@ describe("current-status", () => {
     ]);
     resolved(resolvedHoliday(), resolvedHoliday({ locationId: null }));
 
-    const result = await computePublicHolidayApplicability({
-      at: baseInput.at,
-      clerkOrgId: baseInput.clerkOrgId,
-      locationIds: [locationId],
-      organisationId: baseInput.organisationId,
-    });
+    const result = await withTestTenantDb(
+      tenantTestAccount({
+        at: baseInput.at,
+        clerkOrgId: baseInput.clerkOrgId,
+        locationIds: [locationId],
+        organisationId: baseInput.organisationId,
+      }),
+      (db) =>
+        computePublicHolidayApplicability(
+          {
+            at: baseInput.at,
+            clerkOrgId: baseInput.clerkOrgId,
+            locationIds: [locationId],
+            organisationId: baseInput.organisationId,
+          },
+          db
+        )
+    );
 
     expect(result.locationIds).toEqual(new Set([locationId]));
     expect(result.unassigned).toBe(true);
@@ -172,7 +189,9 @@ describe("current-status", () => {
       activeRecord("annual_leave", "approved"),
     ]);
 
-    const status = await computeCurrentStatus(baseInput);
+    const status = await withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+      computeCurrentStatus(baseInput, db)
+    );
 
     expect(status.statusKey).toBe("on_leave");
     expect(status.label).toBe("On annual leave");
@@ -185,7 +204,9 @@ describe("current-status", () => {
     ]);
     resolved(resolvedHoliday());
 
-    const status = await computeCurrentStatus(baseInput);
+    const status = await withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+      computeCurrentStatus(baseInput, db)
+    );
 
     expect(status.statusKey).toBe("pending_leave");
     expect(status.label).toBe("Leave pending approval");
@@ -197,7 +218,9 @@ describe("current-status", () => {
       activeRecord("training", "approved"),
     ]);
 
-    const status = await computeCurrentStatus(baseInput);
+    const status = await withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+      computeCurrentStatus(baseInput, db)
+    );
 
     expect(status.statusKey).toBe("training");
     expect(status.label).toBe("In training");
@@ -206,19 +229,27 @@ describe("current-status", () => {
   it("returns the public holiday resolved for the person's location and local date", async () => {
     resolved(resolvedHoliday());
 
-    const status = await computeCurrentStatus(baseInput);
+    const status = await withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+      computeCurrentStatus(baseInput, db)
+    );
 
     expect(status.statusKey).toBe("public_holiday");
-    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
-      clerkOrgId: baseInput.clerkOrgId,
-      from: "2026-04-25",
-      organisationId: baseInput.organisationId,
-      to: "2026-04-25",
-    });
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
+      {
+        clerkOrgId: baseInput.clerkOrgId,
+        from: "2026-04-25",
+        organisationId: baseInput.organisationId,
+        to: "2026-04-25",
+      },
+      undefined,
+      expect.any(Object)
+    );
   });
 
   it("returns available when no active record or holiday applies", async () => {
-    const status = await computeCurrentStatus(baseInput);
+    const status = await withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+      computeCurrentStatus(baseInput, db)
+    );
 
     expect(status.statusKey).toBe("available");
     expect(status.label).toBe("Available");
@@ -281,12 +312,24 @@ describe("current-status", () => {
     ]);
     resolved(resolvedHoliday());
 
-    const statuses = await computeCurrentStatusForPeople({
-      at: baseInput.at,
-      clerkOrgId: baseInput.clerkOrgId,
-      organisationId: baseInput.organisationId,
-      people,
-    });
+    const statuses = await withTestTenantDb(
+      tenantTestAccount({
+        at: baseInput.at,
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+        people,
+      }),
+      (db) =>
+        computeCurrentStatusForPeople(
+          {
+            at: baseInput.at,
+            clerkOrgId: baseInput.clerkOrgId,
+            organisationId: baseInput.organisationId,
+            people,
+          },
+          db
+        )
+    );
 
     expect(statuses.get(people[0].personId)?.statusKey).toBe("on_leave");
     expect(statuses.get(people[1].personId)?.statusKey).toBe("pending_leave");
@@ -301,7 +344,9 @@ describe("current-status", () => {
   it("exposes only the public holiday summary on activePublicHoliday", async () => {
     resolved(resolvedHoliday());
 
-    const status = await computeCurrentStatus(baseInput);
+    const status = await withTestTenantDb(tenantTestAccount(baseInput), (db) =>
+      computeCurrentStatus(baseInput, db)
+    );
 
     expect(status.activePublicHoliday).toEqual({
       date: new Date("2026-04-25T00:00:00.000Z"),
@@ -367,22 +412,49 @@ describe("current-status", () => {
       it(`evaluates single and batch identically for: ${scenario.description}`, async () => {
         resolved(...scenario.holidays);
 
-        const singleStatus = await computeCurrentStatus({
-          ...baseInput,
-          locationId: scenario.personLocationId,
-        });
+        const singleStatus = await withTestTenantDb(
+          tenantTestAccount({
+            ...baseInput,
+            locationId: scenario.personLocationId,
+          }),
+          (db) =>
+            computeCurrentStatus(
+              {
+                ...baseInput,
+                locationId: scenario.personLocationId,
+              },
+              db
+            )
+        );
 
-        const batchMap = await computeCurrentStatusForPeople({
-          at: baseInput.at,
-          clerkOrgId: baseInput.clerkOrgId,
-          organisationId: baseInput.organisationId,
-          people: [
-            {
-              locationId: scenario.personLocationId,
-              personId: baseInput.personId,
-            },
-          ],
-        });
+        const batchMap = await withTestTenantDb(
+          tenantTestAccount({
+            at: baseInput.at,
+            clerkOrgId: baseInput.clerkOrgId,
+            organisationId: baseInput.organisationId,
+            people: [
+              {
+                locationId: scenario.personLocationId,
+                personId: baseInput.personId,
+              },
+            ],
+          }),
+          (db) =>
+            computeCurrentStatusForPeople(
+              {
+                at: baseInput.at,
+                clerkOrgId: baseInput.clerkOrgId,
+                organisationId: baseInput.organisationId,
+                people: [
+                  {
+                    locationId: scenario.personLocationId,
+                    personId: baseInput.personId,
+                  },
+                ],
+              },
+              db
+            )
+        );
         const batchStatus = batchMap.get(baseInput.personId);
 
         expect(singleStatus.statusKey).toBe(scenario.expectedStatus);

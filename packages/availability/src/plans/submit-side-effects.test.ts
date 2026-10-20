@@ -10,13 +10,28 @@ const mocks = vi.hoisted(() => ({
   publish: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) => {
+      const result = await run(buildTestDatabase());
+      mocks.committed();
+      return result;
+    },
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   fenceSubmitRecoverySideEffectClaim: mocks.fence,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       $transaction: async (callback: (tx: unknown) => unknown) => {
         const result = await callback({
           auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
@@ -25,35 +40,18 @@ vi.mock("@repo/database", () => ({
         return result;
       },
       auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: async (callback: (tx: unknown) => unknown) => {
-          const result = await callback({
-            auditEvent: {
-              create: mocks.auditCreate,
-              findFirst: mocks.auditFind,
-            },
-          });
-          mocks.committed();
-          return result;
-        },
-        auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFind },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialise,
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatch,
-  publishPersistedNotification: mocks.publish,
+  prepareNotificationPublication: vi.fn(
+    async (requestInput: unknown) => requestInput
+  ),
+  sendPreparedNotificationPublication: mocks.publish,
 }));
 
 const { completeSubmitSideEffects } = await import("./submit-side-effects");
@@ -105,8 +103,8 @@ describe("submit side effects", () => {
     expect(mocks.publish).not.toHaveBeenCalled();
     expect(mocks.dispatch).toHaveBeenCalledWith(
       expect.anything(),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
   });
   it("delivers approval realtime after commit and reuses the checkpoint row on retry", async () => {
@@ -129,8 +127,8 @@ describe("submit side effects", () => {
         recipientUserId: "employee_1",
         type: "leave_approved",
       }),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
     mocks.auditFind.mockResolvedValue({
       id: "checkpoint_1",
@@ -155,8 +153,8 @@ describe("submit side effects", () => {
         body: "Original coverage decision",
         type: "leave_declined",
       }),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
   });
 });

@@ -1,14 +1,14 @@
-import type { Prisma } from "@repo/database";
+import type { TenantDb } from "@repo/database";
 import { log } from "@repo/observability/log";
+import { getAccountApprovalSettings } from "../settings/account-approval-settings-service";
+import { managerScopePersonIds } from "../settings/manager-scope";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { recordFallsOnDay, recordQueryWindow } from "@repo/core";
 import {
+  assertTenantDb,
   resolveAccountCompanies,
   scopedTo,
-  TENANT_READ_TRANSACTION_OPTIONS,
-  tenantDatabase,
-  tenantTransaction,
 } from "@repo/database";
 import type {
   availability_approval_status,
@@ -253,93 +253,86 @@ interface ScopedRecord {
   xero_write_error: string | null;
 }
 export async function getCalendarRange(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<CalendarRange, CalendarServiceError>> {
   const parsed = RangeInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  try {
-    return await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        const companies = (
-          await resolveAccountCompanies(parsed.data.clerkOrgId, tx)
-        ).map((company) => ({
-          ...company,
-          timezone: company.timezone ?? "UTC",
-        }));
-        const selection = selectCalendarCompanies(parsed.data, companies);
-        if (!selection.ok) {
-          return selection;
-        }
-        const selected = selection.value;
-        const allPeople = selected.length
-          ? await tx.person.findMany({
-              orderBy: [
-                { last_name: "asc" },
-                { first_name: "asc" },
-                { id: "asc" },
-              ],
-              select: personSelect,
-              where: {
-                archived_at: null,
-                clerk_org_id: parsed.data.clerkOrgId,
-                is_active: true,
-                organisation_id: { in: selected.map((company) => company.id) },
-              },
-            })
-          : [];
-        const accountWide = !parsed.data.organisationId;
-        if (accountWide && !companyMatchesScope(parsed.data.scope, allPeople)) {
-          return invalidScope();
-        }
-        const ranges: CalendarRange[] = [];
-        for (const company of selected) {
-          const companyPeople = allPeople.filter(
-            (person) => person.organisation_id === company.id
-          );
-          if (
-            accountWide &&
-            !companyMatchesScope(parsed.data.scope, companyPeople)
-          ) {
-            continue;
-          }
-          const companyInput = resolveCompanyInput(
-            parsed.data,
-            company.id,
-            companyPeople
-          );
-          if (!companyInput) {
-            continue;
-          }
-          const result = await loadCompanyCalendarRange(
-            { data: companyInput },
-            tx,
-            company,
-            companyPeople
-          );
-          if (!result.ok) {
-            return result;
-          }
-          ranges.push(result.value);
-        }
-        return {
-          ok: true,
-          value: mergeCompanyCalendars(parsed.data, selected, ranges),
-        };
-      },
-      TENANT_READ_TRANSACTION_OPTIONS
-    );
-  } catch {
-    return unknownError("Failed to load calendar.");
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    const tx = db;
+
+    const companies = (
+      await resolveAccountCompanies(parsed.data.clerkOrgId, tx)
+    ).map((company) => ({
+      ...company,
+      timezone: company.timezone ?? "UTC",
+    }));
+    const selection = selectCalendarCompanies(parsed.data, companies);
+    if (!selection.ok) {
+      return selection;
+    }
+    const selected = selection.value;
+    const allPeople = selected.length
+      ? await tx.person.findMany({
+          orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
+          select: personSelect,
+          where: {
+            archived_at: null,
+            clerk_org_id: parsed.data.clerkOrgId,
+            is_active: true,
+            organisation_id: { in: companies.map((company) => company.id) },
+          },
+        })
+      : [];
+    const accountWide = !parsed.data.organisationId;
+    if (accountWide && !companyMatchesScope(parsed.data.scope, allPeople)) {
+      return invalidScope();
+    }
+    const ranges: CalendarRange[] = [];
+    for (const company of selected) {
+      const companyPeople = allPeople.filter(
+        (person) => person.organisation_id === company.id
+      );
+      if (
+        accountWide &&
+        !companyMatchesScope(parsed.data.scope, companyPeople)
+      ) {
+        continue;
+      }
+      const companyInput = resolveCompanyInput(
+        parsed.data,
+        company.id,
+        allPeople
+      );
+      if (!companyInput) {
+        continue;
+      }
+      const result = await loadCompanyCalendarRange(
+        { data: companyInput },
+        tx,
+        company,
+        companyPeople
+      );
+      if (!result.ok) {
+        return result;
+      }
+      ranges.push(result.value);
+    }
+    return {
+      ok: true,
+      value: mergeCompanyCalendars(parsed.data, selected, ranges),
+    };
   }
 }
 
-function selectCalendarCompanies(
-  input: ParsedAccountRangeInput,
-  companies: CalendarCompany[]
-): Result<CalendarCompany[], CalendarServiceError> {
+export function selectCalendarCompanies<T extends { id: string; name: string }>(
+  input: { companyIds?: string[]; organisationId?: string },
+  companies: T[]
+): Result<T[], CalendarServiceError> {
   const requestedIds =
     input.companyIds ??
     (input.organisationId ? [input.organisationId] : undefined);
@@ -403,7 +396,7 @@ function resolveCompanyInput(
 
 async function loadCompanyCalendarRange(
   parsed: { data: ParsedRangeInput },
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   company: CalendarCompany,
   companyPeople: ScopedPerson[]
 ): Promise<Result<CalendarRange, CalendarServiceError>> {
@@ -412,6 +405,10 @@ async function loadCompanyCalendarRange(
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     },
+    tx
+  );
+  const accountSettingsResult = await getAccountApprovalSettings(
+    { clerkOrgId: parsed.data.clerkOrgId },
     tx
   );
   const { timezone } = company;
@@ -426,15 +423,15 @@ async function loadCompanyCalendarRange(
     timezone,
   };
   const allPeople = companyPeople;
-  const managerReportIds = authorisedReportIds(
+  const managerReportIds = await authorisedReportIds(
     parsed.data,
-    allPeople,
-    settingsResult
+    parsed.data.clerkOrgId,
+    tx
   );
   const scopedPeopleResult = resolvePeopleForScope(parsed.data, allPeople, {
     includeIndirectReports:
-      settingsResult.ok &&
-      settingsResult.value.managerVisibilityScope === "all_team_leave",
+      accountSettingsResult.ok &&
+      accountSettingsResult.value.managerVisibilityScope === "all_team_leave",
     managerReportIds,
   });
   if (!scopedPeopleResult.ok) {
@@ -601,20 +598,19 @@ function mergeCompanyCalendars(
   };
 }
 export async function getEventDetail(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<CalendarEventDetail, CalendarServiceError>> {
   const parsed = DetailInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  try {
-    const settingsResult = await getSettings({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
-    const record = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).availabilityRecord.findFirst({
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    const client = db;
+
+    const record = await client.availabilityRecord.findFirst({
       select: recordSelect,
       where: {
         ...scopedTo({
@@ -626,26 +622,29 @@ export async function getEventDetail(
       },
     });
     if (!record) {
-      return await recordNotFound(parsed.data);
+      return await recordNotFound(parsed.data, client);
     }
-    const allPeople = await loadPeople({
-      actingPersonId: parsed.data.actingPersonId ?? null,
-      actingUserId: parsed.data.actingUserId,
-      anchorDate: new Date(),
-      clerkOrgId: parsed.data.clerkOrgId,
-      filters: {},
-      organisationId: parsed.data.organisationId,
-      role: parsed.data.role,
-      scope: { type: "all_teams" },
-      view: "month",
-    });
+    const allPeople = await loadPeople(
+      {
+        actingPersonId: parsed.data.actingPersonId ?? null,
+        actingUserId: parsed.data.actingUserId,
+        anchorDate: new Date(),
+        clerkOrgId: parsed.data.clerkOrgId,
+        filters: {},
+        organisationId: parsed.data.organisationId,
+        role: parsed.data.role,
+        scope: { type: "all_teams" },
+        view: "month",
+      },
+      client
+    );
     if (!allPeople.some((person) => person.id === record.person_id)) {
       return notAuthorised();
     }
-    const managerReportIds = authorisedReportIds(
+    const managerReportIds = await authorisedReportIds(
       parsed.data,
-      allPeople,
-      settingsResult
+      parsed.data.clerkOrgId,
+      client
     );
     if (
       !canViewRecord({
@@ -658,7 +657,7 @@ export async function getEventDetail(
       return notAuthorised();
     }
     const company = (
-      await resolveAccountCompanies(parsed.data.clerkOrgId)
+      await resolveAccountCompanies(parsed.data.clerkOrgId, client)
     ).find((candidate) => candidate.id === parsed.data.organisationId);
     if (!company) {
       return notAuthorised();
@@ -679,15 +678,11 @@ export async function getEventDetail(
         title: record.title,
       },
     };
-  } catch {
-    return unknownError("Failed to load calendar event.");
   }
 }
 async function loadPeople(
   input: ParsedRangeInput,
-  client:
-    | Prisma.TransactionClient
-    | ReturnType<typeof tenantDatabase> = tenantDatabase(input.clerkOrgId)
+  client: TenantDb
 ): Promise<ScopedPerson[]> {
   return await client.person.findMany({
     orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
@@ -711,16 +706,15 @@ function resolvePeopleForScope(
   }
 ): Result<ScopedPerson[], CalendarServiceError> {
   const actingPersonId = input.actingPersonId ?? null;
-  if (
-    input.accountWide &&
-    input.role === "viewer" &&
-    input.scope.type === "all_teams"
-  ) {
+  if (input.accountWide && input.scope.type === "all_teams") {
     return { ok: true, value: people };
   }
   if (
     !(
       isAdminOrOwner(input.role) ||
+      (input.role === "manager" &&
+        actingPersonId &&
+        options.managerReportIds.has(actingPersonId)) ||
       people.some((candidate) => candidate.id === actingPersonId)
     )
   ) {
@@ -829,9 +823,7 @@ async function loadRecords(
   options: {
     showPendingOnCalendar: boolean;
   },
-  client:
-    | Prisma.TransactionClient
-    | ReturnType<typeof tenantDatabase> = tenantDatabase(input.clerkOrgId)
+  client: TenantDb
 ): Promise<ScopedRecord[]> {
   if (personIds.length === 0) {
     return [];
@@ -900,7 +892,7 @@ async function loadPublicHolidayCells(
     range: CalendarRange["range"];
     timezone: string;
   },
-  client?: Prisma.TransactionClient
+  client: TenantDb
 ): Promise<Map<string, PublicHolidayCell[]>> {
   const sortedDates = [...input.dateOnlyValues].sort();
   const [from] = sortedDates;
@@ -1121,56 +1113,22 @@ function resolveLocalRange(
     startDateOnly: start,
   };
 }
-function authorisedReportIds(
-  actor: {
-    actingPersonId?: string | null;
-    role: CalendarRole;
-  },
-  people: ScopedPerson[],
-  settings: Awaited<ReturnType<typeof getSettings>>
-): Set<string> {
-  if (
-    actor.role !== "manager" ||
-    !actor.actingPersonId ||
-    !settings.ok ||
-    !people.some((person) => person.id === actor.actingPersonId)
-  ) {
+async function authorisedReportIds(
+  actor: { actingPersonId?: string | null; role: CalendarRole },
+  clerkOrgId: string,
+  db: TenantDb
+): Promise<Set<string>> {
+  if (actor.role !== "manager" || !actor.actingPersonId) {
     return new Set<string>();
   }
-  return settings.value.managerVisibilityScope === "all_team_leave"
-    ? transitiveReportIds(people, actor.actingPersonId)
-    : new Set(
-        people
-          .filter((person) => person.manager_person_id === actor.actingPersonId)
-          .map((person) => person.id)
-      );
+  return new Set(
+    await managerScopePersonIds(
+      { actingPersonId: actor.actingPersonId, clerkOrgId },
+      db
+    )
+  );
 }
-function transitiveReportIds(
-  people: ScopedPerson[],
-  actingPersonId: string
-): Set<string> {
-  const byManager = new Map<string, ScopedPerson[]>();
-  for (const person of people) {
-    if (!person.manager_person_id) {
-      continue;
-    }
-    byManager.set(person.manager_person_id, [
-      ...(byManager.get(person.manager_person_id) ?? []),
-      person,
-    ]);
-  }
-  const visited = new Set<string>();
-  const queue = [...(byManager.get(actingPersonId) ?? [])];
-  while (queue.length > 0) {
-    const person = queue.shift();
-    if (!person || visited.has(person.id) || person.id === actingPersonId) {
-      continue;
-    }
-    visited.add(person.id);
-    queue.push(...(byManager.get(person.id) ?? []));
-  }
-  return visited;
-}
+
 function countFailedByPerson(events: CalendarEvent[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const event of events) {
@@ -1281,13 +1239,12 @@ function uniqueSorted(values: string[]): string[] {
   );
 }
 async function recordNotFound(
-  input: ParsedDetailInput
+  input: ParsedDetailInput,
+  client: TenantDb
 ): Promise<Result<never, CalendarServiceError>> {
-  const exists = await tenantDatabase(
-    input.clerkOrgId
-  ).availabilityRecord.findFirst({
+  const exists = await client.availabilityRecord.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.recordId },
+    where: { clerk_org_id: input.clerkOrgId, id: input.recordId },
   });
   if (
     exists &&
@@ -1335,12 +1292,7 @@ function invalidScope(): Result<never, CalendarServiceError> {
     ok: false,
   };
 }
-function unknownError(message: string): Result<never, CalendarServiceError> {
-  return {
-    error: { code: "unknown_error", message },
-    ok: false,
-  };
-}
+
 const personSelect = {
   archived_at: true,
   avatar_url: true,

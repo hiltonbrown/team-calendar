@@ -38,11 +38,26 @@ const mocks = vi.hoisted(() => ({
   xeroTenantFindFirst: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) => {
+      const client = buildTestDatabase();
+      const result = await run(client);
+      mocks.transactionCommitted(client);
+      return result;
+    },
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   getSubmitOperation: vi.fn(async () => null),
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   lockActiveScopedXeroConnection: vi.fn(async () => true),
+  lockPlanLimitMutations: vi.fn(async () => undefined),
   markSubmitCompleted: mocks.markSubmitCompleted,
   markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
   markSubmitDispatchStarted: mocks.markSubmitDispatchStarted,
@@ -50,68 +65,46 @@ vi.mock("@repo/database", () => ({
   markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
   prepareAndClaimSubmitOperation: mocks.prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects: mocks.releaseSideEffects,
+  resolveAccountCompanies: async () => [
+    {
+      country_code: "AU",
+      id: input.organisationId,
+      name: "Acme Org",
+      timezone: "Australia/Brisbane",
+    },
+  ],
   scopedTo: mocks.scopedTo,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
-      $transaction: async (callback: (tx: unknown) => unknown) => {
-        const result = await callback({
-          auditEvent: { create: mocks.auditCreate },
-          availabilityRecord: {
-            updateMany: (mutation: {
-              data: { xero_write_claimed_at?: Date | null };
-            }) =>
-              mutation.data.xero_write_claimed_at
-                ? mocks.availabilityClaimUpdateMany(mutation)
-                : mocks.availabilityUpdateMany(mutation),
-          },
-        });
-        mocks.transactionCommitted();
-        return result;
-      },
+}));
+function buildTestDatabase() {
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
+      auditEvent: { ...{}, ...{ create: mocks.auditCreate } },
       availabilityRecord: {
-        findFirst: mocks.availabilityFindFirst,
-        updateMany: mocks.availabilityClaimUpdateMany,
+        ...{
+          findFirst: mocks.availabilityFindFirst,
+          updateMany: mocks.availabilityClaimUpdateMany,
+        },
+        ...{
+          updateMany: (mutation: {
+            data: {
+              xero_write_claimed_at?: Date | null;
+              approval_status?: string;
+            };
+          }) =>
+            "xero_write_claimed_at" in mutation.data &&
+            !("approval_status" in mutation.data)
+              ? mocks.availabilityClaimUpdateMany(mutation)
+              : mocks.availabilityUpdateMany(mutation),
+        },
       },
       organisation: { findFirst: mocks.organisationFindFirst },
       person: { findFirst: mocks.personFindFirst },
       xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: async (callback: (tx: unknown) => unknown) => {
-          const result = await callback({
-            auditEvent: { create: mocks.auditCreate },
-            availabilityRecord: {
-              updateMany: (mutation: {
-                data: { xero_write_claimed_at?: Date | null };
-              }) =>
-                mutation.data.xero_write_claimed_at
-                  ? mocks.availabilityClaimUpdateMany(mutation)
-                  : mocks.availabilityUpdateMany(mutation),
-            },
-          });
-          mocks.transactionCommitted();
-          return result;
-        },
-        availabilityRecord: {
-          findFirst: mocks.availabilityFindFirst,
-          updateMany: mocks.availabilityClaimUpdateMany,
-        },
-        organisation: { findFirst: mocks.organisationFindFirst },
-        person: { findFirst: mocks.personFindFirst },
-        xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,
 }));
@@ -305,12 +298,14 @@ describe("submit-service", () => {
     });
     expect(mocks.dispatchNotification).toHaveBeenCalledWith(
       expect.objectContaining({ type: "leave_submitted" }),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
     expect(mocks.materialiseAvailabilityPublication).not.toHaveBeenCalled();
     expect(mocks.publishPersistedNotification).not.toHaveBeenCalled();
-    expect(mocks.transactionCommitted).not.toHaveBeenCalled();
+    const failedClient = mocks.dispatchNotification.mock.calls[0]?.[2];
+    expect(failedClient).toBeDefined();
+    expect(mocks.transactionCommitted).not.toHaveBeenCalledWith(failedClient);
     expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
   it("publishes the manager notification only after the submission commits", async () => {
@@ -366,7 +361,11 @@ describe("submit-service", () => {
           archived_at: null,
           clerk_org_id: input.clerkOrgId,
           clerk_user_id: input.actingUserId,
-          organisation_id: input.organisationId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: input.clerkOrgId,
+            is_active: true,
+          },
         },
       });
       expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -685,7 +684,8 @@ describe("submit-service", () => {
     await createLeaveOnApproval(input, mockPort);
     expect(mocks.markSubmitOutcomeUnknown).toHaveBeenCalledWith(
       expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
-      "conflict_error"
+      "conflict_error",
+      expect.any(Object)
     );
     expect(mocks.markSubmitDefinitiveFailure).not.toHaveBeenCalled();
   });
@@ -703,7 +703,8 @@ describe("submit-service", () => {
     await createLeaveOnApproval(input, mockPort);
     expect(mocks.markSubmitDefinitiveFailure).toHaveBeenCalledWith(
       expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
-      "network_error"
+      "network_error",
+      expect.any(Object)
     );
     expect(mocks.markSubmitOutcomeUnknown).not.toHaveBeenCalled();
   });
@@ -1220,7 +1221,8 @@ describe("submit-service", () => {
       });
       expect(mocks.markSubmitOutcomeUnknown).toHaveBeenCalledWith(
         expect.objectContaining({ availabilityRecordId: record.id }),
-        "transport_exception"
+        "transport_exception",
+        expect.any(Object)
       );
       expect(mocks.availabilityClaimUpdateMany).toHaveBeenCalledTimes(1);
       expect(mocks.availabilityClaimUpdateMany).toHaveBeenNthCalledWith(

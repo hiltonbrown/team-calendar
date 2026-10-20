@@ -1,6 +1,7 @@
 import { type Result, xeroRecoveryMessage } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { withTenantDb, withTenantResult } from "@repo/database";
 import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import {
   reconcileXeroApprovalState,
   syncXeroLeaveBalances,
@@ -52,24 +53,27 @@ const localEventNames: Record<LocalSyncRunType, string> = {
 export async function executeLocalSyncFallback(
   input: LocalSyncFallbackInput
 ): Promise<Result<LocalSyncFallbackValue, LocalSyncFallbackError>> {
+  assertNoTenantTransaction("executeLocalSyncFallback");
   try {
-    const state = await getXeroConnectionState(input);
+    const state = await withTenantResult(input.clerkOrgId, (db) =>
+      getXeroConnectionState(input, db)
+    );
     if (!state.ok) {
       return syncFailed(xeroRecoveryMessage("unavailable"));
     }
     if (state.value.state !== "connected") {
       return syncFailed(xeroRecoveryMessage(state.value.state));
     }
-    const tenant = await tenantDatabase(
-      input.clerkOrgId
-    ).xeroConnection.findFirst({
-      select: { id: true },
-      where: {
-        clerk_org_id: input.clerkOrgId,
-        id: input.connectionId,
-        organisation_id: input.organisationId,
-      },
-    });
+    const tenant = await withTenantDb(input.clerkOrgId, (db) =>
+      db.xeroConnection.findFirst({
+        select: { id: true },
+        where: {
+          clerk_org_id: input.clerkOrgId,
+          id: input.connectionId,
+          organisation_id: input.organisationId,
+        },
+      })
+    );
     if (!tenant) {
       return syncFailed("The Xero connection changed. Try again.");
     }
@@ -93,14 +97,16 @@ export async function executeLocalSyncFallback(
       syncResult.value.status === "cancelled"
     ) {
       if (syncResult.value.status === "failed") {
-        const run = await tenantDatabase(input.clerkOrgId).syncRun.findFirst({
-          select: { error_summary: true },
-          where: {
-            clerk_org_id: input.clerkOrgId,
-            id: runId,
-            organisation_id: input.organisationId,
-          },
-        });
+        const run = await withTenantDb(input.clerkOrgId, (db) =>
+          db.syncRun.findFirst({
+            select: { error_summary: true },
+            where: {
+              clerk_org_id: input.clerkOrgId,
+              id: runId,
+              organisation_id: input.organisationId,
+            },
+          })
+        );
         return syncFailed(safeSyncFailureMessage(run?.error_summary));
       }
       return syncFailed("Sync run failed or was cancelled.");

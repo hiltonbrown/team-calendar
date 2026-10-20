@@ -1,5 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
@@ -127,14 +129,28 @@ const createRecord = (
 };
 
 const countFor = (tenant: Tenant, teamIds: string[]) =>
-  countAwayPeopleByTeamAndDay({
-    ...scopeOf(tenant),
-    awayRecordTypes: ["annual_leave"],
-    from: "2026-10-12",
-    teamIds,
-    timezone: "Australia/Brisbane",
-    to: "2026-10-12",
-  });
+  withTestTenantResult(
+    tenantTestAccount({
+      ...scopeOf(tenant),
+      awayRecordTypes: ["annual_leave"],
+      from: "2026-10-12",
+      teamIds,
+      timezone: "Australia/Brisbane",
+      to: "2026-10-12",
+    }),
+    (db) =>
+      countAwayPeopleByTeamAndDay(
+        {
+          ...scopeOf(tenant),
+          awayRecordTypes: ["annual_leave"],
+          from: "2026-10-12",
+          teamIds,
+          timezone: "Australia/Brisbane",
+          to: "2026-10-12",
+        },
+        db
+      )
+  );
 
 beforeEach(cleanTestData);
 afterAll(async () => {
@@ -152,7 +168,10 @@ describe("team coverage queries", () => {
     await createPerson(tenantA, { archived: true });
     await createPerson(tenantB);
 
-    const result = await listTeamsWithCoverageMinimum(scopeOf(tenantA));
+    const result = await withTestTenantResult(
+      tenantTestAccount(scopeOf(tenantA)),
+      (db) => listTeamsWithCoverageMinimum(scopeOf(tenantA), db)
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -171,16 +190,38 @@ describe("team coverage queries", () => {
     await createTenant(tenantA, "Customer support");
     await createTenant(tenantB, "Other tenant team");
 
-    const updated = await setTeamCoverageMinimum({
-      ...scopeOf(tenantA),
-      minimum: 2,
-      teamId: tenantA.teamId,
-    });
-    const crossTenant = await setTeamCoverageMinimum({
-      ...scopeOf(tenantA),
-      minimum: 0,
-      teamId: tenantB.teamId,
-    });
+    const updated = await withTestTenantResult(
+      tenantTestAccount({
+        ...scopeOf(tenantA),
+        minimum: 2,
+        teamId: tenantA.teamId,
+      }),
+      (db) =>
+        setTeamCoverageMinimum(
+          {
+            ...scopeOf(tenantA),
+            minimum: 2,
+            teamId: tenantA.teamId,
+          },
+          db
+        )
+    );
+    const crossTenant = await withTestTenantResult(
+      tenantTestAccount({
+        ...scopeOf(tenantA),
+        minimum: 0,
+        teamId: tenantB.teamId,
+      }),
+      (db) =>
+        setTeamCoverageMinimum(
+          {
+            ...scopeOf(tenantA),
+            minimum: 0,
+            teamId: tenantB.teamId,
+          },
+          db
+        )
+    );
 
     expect(updated).toMatchObject({ ok: true, value: { after: 2, before: 1 } });
     expect(crossTenant).toMatchObject({

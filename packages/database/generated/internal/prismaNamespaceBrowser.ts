@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   Organisation: 'Organisation',
+  AccountSettings: 'AccountSettings',
   OrganisationSettings: 'OrganisationSettings',
   Team: 'Team',
   Location: 'Location',
@@ -124,6 +125,17 @@ export const OrganisationScalarFieldEnum = {
 export type OrganisationScalarFieldEnum = (typeof OrganisationScalarFieldEnum)[keyof typeof OrganisationScalarFieldEnum]
 
 
+export const AccountSettingsScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  manager_visibility_scope: 'manager_visibility_scope',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AccountSettingsScalarFieldEnum = (typeof AccountSettingsScalarFieldEnum)[keyof typeof AccountSettingsScalarFieldEnum]
+
+
 export const OrganisationSettingsScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
@@ -131,7 +143,6 @@ export const OrganisationSettingsScalarFieldEnum = {
   show_pending_on_calendar: 'show_pending_on_calendar',
   show_declined_on_approvals: 'show_declined_on_approvals',
   notify_managers_on_status_change: 'notify_managers_on_status_change',
-  manager_visibility_scope: 'manager_visibility_scope',
   default_leave_request_advance_days: 'default_leave_request_advance_days',
   require_decline_reason: 'require_decline_reason',
   default_privacy_mode: 'default_privacy_mode',

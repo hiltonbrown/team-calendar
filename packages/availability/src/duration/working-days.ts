@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import {
   nonWorkingHolidayDates,
   type ResolvedPublicHoliday,
@@ -50,79 +50,99 @@ export interface WorkingDaysReferenceData {
   organisation: DurationLocation | null;
 }
 export async function loadWorkingDaysReferenceData(
-  inputs: ComputeWorkingDaysInput[]
+  inputs: ComputeWorkingDaysInput[],
+  db: TenantDb
 ): Promise<WorkingDaysReferenceData> {
   const [first] = inputs;
   if (!first) {
-    return {
+    return await {
       holidaysByYear: new Map(),
       locationById: new Map(),
       organisation: null,
     };
   }
-  const scoped = scopedQuery(
-    first.clerkOrgId as ClerkOrgId,
-    first.organisationId as OrganisationId
-  );
-  const ids = [
-    ...new Set(
-      inputs
-        .map(({ locationId }) => locationId)
-        .filter((id): id is string => id !== null)
-    ),
-  ];
-  const [locations, organisation] = await Promise.all([
-    ids.length
-      ? tenantDatabase(first.clerkOrgId).location.findMany({
-          select: {
-            country_code: true,
-            id: true,
-            region_code: true,
-            timezone: true,
-          },
-          where: { ...scoped, id: { in: ids } },
-        })
-      : Promise.resolve([]),
-    tenantDatabase(first.clerkOrgId).organisation.findFirst({
-      select: { country_code: true, timezone: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: scoped.clerk_org_id,
-        id: scoped.organisation_id,
-      },
-    }),
-  ]);
-  const locationById = new Map(
-    locations.map(({ id, ...location }) => [id, location])
-  );
-  const organisationLocation = organisation
-    ? {
-        country_code: organisation.country_code,
-        region_code: null,
-        timezone: organisation.timezone,
-      }
-    : null;
-  const years = new Set<number>();
-  for (const item of inputs) {
-    const result = workingDayYearsForInput(item, {
-      locationById,
-      organisation: organisationLocation,
-    });
-    if (result.ok) {
-      for (const year of result.value) {
-        years.add(year);
+
+  if (
+    inputs.some(
+      (item) =>
+        item.clerkOrgId !== first.clerkOrgId ||
+        item.organisationId !== first.organisationId
+    )
+  ) {
+    throw new Error(
+      "Working-day reference batches must belong to one company."
+    );
+  }
+  assertTenantDb(db, first.clerkOrgId);
+  {
+    assertTenantDb(db, first.clerkOrgId);
+    const client = db;
+
+    const scoped = scopedQuery(
+      first.clerkOrgId as ClerkOrgId,
+      first.organisationId as OrganisationId
+    );
+    const ids = [
+      ...new Set(
+        inputs
+          .map(({ locationId }) => locationId)
+          .filter((id): id is string => id !== null)
+      ),
+    ];
+    const [locations, organisation] = [
+      await (ids.length
+        ? client.location.findMany({
+            select: {
+              country_code: true,
+              id: true,
+              region_code: true,
+              timezone: true,
+            },
+            where: { ...scoped, id: { in: ids } },
+          })
+        : Promise.resolve([])),
+      await client.organisation.findFirst({
+        select: { country_code: true, timezone: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: scoped.clerk_org_id,
+          id: scoped.organisation_id,
+        },
+      }),
+    ];
+    const locationById = new Map(
+      locations.map(({ id, ...location }) => [id, location])
+    );
+    const organisationLocation = organisation
+      ? {
+          country_code: organisation.country_code,
+          region_code: null,
+          timezone: organisation.timezone,
+        }
+      : null;
+    const years = new Set<number>();
+    for (const item of inputs) {
+      const result = workingDayYearsForInput(item, {
+        locationById,
+        organisation: organisationLocation,
+      });
+      if (result.ok) {
+        for (const year of result.value) {
+          years.add(year);
+        }
       }
     }
+    return {
+      holidaysByYear: await loadHolidaysForYears(
+        first.clerkOrgId as ClerkOrgId,
+        first.organisationId as OrganisationId,
+        years,
+        client
+      ),
+      locationById,
+      organisation: organisationLocation,
+    };
   }
-  return {
-    holidaysByYear: await loadHolidaysForYears(
-      first.clerkOrgId as ClerkOrgId,
-      first.organisationId as OrganisationId,
-      years
-    ),
-    locationById,
-    organisation: organisationLocation,
-  };
 }
 
 /**
@@ -132,33 +152,44 @@ export async function loadWorkingDaysReferenceData(
 export async function loadHolidaysForYears(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  years: Iterable<number>
+  years: Iterable<number>,
+  db: TenantDb
 ): Promise<Map<number, Result<ResolvedPublicHoliday[], HolidayLoadError>>> {
-  const sorted = [...new Set(years)].sort((left, right) => left - right);
-  const [first] = sorted;
-  const last = sorted.at(-1);
-  if (first === undefined || last === undefined) {
-    return new Map();
+  assertTenantDb(db, clerkOrgId);
+  {
+    assertTenantDb(db, clerkOrgId);
+    const client = db;
+
+    const sorted = [...new Set(years)].sort((left, right) => left - right);
+    const [first] = sorted;
+    const last = sorted.at(-1);
+    if (first === undefined || last === undefined) {
+      return new Map();
+    }
+    const result = await resolvePublicHolidays(
+      {
+        clerkOrgId,
+        from: `${first}-01-01`,
+        organisationId,
+        to: `${last}-12-31`,
+      },
+      undefined,
+      client
+    );
+    return new Map(
+      sorted.map((year) => [
+        year,
+        result.ok
+          ? {
+              ok: true,
+              value: result.value.filter((holiday) =>
+                holiday.date.startsWith(`${year}-`)
+              ),
+            }
+          : result,
+      ])
+    );
   }
-  const result = await resolvePublicHolidays({
-    clerkOrgId,
-    from: `${first}-01-01`,
-    organisationId,
-    to: `${last}-12-31`,
-  });
-  return new Map(
-    sorted.map((year) => [
-      year,
-      result.ok
-        ? {
-            ok: true,
-            value: result.value.filter((holiday) =>
-              holiday.date.startsWith(`${year}-`)
-            ),
-          }
-        : result,
-    ])
-  );
 }
 
 const WORKING_DAY_START_MINUTES = 9 * 60;
@@ -166,20 +197,24 @@ const WORKING_DAY_END_MINUTES = 17 * 60;
 const WORKING_DAY_MINUTES = WORKING_DAY_END_MINUTES - WORKING_DAY_START_MINUTES;
 
 export async function computeWorkingDays(
-  input: ComputeWorkingDaysInput
+  input: ComputeWorkingDaysInput,
+  db: TenantDb
 ): Promise<Result<number, DurationError>> {
-  if (input.endsAt < input.startsAt) {
-    return {
-      error: {
-        code: "invalid_range",
-        message: "End date must be after start date",
-      },
-      ok: false,
-    };
-  }
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  try {
-    const location = await loadDurationLocation(input);
+    if (input.endsAt < input.startsAt) {
+      return {
+        error: {
+          code: "invalid_range",
+          message: "End date must be after start date",
+        },
+        ok: false,
+      };
+    }
+    const location = await loadDurationLocation(input, client);
     if (!location) {
       return {
         error: {
@@ -198,7 +233,8 @@ export async function computeWorkingDays(
           await loadHolidaysForYears(
             input.clerkOrgId as ClerkOrgId,
             input.organisationId as OrganisationId,
-            yearsBetween(startParts.year, endParts.year)
+            yearsBetween(startParts.year, endParts.year),
+            client
           )
         ).values(),
       ],
@@ -225,14 +261,6 @@ export async function computeWorkingDays(
     }
 
     return { ok: true, value: roundHalfUpToQuarter(duration) };
-  } catch {
-    return {
-      error: {
-        code: "unknown_error",
-        message: "Failed to compute working days",
-      },
-      ok: false,
-    };
   }
 }
 
@@ -337,44 +365,51 @@ export function computeWorkingDaysFromReferenceData(
   }
 }
 
-async function loadDurationLocation(input: ComputeWorkingDaysInput) {
-  if (input.locationId) {
-    return await tenantDatabase(input.clerkOrgId).location.findFirst({
+async function loadDurationLocation(
+  input: ComputeWorkingDaysInput,
+  db: TenantDb
+) {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    if (input.locationId) {
+      return await client.location.findFirst({
+        select: {
+          country_code: true,
+          region_code: true,
+          timezone: true,
+        },
+        where: {
+          ...scopedQuery(
+            input.clerkOrgId as ClerkOrgId,
+            input.organisationId as OrganisationId
+          ),
+          id: input.locationId,
+        },
+      });
+    }
+
+    const organisation = await client.organisation.findFirst({
       select: {
         country_code: true,
-        region_code: true,
         timezone: true,
       },
       where: {
-        ...scopedQuery(
-          input.clerkOrgId as ClerkOrgId,
-          input.organisationId as OrganisationId
-        ),
-        id: input.locationId,
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+        id: input.organisationId,
       },
     });
+    return organisation
+      ? {
+          country_code: organisation.country_code,
+          region_code: null,
+          timezone: organisation.timezone,
+        }
+      : null;
   }
-
-  const organisation = await tenantDatabase(
-    input.clerkOrgId
-  ).organisation.findFirst({
-    select: {
-      country_code: true,
-      timezone: true,
-    },
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-      id: input.organisationId,
-    },
-  });
-  return organisation
-    ? {
-        country_code: organisation.country_code,
-        region_code: null,
-        timezone: organisation.timezone,
-      }
-    : null;
 }
 
 function resolveDurationLocation(

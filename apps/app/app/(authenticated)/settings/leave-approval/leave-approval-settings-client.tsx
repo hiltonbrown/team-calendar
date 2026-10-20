@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AccountApprovalSettings,
   OrganisationSettings,
   OrganisationSettingsPatch,
 } from "@repo/availability";
@@ -28,10 +29,12 @@ import {
 import { SettingsSectionHeader } from "../components/settings-section-header";
 import {
   restoreLeaveApprovalDefaultsAction,
+  updateAccountManagerVisibilityAction,
   updateLeaveApprovalSettingsAction,
 } from "./_actions";
 
 interface LeaveApprovalSettingsClientProps {
+  accountSettings: AccountApprovalSettings;
   organisationId: string;
   settings: OrganisationSettings;
 }
@@ -39,8 +42,10 @@ interface LeaveApprovalSettingsClientProps {
 export const LeaveApprovalSettingsClient = ({
   organisationId,
   settings,
+  accountSettings,
 }: LeaveApprovalSettingsClientProps) => {
   const [state, setState] = useState(settings);
+  const [accountState, setAccountState] = useState(accountSettings);
   const [isPending, startTransition] = useTransition();
   const [saveState, setSaveState] = useState<
     Partial<Record<string, SettingSaveState>>
@@ -89,7 +94,6 @@ export const LeaveApprovalSettingsClient = ({
         defaultLeaveRequestAdvanceDays: 0,
         defaultPrivacyMode: "named",
         feedsIncludePublicHolidaysDefault: false,
-        managerVisibilityScope: "direct_reports_only",
         notifyManagersOnStatusChange: true,
         requireDeclineReason: true,
         showDeclinedOnApprovals: true,
@@ -100,10 +104,40 @@ export const LeaveApprovalSettingsClient = ({
     });
   };
 
+  const updateManagerVisibility = (
+    managerVisibilityScope: AccountApprovalSettings["managerVisibilityScope"]
+  ) => {
+    const previous = accountState;
+    setAccountState({ ...accountState, managerVisibilityScope });
+    setSaveState((current) => ({
+      ...current,
+      managerVisibilityScope: "saving",
+    }));
+    startTransition(async () => {
+      const result = await updateAccountManagerVisibilityAction({
+        managerVisibilityScope,
+      });
+      if (!result.ok) {
+        setAccountState(previous);
+        setSaveState((current) => ({
+          ...current,
+          managerVisibilityScope: "error",
+        }));
+        toast.error(result.error.message);
+        return;
+      }
+      setSaveState((current) => ({
+        ...current,
+        managerVisibilityScope: "saved",
+      }));
+      toast.success("Account manager visibility updated.");
+    });
+  };
+
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Each change is saved immediately and applied across approvals, planning, calendar, people, and analytics."
+        description="Manager visibility applies to every company in this account. Other settings apply to the selected company. Changes are saved immediately."
         title="Leave Approval"
       />
 
@@ -155,8 +189,9 @@ export const LeaveApprovalSettingsClient = ({
             Manager visibility scope
           </CardTitle>
           <CardDescription id="manager-visibility-description">
-            Controls whether managers see only direct reports or indirect
-            reports as well.
+            This setting applies to every company in this account. Controls
+            whether managers see only direct reports or indirect reports as
+            well.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -170,12 +205,10 @@ export const LeaveApprovalSettingsClient = ({
                 value === "direct_reports_only" ||
                 value === "all_team_leave"
               ) {
-                updatePatch("managerVisibilityScope", {
-                  managerVisibilityScope: value,
-                });
+                updateManagerVisibility(value);
               }
             }}
-            value={state.managerVisibilityScope}
+            value={accountState.managerVisibilityScope}
           >
             <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-4 py-3">
               <RadioGroupItem
@@ -311,7 +344,7 @@ export const LeaveApprovalSettingsClient = ({
             onClick={restoreDefaults}
             variant="ghost"
           >
-            Restore defaults
+            Restore company defaults
           </Button>
           <SettingSaveStatus
             id="restore-defaults-status"

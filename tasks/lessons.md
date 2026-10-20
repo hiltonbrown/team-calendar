@@ -158,6 +158,11 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Working with the operator
 
+- Keep verification within the user's current scope. Update affected fixtures
+  before broad checks, reuse passing results that remain valid, and rerun only
+  affected tests unless a required gate calls for the full suite. Do not resume
+  paused database or Neon checks or begin a gated stage without authorisation.
+
 - When the user supplies a database through environment variables, use that target via the guarded integration runner and owned fixtures. Do not substitute a disposable local database without an explicit request; inspect existing environment and runner configuration first.
 
 - When told not to block, a host permission denial ends only the denied action.
@@ -185,6 +190,10 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Dashboard design
 
+- When the user pauses verification, pause all checks, including unit tests and
+  typechecks. Continue the requested implementation and record checks as pending;
+  do not silently narrow the pause to database or network verification.
+
 - Dashboards hold frequently checked, up-to-the-minute information only. Do not
   put Xero sync failures, sync health metrics, Xero connection banners or other
   rare exception or setup states on a dashboard. Failures belong in the action
@@ -199,3 +208,7 @@ Keep one-off task evidence in that task's review, not here.
   apps, packages, scripts and tooling).
 - When the user says "commit and push" while on main, commit and push to main.
   Only create a branch if they ask for one.
+
+- For this pre-launch app, do not add compatibility parameters or bridges for
+  existing internal callers. Migrate the callers to the planned API instead;
+  internal source compatibility is not a user or account migration requirement.

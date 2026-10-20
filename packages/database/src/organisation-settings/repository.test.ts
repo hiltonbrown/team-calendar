@@ -1,8 +1,11 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
+  createMany: vi.fn(),
   findFirst: vi.fn(),
   findFirstOrThrow: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
@@ -13,14 +16,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({
-    organisationSettings: {
-      create: mocks.create,
-      findFirst: mocks.findFirst,
-      findFirstOrThrow: mocks.findFirstOrThrow,
-      updateMany: mocks.updateMany,
-    },
-  }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async () => [],
+        organisationSettings: {
+          createMany: mocks.createMany,
+          findFirst: mocks.findFirst,
+          findFirstOrThrow: mocks.findFirstOrThrow,
+          updateMany: mocks.updateMany,
+        },
+      }),
+  },
 }));
 vi.mock("../tenant-query", () => ({
   scopedQuery: mocks.scopedQuery,
@@ -43,7 +50,6 @@ const row = {
   default_privacy_mode: "named" as const,
   feeds_include_public_holidays_default: false,
   id: "75000000-0000-4000-8000-000000000001",
-  manager_visibility_scope: "direct_reports_only" as const,
   notify_managers_on_status_change: true,
   organisation_id: tenant.organisationId,
   require_decline_reason: true,
@@ -60,7 +66,9 @@ describe("organisation-settings repository", () => {
   it("returns an existing row when present", async () => {
     mocks.findFirst.mockResolvedValue(row);
 
-    const result = await getOrCreateForOrganisation(tenant);
+    const result = await withTestTenantDb(tenantTestAccount(tenant), (db) =>
+      getOrCreateForOrganisation(tenant, db)
+    );
 
     expect(result).toEqual(row);
     expect(mocks.create).not.toHaveBeenCalled();
@@ -68,57 +76,74 @@ describe("organisation-settings repository", () => {
 
   it("creates a default row when missing", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    mocks.create.mockResolvedValue(row);
+    mocks.createMany.mockResolvedValue({ count: 1 });
+    mocks.findFirstOrThrow.mockResolvedValue(row);
 
-    const result = await getOrCreateForOrganisation(tenant);
+    const result = await withTestTenantDb(tenantTestAccount(tenant), (db) =>
+      getOrCreateForOrganisation(tenant, db)
+    );
 
     expect(result).toEqual(row);
-    expect(mocks.create).toHaveBeenCalledWith({
+    expect(mocks.createMany).toHaveBeenCalledWith({
       data: {
         clerk_org_id: tenant.clerkOrgId,
         organisation_id: tenant.organisationId,
       },
-      select: expect.any(Object),
+      skipDuplicates: true,
     });
   });
 
   it("is idempotent under concurrent calls", async () => {
     mocks.findFirst.mockResolvedValue(null);
-    mocks.create.mockRejectedValueOnce(new Error("duplicate"));
-    mocks.create.mockResolvedValueOnce(row);
+    mocks.createMany.mockResolvedValueOnce({ count: 0 });
+    mocks.createMany.mockResolvedValueOnce({ count: 1 });
     mocks.findFirstOrThrow.mockResolvedValue(row);
 
     const [first, second] = await Promise.all([
-      getOrCreateForOrganisation(tenant),
-      getOrCreateForOrganisation(tenant),
+      withTestTenantDb(tenantTestAccount(tenant), (db) =>
+        getOrCreateForOrganisation(tenant, db)
+      ),
+      withTestTenantDb(tenantTestAccount(tenant), (db) =>
+        getOrCreateForOrganisation(tenant, db)
+      ),
     ]);
 
     expect(first).toEqual(row);
     expect(second).toEqual(row);
-    expect(mocks.findFirstOrThrow).toHaveBeenCalledTimes(1);
+    expect(mocks.findFirstOrThrow).toHaveBeenCalledTimes(2);
   });
 
   it("updates persisted values", async () => {
     const updated = {
       ...row,
-      manager_visibility_scope: "all_team_leave" as const,
+      require_decline_reason: false as const,
     };
     mocks.findFirst.mockResolvedValue(row);
     mocks.updateMany.mockResolvedValue({ count: 1 });
     mocks.findFirstOrThrow.mockResolvedValue(updated);
 
-    const result = await updateForOrganisation({
-      ...tenant,
-      patch: { manager_visibility_scope: "all_team_leave" },
-    });
+    const result = await withTestTenantDb(
+      tenantTestAccount({
+        ...tenant,
+        patch: { require_decline_reason: false },
+      }),
+      (db) =>
+        updateForOrganisation(
+          {
+            ...tenant,
+            patch: { require_decline_reason: false },
+          },
+          db
+        )
+    );
 
     expect(mocks.updateMany).toHaveBeenCalledWith({
-      data: { manager_visibility_scope: "all_team_leave" },
+      data: { require_decline_reason: false },
       where: {
         clerk_org_id: tenant.clerkOrgId,
         organisation_id: tenant.organisationId,
       },
     });
-    expect(result.manager_visibility_scope).toBe("all_team_leave");
+    expect(result.require_decline_reason).toBe(false);
   });
 });

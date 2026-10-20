@@ -1,5 +1,6 @@
 import { requireRole } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import {
   cancelXeroOAuth,
@@ -62,6 +63,7 @@ function clearNonce(response: NextResponse): NextResponse {
   return response;
 }
 export async function GET(request: Request) {
+  assertNoTenantTransaction("GET");
   if (isPreviewDeployment()) {
     return clearNonce(
       NextResponse.json(

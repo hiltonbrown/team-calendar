@@ -1,5 +1,7 @@
 import { addDaysToDateKey } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 import type {
   CalendarDay,
   CalendarEvent,
@@ -11,6 +13,20 @@ import type {
 const mocks = vi.hoisted(() => ({
   countAwayPeopleByTeamAndDay: vi.fn(),
   listTeamsWithCoverageMinimum: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+  resolveAccountCompanies: async () => [{ id: scope.organisationId }],
 }));
 
 vi.mock("@repo/database/queries/teams", () => ({
@@ -33,6 +49,8 @@ const scope = {
 function buildPerson(id: string, teamId: string | null): CalendarPerson {
   return {
     avatarUrl: null,
+    companyId: scope.organisationId,
+    companyName: "Acme Org",
     displayName: id,
     firstName: id,
     id,
@@ -56,6 +74,8 @@ function buildEvent(
     allDay: true,
     approvalStatus: "approved",
     avatarUrl: null,
+    companyId: scope.organisationId,
+    companyName: "Acme Org",
     contactabilityStatus: null,
     displayName: personId,
     endsAt: new Date("2026-10-13T14:00:00.000Z"),
@@ -191,28 +211,56 @@ describe("loadManagerCoverage", () => {
   });
 
   it("reads team counts with both tenancy keys and the shared away types", async () => {
-    await loadManagerCoverage({
-      ...scope,
-      ranges: buildRanges(),
-      today: TODAY,
-    });
-    expect(mocks.listTeamsWithCoverageMinimum).toHaveBeenCalledWith(scope);
-    expect(mocks.countAwayPeopleByTeamAndDay).toHaveBeenCalledWith({
-      ...scope,
-      awayRecordTypes: AWAY_RECORD_TYPES,
-      from: "2026-10-09",
-      teamIds: ["team-support"],
-      timezone: TIMEZONE,
-      to: "2026-10-15",
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...scope,
+        ranges: buildRanges(),
+        today: TODAY,
+      }),
+      (db) =>
+        loadManagerCoverage(
+          {
+            ...scope,
+            ranges: buildRanges(),
+            today: TODAY,
+          },
+          db
+        )
+    );
+    expect(mocks.listTeamsWithCoverageMinimum).toHaveBeenCalledWith(
+      scope,
+      expect.any(Object)
+    );
+    expect(mocks.countAwayPeopleByTeamAndDay).toHaveBeenCalledWith(
+      {
+        ...scope,
+        awayRecordTypes: AWAY_RECORD_TYPES,
+        from: "2026-10-09",
+        teamIds: ["team-support"],
+        timezone: TIMEZONE,
+        to: "2026-10-15",
+      },
+      expect.any(Object)
+    );
   });
 
   it("builds rows for teams in scope with full headcount, then No team", async () => {
-    const result = await loadManagerCoverage({
-      ...scope,
-      ranges: buildRanges(),
-      today: TODAY,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...scope,
+        ranges: buildRanges(),
+        today: TODAY,
+      }),
+      (db) =>
+        loadManagerCoverage(
+          {
+            ...scope,
+            ranges: buildRanges(),
+            today: TODAY,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -268,11 +316,24 @@ describe("loadManagerCoverage", () => {
 
   it("omits the No team row when everyone in scope has a team", async () => {
     const teamPeople = people.slice(0, 2);
-    const result = await loadManagerCoverage({
-      ...scope,
-      ranges: [buildRange({ people: teamPeople, weekStart: "2026-10-05" })],
-      today: TODAY,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...scope,
+        ranges: [buildRange({ people: teamPeople, weekStart: "2026-10-05" })],
+        today: TODAY,
+      }),
+      (db) =>
+        loadManagerCoverage(
+          {
+            ...scope,
+            ranges: [
+              buildRange({ people: teamPeople, weekStart: "2026-10-05" }),
+            ],
+            today: TODAY,
+          },
+          db
+        )
+    );
     expect(result.ok && result.value.rows.map((row) => row.teamId)).toEqual([
       "team-support",
     ]);
@@ -284,7 +345,14 @@ describe("loadManagerCoverage", () => {
       ok: false,
     });
     await expect(
-      loadManagerCoverage({ ...scope, ranges: buildRanges(), today: TODAY })
+      withTestTenantResult(
+        tenantTestAccount({ ...scope, ranges: buildRanges(), today: TODAY }),
+        (db) =>
+          loadManagerCoverage(
+            { ...scope, ranges: buildRanges(), today: TODAY },
+            db
+          )
+      )
     ).resolves.toEqual({
       error: { code: "internal", message: "Failed to count people away" },
       ok: false,
@@ -294,13 +362,23 @@ describe("loadManagerCoverage", () => {
       ok: false,
     });
     await expect(
-      loadManagerCoverage({ ...scope, ranges: buildRanges(), today: TODAY })
+      withTestTenantResult(
+        tenantTestAccount({ ...scope, ranges: buildRanges(), today: TODAY }),
+        (db) =>
+          loadManagerCoverage(
+            { ...scope, ranges: buildRanges(), today: TODAY },
+            db
+          )
+      )
     ).resolves.toMatchObject({ error: { code: "internal" }, ok: false });
   });
 
   it("requires a calendar range", async () => {
     await expect(
-      loadManagerCoverage({ ...scope, ranges: [], today: TODAY })
+      withTestTenantResult(
+        tenantTestAccount({ ...scope, ranges: [], today: TODAY }),
+        (db) => loadManagerCoverage({ ...scope, ranges: [], today: TODAY }, db)
+      )
     ).resolves.toMatchObject({ error: { code: "bad_request" }, ok: false });
     expect(mocks.listTeamsWithCoverageMinimum).not.toHaveBeenCalled();
   });

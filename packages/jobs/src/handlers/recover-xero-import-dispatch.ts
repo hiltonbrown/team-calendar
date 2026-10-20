@@ -1,7 +1,8 @@
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { systemDatabase, tenantDatabase } from "@repo/database";
+import { systemDatabase, withTenantDb } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { dispatchInitialXeroSync } from "../events";
 export interface RecoverXeroImportDispatchOptions {
@@ -15,6 +16,7 @@ export interface RecoverXeroImportDispatchResult {
 export async function recoverXeroImportDispatch(
   _options: RecoverXeroImportDispatchOptions = {}
 ): Promise<Result<RecoverXeroImportDispatchResult>> {
+  assertNoTenantTransaction("recoverXeroImportDispatch");
   try {
     const tenants = await systemDatabase.xeroConnection.findMany({
       select: {
@@ -40,17 +42,17 @@ export async function recoverXeroImportDispatch(
     let dispatched = 0;
     let skipped = 0;
     for (const tenant of tenants) {
-      const activeRun = await tenantDatabase(
-        tenant.clerk_org_id
-      ).syncRun.findFirst({
-        where: {
-          clerk_org_id: tenant.clerk_org_id,
-          organisation_id: tenant.organisation_id,
-          run_type: "people",
-          status: "running",
-          xero_connection_id: tenant.id,
-        },
-      });
+      const activeRun = await withTenantDb(tenant.clerk_org_id, (db) =>
+        db.syncRun.findFirst({
+          where: {
+            clerk_org_id: tenant.clerk_org_id,
+            organisation_id: tenant.organisation_id,
+            run_type: "people",
+            status: "running",
+            xero_connection_id: tenant.id,
+          },
+        })
+      );
       if (activeRun) {
         skipped += 1;
         continue;

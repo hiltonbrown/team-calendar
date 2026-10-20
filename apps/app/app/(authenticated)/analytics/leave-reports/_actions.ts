@@ -8,10 +8,11 @@ import {
   listLeaveReportRecordsForDrilldown,
   resolveDateRange,
 } from "@repo/availability";
-import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ExportSchema = z.object({
   from: z.string().optional(),
@@ -42,17 +43,13 @@ export async function exportLeaveReportsCsvAction(input: {
   preset: z.infer<typeof ExportSchema>["preset"];
   to?: string;
 }): Promise<ActionResult<{ csvContent: string; filename: string }>> {
+  assertNoTenantTransaction("exportLeaveReportsCsvAction");
   const parsed = ExportSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(parsed.data.organisationId),
-  ]);
-
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   let role: AnalyticsRole | null = null;
   if (orgRole === "org:owner") {
     role = "owner";
@@ -62,89 +59,106 @@ export async function exportLeaveReportsCsvAction(input: {
     role = "manager";
   }
 
-  if (!(role && user && context.ok)) {
+  if (!(orgId && role && user)) {
     return notAuthorised();
   }
 
+  const clerkOrgId = orgId as ClerkOrgId;
   try {
-    const organisation = await tenantDatabase(
-      context.value.clerkOrgId
-    ).organisation.findFirst({
-      select: { timezone: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: context.value.clerkOrgId,
-        id: parsed.data.organisationId,
-      },
-    });
+    return await withTenantResult(
+      clerkOrgId,
+      async (db): ReturnType<typeof exportLeaveReportsCsvAction> => {
+        const company = await getOrganisationById(
+          clerkOrgId,
+          parsed.data.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return notAuthorised();
+        }
 
-    if (!organisation) {
-      return validationError("Organisation not found.");
-    }
-
-    const rangeResult = resolveDateRange({
-      customEnd: parsed.data.to,
-      customStart: parsed.data.from,
-      preset: parsed.data.preset,
-      timezone: organisation.timezone ?? "UTC",
-    });
-
-    if (!rangeResult.ok) {
-      return {
-        error: {
-          code: "unknown_error",
-          message: "Failed to resolve date range.",
-        },
-        ok: false,
-      };
-    }
-
-    const records: AnalyticsRecordListItem[] = [];
-    let cursor: string | null | undefined;
-    const maxRecords = 10_000;
-
-    for (;;) {
-      const result = await listLeaveReportRecordsForDrilldown({
-        actingUserId: user.id,
-        clerkOrgId: context.value.clerkOrgId,
-        cursor,
-        dateRange: rangeResult.value,
-        filters: {
-          includeArchivedPeople: false,
-          personType: "all",
-        },
-        includePublicHolidays: false,
-        organisationId: parsed.data.organisationId,
-        pageSize: 200,
-        role,
-      });
-
-      if (!result.ok) {
-        return {
-          error: {
-            code: "unknown_error",
-            message: result.error.message || "Failed to list leave records.",
+        const organisation = await db.organisation.findFirst({
+          select: { timezone: true },
+          where: {
+            archived_at: null,
+            clerk_org_id: clerkOrgId,
+            id: parsed.data.organisationId,
           },
-          ok: false,
+        });
+
+        if (!organisation) {
+          return validationError("Organisation not found.");
+        }
+
+        const rangeResult = resolveDateRange({
+          customEnd: parsed.data.to,
+          customStart: parsed.data.from,
+          preset: parsed.data.preset,
+          timezone: organisation.timezone ?? "UTC",
+        });
+
+        if (!rangeResult.ok) {
+          return {
+            error: {
+              code: "unknown_error",
+              message: "Failed to resolve date range.",
+            },
+            ok: false,
+          };
+        }
+
+        const records: AnalyticsRecordListItem[] = [];
+        let cursor: string | null | undefined;
+        const maxRecords = 10_000;
+
+        for (;;) {
+          const result = await listLeaveReportRecordsForDrilldown(
+            {
+              actingUserId: user.id,
+              clerkOrgId,
+              cursor,
+              dateRange: rangeResult.value,
+              filters: {
+                includeArchivedPeople: false,
+                personType: "all",
+              },
+              includePublicHolidays: false,
+              organisationId: parsed.data.organisationId,
+              pageSize: 200,
+              role,
+            },
+            db
+          );
+
+          if (!result.ok) {
+            return {
+              error: {
+                code: "unknown_error",
+                message:
+                  result.error.message || "Failed to list leave records.",
+              },
+              ok: false,
+            };
+          }
+
+          records.push(...result.value.records);
+          if (!result.value.nextCursor || records.length >= maxRecords) {
+            break;
+          }
+          cursor = result.value.nextCursor;
+        }
+
+        const csvContent = exportAnalyticsToCsv(records);
+
+        return {
+          ok: true,
+          value: {
+            csvContent,
+            filename: `leave-report-${dateOnly(rangeResult.value.start, organisation.timezone ?? "UTC")}-to-${dateOnly(new Date(rangeResult.value.end.getTime() - 1), organisation.timezone ?? "UTC")}.csv`,
+          },
         };
       }
-
-      records.push(...result.value.records);
-      if (!result.value.nextCursor || records.length >= maxRecords) {
-        break;
-      }
-      cursor = result.value.nextCursor;
-    }
-
-    const csvContent = exportAnalyticsToCsv(records);
-
-    return {
-      ok: true,
-      value: {
-        csvContent,
-        filename: `leave-report-${dateOnly(rangeResult.value.start, organisation.timezone ?? "UTC")}-to-${dateOnly(new Date(rangeResult.value.end.getTime() - 1), organisation.timezone ?? "UTC")}.csv`,
-      },
-    };
+    );
   } catch {
     return {
       error: {

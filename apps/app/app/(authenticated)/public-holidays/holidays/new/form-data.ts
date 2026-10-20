@@ -1,9 +1,12 @@
+import { requireOrg } from "@repo/auth/helpers";
+import type { ClerkOrgId } from "@repo/core";
+import { withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 
 import { COUNTRIES, REGIONS } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 
 export interface HolidayCountryOption {
   code: string;
@@ -24,16 +27,23 @@ export function holidayCountryOptions(): HolidayCountryOption[] {
 }
 
 export async function loadNewHolidayFormData(orgParam?: string) {
+  assertNoTenantTransaction("loadNewHolidayFormData");
   await requirePageRole("org:admin");
-  const { clerkOrgId, organisationId } =
-    await requireActiveOrgPageContext(orgParam);
-  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
-    select: { country_code: true },
-    where: { clerk_org_id: clerkOrgId, id: organisationId },
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  return withTenantDb(clerkOrgId, async (db) => {
+    const { organisationId } = await resolveActiveOrgPageContext(
+      clerkOrgId,
+      orgParam,
+      db
+    );
+    const organisation = await db.organisation.findFirst({
+      select: { country_code: true },
+      where: { clerk_org_id: clerkOrgId, id: organisationId },
+    });
+    return {
+      countries: holidayCountryOptions(),
+      defaultCountryCode: organisation?.country_code ?? null,
+      organisationId,
+    };
   });
-  return {
-    countries: holidayCountryOptions(),
-    defaultCountryCode: organisation?.country_code ?? null,
-    organisationId,
-  };
 }

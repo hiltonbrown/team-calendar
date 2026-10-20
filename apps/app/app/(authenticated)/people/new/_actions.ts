@@ -2,11 +2,13 @@
 
 import { auth } from "@repo/auth/server";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { afterTenantCommit, withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createManualPerson } from "@/lib/server/create-manual-person";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const CreatePersonSchema = z.object({
   email: z.string().trim().email().max(256),
@@ -32,36 +34,55 @@ export async function createManualPersonAction(input: {
   lastName: string;
   organisationId: string;
 }): Promise<ActionResult<never>> {
+  assertNoTenantTransaction("createManualPersonAction");
   const parsed = CreatePersonSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const { orgRole } = await auth();
-  if (orgRole !== "org:admin" && orgRole !== "org:owner") {
+  const { orgId, orgRole } = await auth();
+  if (!orgId || (orgRole !== "org:admin" && orgRole !== "org:owner")) {
     return notAuthorised();
   }
 
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return notAuthorised();
+  // Trusted Clerk account, and company UUID validated in the same SQL scope.
+  const clerkOrgId = orgId as ClerkOrgId;
+  let created: ActionResult<{ personId: string }>;
+  try {
+    created = await withTenantResult(clerkOrgId, async (db) => {
+      const company = await getOrganisationById(
+        clerkOrgId,
+        parsed.data.organisationId as OrganisationId,
+        db
+      );
+      if (!company.ok) {
+        return notAuthorised();
+      }
+      const result = await createManualPerson(
+        {
+          ...parsed.data,
+          clerkOrgId,
+          organisationId: company.value.id as OrganisationId,
+        },
+        db
+      );
+      if (result.ok) {
+        afterTenantCommit(db, async () => revalidatePath("/people"));
+      }
+      return result;
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to create person. Please try again.",
+      },
+      ok: false,
+    };
   }
-
-  const { clerkOrgId, organisationId } = contextResult.value;
-  const created = await createManualPerson({
-    clerkOrgId: clerkOrgId as ClerkOrgId,
-    email: parsed.data.email,
-    employmentType: parsed.data.employmentType,
-    firstName: parsed.data.firstName,
-    jobTitle: parsed.data.jobTitle,
-    lastName: parsed.data.lastName,
-    organisationId: organisationId as OrganisationId,
-  });
   if (!created.ok) {
     return { error: created.error, ok: false };
   }
-
-  revalidatePath("/people");
   redirect("/people");
 }
 

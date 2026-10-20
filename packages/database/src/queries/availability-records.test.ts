@@ -1,5 +1,7 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
@@ -7,12 +9,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({
-    availabilityRecord: {
-      findFirst: mocks.findFirst,
-      findMany: mocks.findMany,
-    },
-  }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async () => [],
+        ...{
+          availabilityRecord: {
+            findFirst: mocks.findFirst,
+            findMany: mocks.findMany,
+          },
+        },
+      }),
+  },
 }));
 
 const { listAvailabilityForCalendar } = await import("./availability-records");
@@ -32,13 +40,19 @@ describe("availability-records queries", () => {
     const startDate = new Date("2026-08-01");
     const endDate = new Date("2026-08-31");
 
-    const result = await listAvailabilityForCalendar(
-      clerkOrgId,
-      organisationId,
-      {
-        endDate,
-        startDate,
-      }
+    const result = await withTestTenantResult(
+      tenantTestAccount(clerkOrgId),
+      (db) =>
+        listAvailabilityForCalendar(
+          clerkOrgId,
+          organisationId,
+          {
+            endDate,
+            startDate,
+          },
+          undefined,
+          db
+        )
     );
 
     expect(result).toEqual({ ok: true, value: [] });

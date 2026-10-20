@@ -1,3 +1,4 @@
+import { tenantAggregationCache } from "./tenant-request-cache";
 import "server-only";
 
 import {
@@ -8,7 +9,7 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_record_type,
@@ -184,16 +185,24 @@ interface Dataset {
 }
 
 export async function aggregateLeaveReports(
-  input: z.input<typeof AggregateSchema> & { cache?: AggregationCache }
+  input: z.input<typeof AggregateSchema> & { cache?: AggregationCache },
+  db: TenantDb
 ): Promise<Result<LeaveReportsData, AnalyticsServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = AggregateSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof aggregateLeaveReports> => {
     const filters = normaliseFilters(parsed.data.filters, parsed.data.role);
-    const dataset = await loadDataset(parsed.data, filters, input.cache);
+    const dataset = await loadDataset(
+      parsed.data,
+      filters,
+      tenantAggregationCache(input.clerkOrgId, client),
+      client
+    );
     if (!dataset.ok) {
       return dataset;
     }
@@ -245,22 +254,27 @@ export async function aggregateLeaveReports(
         },
       },
     };
-  } catch {
-    return unknownError("Failed to aggregate leave reports.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function listLeaveReportRecordsForDrilldown(
-  input: z.input<typeof DrilldownSchema> & { cache?: AggregationCache }
+  input: z.input<typeof DrilldownSchema> & { cache?: AggregationCache },
+  db: TenantDb
 ): Promise<Result<RecordListPage, AnalyticsServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = DrilldownSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof listLeaveReportRecordsForDrilldown> => {
     const filters = normaliseFilters(parsed.data.filters, parsed.data.role);
-    const peopleResult = await loadPeople(parsed.data, filters);
+    const peopleResult = await loadPeople(parsed.data, filters, client);
     if (!peopleResult.ok) {
       return peopleResult;
     }
@@ -269,9 +283,7 @@ export async function listLeaveReportRecordsForDrilldown(
       return { ok: true, value: { nextCursor: null, records: [] } };
     }
 
-    const records = await tenantDatabase(
-      input.clerkOrgId
-    ).availabilityRecord.findMany({
+    const records = await client.availabilityRecord.findMany({
       cursor: parsed.data.cursor ? { id: parsed.data.cursor } : undefined,
       orderBy: [{ starts_at: "desc" }, { id: "desc" }],
       select: analyticsRecordSelect,
@@ -284,7 +296,8 @@ export async function listLeaveReportRecordsForDrilldown(
     const workingDays = await workingDaysByRecord(
       pageRows,
       parsed.data,
-      parsed.data.includePublicHolidays
+      parsed.data.includePublicHolidays,
+      client
     );
 
     return {
@@ -294,9 +307,11 @@ export async function listLeaveReportRecordsForDrilldown(
         records: pageRows.map((record) => recordListItem(record, workingDays)),
       },
     };
-  } catch {
-    return unknownError("Failed to list leave report records.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 function normaliseFilters(
@@ -319,71 +334,84 @@ function normaliseFilters(
 async function loadDataset(
   input: AggregateInput,
   filters: LeaveReportsFilters,
-  cache?: AggregationCache
+  cache: AggregationCache | undefined,
+  db: TenantDb
 ): Promise<Result<Dataset, AnalyticsServiceError>> {
-  const key = aggregationFingerprint({
-    clerkOrgId: input.clerkOrgId,
-    dateRangeKey: `${input.dateRange.start.toISOString()}:${input.dateRange.end.toISOString()}`,
-    filterKey: {
-      filters,
-      includePublicHolidays: input.includePublicHolidays,
-      role: input.role,
-    },
-    organisationId: input.organisationId,
-    serviceMethod: "leave-reports:dataset",
-  });
-  const load = () => loadDatasetUncached(input, filters);
-  return cache ? await cache.getOrLoad(key, load) : await load();
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const key = aggregationFingerprint({
+      clerkOrgId: input.clerkOrgId,
+      dateRangeKey: `${input.dateRange.start.toISOString()}:${input.dateRange.end.toISOString()}`,
+      filterKey: {
+        actingUserId: input.actingUserId,
+        filters,
+        includePublicHolidays: input.includePublicHolidays,
+        role: input.role,
+      },
+      organisationId: input.organisationId,
+      serviceMethod: "leave-reports:dataset",
+    });
+    const load = () => loadDatasetUncached(input, filters, client);
+    return cache ? await cache.getOrLoad(key, load) : await load();
+  }
 }
 
 async function loadDatasetUncached(
   input: AggregateInput,
-  filters: LeaveReportsFilters
+  filters: LeaveReportsFilters,
+  db: TenantDb
 ): Promise<Result<Dataset, AnalyticsServiceError>> {
-  const peopleResult = await loadPeople(input, filters);
-  if (!peopleResult.ok) {
-    return peopleResult;
-  }
-  const people = peopleResult.value;
-  const personIds = people.map((person) => person.id);
-  if (personIds.length === 0) {
-    return { ok: true, value: { entries: [], people, records: [] } };
-  }
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  const records = await tenantDatabase(
-    input.clerkOrgId
-  ).availabilityRecord.findMany({
-    orderBy: [{ starts_at: "asc" }, { id: "asc" }],
-    select: analyticsRecordSelect,
-    where: recordWhere(input, filters, personIds),
-  });
-  const holidayRows = input.includePublicHolidays
-    ? await loadHolidays(input)
-    : { ok: true as const, value: [] };
-  if (!holidayRows.ok) {
-    return unknownError(holidayRows.error.message);
+    const peopleResult = await loadPeople(input, filters, client);
+    if (!peopleResult.ok) {
+      return peopleResult;
+    }
+    const people = peopleResult.value;
+    const personIds = people.map((person) => person.id);
+    if (personIds.length === 0) {
+      return { ok: true, value: { entries: [], people, records: [] } };
+    }
+
+    const records = await client.availabilityRecord.findMany({
+      orderBy: [{ starts_at: "asc" }, { id: "asc" }],
+      select: analyticsRecordSelect,
+      where: recordWhere(input, filters, personIds),
+    });
+    const holidayRows = input.includePublicHolidays
+      ? await loadHolidays(input, client)
+      : { ok: true as const, value: [] };
+    if (!holidayRows.ok) {
+      return unknownError(holidayRows.error.message);
+    }
+    const holidaysByLocation = buildHolidayMap(holidayRows.value, people);
+
+    const entries = records.flatMap((record) =>
+      expandRecordAcrossDays({
+        locationHolidays:
+          holidaysByLocation.get(record.person.location_id ?? "") ?? [],
+        rangeEnd: input.dateRange.end,
+        rangeStart: input.dateRange.start,
+        record: {
+          allDay: record.all_day,
+          endsAt: record.ends_at,
+          id: record.id,
+          locationId: record.person.location_id,
+          personId: record.person_id,
+          recordType: record.record_type,
+          startsAt: record.starts_at,
+        },
+      })
+    );
+
+    return { ok: true, value: { entries, people, records } };
   }
-  const holidaysByLocation = buildHolidayMap(holidayRows.value, people);
-
-  const entries = records.flatMap((record) =>
-    expandRecordAcrossDays({
-      locationHolidays:
-        holidaysByLocation.get(record.person.location_id ?? "") ?? [],
-      rangeEnd: input.dateRange.end,
-      rangeStart: input.dateRange.start,
-      record: {
-        allDay: record.all_day,
-        endsAt: record.ends_at,
-        id: record.id,
-        locationId: record.person.location_id,
-        personId: record.person_id,
-        recordType: record.record_type,
-        startsAt: record.starts_at,
-      },
-    })
-  );
-
-  return { ok: true, value: { entries, people, records } };
 }
 
 async function loadPeople(
@@ -391,56 +419,68 @@ async function loadPeople(
     AggregateInput,
     "actingUserId" | "clerkOrgId" | "organisationId" | "role"
   >,
-  filters: LeaveReportsFilters
+  filters: LeaveReportsFilters,
+  db: TenantDb
 ): Promise<Result<PersonRow[], AnalyticsServiceError>> {
-  const scoped = scopedQuery(
-    input.clerkOrgId as ClerkOrgId,
-    input.organisationId as OrganisationId
-  );
-  const where: Prisma.PersonWhereInput = {
-    ...scoped,
-    ...(filters.includeArchivedPeople ? {} : { archived_at: null }),
-    ...(filters.locationId?.length
-      ? { location_id: { in: filters.locationId } }
-      : {}),
-    ...(filters.personId?.length ? { id: { in: filters.personId } } : {}),
-    ...(filters.teamId?.length ? { team_id: { in: filters.teamId } } : {}),
-    ...(filters.personType === "all"
-      ? {}
-      : { person_type: filters.personType }),
-  };
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  if (input.role === "viewer") {
-    where.clerk_user_id = input.actingUserId;
-  } else if (input.role === "manager") {
-    const actingPerson = await tenantDatabase(
-      input.clerkOrgId
-    ).person.findFirst({
-      select: { id: true },
-      where: {
-        ...scoped,
-        archived_at: null,
-        clerk_user_id: input.actingUserId,
-      },
-    });
-    if (!actingPerson) {
-      return { ok: true, value: [] };
-    }
-    where.id = {
-      in: await managerScopePersonIds({
-        actingPersonId: actingPerson.id,
-        clerkOrgId: input.clerkOrgId,
-        organisationId: input.organisationId,
-      }),
+    const scoped = scopedQuery(
+      input.clerkOrgId as ClerkOrgId,
+      input.organisationId as OrganisationId
+    );
+    const where: Prisma.PersonWhereInput = {
+      ...scoped,
+      ...(filters.includeArchivedPeople ? {} : { archived_at: null }),
+      ...(filters.locationId?.length
+        ? { location_id: { in: filters.locationId } }
+        : {}),
+      ...(filters.personId?.length ? { id: { in: filters.personId } } : {}),
+      ...(filters.teamId?.length ? { team_id: { in: filters.teamId } } : {}),
+      ...(filters.personType === "all"
+        ? {}
+        : { person_type: filters.personType }),
     };
-  }
 
-  const people = await tenantDatabase(input.clerkOrgId).person.findMany({
-    include: { location: true, team: true },
-    orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
-    where,
-  });
-  return { ok: true, value: people };
+    if (input.role === "viewer") {
+      where.clerk_user_id = input.actingUserId;
+    } else if (input.role === "manager") {
+      const actingPerson = await client.person.findFirst({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          clerk_user_id: input.actingUserId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: input.clerkOrgId,
+            is_active: true,
+          },
+        },
+      });
+      if (!actingPerson) {
+        return { ok: true, value: [] };
+      }
+      where.id = {
+        in: await managerScopePersonIds(
+          {
+            actingPersonId: actingPerson.id,
+            clerkOrgId: input.clerkOrgId,
+          },
+          client
+        ),
+      };
+    }
+
+    const people = await client.person.findMany({
+      include: { location: true, team: true },
+      orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
+      where,
+    });
+    return { ok: true, value: people };
+  }
 }
 
 function recordWhere(
@@ -465,13 +505,22 @@ function recordWhere(
   };
 }
 
-function loadHolidays(input: AggregateInput) {
-  return resolvePublicHolidays({
-    clerkOrgId: input.clerkOrgId as ClerkOrgId,
-    from: toDateOnly(input.dateRange.start),
-    organisationId: input.organisationId as OrganisationId,
-    to: toDateOnly(input.dateRange.end),
-  });
+async function loadHolidays(input: AggregateInput, db: TenantDb) {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+    return await resolvePublicHolidays(
+      {
+        clerkOrgId: input.clerkOrgId as ClerkOrgId,
+        from: toDateOnly(input.dateRange.start),
+        organisationId: input.organisationId as OrganisationId,
+        to: toDateOnly(input.dateRange.end),
+      },
+      undefined,
+      client
+    );
+  }
 }
 
 interface PersonForHolidayMap {
@@ -501,40 +550,47 @@ function buildHolidayMap(
 async function workingDaysByRecord(
   records: readonly RecordRow[],
   input: DrilldownInput,
-  includePublicHolidays: boolean
+  includePublicHolidays: boolean,
+  db: TenantDb
 ): Promise<Map<string, number>> {
-  const holidayRows = includePublicHolidays
-    ? await loadHolidays(input)
-    : { ok: true as const, value: [] };
-  const holidaysByLocation = holidayRows.ok
-    ? buildHolidayMap(
-        holidayRows.value,
-        records.map((record) => record.person)
-      )
-    : new Map<string, AnalyticsHoliday[]>();
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  return new Map(
-    records.map((record) => [
-      record.id,
-      sum(
-        expandRecordAcrossDays({
-          locationHolidays:
-            holidaysByLocation.get(record.person.location_id ?? "") ?? [],
-          rangeEnd: input.dateRange.end,
-          rangeStart: input.dateRange.start,
-          record: {
-            allDay: record.all_day,
-            endsAt: record.ends_at,
-            id: record.id,
-            locationId: record.person.location_id,
-            personId: record.person_id,
-            recordType: record.record_type,
-            startsAt: record.starts_at,
-          },
-        }).map((entry) => entry.workingDayFraction)
-      ),
-    ])
-  );
+    const holidayRows = includePublicHolidays
+      ? await loadHolidays(input, client)
+      : { ok: true as const, value: [] };
+    const holidaysByLocation = holidayRows.ok
+      ? buildHolidayMap(
+          holidayRows.value,
+          records.map((record) => record.person)
+        )
+      : new Map<string, AnalyticsHoliday[]>();
+
+    return new Map(
+      records.map((record) => [
+        record.id,
+        sum(
+          expandRecordAcrossDays({
+            locationHolidays:
+              holidaysByLocation.get(record.person.location_id ?? "") ?? [],
+            rangeEnd: input.dateRange.end,
+            rangeStart: input.dateRange.start,
+            record: {
+              allDay: record.all_day,
+              endsAt: record.ends_at,
+              id: record.id,
+              locationId: record.person.location_id,
+              personId: record.person_id,
+              recordType: record.record_type,
+              startsAt: record.starts_at,
+            },
+          }).map((entry) => entry.workingDayFraction)
+        ),
+      ])
+    );
+  }
 }
 
 function peopleIndex(people: readonly PersonRow[]) {

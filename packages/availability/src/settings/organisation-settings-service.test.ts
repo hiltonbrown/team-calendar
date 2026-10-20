@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
@@ -7,32 +9,32 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   getOrCreateOrganisationSettings: mocks.getOrCreateOrganisationSettings,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+  updateOrganisationSettings: mocks.updateOrganisationSettings,
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       auditEvent: {
         create: mocks.auditCreate,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        auditEvent: {
-          create: mocks.auditCreate,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-  updateOrganisationSettings: mocks.updateOrganisationSettings,
-}));
+    },
+  };
+}
 
 const service = await import("./organisation-settings-service");
 
@@ -44,7 +46,6 @@ const baseRow = {
   default_privacy_mode: "named" as const,
   feeds_include_public_holidays_default: false,
   id: "75000000-0000-4000-8000-000000000001",
-  manager_visibility_scope: "direct_reports_only" as const,
   notify_managers_on_status_change: true,
   organisation_id: "00000000-0000-4000-8000-000000000001",
   require_decline_reason: true,
@@ -61,16 +62,25 @@ describe("organisation-settings-service", () => {
   });
 
   it("returns full defaults from getSettings", async () => {
-    const result = await service.getSettings({
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+      }),
+      (db) =>
+        service.getSettings(
+          {
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
       value: {
         defaultPrivacyMode: "named",
-        managerVisibilityScope: "direct_reports_only",
         organisationId: baseRow.organisation_id,
         showPendingOnCalendar: true,
       },
@@ -86,11 +96,16 @@ describe("organisation-settings-service", () => {
       new Error("Database unavailable")
     );
 
-    expect(await service.getSettings(input)).toMatchObject({
-      error: { code: "unknown_error" },
-      ok: false,
-    });
-    expect(await service.getSettings(input)).toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(input), (db) =>
+        service.getSettings(input, db)
+      )
+    ).rejects.toThrow("Database unavailable");
+    expect(
+      await withTestTenantResult(tenantTestAccount(input), (db) =>
+        service.getSettings(input, db)
+      )
+    ).toMatchObject({
       ok: true,
       value: {
         organisationId: baseRow.organisation_id,
@@ -100,7 +115,7 @@ describe("organisation-settings-service", () => {
     expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(2);
   });
 
-  it("shares an in-flight settings load between concurrent reads", async () => {
+  it("isolates settings reads in separate transaction roots", async () => {
     const input = {
       clerkOrgId: "org_settings_concurrent",
       organisationId: baseRow.organisation_id,
@@ -111,9 +126,15 @@ describe("organisation-settings-service", () => {
     });
     mocks.getOrCreateOrganisationSettings.mockReturnValueOnce(loading);
 
-    const first = service.getSettings(input);
-    const second = service.getSettings(input);
-    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(1);
+    const first = withTestTenantResult(tenantTestAccount(input), (db) =>
+      service.getSettings(input, db)
+    );
+    const second = withTestTenantResult(tenantTestAccount(input), (db) =>
+      service.getSettings(input, db)
+    );
+    await vi.waitFor(() =>
+      expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(2)
+    );
     resolveSettings?.(baseRow);
 
     for (const result of await Promise.all([first, second])) {
@@ -125,59 +146,66 @@ describe("organisation-settings-service", () => {
         },
       });
     }
-    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(1);
+    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(2);
   });
 
   it("updates settings and writes an audit event", async () => {
     const updatedRow = {
       ...baseRow,
-      manager_visibility_scope: "all_team_leave" as const,
       notify_managers_on_status_change: false,
     };
     mocks.updateOrganisationSettings.mockResolvedValue(updatedRow);
 
-    const result = await service.updateSettings({
-      actingRole: "admin",
-      actingUserId: "user_1",
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-      patch: {
-        managerVisibilityScope: "all_team_leave",
-        notifyManagersOnStatusChange: false,
-      },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingRole: "admin",
+        actingUserId: "user_1",
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+        patch: {
+          notifyManagersOnStatusChange: false,
+        },
+      }),
+      (db) =>
+        service.updateSettings(
+          {
+            actingRole: "admin",
+            actingUserId: "user_1",
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+            patch: {
+              notifyManagersOnStatusChange: false,
+            },
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
       value: {
-        managerVisibilityScope: "all_team_leave",
         notifyManagersOnStatusChange: false,
       },
     });
-    expect(mocks.updateOrganisationSettings).toHaveBeenCalledWith({
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-      patch: {
-        manager_visibility_scope: "all_team_leave",
-        notify_managers_on_status_change: false,
+    expect(mocks.updateOrganisationSettings).toHaveBeenCalledWith(
+      {
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+        patch: {
+          notify_managers_on_status_change: false,
+        },
       },
-    });
+      expect.any(Object)
+    );
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           action: "organisation_settings.updated",
-          after_value: expect.objectContaining({
-            managerVisibilityScope: "all_team_leave",
-          }),
-          before_value: expect.objectContaining({
-            managerVisibilityScope: "direct_reports_only",
-          }),
+          after_value: expect.objectContaining({}),
+          before_value: expect.objectContaining({}),
           metadata: {
             actingUserId: "user_1",
-            changedKeys: [
-              "managerVisibilityScope",
-              "notifyManagersOnStatusChange",
-            ],
+            changedKeys: ["notifyManagersOnStatusChange"],
           },
         }),
       })
@@ -185,15 +213,30 @@ describe("organisation-settings-service", () => {
   });
 
   it("rejects unknown keys with a validation error", async () => {
-    const result = await service.updateSettings({
-      actingRole: "admin",
-      actingUserId: "user_1",
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-      patch: {
-        unknown: true,
-      } as never,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingRole: "admin",
+        actingUserId: "user_1",
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+        patch: {
+          unknown: true,
+        } as never,
+      }),
+      (db) =>
+        service.updateSettings(
+          {
+            actingRole: "admin",
+            actingUserId: "user_1",
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+            patch: {
+              unknown: true,
+            } as never,
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "validation_error" },
@@ -202,15 +245,30 @@ describe("organisation-settings-service", () => {
   });
 
   it("rejects invalid enum values", async () => {
-    const result = await service.updateSettings({
-      actingRole: "owner",
-      actingUserId: "user_1",
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-      patch: {
-        managerVisibilityScope: "invalid-scope",
-      } as never,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingRole: "owner",
+        actingUserId: "user_1",
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+        patch: {
+          managerVisibilityScope: "invalid-scope",
+        } as never,
+      }),
+      (db) =>
+        service.updateSettings(
+          {
+            actingRole: "owner",
+            actingUserId: "user_1",
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+            patch: {
+              managerVisibilityScope: "invalid-scope",
+            } as never,
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "validation_error" },
@@ -224,10 +282,20 @@ describe("organisation-settings-service", () => {
       require_decline_reason: false,
     });
 
-    const result = await service.getSettings({
-      clerkOrgId: "org_legacy",
-      organisationId: baseRow.organisation_id,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_legacy",
+        organisationId: baseRow.organisation_id,
+      }),
+      (db) =>
+        service.getSettings(
+          {
+            clerkOrgId: "org_legacy",
+            organisationId: baseRow.organisation_id,
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -236,14 +304,28 @@ describe("organisation-settings-service", () => {
   });
 
   it("rejects attempts to make decline reasons optional without persisting", async () => {
-    const result = await service.updateSettings({
-      actingRole: "admin",
-      actingUserId: "user_1",
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-      // Test-only type escape: exercise domain validation of the legacy false value.
-      patch: { requireDeclineReason: false } as never,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingRole: "admin",
+        actingUserId: "user_1",
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+        // Test-only type escape: exercise domain validation of the legacy false value.
+        patch: { requireDeclineReason: false } as never,
+      }),
+      (db) =>
+        service.updateSettings(
+          {
+            actingRole: "admin",
+            actingUserId: "user_1",
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+            // Test-only type escape: exercise domain validation of the legacy false value.
+            patch: { requireDeclineReason: false } as never,
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "validation_error" },
@@ -264,13 +346,26 @@ describe("organisation-settings-service", () => {
     ["admin", true],
     ["owner", true],
   ] as const)("authorises %s correctly", async (actingRole, expectedOk) => {
-    const result = await service.updateSettings({
-      actingRole,
-      actingUserId: "user_1",
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-      patch: { showPendingOnCalendar: false },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingRole,
+        actingUserId: "user_1",
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+        patch: { showPendingOnCalendar: false },
+      }),
+      (db) =>
+        service.updateSettings(
+          {
+            actingRole,
+            actingUserId: "user_1",
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+            patch: { showPendingOnCalendar: false },
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(expectedOk);
     if (!expectedOk) {
@@ -282,16 +377,36 @@ describe("organisation-settings-service", () => {
   });
 
   it("reuses the request-scoped cache for repeated reads", async () => {
-    const first = await service.getSettings({
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-    });
-    const second = await service.getSettings({
-      clerkOrgId: baseRow.clerk_org_id,
-      organisationId: baseRow.organisation_id,
-    });
+    const first = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+      }),
+      (db) =>
+        service.getSettings(
+          {
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+          },
+          db
+        )
+    );
+    const second = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: baseRow.clerk_org_id,
+        organisationId: baseRow.organisation_id,
+      }),
+      (db) =>
+        service.getSettings(
+          {
+            clerkOrgId: baseRow.clerk_org_id,
+            organisationId: baseRow.organisation_id,
+          },
+          db
+        )
+    );
 
     expect(first).toEqual(second);
-    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(1);
+    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,6 +1,6 @@
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 export interface LeaveBalanceData {
   balance: number;
@@ -28,104 +28,124 @@ export interface LeaveBalanceSummaryData {
 export async function listLeaveBalancesForPerson(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  personId: PersonId
+  personId: PersonId,
+  db: TenantDb
 ): Promise<Result<LeaveBalanceData[]>> {
-  try {
-    const balances = await tenantDatabase(clerkOrgId).leaveBalance.findMany({
-      orderBy: { leave_type_xero_id: "asc" },
-      select: {
-        balance: true,
-        clerk_org_id: true,
-        created_at: true,
-        currency_code: true,
-        id: true,
-        leave_type_xero_id: true,
-        organisation_id: true,
-        person_id: true,
-        updated_at: true,
-        xero_connection_id: true,
-      },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        person_id: personId,
-      },
-    });
-    return {
-      ok: true,
-      value: balances.map((b) => ({
-        balance: Number(b.balance),
-        clerkOrgId: b.clerk_org_id,
-        createdAt: b.created_at,
-        currencyCode: b.currency_code,
-        id: b.id,
-        leaveTypeXeroId: b.leave_type_xero_id,
-        organisationId: b.organisation_id as OrganisationId,
-        personId: b.person_id as PersonId,
-        updatedAt: b.updated_at,
-        xeroConnectionId: b.xero_connection_id,
-      })),
-    };
-  } catch {
-    return {
-      error: appError("internal", "Failed to list leave balances"),
-      ok: false,
-    };
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb = db;
+
+    try {
+      const balances = await tenantDb.leaveBalance.findMany({
+        orderBy: { leave_type_xero_id: "asc" },
+        select: {
+          balance: true,
+          clerk_org_id: true,
+          created_at: true,
+          currency_code: true,
+          id: true,
+          leave_type_xero_id: true,
+          organisation_id: true,
+          person_id: true,
+          updated_at: true,
+          xero_connection_id: true,
+        },
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          person_id: personId,
+        },
+      });
+      return {
+        ok: true,
+        value: balances.map((b) => ({
+          balance: Number(b.balance),
+          clerkOrgId: b.clerk_org_id,
+          createdAt: b.created_at,
+          currencyCode: b.currency_code,
+          id: b.id,
+          leaveTypeXeroId: b.leave_type_xero_id,
+          organisationId: b.organisation_id as OrganisationId,
+          personId: b.person_id as PersonId,
+          updatedAt: b.updated_at,
+          xeroConnectionId: b.xero_connection_id,
+        })),
+      };
+    } catch (error) {
+      if (tenantDb) {
+        throw error;
+      }
+      return {
+        error: appError("internal", "Failed to list leave balances"),
+        ok: false,
+      };
+    }
   }
 }
 export async function listLeaveBalancesForOrganisation(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  filters?: {
-    personId?: PersonId;
-  }
+  filters:
+    | {
+        personId?: PersonId;
+      }
+    | undefined,
+  db: TenantDb
 ): Promise<Result<LeaveBalanceSummaryData[]>> {
-  try {
-    const balances = await tenantDatabase(clerkOrgId).leaveBalance.findMany({
-      orderBy: [
-        { person: { first_name: "asc" } },
-        { leave_type_xero_id: "asc" },
-      ],
-      select: {
-        balance: true,
-        currency_code: true,
-        id: true,
-        leave_type_xero_id: true,
-        person: {
-          select: {
-            first_name: true,
-            last_name: true,
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb2 = db;
+
+    try {
+      const balances = await tenantDb2.leaveBalance.findMany({
+        orderBy: [
+          { person: { first_name: "asc" } },
+          { leave_type_xero_id: "asc" },
+        ],
+        select: {
+          balance: true,
+          currency_code: true,
+          id: true,
+          leave_type_xero_id: true,
+          person: {
+            select: {
+              first_name: true,
+              last_name: true,
+            },
           },
+          person_id: true,
+          updated_at: true,
+          xero_connection_id: true,
         },
-        person_id: true,
-        updated_at: true,
-        xero_connection_id: true,
-      },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        ...(filters?.personId && { person_id: filters.personId }),
-      },
-    });
-    return {
-      ok: true,
-      value: balances.map((b) => ({
-        balance: Number(b.balance),
-        currencyCode: b.currency_code,
-        id: b.id,
-        leaveTypeXeroId: b.leave_type_xero_id,
-        personFirstName: b.person.first_name,
-        personId: b.person_id as PersonId,
-        personLastName: b.person.last_name,
-        updatedAt: b.updated_at,
-        xeroConnectionId: b.xero_connection_id,
-      })),
-    };
-  } catch {
-    return {
-      error: appError(
-        "internal",
-        "Failed to list leave balances for organisation"
-      ),
-      ok: false,
-    };
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          ...(filters?.personId && { person_id: filters.personId }),
+        },
+      });
+      return {
+        ok: true,
+        value: balances.map((b) => ({
+          balance: Number(b.balance),
+          currencyCode: b.currency_code,
+          id: b.id,
+          leaveTypeXeroId: b.leave_type_xero_id,
+          personFirstName: b.person.first_name,
+          personId: b.person_id as PersonId,
+          personLastName: b.person.last_name,
+          updatedAt: b.updated_at,
+          xeroConnectionId: b.xero_connection_id,
+        })),
+      };
+    } catch (error) {
+      if (tenantDb2) {
+        throw error;
+      }
+      return {
+        error: appError(
+          "internal",
+          "Failed to list leave balances for organisation"
+        ),
+        ok: false,
+      };
+    }
   }
 }

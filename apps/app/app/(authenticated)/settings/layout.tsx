@@ -1,7 +1,9 @@
 import { auth } from "@repo/auth/server";
+import type { ClerkOrgId } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../components/header";
 import { SettingsNav } from "./components/settings-nav";
 
@@ -22,7 +24,10 @@ const SettingsLayout = async ({ children }: SettingsLayoutProps) => {
     redirect("/");
   }
 
-  const { organisationId } = await requireActiveOrgPageContext();
+  const clerkOrgId = orgId as ClerkOrgId;
+  const { organisationId } = await withTenantDb(clerkOrgId, (db) =>
+    resolveActiveOrgPageContext(clerkOrgId, undefined, db)
+  );
 
   return (
     <>

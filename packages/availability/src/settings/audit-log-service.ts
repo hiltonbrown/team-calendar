@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { assertTenantDb, type TenantDb } from "@repo/database";
 import { z } from "zod";
 import { csvEscape, scrubXeroWriteErrorRaw } from "./shared";
 
@@ -67,7 +67,10 @@ const ExportSchema = BaseSchema.extend({
 
 const EXPORT_LIMIT = 50_000;
 
-export async function listEvents(input: z.input<typeof ListSchema>): Promise<
+export async function listEvents(
+  input: z.input<typeof ListSchema>,
+  db: TenantDb
+): Promise<
   Result<
     {
       events: AuditEventListItem[];
@@ -77,6 +80,7 @@ export async function listEvents(input: z.input<typeof ListSchema>): Promise<
     AuditLogServiceError
   >
 > {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = ListSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -84,11 +88,10 @@ export async function listEvents(input: z.input<typeof ListSchema>): Promise<
   if (!canViewAuditLog(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
-  try {
+  const run = async (client: TenantDb): ReturnType<typeof listEvents> => {
     const where = whereFor(parsed.data);
-    const [events, totalCount] = await Promise.all([
-      tenantDatabase(input.clerkOrgId).auditEvent.findMany({
+    const [events, totalCount] = [
+      await client.auditEvent.findMany({
         cursor: parsed.data.pagination.cursor
           ? { id: parsed.data.pagination.cursor }
           : undefined,
@@ -97,8 +100,8 @@ export async function listEvents(input: z.input<typeof ListSchema>): Promise<
         take: parsed.data.pagination.pageSize + 1,
         where,
       }),
-      tenantDatabase(input.clerkOrgId).auditEvent.count({ where }),
-    ]);
+      await client.auditEvent.count({ where }),
+    ];
 
     const page = events.slice(0, parsed.data.pagination.pageSize).map(mapEvent);
     return {
@@ -112,14 +115,16 @@ export async function listEvents(input: z.input<typeof ListSchema>): Promise<
         totalCount,
       },
     };
-  } catch {
-    return unknownError("Failed to load audit events.");
-  }
+  };
+  assertTenantDb(db, input.clerkOrgId);
+  return await run(db);
 }
 
 export async function getEventDetail(
-  input: z.input<typeof DetailSchema>
+  input: z.input<typeof DetailSchema>,
+  db: TenantDb
 ): Promise<Result<AuditEventDetail, AuditLogServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = DetailSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -127,9 +132,8 @@ export async function getEventDetail(
   if (!canViewAuditLog(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
-  try {
-    const event = await tenantDatabase(input.clerkOrgId).auditEvent.findFirst({
+  const run = async (client: TenantDb): ReturnType<typeof getEventDetail> => {
+    const event = await client.auditEvent.findFirst({
       where: {
         clerk_org_id: parsed.data.clerkOrgId,
         id: parsed.data.eventId,
@@ -152,16 +156,18 @@ export async function getEventDetail(
         beforeValue: scrubXeroWriteErrorRaw(event.before_value),
       },
     };
-  } catch {
-    return unknownError("Failed to load audit event detail.");
-  }
+  };
+  assertTenantDb(db, input.clerkOrgId);
+  return await run(db);
 }
 
 export async function exportCsv(
-  input: z.input<typeof ExportSchema>
+  input: z.input<typeof ExportSchema>,
+  db: TenantDb
 ): Promise<
   Result<{ csvContent: string; filename: string }, AuditLogServiceError>
 > {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = ExportSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -169,9 +175,8 @@ export async function exportCsv(
   if (!canViewAuditLog(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
-  try {
-    const events = await tenantDatabase(input.clerkOrgId).auditEvent.findMany({
+  const run = async (client: TenantDb): ReturnType<typeof exportCsv> => {
+    const events = await client.auditEvent.findMany({
       orderBy: [{ created_at: "desc" }, { id: "desc" }],
       take: EXPORT_LIMIT + 1,
       where: whereFor({
@@ -196,7 +201,7 @@ export async function exportCsv(
         ),
       ]);
 
-    await tenantDatabase(input.clerkOrgId).auditEvent.create({
+    await client.auditEvent.create({
       data: {
         action: "audit_log.exported",
         actor_user_id: parsed.data.actingUserId,
@@ -240,9 +245,11 @@ export async function exportCsv(
         filename: `audit-log-${dateStamp(parsed.data.filters.dateFrom)}-${dateStamp(parsed.data.filters.dateTo)}.csv`,
       },
     };
-  } catch {
-    return unknownError("Failed to export audit log.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 function mapEvent(event: {
@@ -337,8 +344,4 @@ function notAuthorised(): Result<never, AuditLogServiceError> {
     },
     ok: false,
   };
-}
-
-function unknownError(message: string): Result<never, AuditLogServiceError> {
-  return { error: { code: "unknown_error", message }, ok: false };
 }

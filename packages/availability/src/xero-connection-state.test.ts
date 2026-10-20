@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../database/src/tenant-db";
+import { tenantTestAccount } from "../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock("server-only", () => ({}));
@@ -19,10 +21,12 @@ describe("getXeroConnectionStateForScope", () => {
     async (state) => {
       const result = { ok: true, value: { state } };
       mocks.query.mockResolvedValue(result);
-      await expect(getXeroConnectionStateForScope(scope)).resolves.toEqual(
-        result
-      );
-      expect(mocks.query).toHaveBeenCalledWith(scope);
+      await expect(
+        withTestTenantResult(tenantTestAccount(scope), (db) =>
+          getXeroConnectionStateForScope(scope, db)
+        )
+      ).resolves.toEqual(result);
+      expect(mocks.query).toHaveBeenCalledWith(scope, expect.any(Object));
     }
   );
   it("preserves query unavailability", async () => {
@@ -30,16 +34,28 @@ describe("getXeroConnectionStateForScope", () => {
       error: { code: "state_unavailable" },
       ok: false,
     });
-    await expect(getXeroConnectionStateForScope(scope)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionStateForScope(scope, db)
+      )
+    ).resolves.toEqual({
       error: { code: "state_unavailable" },
       ok: false,
     });
   });
   it("preserves an unavailable state on lookup errors", async () => {
     mocks.query.mockRejectedValue(new Error("database unavailable"));
-    await expect(getXeroConnectionStateForScope(scope)).resolves.toEqual({
-      error: { code: "state_unavailable" },
-      ok: false,
-    });
+    await expect(
+      withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionStateForScope(scope, db)
+      )
+    ).rejects.toThrow("database unavailable");
   });
 });
+
+vi.mock("../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

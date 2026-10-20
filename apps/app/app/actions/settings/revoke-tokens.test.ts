@@ -64,10 +64,31 @@ describe("revokeAllTokens", () => {
       ok: true,
       value: { revokedCount: 2 },
     });
-    expect(mocks.revokeAllFeedTokens).toHaveBeenCalledWith({
-      clerkOrgId: "org_1",
-      organisationId,
-    });
+    expect(mocks.revokeAllFeedTokens).toHaveBeenCalledWith(
+      {
+        clerkOrgId: "org_1",
+        organisationId,
+      },
+      expect.any(Object)
+    );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/settings/feeds");
   });
 });
+
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: vi.fn(() => Promise.resolve({ id: organisationId })),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+}));

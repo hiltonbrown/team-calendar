@@ -7,6 +7,8 @@ import {
   type OrganisationSettingsInput,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
+import { withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -33,6 +35,7 @@ export async function createOrganisationAction(input: {
   countryCode: string;
   name: string;
 }): Promise<ActionResult<never>> {
+  assertNoTenantTransaction("createOrganisationAction");
   const parsed = SetupOrganisationSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -49,35 +52,49 @@ export async function createOrganisationAction(input: {
 
   // ensureOrganisationForClerk throws on DB failure, so redirect must be outside try/catch
   try {
-    const payload: OrganisationSettingsInput = {
-      clerkOrgId: orgId,
-      countryCode: parsed.data.countryCode,
-      name: parsed.data.name,
-    };
-    const tenant = await ensureOrganisationForClerk(payload);
-    const personResult = await ensureCurrentUserPerson(tenant, {
-      avatarUrl: user.imageUrl,
-      clerkUserId: user.id,
-      displayName:
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.emailAddresses[0]?.emailAddress ||
-        user.id,
-      email: user.emailAddresses[0]?.emailAddress,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    });
-
-    if (!personResult.ok) {
-      if (personResult.error.code === "conflict") {
-        return {
-          error: {
-            code: "conflict",
-            message: personResult.error.message,
-          },
-          ok: false,
+    const prepared = await withTenantResult(
+      orgId,
+      async (db): Promise<ActionResult<void>> => {
+        const payload: OrganisationSettingsInput = {
+          clerkOrgId: orgId,
+          countryCode: parsed.data.countryCode,
+          name: parsed.data.name,
         };
+        const tenant = await ensureOrganisationForClerk(payload, db);
+        const personResult = await ensureCurrentUserPerson(
+          tenant,
+          {
+            avatarUrl: user.imageUrl,
+            clerkUserId: user.id,
+            displayName:
+              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+              user.emailAddresses[0]?.emailAddress ||
+              user.id,
+            email: user.emailAddresses[0]?.emailAddress,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          db
+        );
+
+        if (!personResult.ok) {
+          if (personResult.error.code === "conflict") {
+            return {
+              error: {
+                code: "conflict",
+                message: personResult.error.message,
+              },
+              ok: false,
+            };
+          }
+          return unknownError(personResult.error.message);
+        }
+
+        return { ok: true, value: undefined };
       }
-      return unknownError(personResult.error.message);
+    );
+    if (!prepared.ok) {
+      return prepared;
     }
   } catch {
     return unknownError("Failed to create organisation. Please try again.");

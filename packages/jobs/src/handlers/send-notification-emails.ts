@@ -1,4 +1,5 @@
 import { systemDatabase } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { sendQueuedNotificationEmails } from "@repo/notifications";
 import type { InngestFunction } from "inngest";
 import { inngest } from "../client";
@@ -19,6 +20,7 @@ export async function drainNotificationEmailQueue(): Promise<{
   processed: number;
   sent: number;
 }> {
+  assertNoTenantTransaction("drainNotificationEmailQueue");
   const accounts = await systemDatabase.notificationEmailQueue.findMany({
     distinct: ["clerk_org_id"],
     select: { clerk_org_id: true },

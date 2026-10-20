@@ -2,7 +2,7 @@ import { log } from "@repo/observability/log";
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import { z } from "zod";
 import type { AlternativeContactSnapshot, PeopleRole } from "./people-service";
 
@@ -66,34 +66,35 @@ const ReorderContactsSchema = BaseInputSchema.extend({
   personId: z.string().uuid(),
 });
 
-export async function addAlternativeContact(input: {
-  actingPersonId: null | string;
-  actingRole: PeopleRole;
-  actingUserId?: string;
-  clerkOrgId: string;
-  email?: string;
-  name: string;
-  notes?: string;
-  organisationId: string;
-  personId: string;
-  phone?: string;
-  role?: string;
-}): Promise<
-  Result<AlternativeContactSnapshot, AlternativeContactServiceError>
-> {
-  const parsed = AddContactSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-
-  try {
+export async function addAlternativeContact(
+  input: {
+    actingPersonId: null | string;
+    actingRole: PeopleRole;
+    actingUserId?: string;
+    clerkOrgId: string;
+    email?: string;
+    name: string;
+    notes?: string;
+    organisationId: string;
+    personId: string;
+    phone?: string;
+    role?: string;
+  },
+  db: TenantDb
+): Promise<Result<AlternativeContactSnapshot, AlternativeContactServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof addAlternativeContact> => {
+    const parsed = AddContactSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await client.person.findFirst({
       select: { id: true, manager_person_id: true },
       where: {
         ...scoped,
@@ -101,7 +102,7 @@ export async function addAlternativeContact(input: {
       },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, client);
     }
     if (
       !canMutate(person, parsed.data.actingPersonId, parsed.data.actingRole)
@@ -109,83 +110,85 @@ export async function addAlternativeContact(input: {
       return notAuthorised();
     }
 
-    const contact = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        const lastContact = await tx.alternativeContact.findFirst({
-          orderBy: { display_order: "desc" },
-          select: { display_order: true },
-          where: {
-            ...scoped,
-            person_id: person.id,
-          },
-        });
-        const created = await tx.alternativeContact.create({
-          data: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            display_order: (lastContact?.display_order ?? -1) + 1,
-            email: emptyToNull(parsed.data.email),
-            name: parsed.data.name,
-            notes: emptyToNull(parsed.data.notes),
-            organisation_id: parsed.data.organisationId,
-            person_id: person.id,
-            phone: emptyToNull(parsed.data.phone),
-            role: emptyToNull(parsed.data.role),
-          },
-          select: alternativeContactSelect,
-        });
-        await tx.auditEvent.create({
-          data: auditData(
-            parsed.data,
-            "alternative_contacts.added",
-            person.id,
-            created.id,
-            {
-              contactId: created.id,
-              personId: person.id,
-            }
-          ),
-        });
-        return created;
-      }
-    );
+    const contact = await (async (tx: TenantDb) => {
+      const lastContact = await tx.alternativeContact.findFirst({
+        orderBy: { display_order: "desc" },
+        select: { display_order: true },
+        where: {
+          ...scoped,
+          person_id: person.id,
+        },
+      });
+      const created = await tx.alternativeContact.create({
+        data: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          display_order: (lastContact?.display_order ?? -1) + 1,
+          email: emptyToNull(parsed.data.email),
+          name: parsed.data.name,
+          notes: emptyToNull(parsed.data.notes),
+          organisation_id: parsed.data.organisationId,
+          person_id: person.id,
+          phone: emptyToNull(parsed.data.phone),
+          role: emptyToNull(parsed.data.role),
+        },
+        select: alternativeContactSelect,
+      });
+      await tx.auditEvent.create({
+        data: auditData(
+          parsed.data,
+          "alternative_contacts.added",
+          person.id,
+          created.id,
+          {
+            contactId: created.id,
+            personId: person.id,
+          }
+        ),
+      });
+      return created;
+    })(client);
 
     return { ok: true, value: toAlternativeContactSnapshot(contact) };
-  } catch {
-    return unknownError("Failed to add alternative contact.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
-export async function updateAlternativeContact(input: {
-  actingPersonId: null | string;
-  actingRole: PeopleRole;
-  actingUserId?: string;
-  clerkOrgId: string;
-  contactId: string;
-  organisationId: string;
-  patch: {
-    email?: string;
-    name?: string;
-    notes?: string;
-    phone?: string;
-    role?: string;
-  };
-}): Promise<
-  Result<AlternativeContactSnapshot, AlternativeContactServiceError>
-> {
-  const parsed = UpdateContactSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-
-  try {
+export async function updateAlternativeContact(
+  input: {
+    actingPersonId: null | string;
+    actingRole: PeopleRole;
+    actingUserId?: string;
+    clerkOrgId: string;
+    contactId: string;
+    organisationId: string;
+    patch: {
+      email?: string;
+      name?: string;
+      notes?: string;
+      phone?: string;
+      role?: string;
+    };
+  },
+  db: TenantDb
+): Promise<Result<AlternativeContactSnapshot, AlternativeContactServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof updateAlternativeContact> => {
+    const parsed = UpdateContactSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const existing = await loadContact(scoped, parsed.data.contactId);
+    const existing = await loadContact(scoped, parsed.data.contactId, client);
     if (!existing) {
-      return await contactNotFound(parsed.data);
+      return await contactNotFound(parsed.data, client);
     }
     if (
       !canMutate(
@@ -207,75 +210,79 @@ export async function updateAlternativeContact(input: {
       return validationError(contactFields.error);
     }
 
-    const updated = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        const row = await tx.alternativeContact.update({
-          data: {
-            email:
-              parsed.data.patch.email === undefined
-                ? undefined
-                : emptyToNull(parsed.data.patch.email),
-            name: parsed.data.patch.name,
-            notes:
-              parsed.data.patch.notes === undefined
-                ? undefined
-                : emptyToNull(parsed.data.patch.notes),
-            phone:
-              parsed.data.patch.phone === undefined
-                ? undefined
-                : emptyToNull(parsed.data.patch.phone),
-            role:
-              parsed.data.patch.role === undefined
-                ? undefined
-                : emptyToNull(parsed.data.patch.role),
-          },
-          select: alternativeContactSelect,
-          where: { id: existing.id },
-        });
-        await tx.auditEvent.create({
-          data: auditData(
-            parsed.data,
-            "alternative_contacts.updated",
-            existing.person_id,
-            existing.id,
-            {
-              contactId: existing.id,
-              personId: existing.person_id,
-            }
-          ),
-        });
-        return row;
-      }
-    );
+    const updated = await (async (tx: TenantDb) => {
+      const row = await tx.alternativeContact.update({
+        data: {
+          email:
+            parsed.data.patch.email === undefined
+              ? undefined
+              : emptyToNull(parsed.data.patch.email),
+          name: parsed.data.patch.name,
+          notes:
+            parsed.data.patch.notes === undefined
+              ? undefined
+              : emptyToNull(parsed.data.patch.notes),
+          phone:
+            parsed.data.patch.phone === undefined
+              ? undefined
+              : emptyToNull(parsed.data.patch.phone),
+          role:
+            parsed.data.patch.role === undefined
+              ? undefined
+              : emptyToNull(parsed.data.patch.role),
+        },
+        select: alternativeContactSelect,
+        where: { id: existing.id },
+      });
+      await tx.auditEvent.create({
+        data: auditData(
+          parsed.data,
+          "alternative_contacts.updated",
+          existing.person_id,
+          existing.id,
+          {
+            contactId: existing.id,
+            personId: existing.person_id,
+          }
+        ),
+      });
+      return row;
+    })(client);
 
     return { ok: true, value: toAlternativeContactSnapshot(updated) };
-  } catch {
-    return unknownError("Failed to update alternative contact.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
-export async function deleteAlternativeContact(input: {
-  actingPersonId: null | string;
-  actingRole: PeopleRole;
-  actingUserId?: string;
-  clerkOrgId: string;
-  contactId: string;
-  organisationId: string;
-}): Promise<Result<{ personId: string }, AlternativeContactServiceError>> {
-  const parsed = DeleteContactSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-
-  try {
+export async function deleteAlternativeContact(
+  input: {
+    actingPersonId: null | string;
+    actingRole: PeopleRole;
+    actingUserId?: string;
+    clerkOrgId: string;
+    contactId: string;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<Result<{ personId: string }, AlternativeContactServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof deleteAlternativeContact> => {
+    const parsed = DeleteContactSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const existing = await loadContact(scoped, parsed.data.contactId);
+    const existing = await loadContact(scoped, parsed.data.contactId, client);
     if (!existing) {
-      return await contactNotFound(parsed.data);
+      return await contactNotFound(parsed.data, client);
     }
     if (
       !canMutate(
@@ -287,7 +294,7 @@ export async function deleteAlternativeContact(input: {
       return notAuthorised();
     }
 
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       await tx.alternativeContact.delete({ where: { id: existing.id } });
       const remaining = await tx.alternativeContact.findMany({
         orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
@@ -315,36 +322,41 @@ export async function deleteAlternativeContact(input: {
           }
         ),
       });
-    });
+    })(client);
 
     return { ok: true, value: { personId: existing.person_id } };
-  } catch {
-    return unknownError("Failed to delete alternative contact.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
-export async function reorderAlternativeContacts(input: {
-  actingPersonId: null | string;
-  actingRole: PeopleRole;
-  actingUserId?: string;
-  clerkOrgId: string;
-  orderedContactIds: string[];
-  organisationId: string;
-  personId: string;
-}): Promise<Result<{ personId: string }, AlternativeContactServiceError>> {
-  const parsed = ReorderContactsSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-
-  try {
+export async function reorderAlternativeContacts(
+  input: {
+    actingPersonId: null | string;
+    actingRole: PeopleRole;
+    actingUserId?: string;
+    clerkOrgId: string;
+    orderedContactIds: string[];
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<Result<{ personId: string }, AlternativeContactServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof reorderAlternativeContacts> => {
+    const parsed = ReorderContactsSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await client.person.findFirst({
       select: { id: true, manager_person_id: true },
       where: {
         ...scoped,
@@ -352,7 +364,7 @@ export async function reorderAlternativeContacts(input: {
       },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, client);
     }
     if (
       !canMutate(person, parsed.data.actingPersonId, parsed.data.actingRole)
@@ -360,9 +372,7 @@ export async function reorderAlternativeContacts(input: {
       return notAuthorised();
     }
 
-    const existing = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).alternativeContact.findMany({
+    const existing = await client.alternativeContact.findMany({
       orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
       select: { id: true },
       where: {
@@ -385,7 +395,7 @@ export async function reorderAlternativeContacts(input: {
       };
     }
 
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       for (const [
         displayOrder,
         contactId,
@@ -407,12 +417,14 @@ export async function reorderAlternativeContacts(input: {
           }
         ),
       });
-    });
+    })(client);
 
     return { ok: true, value: { personId: person.id } };
-  } catch {
-    return unknownError("Failed to reorder alternative contacts.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 const alternativeContactSelect = {
@@ -426,11 +438,12 @@ const alternativeContactSelect = {
   role: true,
 } as const;
 
-function loadContact(
+async function loadContact(
   scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId },
-  contactId: string
+  contactId: string,
+  db: TenantDb
 ) {
-  return tenantDatabase(scoped.clerk_org_id).alternativeContact.findFirst({
+  return await db.alternativeContact.findFirst({
     select: {
       ...alternativeContactSelect,
       person: {
@@ -506,14 +519,17 @@ function toAlternativeContactSnapshot(contact: {
   };
 }
 
-async function personNotFound(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-}): Promise<Result<never, AlternativeContactServiceError>> {
-  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
+async function personNotFound(
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<Result<never, AlternativeContactServiceError>> {
+  const exists = await db.person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.personId },
+    where: { clerk_org_id: input.clerkOrgId, id: input.personId },
   });
   if (
     exists &&
@@ -533,16 +549,17 @@ async function personNotFound(input: {
   };
 }
 
-async function contactNotFound(input: {
-  clerkOrgId: string;
-  contactId: string;
-  organisationId: string;
-}): Promise<Result<never, AlternativeContactServiceError>> {
-  const exists = await tenantDatabase(
-    input.clerkOrgId
-  ).alternativeContact.findFirst({
+async function contactNotFound(
+  input: {
+    clerkOrgId: string;
+    contactId: string;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<Result<never, AlternativeContactServiceError>> {
+  const exists = await db.alternativeContact.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.contactId },
+    where: { clerk_org_id: input.clerkOrgId, id: input.contactId },
   });
   if (
     exists &&
@@ -595,18 +612,6 @@ function notAuthorised(): Result<never, AlternativeContactServiceError> {
     error: {
       code: "not_authorised",
       message: "You do not have permission to manage these contacts.",
-    },
-    ok: false,
-  };
-}
-
-function unknownError(
-  message: string
-): Result<never, AlternativeContactServiceError> {
-  return {
-    error: {
-      code: "unknown_error",
-      message,
     },
     ok: false,
   };

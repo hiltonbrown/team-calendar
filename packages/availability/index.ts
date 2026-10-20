@@ -100,6 +100,7 @@ export {
   type DashboardServiceError,
   type EmployeeDashboardView,
   getAdminView,
+  getDashboardApprovalQueue,
   getEmployeeView,
   getManagerView,
   type ManagerDashboardView,
@@ -162,6 +163,12 @@ export {
   type FieldOwnership,
   fieldOwnershipForPerson,
 } from "./src/people/field-ownership";
+export {
+  listManagerChoices,
+  type ManagerAssignmentError,
+  type ManagerChoice,
+  setPersonManager,
+} from "./src/people/manager-assignment-service";
 export * from "./src/people/manual-balance-service";
 export {
   type ManualBalanceServiceError,
@@ -220,6 +227,12 @@ export {
 } from "./src/records/manual-records-service";
 export * from "./src/records/record-type-categories";
 export {
+  type AccountApprovalSettings,
+  type AccountApprovalSettingsError,
+  getAccountApprovalSettings,
+  updateAccountApprovalSettings,
+} from "./src/settings/account-approval-settings-service";
+export {
   type AuditEventDetail,
   type AuditEventListItem,
   AuditLogFilterSchema,
@@ -233,6 +246,7 @@ export {
   type BillingSummary,
   getBillingSummary,
 } from "./src/settings/billing-service";
+export { managerScopePersonIds } from "./src/settings/manager-scope";
 export {
   defaultOrganisationSettingsPatch,
   getSettings,
@@ -261,15 +275,23 @@ export {
   listRuns,
   listRunTimeline,
   listTenantSummaries,
+  type PreparedManualSync,
+  type PreparedSyncCancellation,
+  prepareManualSync,
+  prepareSyncCancellation,
   type RunDetail,
   type RunDetailPage,
   type RunListItem,
+  recordManualSyncDispatch,
+  recordSyncCancellation,
   type SyncMonitorError,
   type SyncMonitorRole,
   type SyncRunFilters,
   type SyncRunStatus,
   type SyncRunType,
   type SyncTriggerType,
+  sendPreparedManualSync,
+  sendPreparedSyncCancellation,
   type TenantSummary,
   type TimelineEvent,
   type TimelinePage,

@@ -9,6 +9,7 @@ import type {
   SubmitLeaveInput,
   WithdrawLeaveInput,
 } from "@repo/core";
+import { assertNoTenantTransaction, withTenantResult } from "@repo/database";
 import { availability_record_type } from "@repo/database/generated/enums";
 import { prepareAuLeaveMutation } from "../au/write";
 import { emitXeroMetric } from "../metrics";
@@ -278,7 +279,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
       };
     }
     const tenant = resolution.value;
-    const res = await resolveXeroEmployeeId({
+    const res = await resolveWriteEmployeeId({
       personId: input.personId,
       xeroConnection: tenant,
     });
@@ -323,7 +324,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
         ok: false,
       };
     }
-    const res = await resolveXeroLeaveTypeId({
+    const res = await resolveWriteLeaveTypeId({
       personId: input.personId,
       recordType: input.recordType,
       xeroConnection: tenant,
@@ -443,4 +444,21 @@ function missingMutationIdentity(): Result<never, ProviderWriteError> {
     }),
     ok: false,
   };
+}
+
+export async function resolveWriteEmployeeId(
+  input: Parameters<typeof resolveXeroEmployeeId>[0]
+) {
+  assertNoTenantTransaction("resolveWriteEmployeeId");
+  return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
+    resolveXeroEmployeeId(input, db)
+  );
+}
+export async function resolveWriteLeaveTypeId(
+  input: Parameters<typeof resolveXeroLeaveTypeId>[0]
+) {
+  assertNoTenantTransaction("resolveWriteLeaveTypeId");
+  return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
+    resolveXeroLeaveTypeId(input, db)
+  );
 }

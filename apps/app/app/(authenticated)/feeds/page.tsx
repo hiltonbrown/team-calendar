@@ -1,4 +1,7 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
+import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { getOwnFeedEligibility, listFeeds, normaliseRole } from "@repo/feeds";
 import { PauseIcon, UserRoundXIcon } from "lucide-react";
 import type { Metadata } from "next";
@@ -9,7 +12,7 @@ import { YourCalendar } from "@/components/feed/your-calendar";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { recommendFeed } from "@/lib/feeds/recommend-feed";
 import { withOrg } from "@/lib/navigation/org-url";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../components/header";
 import { OwnFeedActions } from "./own-feed-actions";
 
@@ -30,12 +33,12 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
   await requirePageRole("org:viewer");
   const { org } = await searchParams;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const [{ orgRole }, user, context] = await Promise.all([
+  const [{ orgRole }, user, account] = await Promise.all([
     auth(),
     currentUser(),
-    requireActiveOrgPageContext(orgParam),
+    requireOrg(),
   ]);
-  const { clerkOrgId, organisationId, orgQueryValue } = context;
+  const clerkOrgId = account as ClerkOrgId;
   const role = normaliseRole(orgRole);
   const isAdmin =
     role === "admin" ||
@@ -43,23 +46,47 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
     role === "org:admin" ||
     role === "org:owner";
 
-  const [feedsResult, eligibilityResult] = user
-    ? await Promise.all([
-        listFeeds({
-          actingRole: role,
-          actingUserId: user.id,
+  const { organisationId, orgQueryValue, feedsResult, eligibilityResult } =
+    await withTenantDb(
+      clerkOrgId,
+      async (db) => {
+        const context = await resolveActiveOrgPageContext(
           clerkOrgId,
-          filters: { status: ["active", "paused"] },
-          organisationId,
-          pagination: { pageSize: 100 },
-        }),
-        getOwnFeedEligibility({
-          actingUserId: user.id,
-          clerkOrgId,
-          organisationId,
-        }),
-      ])
-    : [null, null];
+          orgParam,
+          db
+        );
+        const scopedOrganisationId = context.organisationId;
+        const [preparedFeedsResult, preparedEligibilityResult] = user
+          ? ([
+              await listFeeds(
+                {
+                  actingRole: role,
+                  actingUserId: user.id,
+                  clerkOrgId,
+                  filters: { status: ["active", "paused"] },
+                  organisationId: scopedOrganisationId,
+                  pagination: { pageSize: 100 },
+                },
+                db
+              ),
+              await getOwnFeedEligibility(
+                {
+                  actingUserId: user.id,
+                  clerkOrgId,
+                  organisationId: scopedOrganisationId,
+                },
+                db
+              ),
+            ] as const)
+          : ([null, null] as const);
+        return {
+          ...context,
+          eligibilityResult: preparedEligibilityResult,
+          feedsResult: preparedFeedsResult,
+        };
+      },
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
 
   const hasLoadError = !feedsResult?.ok;
   const { others, ownPausedFeed, recommended } = recommendFeed(

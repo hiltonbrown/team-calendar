@@ -3,39 +3,38 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(async () => 1),
   find: vi.fn(),
-  query: vi.fn(async () => []),
+  query: vi.fn((..._args: unknown[]) => Promise.resolve([])),
   resolve: vi.fn(),
   transaction: vi.fn(),
   writes: vi.fn(async () => ({ count: 1 })),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
-  const tx = {
-    $executeRaw: mocks.execute,
-    $queryRaw: mocks.query,
-    person: { updateMany: mocks.writes },
-    xeroConnection: { findFirst: mocks.find },
-  };
-  return {
-    database: {
-      ...tx,
-      $transaction: mocks.transaction.mockImplementation(async (operation) =>
-        operation(tx)
-      ),
-    },
-    getScopedXeroConnection: vi.fn(async (bindingScope) => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: { $transaction: mocks.transaction },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+  getScopedXeroConnection: (bindingScope: { connectionId: string }) =>
+    Promise.resolve({
       ok: true,
       value: {
         authorisation: { status: "active" },
         id: bindingScope.connectionId,
+        xero_authorisation_id: "grant-a",
       },
-    })),
-    tenantDatabase: vi.fn(() => tx),
-    tenantTransaction: vi.fn((_clerkOrgId, operation) =>
-      mocks.transaction(operation)
-    ),
-  };
-});
+    }),
+}));
+mocks.transaction.mockImplementation((operation) =>
+  operation({
+    $executeRaw: mocks.execute,
+    $queryRaw: mocks.query,
+    person: { updateMany: mocks.writes },
+    xeroConnection: { findFirst: mocks.find },
+  })
+);
+
 vi.mock("@repo/xero", async () => ({
   classifyXeroFailure: (
     await vi.importActual<typeof import("@repo/xero")>("@repo/xero")
@@ -64,6 +63,7 @@ describe("Xero sync connection lock", () => {
     mocks.find.mockResolvedValue({
       id: scope.connectionId,
       sync_paused_at: null,
+      xero_authorisation_id: "grant-a",
     });
   });
   it("locks the current scoped binding before the actual batch and reuses its transaction", async () => {
@@ -95,7 +95,7 @@ describe("Xero sync connection lock", () => {
         return Promise.resolve();
       });
     });
-    expect(mocks.query).toHaveBeenCalledTimes(1);
+    expect(connectionLockCalls()).toHaveLength(1);
     expect(mocks.writes).toHaveBeenCalledTimes(1);
   });
   it("checks the captured external file before allowing persistence", async () => {
@@ -124,7 +124,9 @@ describe("Xero sync connection lock", () => {
       value: { connectionId: scope.connectionId },
     });
     mocks.find.mockImplementation(async ({ where }) =>
-      where.released_at === null ? null : { id: scope.connectionId }
+      where.released_at === null
+        ? null
+        : { id: scope.connectionId, xero_authorisation_id: "grant-a" }
     );
     await expect(
       resolveSyncTenant(scope, "payroll.employees.read")
@@ -193,7 +195,10 @@ describe("Xero sync connection lock", () => {
 });
 it("projects only after canonical commit and reacquires the connection lock", async () => {
   vi.clearAllMocks();
-  mocks.find.mockResolvedValue({ id: scope.connectionId });
+  mocks.find.mockResolvedValue({
+    id: scope.connectionId,
+    xero_authorisation_id: "grant-a",
+  });
   let committed = false;
   const baseTransaction = mocks.transaction.getMockImplementation();
   if (!baseTransaction) {
@@ -206,7 +211,7 @@ it("projects only after canonical commit and reacquires the connection lock", as
   });
   const effect = vi.fn(() => {
     expect(committed).toBe(true);
-    expect(mocks.query).toHaveBeenCalledTimes(2);
+    expect(connectionLockCalls()).toHaveLength(2);
     return Promise.resolve();
   });
   await withXeroBinding(scope, async (tx) => {
@@ -219,7 +224,10 @@ it("projects only after canonical commit and reacquires the connection lock", as
 it("cancels deferred projection when connection disconnected after canonical commit", async () => {
   vi.clearAllMocks();
   mocks.find
-    .mockResolvedValueOnce({ id: scope.connectionId })
+    .mockResolvedValueOnce({
+      id: scope.connectionId,
+      xero_authorisation_id: "grant-a",
+    })
     .mockResolvedValue(null);
   const effect = vi.fn(async () => undefined);
   await expect(
@@ -227,3 +235,9 @@ it("cancels deferred projection when connection disconnected after canonical com
   ).rejects.toBeInstanceOf(XeroBindingChangedError);
   expect(effect).not.toHaveBeenCalled();
 });
+
+function connectionLockCalls() {
+  return mocks.query.mock.calls.filter(([strings]) =>
+    (strings as TemplateStringsArray).join("").includes("FOR UPDATE")
+  );
+}

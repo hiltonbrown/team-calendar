@@ -294,6 +294,8 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ### S-03: Dashboard
 
+**Account scope:** Defaults to all active companies in the Clerk account, with an optional company filter. Approved leave from every selected company follows the existing privacy rules for each role.
+
 **Route:** `/` (root of the authenticated app). No `/dashboard` alias exists; `components/dashboard/` is a shared component library, not a second route. No modal behaviour.
 **Guard:** `requirePageRole("org:viewer")` (`page.tsx:24`). Access: all roles.
 **Evidence:** `apps/app/app/(authenticated)/page.tsx:1-56`; `dashboard-body.tsx:1-201`; `packages/availability/src/dashboard/dashboard-service.ts`; `apps/app/components/dashboard/{admin-view,manager-view,employee-view,viewer-view,admin-empty-view,dashboard-skeleton,dashboard-scaffold,quick-actions-card,dashboard-live-updates,xero-disconnected-banner,dashboard-card-shell}.tsx`; `apps/app/app/(authenticated)/dashboard-body.test.tsx`.
@@ -418,6 +420,8 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ### S-08: People
 
+**Account scope:** Defaults to all active owned companies, with company labels and a company filter. Existing read and edit permissions apply across the account.
+
 **Route:** `/people`. No modal on the list itself; row click opens S-09's modal.
 **Guard:** `requirePageRole("org:viewer")` (list); `requirePageRole("org:admin")` on `/people/new`. Access: all roles (read); Admin/Owner ("Add person", `includeArchived` filter, Sync from Xero, Reconcile Clerk access).
 **Evidence:** `apps/app/app/(authenticated)/people/page.tsx:23`; `people-client.tsx`; `people/new/page.tsx:18`; `people/_actions.ts:277-337,457-466`.
@@ -441,6 +445,8 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 ---
 
 ### S-09: Person profile
+
+**Manager assignment:** Owners and admins can assign or clear a manager from any active owned company. The picker identifies each manager's company; other roles retain read-only manager information.
 
 **Route:** `/people/[personId]` (full page) and `/people/@modal/(.)[personId]` (intercepting modal).
 **Guard:** `requirePageRole("org:viewer")` on both, with duplicated view-model-loading logic in each file.
@@ -472,6 +478,8 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 ---
 
 ### S-10: Leave approvals
+
+**Account scope:** Owners and admins see one queue combining requests from all active owned companies, labelled by company. Managers approve their reports across companies. Actions use the record's company settings and Xero connection. "Sync Xero leave" covers every eligible owned company.
 
 **Route:** `/leave-approvals`.
 **Guard:** `requirePageRole("org:manager")`, local `try/catch` → `PermissionDeniedState`.

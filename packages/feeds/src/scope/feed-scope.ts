@@ -1,8 +1,13 @@
+import type { Prisma } from "@repo/database/generated/client";
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { resolveAccountCompanies, tenantDatabase } from "@repo/database";
-import type { Prisma } from "@repo/database/generated/client";
+import {
+  assertTenantDb,
+  getAccountSettings,
+  resolveAccountCompanies,
+  type TenantDb,
+} from "@repo/database";
 import type { feed_scope_rule_type } from "@repo/database/generated/enums";
 import { z } from "zod";
 
@@ -90,107 +95,113 @@ export const FeedScopeSchema = z
 
 export const FeedScopesSchema = z.array(FeedScopeSchema).min(1);
 
-export async function validateScopes(input: {
-  clerkOrgId: string;
-  organisationId: string | null;
-  scopes: FeedScopeInput[];
-}): Promise<Result<FeedScopeInput[], FeedScopeError>> {
+export async function validateScopes(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+    scopes: FeedScopeInput[];
+  },
+  db: TenantDb
+): Promise<Result<FeedScopeInput[], FeedScopeError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = FeedScopesSchema.safeParse(input.scopes);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  try {
     for (const scope of parsed.data) {
-      if (scope.scopeType === "team") {
-        const { scopeValue } = scope;
-        if (!scopeValue) {
-          return invalidScope();
-        }
-        const team = await tenantDatabase(input.clerkOrgId).team.findFirst({
-          select: { id: true },
-          where: {
-            clerk_org_id: input.clerkOrgId,
-            id: scopeValue,
-            organisation_id: await companyWhere(input),
-          },
-        });
-        if (!team) {
-          return invalidScope();
-        }
-      }
-      if (scope.scopeType === "person") {
-        const { scopeValue } = scope;
-        if (!scopeValue) {
-          return invalidScope();
-        }
-        const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
-          select: { id: true },
-          where: {
-            archived_at: null,
-            clerk_org_id: input.clerkOrgId,
-            id: scopeValue,
-            organisation_id: await companyWhere(input),
-          },
-        });
-        if (!person) {
-          return invalidScope();
-        }
+      if (!(await feedScopeTargetExists(input, scope, client))) {
+        return invalidScope();
       }
     }
     return { ok: true, value: dedupeScopes(parsed.data) };
-  } catch {
-    return unknownError("Failed to validate feed scopes.");
   }
 }
 
-export async function resolvePeopleForFeed(input: {
-  actingPersonId?: string | null;
-  client?: Prisma.TransactionClient;
-  clerkOrgId: string;
-  createdByUserId?: string | null;
-  organisationId: string | null;
-  preloaded?: FeedScopeData;
-  companyIds?: string[];
-  scopes: FeedScopeInput[];
-}): Promise<Result<ScopedFeedPerson[], FeedScopeError>> {
-  try {
+async function feedScopeTargetExists(
+  input: Parameters<typeof validateScopes>[0],
+  scope: FeedScopeInput,
+  client: TenantDb
+): Promise<boolean> {
+  if (scope.scopeType !== "team" && scope.scopeType !== "person") {
+    return true;
+  }
+  if (!scope.scopeValue) {
+    return false;
+  }
+  const where = {
+    clerk_org_id: input.clerkOrgId,
+    id: scope.scopeValue,
+    organisation_id: await companyWhere(input, client),
+  };
+  if (scope.scopeType === "team") {
+    return Boolean(
+      await client.team.findFirst({ select: { id: true }, where })
+    );
+  }
+  return Boolean(
+    await client.person.findFirst({
+      select: { id: true },
+      where: { ...where, archived_at: null },
+    })
+  );
+}
+
+export async function resolvePeopleForFeed(
+  input: {
+    actingPersonId?: string | null;
+    clerkOrgId: string;
+    createdByUserId?: string | null;
+    organisationId: string | null;
+    preloaded?: FeedScopeData;
+    companyIds?: string[];
+    scopes: FeedScopeInput[];
+  },
+  db: TenantDb
+): Promise<Result<ScopedFeedPerson[], FeedScopeError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const ownedCompanyIds = (
+      await resolveAccountCompanies(input.clerkOrgId, client)
+    ).map((company) => company.id);
     const companyIds =
       input.organisationId === null
-        ? (input.companyIds ??
-          (await resolveAccountCompanies(input.clerkOrgId, input.client)).map(
-            (company) => company.id
-          ))
-        : [input.organisationId];
+        ? ownedCompanyIds.filter(
+            (id) => !input.companyIds || input.companyIds.includes(id)
+          )
+        : ownedCompanyIds.filter((id) => id === input.organisationId);
     const candidates =
       input.preloaded?.people.filter((person) => person.is_active) ??
-      (await (input.client ?? tenantDatabase(input.clerkOrgId)).person.findMany(
-        {
-          orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
-          select: personSelect,
-          where: peopleWhereForFeedScope(input, companyIds),
-        }
-      ));
+      (await client.person.findMany({
+        orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
+        select: personSelect,
+        where: peopleWhereForFeedScope(input, companyIds),
+      }));
 
-    const people =
-      input.organisationId === null
-        ? candidates.filter(
-            (person) =>
-              person.clerk_org_id === input.clerkOrgId &&
-              companyIds.includes(person.organisation_id)
-          )
-        : candidates;
-    const dynamicPeople = resolveDynamicPersonIds({
-      actingPersonId: input.actingPersonId ?? null,
-      clerkOrgId: input.clerkOrgId,
-      createdByUserId: input.createdByUserId ?? null,
-      organisationId: input.organisationId,
+    const people = candidates.filter(
+      (person) =>
+        person.clerk_org_id === input.clerkOrgId &&
+        companyIds.includes(person.organisation_id)
+    );
+    const { dynamicPeople, managerPeople } = await feedScopePeopleGraph(
+      input,
       people,
-    });
-
+      ownedCompanyIds,
+      client
+    );
     const selected = new Map<string, ScopedFeedPerson>();
     for (const scope of input.scopes) {
-      const scopedPeople = peopleForScope(scope, people, dynamicPeople);
+      const scopedPeople = peopleForScope(
+        scope,
+        people,
+        scope.scopeType === "manager_team" ? managerPeople : dynamicPeople
+      );
       for (const person of scopedPeople) {
         selected.set(person.id, toScopedPerson(person));
       }
@@ -201,136 +212,156 @@ export async function resolvePeopleForFeed(input: {
         first.displayName.localeCompare(second.displayName)
       ),
     };
-  } catch (error) {
-    if (input.client) {
-      throw error;
+  }
+}
+
+export async function loadFeedScopeData(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+  },
+  db: TenantDb
+): Promise<Result<FeedScopeData, FeedScopeError>> {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    try {
+      const organisationWhere = await companyWhere(input, client);
+      const loadPeople = () =>
+        client.person.findMany({
+          orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
+          select: personSelect,
+          where: {
+            archived_at: null,
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: organisationWhere,
+          },
+        });
+      const loadTeams = () =>
+        client.team.findMany({
+          select: { id: true, name: true },
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: organisationWhere,
+          },
+        });
+      const [people, teams] = [await loadPeople(), await loadTeams()];
+
+      return { ok: true, value: { people, teams } };
+    } catch {
+      return unknownError("Failed to load feed scope data.");
     }
-    return unknownError("Failed to resolve feed scope.");
   }
 }
 
-export async function loadFeedScopeData(input: {
-  clerkOrgId: string;
-  organisationId: string | null;
-}): Promise<Result<FeedScopeData, FeedScopeError>> {
-  try {
-    const [people, teams] = await Promise.all([
-      tenantDatabase(input.clerkOrgId).person.findMany({
-        orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
-        select: personSelect,
-        where: {
-          archived_at: null,
-          clerk_org_id: input.clerkOrgId,
-          organisation_id: await companyWhere(input),
-        },
-      }),
-      tenantDatabase(input.clerkOrgId).team.findMany({
-        select: { id: true, name: true },
-        where: {
-          clerk_org_id: input.clerkOrgId,
-          organisation_id: await companyWhere(input),
-        },
-      }),
-    ]);
+export async function resolveScopeRows(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+    preloaded?: FeedScopeData;
+    scopes: Array<{
+      id: string;
+      scope_type: feed_scope_rule_type;
+      scope_value: string | null;
+    }>;
+  },
+  db: TenantDb
+): Promise<Result<ResolvedFeedScope[], FeedScopeError>> {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-    return { ok: true, value: { people, teams } };
-  } catch {
-    return unknownError("Failed to load feed scope data.");
+    try {
+      const [teams, people] = input.preloaded
+        ? [input.preloaded.teams, input.preloaded.people]
+        : [
+            await client.team.findMany({
+              select: { id: true, name: true },
+              where: {
+                clerk_org_id: input.clerkOrgId,
+                organisation_id: await companyWhere(input, client),
+              },
+            }),
+            await client.person.findMany({
+              select: { first_name: true, id: true, last_name: true },
+              where: {
+                archived_at: null,
+                clerk_org_id: input.clerkOrgId,
+                organisation_id: await companyWhere(input, client),
+              },
+            }),
+          ];
+      const teamNames = new Map(teams.map((team) => [team.id, team.name]));
+      const personNames = new Map(
+        people.map((person) => [
+          person.id,
+          `${person.first_name} ${person.last_name}`,
+        ])
+      );
+
+      return {
+        ok: true,
+        value: input.scopes.map((scope) => ({
+          id: scope.id,
+          label: labelForScope(scope, teamNames, personNames),
+          scopeType: scope.scope_type,
+          scopeValue: scope.scope_value,
+        })),
+      };
+    } catch {
+      return unknownError("Failed to resolve feed scopes.");
+    }
   }
 }
 
-export async function resolveScopeRows(input: {
-  clerkOrgId: string;
-  organisationId: string | null;
-  preloaded?: FeedScopeData;
-  scopes: Array<{
-    id: string;
-    scope_type: feed_scope_rule_type;
-    scope_value: string | null;
-  }>;
-}): Promise<Result<ResolvedFeedScope[], FeedScopeError>> {
-  try {
-    const [teams, people] = input.preloaded
-      ? [input.preloaded.teams, input.preloaded.people]
-      : await Promise.all([
-          tenantDatabase(input.clerkOrgId).team.findMany({
-            select: { id: true, name: true },
-            where: {
-              clerk_org_id: input.clerkOrgId,
-              organisation_id: await companyWhere(input),
-            },
-          }),
-          tenantDatabase(input.clerkOrgId).person.findMany({
-            select: { first_name: true, id: true, last_name: true },
-            where: {
-              archived_at: null,
-              clerk_org_id: input.clerkOrgId,
-              organisation_id: await companyWhere(input),
-            },
-          }),
-        ]);
-    const teamNames = new Map(teams.map((team) => [team.id, team.name]));
-    const personNames = new Map(
-      people.map((person) => [
-        person.id,
-        `${person.first_name} ${person.last_name}`,
-      ])
-    );
+export async function canViewFeed(
+  input: {
+    actingPersonId?: string | null;
+    clerkOrgId: string;
+    createdByUserId?: string | null;
+    organisationId: string | null;
+    preloaded?: FeedScopeData;
+    role: FeedRole;
+    scopes: FeedScopeInput[];
+  },
+  db: TenantDb
+): Promise<Result<boolean, FeedScopeError>> {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
+    if (isAdminOrOwner(input.role)) {
+      return { ok: true, value: true };
+    }
+    const actingPersonId = input.actingPersonId ?? null;
+    if (!actingPersonId) {
+      return { ok: true, value: false };
+    }
+    const peopleResult = await resolvePeopleForFeed(input, client);
+    if (!peopleResult.ok) {
+      return peopleResult;
+    }
+    if (input.role === "manager" || input.role === "org:manager") {
+      const reportIds = transitiveReportIds(
+        peopleResult.value.map((person) => ({
+          id: person.id,
+          manager_person_id: person.managerPersonId,
+        })),
+        actingPersonId
+      );
+      return {
+        ok: true,
+        value: peopleResult.value.some(
+          (person) => person.id === actingPersonId || reportIds.has(person.id)
+        ),
+      };
+    }
     return {
       ok: true,
-      value: input.scopes.map((scope) => ({
-        id: scope.id,
-        label: labelForScope(scope, teamNames, personNames),
-        scopeType: scope.scope_type,
-        scopeValue: scope.scope_value,
-      })),
-    };
-  } catch {
-    return unknownError("Failed to resolve feed scopes.");
-  }
-}
-
-export async function canViewFeed(input: {
-  client?: Prisma.TransactionClient;
-  actingPersonId?: string | null;
-  clerkOrgId: string;
-  createdByUserId?: string | null;
-  organisationId: string | null;
-  preloaded?: FeedScopeData;
-  role: FeedRole;
-  scopes: FeedScopeInput[];
-}): Promise<Result<boolean, FeedScopeError>> {
-  if (isAdminOrOwner(input.role)) {
-    return { ok: true, value: true };
-  }
-  const actingPersonId = input.actingPersonId ?? null;
-  if (!actingPersonId) {
-    return { ok: true, value: false };
-  }
-  const peopleResult = await resolvePeopleForFeed(input);
-  if (!peopleResult.ok) {
-    return peopleResult;
-  }
-  if (input.role === "manager" || input.role === "org:manager") {
-    const reportIds = transitiveReportIds(
-      peopleResult.value.map((person) => ({
-        id: person.id,
-        manager_person_id: person.managerPersonId,
-      })),
-      actingPersonId
-    );
-    return {
-      ok: true,
-      value: peopleResult.value.some(
-        (person) => person.id === actingPersonId || reportIds.has(person.id)
-      ),
+      value: peopleResult.value.some((person) => person.id === actingPersonId),
     };
   }
-  return {
-    ok: true,
-    value: peopleResult.value.some((person) => person.id === actingPersonId),
-  };
 }
 
 export function scopeSummary(
@@ -390,21 +421,29 @@ export function normaliseRole(role: string | null | undefined): FeedRole {
   return "viewer";
 }
 
-export async function findActingPersonId(input: {
-  clerkOrgId: string;
-  organisationId: string | null;
-  userId: string;
-}): Promise<string | null> {
-  const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
-    select: { id: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-      clerk_user_id: input.userId,
-      organisation_id: await companyWhere(input),
-    },
-  });
-  return person?.id ?? null;
+export async function findActingPersonId(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+    userId: string;
+  },
+  db: TenantDb
+): Promise<string | null> {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const person = await client.person.findFirst({
+      select: { id: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+        clerk_user_id: input.userId,
+        organisation_id: await companyWhere(input, client),
+      },
+    });
+    return person?.id ?? null;
+  }
 }
 
 export function createScopeRows(input: {
@@ -495,7 +534,7 @@ function resolveDynamicPersonIds(input: {
   clerkOrgId: string;
   createdByUserId: string | null;
   organisationId: string | null;
-  people: PersonRow[];
+  people: Pick<PersonRow, "id" | "clerk_user_id">[];
 }): Set<string> {
   const linked = input.createdByUserId
     ? input.people
@@ -505,7 +544,12 @@ function resolveDynamicPersonIds(input: {
   if (linked.length > 0) {
     return new Set(linked);
   }
-  return new Set(input.actingPersonId ? [input.actingPersonId] : []);
+  return new Set(
+    input.actingPersonId &&
+      input.people.some((person) => person.id === input.actingPersonId)
+      ? [input.actingPersonId]
+      : []
+  );
 }
 
 function peopleForScope(
@@ -528,14 +572,7 @@ function peopleForScope(
   if (dynamicPersonIds.size === 0) {
     return [];
   }
-  return people.filter(
-    (person) =>
-      dynamicPersonIds.has(person.id) ||
-      Boolean(
-        person.manager_person_id &&
-          dynamicPersonIds.has(person.manager_person_id)
-      )
-  );
+  return people.filter((person) => dynamicPersonIds.has(person.id));
 }
 
 function labelForScope(
@@ -671,13 +708,65 @@ const personSelect = {
 
 type PersonRow = Prisma.PersonGetPayload<{ select: typeof personSelect }>;
 
-async function companyWhere(input: {
-  clerkOrgId: string;
-  organisationId: string | null;
-}) {
+async function companyWhere(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+  },
+  db: TenantDb
+) {
   if (input.organisationId !== null) {
     return input.organisationId;
   }
-  const companies = await resolveAccountCompanies(input.clerkOrgId);
+  const companies = await resolveAccountCompanies(input.clerkOrgId, db);
   return { in: companies.map((company) => company.id) };
+}
+
+async function feedScopePeopleGraph(
+  input: Parameters<typeof resolvePeopleForFeed>[0],
+  people: Prisma.PersonGetPayload<{ select: typeof personSelect }>[],
+  ownedCompanyIds: string[],
+  client: TenantDb
+) {
+  const hasManagerTeam = input.scopes.some(
+    (scope) => scope.scopeType === "manager_team"
+  );
+  const graph = hasManagerTeam
+    ? await client.person.findMany({
+        select: {
+          clerk_user_id: true,
+          id: true,
+          manager_person_id: true,
+        },
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          organisation_id: { in: ownedCompanyIds },
+        },
+      })
+    : people;
+  const dynamicPeople = resolveDynamicPersonIds({
+    actingPersonId: input.actingPersonId ?? null,
+    clerkOrgId: input.clerkOrgId,
+    createdByUserId: input.createdByUserId ?? null,
+    organisationId: input.organisationId,
+    people: graph,
+  });
+  const managerPeople = new Set(dynamicPeople);
+  if (hasManagerTeam) {
+    const settings = await getAccountSettings(input.clerkOrgId, client);
+    for (const managerId of dynamicPeople) {
+      const reports =
+        settings.manager_visibility_scope === "all_team_leave"
+          ? [...transitiveReportIds(graph, managerId)]
+          : graph
+              .filter((person) => person.manager_person_id === managerId)
+              .map((person) => person.id);
+      for (const personId of reports) {
+        managerPeople.add(personId);
+      }
+    }
+  }
+
+  return { dynamicPeople, managerPeople };
 }

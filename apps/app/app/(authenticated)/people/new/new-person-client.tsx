@@ -30,14 +30,17 @@ const EMPLOYMENT_TYPE_OPTIONS = [
 ] as const;
 
 interface NewPersonClientProps {
+  companies?: { id: string; name: string }[];
   organisationId: string;
   orgQueryValue: string | null;
 }
 
 export const NewPersonClient = ({
+  companies = [],
   organisationId,
   orgQueryValue,
 }: NewPersonClientProps) => {
+  const [companyId, setCompanyId] = useState(organisationId);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -60,7 +63,7 @@ export const NewPersonClient = ({
         firstName,
         jobTitle: jobTitle.trim() || undefined,
         lastName,
-        organisationId,
+        organisationId: companyId,
       });
       if (!result.ok) {
         toast.error(result.error.message);
@@ -79,6 +82,23 @@ export const NewPersonClient = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          {companies.length > 1 ? (
+            <div className="space-y-2">
+              <Label htmlFor="person-company">Company</Label>
+              <Select onValueChange={setCompanyId} value={companyId}>
+                <SelectTrigger id="person-company">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="first-name">First name</Label>

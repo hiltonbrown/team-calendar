@@ -137,6 +137,13 @@ describe("CalendarStep", () => {
       })
     );
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/"));
+    // The role resolves to the native button whose pending state blocks the next click.
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "Skip" }) as HTMLButtonElement)
+          .disabled
+      ).toBe(false)
+    );
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() =>
       expect(mocks.completeWelcomeAction).toHaveBeenLastCalledWith({

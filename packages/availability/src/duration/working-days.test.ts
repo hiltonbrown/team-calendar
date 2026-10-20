@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   findLocation: vi.fn(),
@@ -11,29 +13,30 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       location: { findFirst: mocks.findLocation },
       organisation: { findFirst: mocks.findOrganisation },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        location: { findFirst: mocks.findLocation },
-        organisation: { findFirst: mocks.findOrganisation },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("../holidays/resolve-public-holidays", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("../holidays/resolve-public-holidays")
@@ -91,14 +94,28 @@ describe("computeWorkingDays", () => {
     async (timezone) => {
       mocks.findLocation.mockResolvedValue({ ...location, timezone });
 
-      const result = await computeWorkingDays({
-        allDay: true,
-        clerkOrgId: "org_1",
-        endsAt: new Date("2026-01-07T23:59:59.999Z"),
-        locationId: "loc_1",
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        startsAt: new Date("2026-01-05T00:00:00.000Z"),
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          allDay: true,
+          clerkOrgId: "org_1",
+          endsAt: new Date("2026-01-07T23:59:59.999Z"),
+          locationId: "loc_1",
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-01-05T00:00:00.000Z"),
+        }),
+        (db) =>
+          computeWorkingDays(
+            {
+              allDay: true,
+              clerkOrgId: "org_1",
+              endsAt: new Date("2026-01-07T23:59:59.999Z"),
+              locationId: "loc_1",
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              startsAt: new Date("2026-01-05T00:00:00.000Z"),
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: 3 });
     }
@@ -109,14 +126,28 @@ describe("computeWorkingDays", () => {
     async (timezone) => {
       mocks.findLocation.mockResolvedValue({ ...location, timezone });
 
-      const result = await computeWorkingDays({
-        allDay: true,
-        clerkOrgId: "org_1",
-        endsAt: new Date("2026-01-09T23:59:59.999Z"),
-        locationId: "loc_1",
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        startsAt: new Date("2026-01-05T00:00:00.000Z"),
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          allDay: true,
+          clerkOrgId: "org_1",
+          endsAt: new Date("2026-01-09T23:59:59.999Z"),
+          locationId: "loc_1",
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-01-05T00:00:00.000Z"),
+        }),
+        (db) =>
+          computeWorkingDays(
+            {
+              allDay: true,
+              clerkOrgId: "org_1",
+              endsAt: new Date("2026-01-09T23:59:59.999Z"),
+              locationId: "loc_1",
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              startsAt: new Date("2026-01-05T00:00:00.000Z"),
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: 5 });
     }
@@ -127,14 +158,28 @@ describe("computeWorkingDays", () => {
     async (timezone) => {
       mocks.findLocation.mockResolvedValue({ ...location, timezone });
 
-      const result = await computeWorkingDays({
-        allDay: false,
-        clerkOrgId: "org_1",
-        endsAt: new Date("2026-01-05T17:00:00.000Z"),
-        locationId: "loc_1",
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        startsAt: new Date("2026-01-05T09:00:00.000Z"),
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          allDay: false,
+          clerkOrgId: "org_1",
+          endsAt: new Date("2026-01-05T17:00:00.000Z"),
+          locationId: "loc_1",
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-01-05T09:00:00.000Z"),
+        }),
+        (db) =>
+          computeWorkingDays(
+            {
+              allDay: false,
+              clerkOrgId: "org_1",
+              endsAt: new Date("2026-01-05T17:00:00.000Z"),
+              locationId: "loc_1",
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              startsAt: new Date("2026-01-05T09:00:00.000Z"),
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: 1 });
     }
@@ -145,14 +190,28 @@ describe("computeWorkingDays", () => {
     async (timezone) => {
       mocks.findLocation.mockResolvedValue({ ...location, timezone });
 
-      const result = await computeWorkingDays({
-        allDay: false,
-        clerkOrgId: "org_1",
-        endsAt: new Date("2026-01-05T13:00:00.000Z"),
-        locationId: "loc_1",
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        startsAt: new Date("2026-01-05T09:00:00.000Z"),
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          allDay: false,
+          clerkOrgId: "org_1",
+          endsAt: new Date("2026-01-05T13:00:00.000Z"),
+          locationId: "loc_1",
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-01-05T09:00:00.000Z"),
+        }),
+        (db) =>
+          computeWorkingDays(
+            {
+              allDay: false,
+              clerkOrgId: "org_1",
+              endsAt: new Date("2026-01-05T13:00:00.000Z"),
+              locationId: "loc_1",
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              startsAt: new Date("2026-01-05T09:00:00.000Z"),
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: 0.5 });
     }
@@ -167,41 +226,83 @@ describe("computeWorkingDays", () => {
         value: [holiday("2026-01-06")],
       });
 
-      const result = await computeWorkingDays({
-        allDay: true,
-        clerkOrgId: "org_1",
-        endsAt: new Date("2026-01-07T23:59:59.999Z"),
-        locationId: "loc_1",
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        startsAt: new Date("2026-01-05T00:00:00.000Z"),
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          allDay: true,
+          clerkOrgId: "org_1",
+          endsAt: new Date("2026-01-07T23:59:59.999Z"),
+          locationId: "loc_1",
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-01-05T00:00:00.000Z"),
+        }),
+        (db) =>
+          computeWorkingDays(
+            {
+              allDay: true,
+              clerkOrgId: "org_1",
+              endsAt: new Date("2026-01-07T23:59:59.999Z"),
+              locationId: "loc_1",
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              startsAt: new Date("2026-01-05T00:00:00.000Z"),
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: 2 });
     }
   );
 
   it("counts Monday to Friday all-day as five working days", async () => {
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-08T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-08T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 5 });
   });
 
   it("excludes weekends", async () => {
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-11T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-08T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-11T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-08T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-11T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-08T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 2 });
   });
@@ -212,14 +313,28 @@ describe("computeWorkingDays", () => {
       value: [holiday("2026-05-05")],
     });
 
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-08T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-08T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 4 });
   });
@@ -230,14 +345,28 @@ describe("computeWorkingDays", () => {
       value: [holiday("2026-05-05", { classification: "working" })],
     });
 
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-08T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-08T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 5 });
   });
@@ -248,14 +377,28 @@ describe("computeWorkingDays", () => {
       value: [holiday("2026-05-05", { locationId: "loc_2" })],
     });
 
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-08T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-08T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 5 });
   });
@@ -269,27 +412,55 @@ describe("computeWorkingDays", () => {
       ],
     });
 
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-08T00:00:00.000Z"),
-      locationId: null,
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-08T00:00:00.000Z"),
+        locationId: null,
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-08T00:00:00.000Z"),
+            locationId: null,
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 4 });
   });
 
   it("resolves holidays for every year in the range from one load", async () => {
-    await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2027-01-05T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-12-30T00:00:00.000Z"),
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2027-01-05T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-12-30T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2027-01-05T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-12-30T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(
       mocks.resolvePublicHolidays.mock.calls.map(([input]) => input)
@@ -309,41 +480,83 @@ describe("computeWorkingDays", () => {
       value: [holiday("2026-12-31"), holiday("2027-01-01")],
     });
 
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2027-01-04T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-12-30T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2027-01-04T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-12-30T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2027-01-04T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-12-30T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     // Wed 30 Dec to Mon 4 Jan: four weekdays, two of them holidays.
     expect(result).toEqual({ ok: true, value: 2 });
   });
 
   it("rounds part-day ranges half-up to the nearest quarter", async () => {
-    const result = await computeWorkingDays({
-      allDay: false,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-04T13:07:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T09:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: false,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-04T13:07:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T09:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: false,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-04T13:07:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T09:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: 0.5 });
   });
 
   it("returns invalid_range when end precedes start", async () => {
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-04T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-05T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-04T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-05T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-04T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-05T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -354,14 +567,28 @@ describe("computeWorkingDays", () => {
   it("returns location_not_found when the location is missing", async () => {
     mocks.findLocation.mockResolvedValue(null);
 
-    const result = await computeWorkingDays({
-      allDay: true,
-      clerkOrgId: "org_1",
-      endsAt: new Date("2026-05-05T00:00:00.000Z"),
-      locationId: "loc_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      startsAt: new Date("2026-05-04T00:00:00.000Z"),
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        allDay: true,
+        clerkOrgId: "org_1",
+        endsAt: new Date("2026-05-05T00:00:00.000Z"),
+        locationId: "loc_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      }),
+      (db) =>
+        computeWorkingDays(
+          {
+            allDay: true,
+            clerkOrgId: "org_1",
+            endsAt: new Date("2026-05-05T00:00:00.000Z"),
+            locationId: "loc_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            startsAt: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {

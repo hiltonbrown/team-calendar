@@ -1,6 +1,7 @@
 "use server";
 
 import { auth, clerkClient } from "@repo/auth/server";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
 
 const UpdateRoleSchema = z.object({
@@ -13,6 +14,7 @@ type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 export const updateMemberRole = async (
   input: unknown
 ): Promise<Result<void>> => {
+  assertNoTenantTransaction("updateMemberRole");
   const { orgId, orgRole } = await auth();
 
   if (!orgId) {

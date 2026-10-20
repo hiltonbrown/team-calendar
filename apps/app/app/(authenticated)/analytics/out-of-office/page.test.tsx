@@ -1,3 +1,7 @@
+vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: () => Promise.resolve("org_1"),
+}));
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,15 +23,33 @@ vi.mock("@repo/availability", () => ({
   aggregateOutOfOffice: mocks.aggregateOutOfOffice,
   resolveDateRange: mocks.resolveDateRange,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => mocks.database),
+vi.mock("../../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../../packages/database/src/tenant-db")
+  >("../../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("@/lib/auth/require-page-role", () => ({
   PermissionDeniedError: class PermissionDeniedError extends Error {},
   requirePageRole: mocks.requirePageRole,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("../../components/header", () => ({
@@ -52,7 +74,7 @@ describe("OutOfOfficePage", () => {
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({ id: "user-1" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org-1",
+      clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
     });
     mocks.database.organisation.findFirst.mockResolvedValue({
@@ -90,13 +112,14 @@ describe("OutOfOfficePage", () => {
 
     expect(mocks.aggregateOutOfOffice).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org-1",
+        clerkOrgId: "org_1",
         filters: {
           includeArchivedPeople: false,
           personType: "employee",
         },
         organisationId: "00000000-0000-4000-8000-000000000001",
-      })
+      }),
+      expect.any(Object)
     );
     expect(screen.getByText("People: employee")).toBeDefined();
   });
@@ -114,7 +137,8 @@ describe("OutOfOfficePage", () => {
           includeArchivedPeople: false,
           personType: "all",
         },
-      })
+      }),
+      expect.any(Object)
     );
   });
 });

@@ -2,10 +2,12 @@
 
 import { auth, currentUser } from "@repo/auth/server";
 import { updateTeamCoverageMinimum } from "@repo/availability";
-import type { Result } from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { afterTenantCommit, withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const UpdateSchema = z.object({
   minimum: z.number().nullable(),
@@ -31,6 +33,7 @@ export async function updateTeamCoverageMinimumAction(input: {
   organisationId: string;
   teamId: string;
 }): Promise<ActionResult<CoverageMinimumReceipt>> {
+  assertNoTenantTransaction("updateTeamCoverageMinimumAction");
   const parsed = UpdateSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -47,27 +50,67 @@ export async function updateTeamCoverageMinimumAction(input: {
     return context;
   }
 
-  const result = await updateTeamCoverageMinimum({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    minimum: parsed.data.minimum,
-    organisationId: context.value.organisationId,
-    teamId: parsed.data.teamId,
-  });
-  if (!result.ok) {
-    return { error: result.error, ok: false };
-  }
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof updateTeamCoverageMinimumAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId as ClerkOrgId,
+          context.value.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return {
+            error: { code: "not_authorised", message: "Company not found." },
+            ok: false,
+          };
+        }
+        const result = await updateTeamCoverageMinimum(
+          {
+            actingRole: context.value.role,
+            actingUserId: context.value.actingUserId,
+            clerkOrgId: context.value.clerkOrgId,
+            minimum: parsed.data.minimum,
+            organisationId: context.value.organisationId,
+            teamId: parsed.data.teamId,
+          },
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error, ok: false };
+        }
 
-  revalidatePath("/settings/coverage");
-  revalidatePath("/");
-  return {
-    ok: true,
-    value: {
-      message: coverageReceipt(result.value.teamName, result.value.minimum),
-      minimum: result.value.minimum,
-    },
-  };
+        afterTenantCommit(db, () => {
+          revalidatePath("/settings/coverage");
+
+          return Promise.resolve();
+        });
+        afterTenantCommit(db, () => {
+          revalidatePath("/");
+
+          return Promise.resolve();
+        });
+        return {
+          ok: true,
+          value: {
+            message: coverageReceipt(
+              result.value.teamName,
+              result.value.minimum
+            ),
+            minimum: result.value.minimum,
+          },
+        };
+      }
+    );
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to update team coverage.",
+      },
+      ok: false,
+    };
+  }
 }
 
 function coverageReceipt(teamName: string, minimum: number | null): string {
@@ -85,19 +128,14 @@ async function resolveAdminContext(organisationId: string): Promise<
     role: "admin" | "owner";
   }>
 > {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
-
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   let role: "admin" | "owner" | null = null;
   if (orgRole === "org:owner") {
     role = "owner";
   } else if (orgRole === "org:admin") {
     role = "admin";
   }
-  if (!(user && role && context.ok)) {
+  if (!(orgId && user && role)) {
     return {
       error: {
         code: "not_authorised",
@@ -111,8 +149,8 @@ async function resolveAdminContext(organisationId: string): Promise<
     ok: true,
     value: {
       actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
+      clerkOrgId: orgId,
+      organisationId,
       role,
     },
   };

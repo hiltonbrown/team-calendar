@@ -1,4 +1,4 @@
-import type { Prisma } from "@repo/database";
+import { assertTenantDb, type TenantDb } from "@repo/database";
 import "server-only";
 import type { Result } from "@repo/core";
 import {
@@ -12,13 +12,8 @@ export type { XeroConnectionStateInput } from "@repo/database/queries/xero-conne
 
 export async function getXeroConnectionStateForScope(
   input: XeroConnectionStateInput,
-  client?: Prisma.TransactionClient
+  db: TenantDb
 ): Promise<Result<XeroConnectionStateResult, XeroConnectionStateError>> {
-  try {
-    return client
-      ? await getXeroConnectionState(input, client)
-      : await getXeroConnectionState(input);
-  } catch {
-    return { error: { code: "state_unavailable" }, ok: false };
-  }
+  assertTenantDb(db, input.clerkOrgId);
+  return await getXeroConnectionState(input, db);
 }

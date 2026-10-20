@@ -1,3 +1,4 @@
+import { assertNoTenantTransaction, withTenantResult } from "@repo/database";
 import {
   listDueXeroAuthorisations,
   saveXeroAuthorisation,
@@ -301,8 +302,11 @@ export async function resolveXeroAccess(input: {
     XeroAccessError
   >
 > {
+  assertNoTenantTransaction("resolveXeroAccess");
   const deadline = input.deadline ?? { expiresAtMs: Date.now() + 120_000 };
-  const scoped = await getScopedXeroConnection(input);
+  const scoped = await withTenantResult(input.clerkOrgId, (db) =>
+    getScopedXeroConnection(input, db)
+  );
   if (!scoped.ok) {
     return scoped;
   }
@@ -368,7 +372,9 @@ export async function resolveXeroAccess(input: {
   if (!grant.ok) {
     return grant;
   }
-  const current = await getScopedXeroConnection(input);
+  const current = await withTenantResult(input.clerkOrgId, (db) =>
+    getScopedXeroConnection(input, db)
+  );
   if (
     !current.ok ||
     current.value.id !== connection.id ||

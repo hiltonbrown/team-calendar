@@ -1,23 +1,20 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { tenantDatabase, tenantTransaction } from "@repo/database";
+import {
+  assertTenantDb,
+  lockPlanLimitMutations,
+  resolveAccountCompanies,
+  type TenantDb,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
-import { invalidateFeedCachesForPerson } from "@repo/feeds";
-import { log } from "@repo/observability/log";
+import {
+  invalidateAccountFeedCaches,
+  invalidateFeedCachesForPerson,
+} from "@repo/feeds";
 import { noemailFallbackDomain } from "@repo/seo/branding";
 
-type ReconciliationClient = Pick<
-  Prisma.TransactionClient,
-  | "alternativeContact"
-  | "auditEvent"
-  | "availabilityRecord"
-  | "feedScope"
-  | "leaveBalance"
-  | "notification"
-  | "person"
-  | "xeroPersonMatch"
->;
+type ReconciliationClient = TenantDb;
 
 export interface ReconcileXeroPersonContext {
   clerkOrgId: string;
@@ -333,64 +330,68 @@ async function handleCandidatesOrNewPerson(
 export async function reconcileXeroPerson(
   context: ReconcileXeroPersonContext,
   input: ReconcileXeroPersonInput,
-  tx?: Prisma.TransactionClient
+  db: TenantDb
 ): Promise<ReconcileOutcome> {
-  const client = tx ?? tenantDatabase(context.clerkOrgId);
-  const rawEmail =
-    input.email?.trim() ||
-    `${input.firstName}.${input.lastName}@${noemailFallbackDomain}`;
-  const resolvedEmail = rawEmail.toLowerCase();
-  const employmentType = input.employmentType ?? "employee";
-  const personType =
-    employmentType === "contractor" ? "contractor" : "employee";
+  {
+    assertTenantDb(db, context.clerkOrgId);
+    const client = db;
 
-  // 1. Exact match on xero_employee_id or source_person_key
-  const exactMatchedPersonId = await findExistingExactMatch(
-    client,
-    context,
-    input,
-    resolvedEmail,
-    employmentType,
-    personType
-  );
-  if (exactMatchedPersonId) {
-    return { outcome: "exact_matched", personId: exactMatchedPersonId };
+    const rawEmail =
+      input.email?.trim() ||
+      `${input.firstName}.${input.lastName}@${noemailFallbackDomain}`;
+    const resolvedEmail = rawEmail.toLowerCase();
+    const employmentType = input.employmentType ?? "employee";
+    const personType =
+      employmentType === "contractor" ? "contractor" : "employee";
+
+    // 1. Exact match on xero_employee_id or source_person_key
+    const exactMatchedPersonId = await findExistingExactMatch(
+      client,
+      context,
+      input,
+      resolvedEmail,
+      employmentType,
+      personType
+    );
+    if (exactMatchedPersonId) {
+      return { outcome: "exact_matched", personId: exactMatchedPersonId };
+    }
+
+    // 2. Discover manual candidate people in this organisation
+    const manualCandidates = await client.person.findMany({
+      where: {
+        archived_at: null,
+        clerk_org_id: context.clerkOrgId,
+        organisation_id: context.organisationId,
+        xero_employee_id: null,
+      },
+    });
+
+    // 3. Single unambiguous manual person upgrade
+    const upgradedPersonId = await tryUpgradeManualCandidate(
+      client,
+      context,
+      input,
+      manualCandidates,
+      resolvedEmail,
+      employmentType,
+      personType
+    );
+    if (upgradedPersonId) {
+      return { outcome: "upgraded_in_place", personId: upgradedPersonId };
+    }
+
+    // 4. Check for ambiguous candidates or create new person
+    return await handleCandidatesOrNewPerson(
+      client,
+      context,
+      input,
+      manualCandidates,
+      resolvedEmail,
+      employmentType,
+      personType
+    );
   }
-
-  // 2. Discover manual candidate people in this organisation
-  const manualCandidates = await client.person.findMany({
-    where: {
-      archived_at: null,
-      clerk_org_id: context.clerkOrgId,
-      organisation_id: context.organisationId,
-      xero_employee_id: null,
-    },
-  });
-
-  // 3. Single unambiguous manual person upgrade
-  const upgradedPersonId = await tryUpgradeManualCandidate(
-    client,
-    context,
-    input,
-    manualCandidates,
-    resolvedEmail,
-    employmentType,
-    personType
-  );
-  if (upgradedPersonId) {
-    return { outcome: "upgraded_in_place", personId: upgradedPersonId };
-  }
-
-  // 4. Check for ambiguous candidates or create new person
-  return await handleCandidatesOrNewPerson(
-    client,
-    context,
-    input,
-    manualCandidates,
-    resolvedEmail,
-    employmentType,
-    personType
-  );
 }
 
 interface ValidatedMergeTarget {
@@ -459,7 +460,6 @@ async function validateMergeInput(
         clerk_org_id: context.clerkOrgId,
         clerk_user_id: resolvedClerkUserId,
         id: { notIn: excludedIds },
-        organisation_id: context.organisationId,
       },
     });
 
@@ -468,7 +468,7 @@ async function validateMergeInput(
         error: {
           code: "validation_error",
           message:
-            "That user is already linked to another person in this organisation.",
+            "That user is already linked to another person in this account.",
         },
         ok: false,
       };
@@ -481,31 +481,92 @@ async function validateMergeInput(
   };
 }
 
+async function prepareManagerMerge(
+  client: TenantDb,
+  context: ReconcileXeroPersonContext,
+  candidatePerson: Prisma.PersonGetPayload<Record<string, never>>,
+  xeroPerson: Prisma.PersonGetPayload<Record<string, never>>
+): Promise<Result<{ managerPersonId: string | null }, ReconciliationError>> {
+  const companies = await resolveAccountCompanies(context.clerkOrgId, client);
+  const people = await client.person.findMany({
+    select: { id: true, manager_person_id: true },
+    where: {
+      clerk_org_id: context.clerkOrgId,
+      organisation_id: { in: companies.map((company) => company.id) },
+    },
+  });
+  const graph = new Map(
+    people.map((person) => [person.id, person.manager_person_id])
+  );
+  if (!(graph.has(candidatePerson.id) && graph.has(xeroPerson.id))) {
+    return {
+      error: {
+        code: "not_found",
+        message: "Choose profiles in an active owned company.",
+      },
+      ok: false,
+    };
+  }
+  // Use the graph snapshot taken after acquiring the lock, not the earlier validation read.
+  const candidateManager = graph.get(candidatePerson.id) ?? null;
+  const xeroManager = graph.get(xeroPerson.id) ?? null;
+  const managerPersonId =
+    xeroManager === candidatePerson.id
+      ? candidateManager
+      : (xeroManager ?? candidateManager);
+  graph.delete(candidatePerson.id);
+  graph.set(xeroPerson.id, managerPersonId);
+  for (const [personId, managerId] of graph) {
+    if (managerId === candidatePerson.id) {
+      graph.set(personId, xeroPerson.id);
+    }
+  }
+  for (const personId of graph.keys()) {
+    const visited = new Set<string>();
+    let ancestor: string | null = personId;
+    while (ancestor) {
+      if (visited.has(ancestor)) {
+        return {
+          error: {
+            code: "validation_error",
+            message:
+              "Merging these profiles would create a manager cycle. Update their managers first.",
+          },
+          ok: false,
+        };
+      }
+      visited.add(ancestor);
+      ancestor = graph.get(ancestor) ?? null;
+    }
+  }
+  return { ok: true, value: { managerPersonId } };
+}
+
 async function transferCandidateRelations(
   client: ReconciliationClient,
   context: ReconcileXeroPersonContext,
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>>,
-  xeroPerson: Prisma.PersonGetPayload<Record<string, never>>
+  xeroPerson: Prisma.PersonGetPayload<Record<string, never>>,
+  managerPersonId: string | null
 ): Promise<void> {
+  const companies = await resolveAccountCompanies(context.clerkOrgId, client);
   await client.person.updateMany({
     data: { manager_person_id: xeroPerson.id },
     where: {
       clerk_org_id: context.clerkOrgId,
+      id: { notIn: [candidatePerson.id, xeroPerson.id] },
       manager_person_id: candidatePerson.id,
+      organisation_id: { in: companies.map((company) => company.id) },
+    },
+  });
+  await client.person.updateMany({
+    data: { manager_person_id: managerPersonId },
+    where: {
+      clerk_org_id: context.clerkOrgId,
+      id: xeroPerson.id,
       organisation_id: context.organisationId,
     },
   });
-
-  if (
-    !xeroPerson.manager_person_id &&
-    candidatePerson.manager_person_id &&
-    candidatePerson.manager_person_id !== xeroPerson.id
-  ) {
-    await client.person.update({
-      data: { manager_person_id: candidatePerson.manager_person_id },
-      where: { id: xeroPerson.id },
-    });
-  }
 
   const personUpdates: Prisma.PersonUpdateInput = {};
   if (!xeroPerson.team_id && candidatePerson.team_id) {
@@ -554,7 +615,7 @@ async function transferCandidateRelations(
     data: { recipient_person_id: xeroPerson.id },
     where: {
       clerk_org_id: context.clerkOrgId,
-      organisation_id: context.organisationId,
+      organisation_id: { in: companies.map((company) => company.id) },
       recipient_person_id: candidatePerson.id,
     },
   });
@@ -598,10 +659,11 @@ async function transferCandidateBalancesAndScopes(
     }
   }
 
+  const companies = await resolveAccountCompanies(context.clerkOrgId, client);
   const candidateScopes = await client.feedScope.findMany({
     where: {
       clerk_org_id: context.clerkOrgId,
-      organisation_id: context.organisationId,
+      organisation_id: { in: companies.map((company) => company.id) },
       scope_type: "person",
       scope_value: candidatePerson.id,
     },
@@ -612,7 +674,7 @@ async function transferCandidateBalancesAndScopes(
       where: {
         clerk_org_id: context.clerkOrgId,
         feed_id: scopeItem.feed_id,
-        organisation_id: context.organisationId,
+        organisation_id: scopeItem.organisation_id,
         scope_type: "person",
         scope_value: xeroPerson.id,
       },
@@ -631,6 +693,7 @@ async function transferCandidateBalancesAndScopes(
     data: {
       archived_at: new Date(),
       clerk_user_id: null,
+      manager_person_id: null,
       updated_at: new Date(),
     },
     where: { id: candidatePerson.id },
@@ -688,21 +751,26 @@ async function finaliseMergeAndAudit(
     },
   });
 
-  try {
-    if (candidatePerson) {
-      await invalidateFeedCachesForPerson({
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-        personId: candidatePerson.id,
-      });
+  const { clerkOrgId, organisationId } = context;
+  const personIds = [candidatePerson?.id, xeroPerson.id].filter(
+    (id): id is string => Boolean(id)
+  );
+  const result = await invalidateAccountFeedCaches({ clerkOrgId }, client);
+  if (!result.ok) {
+    throw new Error(result.error.message);
+  }
+  for (const personId of personIds) {
+    const invalidated = await invalidateFeedCachesForPerson(
+      {
+        clerkOrgId,
+        organisationId,
+        personId,
+      },
+      client
+    );
+    if (!invalidated.ok) {
+      throw new Error(invalidated.error.message);
     }
-    await invalidateFeedCachesForPerson({
-      clerkOrgId: context.clerkOrgId,
-      organisationId: context.organisationId,
-      personId: xeroPerson.id,
-    });
-  } catch (err) {
-    log.warn("Failed to invalidate feed caches during person merge", { err });
   }
 }
 
@@ -714,11 +782,27 @@ async function finaliseMergeAndAudit(
 export async function mergeCandidateIntoXeroPerson(
   context: ReconcileXeroPersonContext,
   input: MergePersonMatchInput,
-  tx?: Prisma.TransactionClient
+  db: TenantDb
 ): Promise<
   Result<{ merged: true; xeroPersonId: string }, ReconciliationError>
 > {
+  assertTenantDb(db, context.clerkOrgId);
+  if (
+    input.clerkOrgId !== context.clerkOrgId ||
+    input.organisationId !== context.organisationId
+  ) {
+    return await {
+      error: {
+        code: "validation_error",
+        message: "Person merge scope does not match.",
+      },
+      ok: false,
+    };
+  }
   const runMerge = async (client: ReconciliationClient) => {
+    // Read merge targets after both account locks so concurrent linking or graph edits cannot invalidate validation.
+    await lockPlanLimitMutations(context.clerkOrgId, client);
+    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-calendar:manager-assignment:${context.clerkOrgId}`}, 0))::text AS acquired`;
     const validation = await validateMergeInput(client, context, input);
     if (!validation.ok) {
       return validation;
@@ -727,11 +811,21 @@ export async function mergeCandidateIntoXeroPerson(
       validation.value;
 
     if (candidatePerson && candidatePerson.id !== xeroPerson.id) {
-      await transferCandidateRelations(
+      const managerMerge = await prepareManagerMerge(
         client,
         context,
         candidatePerson,
         xeroPerson
+      );
+      if (!managerMerge.ok) {
+        return managerMerge;
+      }
+      await transferCandidateRelations(
+        client,
+        context,
+        candidatePerson,
+        xeroPerson,
+        managerMerge.value.managerPersonId
       );
       await transferCandidateBalancesAndScopes(
         client,
@@ -756,10 +850,10 @@ export async function mergeCandidateIntoXeroPerson(
     };
   };
 
-  if (tx) {
-    return await runMerge(tx);
-  }
-  return await tenantTransaction(context.clerkOrgId, runMerge);
+  return await (async () => {
+    assertTenantDb(db, context.clerkOrgId);
+    return await runMerge(db);
+  })();
 }
 
 /**
@@ -772,8 +866,9 @@ export async function ignorePersonMatch(
     actorUserId: string;
     matchId: string;
   },
-  tx?: Prisma.TransactionClient
+  db: TenantDb
 ): Promise<Result<{ ignored: true }, ReconciliationError>> {
+  assertTenantDb(db, context.clerkOrgId);
   const runIgnore = async (client: ReconciliationClient) => {
     const match = await client.xeroPersonMatch.findFirst({
       where: {
@@ -821,8 +916,8 @@ export async function ignorePersonMatch(
     return { ok: true as const, value: { ignored: true as const } };
   };
 
-  if (tx) {
-    return await runIgnore(tx);
-  }
-  return await tenantTransaction(context.clerkOrgId, runIgnore);
+  return await (async () => {
+    assertTenantDb(db, context.clerkOrgId);
+    return await runIgnore(db);
+  })();
 }

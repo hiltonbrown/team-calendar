@@ -1,3 +1,60 @@
+const tenantPoolMocks = vi.hoisted(() => ({
+  organisationFindFirst: vi.fn((query: { where: { id?: string } }) =>
+    Promise.resolve(
+      query.where.id === "00000000-0000-4000-8000-000000000001"
+        ? {
+            country_code: "AU",
+            id: "00000000-0000-4000-8000-000000000001",
+            name: "Company A",
+            timezone: "Australia/Brisbane",
+          }
+        : null
+    )
+  ),
+}));
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (client: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: tenantPoolMocks.organisationFindFirst,
+          findMany: vi.fn(() =>
+            Promise.resolve([
+              {
+                country_code: "AU",
+                id: "00000000-0000-4000-8000-000000000001",
+                name: "Company A",
+                timezone: "Australia/Brisbane",
+              },
+            ])
+          ),
+        },
+        person: {
+          findFirst: vi.fn(() =>
+            Promise.resolve({
+              id: "person-1",
+              organisation_id: "00000000-0000-4000-8000-000000000001",
+            })
+          ),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/account-companies")
+  >("../../../../../packages/database/src/queries/account-companies")),
+
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/organisations")
+  >("../../../../../packages/database/src/queries/organisations")),
+}));
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,6 +94,7 @@ vi.mock("@/lib/server/ensure-default-organisation", () => ({
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("@/lib/server/load-onboarding-people", () => ({
   loadOnboardingPeople: mocks.loadOnboardingPeople,
@@ -137,7 +195,9 @@ describe("OnboardingPage", () => {
     await renderPage();
     expect(mocks.ensureDefaultOrganisation).toHaveBeenCalledWith("org_1");
     expect(mocks.requireActiveOrgPageContext).toHaveBeenCalledWith(
-      organisationId
+      "org_1",
+      organisationId,
+      expect.any(Object)
     );
   });
   it("does not create a company while revisiting an existing company URL", async () => {
@@ -146,7 +206,7 @@ describe("OnboardingPage", () => {
     expect(mocks.resolveAccountCompanies).not.toHaveBeenCalled();
   });
   it("sends members back to the app", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
     await expect(renderPage()).rejects.toThrow("redirect:/");
     expect(mocks.loadWizardSnapshot).not.toHaveBeenCalled();
   });

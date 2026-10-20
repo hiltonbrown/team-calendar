@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   alternativeContactUpdateMany: vi.fn(),
@@ -8,7 +13,12 @@ const mocks = vi.hoisted(() => ({
   feedScopeFindFirst: vi.fn(),
   feedScopeFindMany: vi.fn(),
   feedScopeUpdate: vi.fn(),
+  invalidateAccountFeedCaches: vi.fn(),
   invalidateFeedCachesForPerson: vi.fn(),
+  knownPeople: new Map<
+    string,
+    { id: string; manager_person_id: string | null }
+  >(),
   leaveBalanceDelete: vi.fn(),
   leaveBalanceFindMany: vi.fn(),
   leaveBalanceUpdate: vi.fn(),
@@ -26,77 +36,89 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/feeds", () => ({
+  invalidateAccountFeedCaches: mocks.invalidateAccountFeedCaches,
   invalidateFeedCachesForPerson: mocks.invalidateFeedCachesForPerson,
 }));
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
-vi.mock("@repo/database", () => {
-  const db = {
-    $transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
-      cb(db)
-    ),
-    alternativeContact: {
-      updateMany: mocks.alternativeContactUpdateMany,
-    },
-    auditEvent: {
-      create: mocks.auditEventCreate,
-    },
-    availabilityRecord: {
-      updateMany: mocks.availabilityRecordUpdateMany,
-    },
-    feedScope: {
-      delete: mocks.feedScopeDelete,
-      findFirst: mocks.feedScopeFindFirst,
-      findMany: mocks.feedScopeFindMany,
-      update: mocks.feedScopeUpdate,
-    },
-    leaveBalance: {
-      delete: mocks.leaveBalanceDelete,
-      findMany: mocks.leaveBalanceFindMany,
-      update: mocks.leaveBalanceUpdate,
-    },
-    notification: {
-      updateMany: mocks.notificationUpdateMany,
-    },
-    person: {
-      create: mocks.personCreate,
-      findFirst: mocks.personFindFirst,
-      findMany: mocks.personFindMany,
-      update: mocks.personUpdate,
-      updateMany: mocks.personUpdateMany,
-      upsert: mocks.personUpsert,
-    },
-    xeroPersonMatch: {
-      findFirst: mocks.xeroPersonMatchFindFirst,
-      update: mocks.xeroPersonMatchUpdate,
-      upsert: mocks.xeroPersonMatchUpsert,
-    },
-  };
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildMergeDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+  lockPlanLimitMutations: vi.fn(async () => undefined),
+  resolveAccountCompanies: async () => [
+    { id: "10000000-0000-4000-8000-000000000001", name: "Company A" },
+  ],
+  scopedTo: (context: { clerkOrgId: string; organisationId: string }) => ({
+    clerk_org_id: context.clerkOrgId,
+    organisation_id: context.organisationId,
+  }),
+}));
+function buildMergeDatabase() {
+  // Delegate fakes supply business rows while the core owns branding, rollback and effects.
   return {
-    scopedTo: vi.fn(
-      (context: { clerkOrgId: string; organisationId: string }) => ({
-        clerk_org_id: context.clerkOrgId,
-        organisation_id: context.organisationId,
-      })
-    ),
-    tenantDatabase: vi.fn((accountId: string) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return db;
-    }),
-    tenantTransaction: vi.fn(
-      (accountId: string, transactionCallback: unknown, options?: unknown) => {
-        if (!accountId) {
-          throw new Error("Missing tenant context");
-        }
-        return db.$transaction(transactionCallback, options);
-      }
-    ),
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
+      alternativeContact: {
+        updateMany: mocks.alternativeContactUpdateMany,
+      },
+      auditEvent: {
+        create: mocks.auditEventCreate,
+      },
+      availabilityRecord: {
+        updateMany: mocks.availabilityRecordUpdateMany,
+      },
+      feedScope: {
+        delete: mocks.feedScopeDelete,
+        findFirst: mocks.feedScopeFindFirst,
+        findMany: mocks.feedScopeFindMany,
+        update: mocks.feedScopeUpdate,
+      },
+      leaveBalance: {
+        delete: mocks.leaveBalanceDelete,
+        findMany: mocks.leaveBalanceFindMany,
+        update: mocks.leaveBalanceUpdate,
+      },
+      notification: {
+        updateMany: mocks.notificationUpdateMany,
+      },
+      person: {
+        create: mocks.personCreate,
+        findFirst: async (args: unknown) => {
+          const person = await mocks.personFindFirst(args);
+          if (person?.id) {
+            mocks.knownPeople.set(person.id, {
+              id: person.id,
+              manager_person_id: person.manager_person_id ?? null,
+            });
+          }
+          return person;
+        },
+        findMany: async (args: { select?: { manager_person_id?: boolean } }) =>
+          args.select?.manager_person_id
+            ? [...mocks.knownPeople.values()]
+            : mocks.personFindMany(args),
+        update: mocks.personUpdate,
+        updateMany: mocks.personUpdateMany,
+        upsert: mocks.personUpsert,
+      },
+      xeroPersonMatch: {
+        findFirst: mocks.xeroPersonMatchFindFirst,
+        update: mocks.xeroPersonMatchUpdate,
+        upsert: mocks.xeroPersonMatchUpsert,
+      },
+    },
   };
-});
+}
 
 const { reconcileXeroPerson, mergeCandidateIntoXeroPerson, ignorePersonMatch } =
   await import("./xero-person-reconciliation");
@@ -112,6 +134,15 @@ describe("xero-person-reconciliation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.knownPeople.clear();
+    mocks.invalidateAccountFeedCaches.mockResolvedValue({
+      ok: true,
+      value: { feedIds: [] },
+    });
+    mocks.invalidateFeedCachesForPerson.mockResolvedValue({
+      ok: true,
+      value: { feedIds: [] },
+    });
     mocks.personFindFirst.mockResolvedValue(null);
     mocks.personFindMany.mockResolvedValue([]);
     mocks.personUpdate.mockImplementation(async (args) => ({
@@ -142,13 +173,19 @@ describe("xero-person-reconciliation", () => {
         xero_employee_id: employeeId,
       });
 
-      const result = await reconcileXeroPerson(context, {
-        email: "alice@example.com",
-        employeeId,
-        firstName: "Alice",
-        jobTitle: "Senior Engineer",
-        lastName: "Smith",
-      });
+      const result = await withTestTenantDb(tenantTestAccount(context), (db) =>
+        reconcileXeroPerson(
+          context,
+          {
+            email: "alice@example.com",
+            employeeId,
+            firstName: "Alice",
+            jobTitle: "Senior Engineer",
+            lastName: "Smith",
+          },
+          db
+        )
+      );
 
       expect(result).toEqual({
         outcome: "exact_matched",
@@ -188,13 +225,19 @@ describe("xero-person-reconciliation", () => {
           { id: candidatePersonId, xero_employee_id: null },
         ]); // allOrgPeopleWithEmail
 
-      const result = await reconcileXeroPerson(context, {
-        email: "alice@example.com",
-        employeeId,
-        firstName: "Alice",
-        jobTitle: "Senior Staff",
-        lastName: "Smith",
-      });
+      const result = await withTestTenantDb(tenantTestAccount(context), (db) =>
+        reconcileXeroPerson(
+          context,
+          {
+            email: "alice@example.com",
+            employeeId,
+            firstName: "Alice",
+            jobTitle: "Senior Staff",
+            lastName: "Smith",
+          },
+          db
+        )
+      );
 
       expect(result).toEqual({
         outcome: "upgraded_in_place",
@@ -235,12 +278,18 @@ describe("xero-person-reconciliation", () => {
         .mockResolvedValueOnce([person1, person2]) // manualCandidates
         .mockResolvedValueOnce([person1, person2]); // allOrgPeopleWithEmail
 
-      const result = await reconcileXeroPerson(context, {
-        email: "alice@example.com",
-        employeeId,
-        firstName: "Alice",
-        lastName: "One",
-      });
+      const result = await withTestTenantDb(tenantTestAccount(context), (db) =>
+        reconcileXeroPerson(
+          context,
+          {
+            email: "alice@example.com",
+            employeeId,
+            firstName: "Alice",
+            lastName: "One",
+          },
+          db
+        )
+      );
 
       expect(result.outcome).toBe("created_with_pending_match");
       expect(mocks.personUpsert).toHaveBeenCalled();
@@ -268,12 +317,18 @@ describe("xero-person-reconciliation", () => {
       // Email is missing/synthetic fallback
       mocks.personFindMany.mockResolvedValueOnce([manualPerson]);
 
-      const result = await reconcileXeroPerson(context, {
-        email: null,
-        employeeId,
-        firstName: "Alice",
-        lastName: "Smith",
-      });
+      const result = await withTestTenantDb(tenantTestAccount(context), (db) =>
+        reconcileXeroPerson(
+          context,
+          {
+            email: null,
+            employeeId,
+            firstName: "Alice",
+            lastName: "Smith",
+          },
+          db
+        )
+      );
 
       expect(result.outcome).toBe("created_with_pending_match");
       expect(mocks.personUpsert).toHaveBeenCalled();
@@ -292,12 +347,18 @@ describe("xero-person-reconciliation", () => {
       mocks.personFindFirst.mockResolvedValue(null);
       mocks.personFindMany.mockResolvedValue([]);
 
-      const result = await reconcileXeroPerson(context, {
-        email: "stranger@example.com",
-        employeeId,
-        firstName: "Bob",
-        lastName: "Taylor",
-      });
+      const result = await withTestTenantDb(tenantTestAccount(context), (db) =>
+        reconcileXeroPerson(
+          context,
+          {
+            email: "stranger@example.com",
+            employeeId,
+            firstName: "Bob",
+            lastName: "Taylor",
+          },
+          db
+        )
+      );
 
       expect(result).toEqual({ outcome: "created", personId: xeroPersonId });
       expect(mocks.xeroPersonMatchUpsert).not.toHaveBeenCalled();
@@ -330,13 +391,21 @@ describe("xero-person-reconciliation", () => {
     it("returns not_found error if Xero person does not exist", async () => {
       mocks.personFindFirst.mockResolvedValueOnce(null);
 
-      const result = await mergeCandidateIntoXeroPerson(context, {
-        actorUserId: "user_admin",
-        candidatePersonId,
-        clerkOrgId,
-        organisationId,
-        xeroPersonId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          mergeCandidateIntoXeroPerson(
+            context,
+            {
+              actorUserId: "user_admin",
+              candidatePersonId,
+              clerkOrgId,
+              organisationId,
+              xeroPersonId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: { code: "not_found", message: "Xero person not found." },
@@ -349,13 +418,21 @@ describe("xero-person-reconciliation", () => {
         .mockResolvedValueOnce(xeroPerson)
         .mockResolvedValueOnce({ ...candidatePerson, archived_at: new Date() });
 
-      const result = await mergeCandidateIntoXeroPerson(context, {
-        actorUserId: "user_admin",
-        candidatePersonId,
-        clerkOrgId,
-        organisationId,
-        xeroPersonId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          mergeCandidateIntoXeroPerson(
+            context,
+            {
+              actorUserId: "user_admin",
+              candidatePersonId,
+              clerkOrgId,
+              organisationId,
+              xeroPersonId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -366,29 +443,68 @@ describe("xero-person-reconciliation", () => {
       });
     });
 
-    it("rejects if resolved Clerk user ID is already linked to a third person in the organization", async () => {
+    it("rejects if resolved Clerk user ID is already linked to a third person in the account", async () => {
       mocks.personFindFirst
         .mockResolvedValueOnce(xeroPerson)
         .mockResolvedValueOnce(candidatePerson)
         .mockResolvedValueOnce({ id: "third_person_id" }); // alreadyLinked check
 
-      const result = await mergeCandidateIntoXeroPerson(context, {
-        actorUserId: "user_admin",
-        candidatePersonId,
-        clerkOrgId,
-        clerkUserId: "user_cand_1",
-        organisationId,
-        xeroPersonId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          mergeCandidateIntoXeroPerson(
+            context,
+            {
+              actorUserId: "user_admin",
+              candidatePersonId,
+              clerkOrgId,
+              clerkUserId: "user_cand_1",
+              organisationId,
+              xeroPersonId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
           code: "validation_error",
           message:
-            "That user is already linked to another person in this organisation.",
+            "That user is already linked to another person in this account.",
         },
         ok: false,
       });
+    });
+
+    it("keeps a manager manually assigned to the Xero person", async () => {
+      mocks.personFindFirst
+        .mockResolvedValueOnce({
+          ...xeroPerson,
+          manager_person_id: "manual-manager",
+        })
+        .mockResolvedValueOnce(candidatePerson)
+        .mockResolvedValueOnce(null);
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          mergeCandidateIntoXeroPerson(
+            context,
+            {
+              actorUserId: "user_admin",
+              candidatePersonId,
+              clerkOrgId,
+              organisationId,
+              xeroPersonId,
+            },
+            db
+          )
+      );
+      expect(result).toMatchObject({ ok: true });
+      expect(mocks.personUpdateMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { manager_person_id: candidatePerson.manager_person_id },
+        })
+      );
     });
 
     it("successfully merges candidate into Xero person, transferring relations and archiving candidate", async () => {
@@ -430,16 +546,24 @@ describe("xero-person-reconciliation", () => {
         .mockResolvedValueOnce({ id: "target_fs1" }) // feed1 exists on target
         .mockResolvedValueOnce(null); // feed2 does not exist on target
 
-      const result = await mergeCandidateIntoXeroPerson(context, {
-        actorDisplay: "Admin User",
-        actorUserId: "user_admin",
-        candidatePersonId,
-        clerkOrgId,
-        clerkUserId: "user_cand_1",
-        matchId,
-        organisationId,
-        xeroPersonId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          mergeCandidateIntoXeroPerson(
+            context,
+            {
+              actorDisplay: "Admin User",
+              actorUserId: "user_admin",
+              candidatePersonId,
+              clerkOrgId,
+              clerkUserId: "user_cand_1",
+              matchId,
+              organisationId,
+              xeroPersonId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -457,10 +581,10 @@ describe("xero-person-reconciliation", () => {
       );
 
       // Assert manager, team and location inherited
-      expect(mocks.personUpdate).toHaveBeenCalledWith(
+      expect(mocks.personUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: { manager_person_id: "mgr_cand" },
-          where: { id: xeroPersonId },
+          where: expect.objectContaining({ id: xeroPersonId }),
         })
       );
       expect(mocks.personUpdate).toHaveBeenCalledWith(
@@ -551,10 +675,12 @@ describe("xero-person-reconciliation", () => {
 
       // Assert feed cache invalidation
       expect(mocks.invalidateFeedCachesForPerson).toHaveBeenCalledWith(
-        expect.objectContaining({ personId: candidatePersonId })
+        expect.objectContaining({ personId: candidatePersonId }),
+        expect.any(Object)
       );
       expect(mocks.invalidateFeedCachesForPerson).toHaveBeenCalledWith(
-        expect.objectContaining({ personId: xeroPersonId })
+        expect.objectContaining({ personId: xeroPersonId }),
+        expect.any(Object)
       );
     });
   });
@@ -563,10 +689,18 @@ describe("xero-person-reconciliation", () => {
     it("returns not_found if match does not exist", async () => {
       mocks.xeroPersonMatchFindFirst.mockResolvedValueOnce(null);
 
-      const result = await ignorePersonMatch(context, {
-        actorUserId: "user_admin",
-        matchId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          ignorePersonMatch(
+            context,
+            {
+              actorUserId: "user_admin",
+              matchId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: { code: "not_found", message: "Match not found." },
@@ -581,11 +715,19 @@ describe("xero-person-reconciliation", () => {
         xero_person_id: xeroPersonId,
       });
 
-      const result = await ignorePersonMatch(context, {
-        actorDisplay: "Admin User",
-        actorUserId: "user_admin",
-        matchId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount(context),
+        (db) =>
+          ignorePersonMatch(
+            context,
+            {
+              actorDisplay: "Admin User",
+              actorUserId: "user_admin",
+              matchId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: { ignored: true } });
       expect(mocks.xeroPersonMatchUpdate).toHaveBeenCalledWith(

@@ -8,33 +8,38 @@ import {
   type ApprovalServiceError,
   approve,
   decline,
-  dispatchApprovalReconciliation,
-  dispatchXeroLeaveSync,
+  managerScopePersonIds,
+  prepareApprovalSync,
   requestMoreInfo,
   retryApproval,
   retryDecline,
   revertApprovalAttempt,
+  sendPreparedApprovalSync,
 } from "@repo/availability";
-import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId, Result } from "@repo/core";
+import {
+  afterTenantCommit,
+  assertTenantDb,
+  resolveAccountCompanies,
+  type TenantDb,
+  withTenantDb,
+  withTenantResult,
+} from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
+
 import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const RecordActionSchema = z.object({
-  organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
 });
 const DeclineActionSchema = RecordActionSchema.extend({
-  reason: z.string().trim().min(3).max(1000),
+  reason: z.string().trim().max(1000),
 });
 const RequestInfoActionSchema = RecordActionSchema.extend({
   question: z.string().trim().min(3).max(1000),
-});
-const ReconciliationActionSchema = z.object({
-  organisationId: z.string().uuid(),
 });
 export type ApprovalActionError =
   | ApprovalServiceError
@@ -57,9 +62,9 @@ export interface ApprovalActionValue {
   xeroWriteError: string | null;
 }
 export async function approveAction(input: {
-  organisationId: string;
   recordId: string;
 }): Promise<ApprovalActionResult> {
+  assertNoTenantTransaction("approveAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -71,17 +76,17 @@ export async function approveAction(input: {
     }
     if (result.value.approvedAt) {
       try {
-        const first = await tenantDatabase(
-          context.value.clerkOrgId
-        ).availabilityRecord.findFirst({
-          orderBy: { approved_at: "asc" },
-          select: { approved_at: true },
-          where: {
-            approved_at: { not: null },
-            clerk_org_id: context.value.clerkOrgId,
-            organisation_id: context.value.organisationId,
-          },
-        });
+        const first = await withTenantDb(context.value.clerkOrgId, (db) =>
+          db.availabilityRecord.findFirst({
+            orderBy: { approved_at: "asc" },
+            select: { approved_at: true },
+            where: {
+              approved_at: { not: null },
+              clerk_org_id: context.value.clerkOrgId,
+              organisation_id: context.value.organisationId,
+            },
+          })
+        );
         if (!first?.approved_at) {
           revalidateApprovalWritePaths();
           return approvalValue(result.value);
@@ -109,15 +114,15 @@ export async function approveAction(input: {
   })();
 }
 export async function declineAction(input: {
-  organisationId: string;
   reason: string;
   recordId: string;
 }): Promise<ApprovalActionResult> {
+  assertNoTenantTransaction("declineAction");
   const parsed = DeclineActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
+  const context = await resolveRecordActionContext(parsed.data);
   if (!context.ok) {
     return context;
   }
@@ -138,36 +143,57 @@ export async function declineAction(input: {
   })();
 }
 export async function requestMoreInfoAction(input: {
-  organisationId: string;
   question: string;
   recordId: string;
 }): Promise<ApprovalActionResult> {
+  assertNoTenantTransaction("requestMoreInfoAction");
   const parsed = RequestInfoActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedApprovalActor();
+  if (!actor.ok) {
+    return actor;
   }
-  return await (async () => {
-    const result = await requestMoreInfo({
-      ...context.value,
-      question: parsed.data.question,
-      recordId: parsed.data.recordId,
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const context = await loadRecordActionContext(
+        actor.value,
+        parsed.data.recordId,
+        db
+      );
+      if (!context.ok) {
+        return context;
+      }
+      const result = await requestMoreInfo(
+        { ...context.value, question: parsed.data.question },
+        db
+      );
+      if (!result.ok) {
+        return result;
+      }
+      afterTenantCommit(db, () => {
+        revalidatePath("/leave-approvals");
+        revalidatePath("/notifications");
+
+        return Promise.resolve();
+      });
+      return approvalValue(result.value);
     });
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/leave-approvals");
-    revalidatePath("/notifications");
-    return approvalValue(result.value);
-  })();
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to request more information.",
+      },
+      ok: false,
+    };
+  }
 }
 export async function retryApprovalAction(input: {
-  organisationId: string;
   recordId: string;
 }): Promise<ApprovalActionResult> {
+  assertNoTenantTransaction("retryApprovalAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -182,9 +208,9 @@ export async function retryApprovalAction(input: {
   })();
 }
 export async function retryDeclineAction(input: {
-  organisationId: string;
   recordId: string;
 }): Promise<ApprovalActionResult> {
+  assertNoTenantTransaction("retryDeclineAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -199,9 +225,9 @@ export async function retryDeclineAction(input: {
   })();
 }
 export async function revertApprovalAttemptAction(input: {
-  organisationId: string;
   recordId: string;
 }): Promise<ApprovalActionResult> {
+  assertNoTenantTransaction("revertApprovalAttemptAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -216,137 +242,204 @@ export async function revertApprovalAttemptAction(input: {
     return approvalValue(result.value);
   })();
 }
-export async function dispatchApprovalReconciliationAction(input: {
-  organisationId: string;
-}): Promise<
-  ApprovalActionResult<{
-    queued: boolean;
-    reason?: string;
-  }>
-> {
-  const parsed = ReconciliationActionSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
-  }
-  const context = await resolveActionContext(parsed.data.organisationId, {
-    adminOnly: true,
-  });
-  if (!context.ok) {
-    return context;
-  }
-  return await (async () => {
-    const result = await dispatchApprovalReconciliation(context.value);
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/leave-approvals");
-    return result;
-  })();
+export interface AccountApprovalSyncResult {
+  companies: {
+    companyId: string;
+    companyName: string;
+    result: ApprovalActionResult<{ queued: boolean; reason?: string }>;
+  }[];
 }
-export async function dispatchXeroLeaveSyncAction(input: {
-  organisationId: string;
-}): Promise<
-  ApprovalActionResult<{
-    queued: boolean;
-    reason?: string;
-  }>
+export async function dispatchApprovalReconciliationAction(): Promise<
+  ApprovalActionResult<AccountApprovalSyncResult>
 > {
-  const parsed = ReconciliationActionSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
+  assertNoTenantTransaction("dispatchApprovalReconciliationAction");
+  return await dispatchAccountApprovalSync("approval_state_reconciliation");
+}
+export async function dispatchXeroLeaveSyncAction(): Promise<
+  ApprovalActionResult<AccountApprovalSyncResult>
+> {
+  assertNoTenantTransaction("dispatchXeroLeaveSyncAction");
+  return await dispatchAccountApprovalSync("leave_records");
+}
+async function dispatchAccountApprovalSync(
+  runType: "leave_records" | "approval_state_reconciliation"
+): Promise<ApprovalActionResult<AccountApprovalSyncResult>> {
+  const actor = await authenticatedApprovalActor(true);
+  if (!actor.ok) {
+    return actor;
   }
-  const context = await resolveActionContext(parsed.data.organisationId, {
-    adminOnly: true,
-  });
-  if (!context.ok) {
-    return context;
-  }
-  return await (async () => {
-    const result = await dispatchXeroLeaveSync(context.value);
-    if (!result.ok) {
-      return result;
+  try {
+    const prepared = await withTenantDb(actor.value.clerkOrgId, async (db) => {
+      const companies = await resolveAccountCompanies(
+        actor.value.clerkOrgId,
+        db
+      );
+      const connections = await db.xeroConnection.findMany({
+        select: { organisation_id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: actor.value.clerkOrgId,
+          organisation_id: { in: companies.map((company) => company.id) },
+          released_at: null,
+          sync_paused_at: null,
+        },
+      });
+      const snapshots: Array<{
+        company: Awaited<ReturnType<typeof resolveAccountCompanies>>[number];
+        prepared: Awaited<ReturnType<typeof prepareApprovalSync>>;
+      }> = [];
+      for (const company of companies.filter((preparedCompany) =>
+        connections.some(
+          (connection) => connection.organisation_id === preparedCompany.id
+        )
+      )) {
+        snapshots.push({
+          company,
+          prepared: await prepareApprovalSync(
+            { ...actor.value, organisationId: company.id },
+            runType,
+            db
+          ),
+        });
+      }
+      return snapshots;
+    });
+    const companies: AccountApprovalSyncResult["companies"] = [];
+    for (const item of prepared) {
+      let result: ApprovalActionResult<{ queued: boolean; reason?: string }>;
+      try {
+        result = item.prepared.ok
+          ? await sendPreparedApprovalSync(item.prepared.value)
+          : item.prepared;
+      } catch {
+        result = {
+          error: { code: "unknown_error", message: "Failed to dispatch sync." },
+          ok: false,
+        };
+      }
+      companies.push({
+        companyId: item.company.id,
+        companyName: item.company.name,
+        result,
+      });
     }
     revalidatePath("/leave-approvals");
     revalidatePath("/");
-    return result;
-  })();
+    return { ok: true, value: { companies } };
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to prepare account sync.",
+      },
+      ok: false,
+    };
+  }
 }
-async function resolveRecordActionContext(input: {
+interface ApprovalActor {
+  actingUserId: string;
+  clerkOrgId: ClerkOrgId;
+  role: ApprovalRole;
+}
+interface RecordActionContext extends ApprovalActor {
+  actingPersonId: string | null;
   organisationId: string;
   recordId: string;
-}): Promise<
-  ApprovalActionResult<{
-    actingPersonId: string | null;
-    actingUserId: string;
-    clerkOrgId: string;
-    organisationId: string;
-    recordId: string;
-    role: ApprovalRole;
-  }>
-> {
+}
+async function authenticatedApprovalActor(
+  adminOnly = false
+): Promise<ApprovalActionResult<ApprovalActor>> {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  const role = effectiveRole(orgRole);
+  if (!(orgId && user && role) || (adminOnly && role === "manager")) {
+    return notAuthorised();
+  }
+  // Clerk supplied this authenticated account before SQL preparation.
+  return {
+    ok: true,
+    value: { actingUserId: user.id, clerkOrgId: orgId as ClerkOrgId, role },
+  };
+}
+async function loadRecordActionContext(
+  actor: ApprovalActor,
+  recordId: string,
+  db: TenantDb
+): Promise<ApprovalActionResult<RecordActionContext>> {
+  assertTenantDb(db, actor.clerkOrgId);
+  const companies = await resolveAccountCompanies(actor.clerkOrgId, db);
+  const companyIds = companies.map((company) => company.id);
+  const record = await db.availabilityRecord.findFirst({
+    select: { organisation_id: true, person_id: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: actor.clerkOrgId,
+      id: recordId,
+      organisation_id: { in: companyIds },
+    },
+  });
+  if (!record) {
+    return notAuthorised();
+  }
+  const person = await db.person.findFirst({
+    orderBy: [{ created_at: "asc" }, { id: "asc" }],
+    select: { id: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: actor.clerkOrgId,
+      clerk_user_id: actor.actingUserId,
+      organisation_id: { in: companyIds },
+    },
+  });
+  if (actor.role === "manager") {
+    if (!person) {
+      return notAuthorised();
+    }
+    const managed = await managerScopePersonIds(
+      {
+        actingPersonId: person.id,
+        clerkOrgId: actor.clerkOrgId,
+        excludeSelf: true,
+      },
+      db
+    );
+    if (!managed.includes(record.person_id)) {
+      return notAuthorised();
+    }
+  }
+  return {
+    ok: true,
+    value: {
+      ...actor,
+      actingPersonId: person?.id ?? null,
+      organisationId: record.organisation_id,
+      recordId,
+    },
+  };
+}
+async function resolveRecordActionContext(input: {
+  recordId: string;
+}): Promise<ApprovalActionResult<RecordActionContext>> {
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedApprovalActor();
+  if (!actor.ok) {
+    return actor;
   }
-  return {
-    ok: true,
-    value: {
-      ...context.value,
-      recordId: parsed.data.recordId,
-    },
-  };
-}
-async function resolveActionContext(
-  organisationId: string,
-  options: {
-    adminOnly?: boolean;
-  } = {}
-): Promise<
-  ApprovalActionResult<{
-    actingPersonId: string | null;
-    actingUserId: string;
-    clerkOrgId: string;
-    organisationId: string;
-    role: ApprovalRole;
-  }>
-> {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
-  const role = effectiveRole(orgRole);
-  if (!(user && role) || (options.adminOnly && role === "manager")) {
-    return notAuthorised();
+  try {
+    return await withTenantDb(actor.value.clerkOrgId, (db) =>
+      loadRecordActionContext(actor.value, parsed.data.recordId, db)
+    );
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to load leave request.",
+      },
+      ok: false,
+    };
   }
-  if (!context.ok) {
-    return notAuthorised(context.error.message);
-  }
-  const actingPerson = await tenantDatabase(
-    context.value.clerkOrgId
-  ).person.findFirst({
-    select: { id: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: context.value.clerkOrgId,
-      clerk_user_id: user.id,
-      organisation_id: context.value.organisationId,
-    },
-  });
-  return {
-    ok: true,
-    value: {
-      actingPersonId: actingPerson?.id ?? null,
-      actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      role,
-    },
-  };
 }
 function effectiveRole(role: string | null | undefined): ApprovalRole | null {
   if (role === "org:owner") {

@@ -1,9 +1,15 @@
-vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
-const mocks = vi.hoisted(() => ({ tenantDatabase: vi.fn() }));
+vi.mock("@repo/database", () => ({ withTenantDb: mocks.withTenantDb }));
+const mocks = vi.hoisted(() => ({ withTenantDb: vi.fn() }));
+
+import type { Database } from "@repo/database";
+
+interface NotificationSseRecipientDatabase {
+  person: Pick<Database["person"], "findMany">;
+}
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  type NotificationSseRecipientDatabase,
+  type NotificationSseEvent,
   pollNotificationStream,
   publishNotificationEvent,
   publishOrganisationNotificationEvent,
@@ -23,7 +29,10 @@ describe("notification SSE broker", () => {
   let recipients: NotificationSseRecipientDatabase;
 
   beforeEach(() => {
-    const entries = new Map<string, { event: typeof event; id: string }[]>();
+    const entries = new Map<
+      string,
+      { event: NotificationSseEvent; id: string }[]
+    >();
     let sequence = 0;
     streamClient = {
       append: vi.fn((channel, nextEvent) => {
@@ -48,7 +57,12 @@ describe("notification SSE broker", () => {
       },
     };
     setNotificationSseStreamClientForTests(streamClient);
-    mocks.tenantDatabase.mockReturnValue(recipients);
+    mocks.withTenantDb.mockImplementation(
+      async (
+        _account: string,
+        run: (db: NotificationSseRecipientDatabase) => Promise<unknown>
+      ) => run(recipients)
+    );
   });
 
   afterEach(() => {
@@ -57,27 +71,27 @@ describe("notification SSE broker", () => {
 
   it("reads a published event from the matching user channel", async () => {
     await publishNotificationEvent(
-      { organisationId: "org-a", userId: "user-a" },
+      { clerkOrgId: "clerk-org-a", userId: "user-a" },
       event
     );
 
     await expect(
       pollNotificationStream(
-        { organisationId: "org-a", userId: "user-a" },
+        { clerkOrgId: "clerk-org-a", userId: "user-a" },
         "0-0"
       )
     ).resolves.toEqual([{ event, id: "1000-1" }]);
   });
 
-  it("does not read an event across organisations for the same user", async () => {
+  it("does not read an event across accounts for the same user", async () => {
     await publishNotificationEvent(
-      { organisationId: "org-a", userId: "user-a" },
+      { clerkOrgId: "clerk-org-a", userId: "user-a" },
       event
     );
 
     await expect(
       pollNotificationStream(
-        { organisationId: "org-b", userId: "user-a" },
+        { clerkOrgId: "clerk-org-b", userId: "user-a" },
         "0-0"
       )
     ).resolves.toEqual([]);
@@ -91,11 +105,17 @@ describe("notification SSE broker", () => {
       { clerkOrgId: "clerk-org-a", organisationId: "org-a" },
       event
     );
-    expect(mocks.tenantDatabase).toHaveBeenCalledWith("clerk-org-a");
-    expect(streamClient.append).toHaveBeenCalledWith("sse:user-a:org-a", event);
+    expect(mocks.withTenantDb).toHaveBeenCalledWith(
+      "clerk-org-a",
+      expect.any(Function)
+    );
+    expect(streamClient.append).toHaveBeenCalledWith(
+      "sse:account:clerk-org-a:user-a",
+      event
+    );
   });
 
-  it("fans organisation events out only to active members of that organisation", async () => {
+  it("fans organisation events out only to active members across the account", async () => {
     const findMany = vi.mocked(recipients.person.findMany);
     findMany.mockResolvedValue([
       { clerk_user_id: "user-a" },
@@ -105,8 +125,7 @@ describe("notification SSE broker", () => {
 
     await publishOrganisationNotificationEvent(
       { clerkOrgId: "clerk-org-a", organisationId: "org-a" },
-      event,
-      recipients
+      event
     );
 
     expect(findMany).toHaveBeenCalledWith({
@@ -116,16 +135,71 @@ describe("notification SSE broker", () => {
         clerk_org_id: "clerk-org-a",
         clerk_user_id: { not: null },
         is_active: true,
-        organisation_id: "org-a",
+        organisation: { clerk_org_id: "clerk-org-a" },
       },
     });
     expect(streamClient.append).toHaveBeenCalledTimes(2);
-    expect(streamClient.append).toHaveBeenCalledWith("sse:user-a:org-a", event);
-    expect(streamClient.append).toHaveBeenCalledWith("sse:user-b:org-a", event);
-    expect(streamClient.append).not.toHaveBeenCalledWith(
-      "sse:user-a:org-b",
+    expect(streamClient.append).toHaveBeenCalledWith(
+      "sse:account:clerk-org-a:user-a",
       event
     );
+    expect(streamClient.append).toHaveBeenCalledWith(
+      "sse:account:clerk-org-a:user-b",
+      event
+    );
+    expect(streamClient.append).not.toHaveBeenCalledWith(
+      "sse:account:clerk-org-b:user-a",
+      event
+    );
+  });
+
+  it("delivers a B-company event to an A-employed manager through one account channel", async () => {
+    const created = {
+      payload: {
+        actionUrl: "/plans/record-B",
+        body: "Company B request",
+        category: "approval_flow" as const,
+        createdAt: new Date().toISOString(),
+        notificationId: "notification-B",
+        organisationId: "company-B",
+        organisationName: "Company B",
+        title: "Leave submitted",
+        type: "leave_submitted" as const,
+        unreadCount: 2,
+      },
+      type: "notification.created" as const,
+    };
+    await publishNotificationEvent(
+      { clerkOrgId: "account-A", userId: "manager-A" },
+      created
+    );
+    expect(streamClient.append).toHaveBeenCalledWith(
+      "sse:account:account-A:manager-A",
+      created
+    );
+    expect(
+      await pollNotificationStream(
+        { clerkOrgId: "account-A", userId: "manager-A" },
+        "0-0"
+      )
+    ).toMatchObject([{ event: created }]);
+    expect(
+      await pollNotificationStream(
+        { clerkOrgId: "account-B", userId: "manager-A" },
+        "0-0"
+      )
+    ).toEqual([]);
+  });
+  it("deduplicates a user when broadcasting a company sync event across the account", async () => {
+    vi.mocked(recipients.person.findMany).mockResolvedValue([
+      { clerk_user_id: "manager-A" },
+      { clerk_user_id: "manager-A" },
+    ] as never);
+    await publishOrganisationNotificationEvent(
+      { clerkOrgId: "account-A", organisationId: "company-B" },
+      event
+    );
+    expect(streamClient.append).toHaveBeenCalledTimes(1);
   });
 
   it("degrades gracefully when the stream client is unconfigured", async () => {
@@ -133,13 +207,13 @@ describe("notification SSE broker", () => {
 
     await expect(
       publishNotificationEvent(
-        { organisationId: "org-a", userId: "user-a" },
+        { clerkOrgId: "clerk-org-a", userId: "user-a" },
         event
       )
     ).resolves.toBeUndefined();
     await expect(
       pollNotificationStream(
-        { organisationId: "org-a", userId: "user-a" },
+        { clerkOrgId: "clerk-org-a", userId: "user-a" },
         "0-0"
       )
     ).resolves.toEqual([]);

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../../../../packages/database/src/tenant-db";
+import { tenantTestAccount } from "../../../../packages/database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   feedCount: vi.fn(),
@@ -9,12 +11,29 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/availability", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../packages/database/src/tenant-db")
+  >("../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
     feed: { count: mocks.feedCount },
     organisation: { findFirst: mocks.organisationFindFirst },
-  })),
-}));
+  };
+}
 
 const { loadOnboardingState } = await import("./load-onboarding-state");
 const input = {
@@ -34,7 +53,9 @@ describe("loadOnboardingState", () => {
   });
 
   it("lists only holidays and the feed when Xero is connected", async () => {
-    const state = await loadOnboardingState(input);
+    const state = await withTestTenantDb(tenantTestAccount(input), (db) =>
+      loadOnboardingState(input, db)
+    );
     expect(state.steps.map((step) => step.id)).toEqual(["holidays", "feed"]);
     expect(state).toMatchObject({
       completedRequiredCount: 2,
@@ -48,7 +69,9 @@ describe("loadOnboardingState", () => {
       ok: true,
       value: { state: "not_connected" },
     });
-    const state = await loadOnboardingState(input);
+    const state = await withTestTenantDb(tenantTestAccount(input), (db) =>
+      loadOnboardingState(input, db)
+    );
     const ids = state.steps.map((step) => step.id as string);
     expect(ids).not.toContain("profile");
     expect(ids).not.toContain("people");
@@ -59,7 +82,9 @@ describe("loadOnboardingState", () => {
       ok: true,
       value: { state: "not_connected" },
     });
-    const state = await loadOnboardingState(input);
+    const state = await withTestTenantDb(tenantTestAccount(input), (db) =>
+      loadOnboardingState(input, db)
+    );
     expect(state.steps.find((step) => step.id === "xero")).toMatchObject({
       ctaLabel: "Connect Xero",
       status: "optional",
@@ -80,7 +105,9 @@ describe("loadOnboardingState", () => {
           ? { error: { code: "state_unavailable" }, ok: false }
           : { ok: true, value: { state: xeroState } }
       );
-      const state = await loadOnboardingState(input);
+      const state = await withTestTenantDb(tenantTestAccount(input), (db) =>
+        loadOnboardingState(input, db)
+      );
       expect(state.steps.find((step) => step.id === "xero")).toMatchObject({
         ctaLabel: "Review Xero",
         description: message,
@@ -91,13 +118,17 @@ describe("loadOnboardingState", () => {
   it("marks the first unfinished step as next", async () => {
     mocks.organisationFindFirst.mockResolvedValue({ country_code: "XX" });
     mocks.feedCount.mockResolvedValue(0);
-    const state = await loadOnboardingState(input);
+    const state = await withTestTenantDb(tenantTestAccount(input), (db) =>
+      loadOnboardingState(input, db)
+    );
     expect(state.steps.map((step) => step.status)).toEqual(["next", "pending"]);
     expect(state.isComplete).toBe(false);
   });
 
   it("scopes every count to the tenant", async () => {
-    await loadOnboardingState(input);
+    await withTestTenantDb(tenantTestAccount(input), (db) =>
+      loadOnboardingState(input, db)
+    );
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: expect.objectContaining({
         clerk_org_id: "org_1",

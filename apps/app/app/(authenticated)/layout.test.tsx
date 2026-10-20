@@ -129,3 +129,18 @@ describe("AppLayout first-run gate", () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../packages/database/src/tenant-db")
+  >("../../../../packages/database/src/tenant-db")),
+}));

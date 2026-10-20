@@ -1,3 +1,4 @@
+import { assertTenantDb, type TenantDb } from "./tenant-db";
 import "server-only";
 import type { Prisma } from "../generated/client";
 import { type XeroScope, xeroScope } from "./queries/xero-connections";
@@ -43,9 +44,10 @@ export async function withXeroGrantLock<T>(
   );
 }
 export async function lockActiveScopedXeroConnection(
-  tx: Prisma.TransactionClient,
-  scope: XeroScope
+  scope: XeroScope,
+  tx: TenantDb
 ): Promise<boolean> {
+  assertTenantDb(tx, scope.clerkOrgId);
   await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
   const connection = await tx.xeroConnection.findFirst({
     select: { xero_authorisation_id: true },

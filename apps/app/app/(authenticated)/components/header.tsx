@@ -1,8 +1,9 @@
 import { requireOrg } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
-import { listOrganisationsByClerkOrg } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { ModeToggle } from "@repo/design-system/components/mode-toggle";
 import { Separator } from "@repo/design-system/components/ui/separator";
 import { SidebarTrigger } from "@repo/design-system/components/ui/sidebar";
@@ -18,17 +19,17 @@ interface HeaderProps {
   organisationId?: string | null;
   page: string;
   pages?: string[];
+  showCompanySelector?: boolean;
 }
 
 export const Header = async ({
   page,
   children,
   organisationId,
+  showCompanySelector = true,
 }: HeaderProps) => {
-  const [bell, companies] = await Promise.all([
-    loadBellData(organisationId),
-    loadCompanies(),
-  ]);
+  assertNoTenantTransaction("Header");
+  const { bell, companies } = await loadHeaderData(showCompanySelector);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-border border-b bg-background px-4 shadow-[var(--elev-sticky)]">
@@ -42,17 +43,19 @@ export const Header = async ({
       </div>
 
       <div className="flex items-center gap-2">
-        <CompanySelector
-          companies={companies}
-          organisationId={organisationId}
-        />
+        {showCompanySelector ? (
+          <CompanySelector
+            companies={companies}
+            organisationId={organisationId}
+          />
+        ) : null}
         {children}
         <CommandMenuTrigger />
         {bell ? (
           <NotificationsBell
             initialRecent={bell.recent}
             initialUnreadCount={bell.unreadCount}
-            organisationId={bell.organisationId}
+            key={bell.clerkOrgId}
           />
         ) : null}
         <ModeToggle />
@@ -68,75 +71,56 @@ export const Header = async ({
   );
 };
 
-async function loadBellData(organisationId?: string | null): Promise<{
-  organisationId: string;
-  recent: Array<{
-    actionUrl: string | null;
-    body: string;
-    createdAt: string;
-    iconKey: string;
-    id: string;
-    title: string;
-  }>;
-  unreadCount: number;
-} | null> {
+async function loadHeaderData(showCompanySelector: boolean) {
   try {
     const [user, rawClerkOrgId] = await Promise.all([
       currentUser(),
       requireOrg(),
     ]);
-    // requireOrg guarantees this string is the active Clerk Organisation ID.
+    // requireOrg supplies the authenticated Clerk account identifier.
     const clerkOrgId = rawClerkOrgId as ClerkOrgId;
-    if (!user) {
-      return null;
-    }
-    let resolvedOrganisationId = organisationId ?? null;
-    if (!resolvedOrganisationId) {
-      const organisations = await listOrganisationsByClerkOrg(clerkOrgId);
-      resolvedOrganisationId = organisations.ok
-        ? (organisations.value[0]?.id ?? null)
-        : null;
-    }
-    if (!resolvedOrganisationId) {
-      return null;
-    }
-    const [countResult, recentResult] = await Promise.all([
-      getUnreadCount({
-        clerkOrgId,
-        organisationId: resolvedOrganisationId,
-        userId: user.id,
-      }),
-      listRecentUnread({
-        clerkOrgId,
-        limit: 3,
-        organisationId: resolvedOrganisationId,
-        userId: user.id,
-      }),
-    ]);
-    return {
-      organisationId: resolvedOrganisationId,
-      recent: recentResult.ok
-        ? recentResult.value.map((item) => ({
-            actionUrl: item.actionUrl,
-            body: item.body,
-            createdAt: item.createdAt.toISOString(),
-            iconKey: item.iconKey,
-            id: item.id,
-            title: item.title,
-          }))
-        : [],
-      unreadCount: countResult.ok ? countResult.value : 0,
-    };
+    return await withTenantDb(
+      clerkOrgId,
+      async (db) => {
+        const companies = showCompanySelector
+          ? (await resolveAccountCompanies(clerkOrgId, db)).map(
+              ({ id, name }) => ({ id, name })
+            )
+          : [];
+        if (!user) {
+          return { bell: null, companies };
+        }
+        const countResult = await getUnreadCount(
+          { clerkOrgId, userId: user.id },
+          db
+        );
+        const recentResult = await listRecentUnread(
+          { clerkOrgId, limit: 3, userId: user.id },
+          db
+        );
+        return {
+          bell: {
+            clerkOrgId,
+            recent: recentResult.ok
+              ? recentResult.value.map((item) => ({
+                  actionUrl: item.actionUrl,
+                  body: item.body,
+                  createdAt: item.createdAt.toISOString(),
+                  iconKey: item.iconKey,
+                  id: item.id,
+                  organisationId: item.organisationId,
+                  organisationName: item.organisationName,
+                  title: item.title,
+                }))
+              : [],
+            unreadCount: countResult.ok ? countResult.value : 0,
+          },
+          companies,
+        };
+      },
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
   } catch {
-    return null;
-  }
-}
-
-async function loadCompanies(): Promise<Array<{ id: string; name: string }>> {
-  try {
-    const companies = await resolveAccountCompanies(await requireOrg());
-    return companies.map(({ id, name }) => ({ id, name }));
-  } catch {
-    return [];
+    return { bell: null, companies: [] };
   }
 }

@@ -64,11 +64,12 @@ describe("NotificationsBell", () => {
             createdAt: new Date().toISOString(),
             iconKey: "inbox-in",
             id: "n_1",
+            organisationId: "00000000-0000-4000-8000-000000000002",
+            organisationName: "Company B",
             title: "Leave submitted",
           },
         ]}
         initialUnreadCount={7}
-        organisationId="00000000-0000-4000-8000-000000000001"
       />
     );
 
@@ -84,35 +85,29 @@ describe("NotificationsBell", () => {
       name: LEAVE_SUBMITTED_REGEX,
     });
     expect(notifBtn).toBeDefined();
+    expect(screen.getByText(COMPANY_B_PATTERN)).toBeDefined();
 
     fireEvent.click(notifBtn);
 
     expect(mocks.markAsReadAction).toHaveBeenCalledWith({
       notificationId: "n_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
     });
 
     await waitFor(() => {
       expect(mocks.push).toHaveBeenCalledWith(
-        "/plans/123?org=00000000-0000-4000-8000-000000000001"
+        "/plans/123?org=00000000-0000-4000-8000-000000000002"
       );
     });
   });
 
-  it("preserves organisation context on the full notifications link", () => {
-    render(
-      <NotificationsBell
-        initialRecent={[]}
-        initialUnreadCount={0}
-        organisationId="00000000-0000-4000-8000-000000000001"
-      />
-    );
+  it("opens the account-wide notifications inbox", () => {
+    render(<NotificationsBell initialRecent={[]} initialUnreadCount={0} />);
 
     fireEvent.click(screen.getByLabelText("Notifications, 0 unread"));
 
     expect(
       screen.getByRole("link", { name: "View all" }).getAttribute("href")
-    ).toBe("/notifications?org=00000000-0000-4000-8000-000000000001");
+    ).toBe("/notifications");
   });
 
   it("surfaces mark-as-read failures without navigating away", async () => {
@@ -130,11 +125,12 @@ describe("NotificationsBell", () => {
             createdAt: new Date().toISOString(),
             iconKey: "inbox-in",
             id: "n_1",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            organisationName: "Company A",
             title: "Leave submitted",
           },
         ]}
         initialUnreadCount={1}
-        organisationId="00000000-0000-4000-8000-000000000001"
       />
     );
 
@@ -152,13 +148,7 @@ describe("NotificationsBell", () => {
   it("announces when live notifications are reconnecting", () => {
     mocks.connection.status = "connecting";
 
-    render(
-      <NotificationsBell
-        initialRecent={[]}
-        initialUnreadCount={0}
-        organisationId="00000000-0000-4000-8000-000000000001"
-      />
-    );
+    render(<NotificationsBell initialRecent={[]} initialUnreadCount={0} />);
 
     fireEvent.click(screen.getByLabelText("Notifications, 0 unread"));
 
@@ -168,25 +158,13 @@ describe("NotificationsBell", () => {
   });
 
   it("formats large badges as 99+", () => {
-    render(
-      <NotificationsBell
-        initialRecent={[]}
-        initialUnreadCount={120}
-        organisationId="00000000-0000-4000-8000-000000000001"
-      />
-    );
+    render(<NotificationsBell initialRecent={[]} initialUnreadCount={120} />);
 
     expect(screen.getByText("99+")).toBeDefined();
   });
 
   it("disables Mark all as read button when unread count is zero", () => {
-    render(
-      <NotificationsBell
-        initialRecent={[]}
-        initialUnreadCount={0}
-        organisationId="00000000-0000-4000-8000-000000000001"
-      />
-    );
+    render(<NotificationsBell initialRecent={[]} initialUnreadCount={0} />);
 
     fireEvent.click(screen.getByLabelText("Notifications, 0 unread"));
 
@@ -196,3 +174,5 @@ describe("NotificationsBell", () => {
     expect(markAllBtn.disabled).toBe(true);
   });
 });
+
+const COMPANY_B_PATTERN = /Company B/;

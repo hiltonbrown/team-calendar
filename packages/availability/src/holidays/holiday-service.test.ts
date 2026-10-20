@@ -1,33 +1,36 @@
 import { vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const database = vi.hoisted(() => ({
   publicHoliday: { create: vi.fn(), delete: vi.fn(), findFirst: vi.fn() },
   publicHolidayPreference: { deleteMany: vi.fn() },
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   scopedQuery: vi.fn((clerk: string, organisation: string) => ({
     clerk_org_id: clerk,
     organisation_id: organisation,
   })),
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return database;
-  }),
-  tenantTransaction: vi.fn(
-    async (
-      accountId: string,
-      callback: (client: typeof database) => Promise<unknown>
-    ) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return await callback(database);
-    }
-  ),
 }));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...database,
+  };
+}
 
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -57,7 +60,9 @@ describe("holiday-service", () => {
 
   describe("addCustomHoliday", () => {
     it("stores a custom holiday with its own country and region", async () => {
-      const result = await addCustomHoliday(base);
+      const result = await withTestTenantResult(tenantTestAccount(base), (db) =>
+        addCustomHoliday(base, db)
+      );
       expect(result).toEqual({ ok: true, value: { id: "h-1" } });
       expect(database.publicHoliday.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -75,12 +80,24 @@ describe("holiday-service", () => {
     });
 
     it("applies everywhere when the holiday covers all jurisdictions", async () => {
-      await addCustomHoliday({
-        ...base,
-        appliesToAllJurisdictions: true,
-        countryCode: null,
-        regionCode: null,
-      });
+      await withTestTenantResult(
+        tenantTestAccount({
+          ...base,
+          appliesToAllJurisdictions: true,
+          countryCode: null,
+          regionCode: null,
+        }),
+        (db) =>
+          addCustomHoliday(
+            {
+              ...base,
+              appliesToAllJurisdictions: true,
+              countryCode: null,
+              regionCode: null,
+            },
+            db
+          )
+      );
       expect(database.publicHoliday.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -93,13 +110,23 @@ describe("holiday-service", () => {
 
     it("rejects unsupported countries and regions from another country", async () => {
       expect(
-        await addCustomHoliday({ ...base, countryCode: "US", regionCode: null })
+        await withTestTenantResult(
+          tenantTestAccount({ ...base, countryCode: "US", regionCode: null }),
+          (db) =>
+            addCustomHoliday(
+              { ...base, countryCode: "US", regionCode: null },
+              db
+            )
+        )
       ).toMatchObject({
         error: { code: "bad_request" },
         ok: false,
       });
       expect(
-        await addCustomHoliday({ ...base, regionCode: "SCT" })
+        await withTestTenantResult(
+          tenantTestAccount({ ...base, regionCode: "SCT" }),
+          (db) => addCustomHoliday({ ...base, regionCode: "SCT" }, db)
+        )
       ).toMatchObject({
         error: { code: "bad_request" },
         ok: false,
@@ -111,7 +138,9 @@ describe("holiday-service", () => {
       vi.mocked(database.publicHoliday.findFirst).mockResolvedValue({
         id: "existing",
       } as never);
-      const result = await addCustomHoliday(base);
+      const result = await withTestTenantResult(tenantTestAccount(base), (db) =>
+        addCustomHoliday(base, db)
+      );
       expect(result).toMatchObject({ error: { code: "conflict" }, ok: false });
       expect(
         vi.mocked(database.publicHoliday.findFirst).mock.calls[0]?.[0]?.where
@@ -129,10 +158,9 @@ describe("holiday-service", () => {
       vi.mocked(database.publicHoliday.findFirst).mockResolvedValue({
         id: "h-1",
       } as never);
-      const result = await deleteCustomHoliday(
-        clerkOrgId,
-        organisationId,
-        "h-1"
+      const result = await withTestTenantResult(
+        tenantTestAccount(clerkOrgId),
+        (db) => deleteCustomHoliday(clerkOrgId, organisationId, "h-1", db)
       );
       expect(result).toEqual({ ok: true, value: { id: "h-1" } });
       expect(database.publicHolidayPreference.deleteMany).toHaveBeenCalledWith({
@@ -152,10 +180,9 @@ describe("holiday-service", () => {
     });
 
     it("returns not_found for holidays outside the organisation", async () => {
-      const result = await deleteCustomHoliday(
-        clerkOrgId,
-        organisationId,
-        "h-x"
+      const result = await withTestTenantResult(
+        tenantTestAccount(clerkOrgId),
+        (db) => deleteCustomHoliday(clerkOrgId, organisationId, "h-x", db)
       );
       expect(result).toMatchObject({ error: { code: "not_found" }, ok: false });
       expect(database.publicHoliday.delete).not.toHaveBeenCalled();

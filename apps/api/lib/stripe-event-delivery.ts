@@ -9,7 +9,9 @@ import {
   recordStripeEventFailure,
   recordStripeEventIgnored,
   upsertSubscriptionFromWebhook,
+  withTenantDb,
 } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { inngest } from "@repo/jobs/src/client";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
@@ -142,7 +144,9 @@ async function resolveEventIdentity(
   if (!metadataOrgId) {
     return { conflict: false, stripeCustomerId };
   }
-  const orgBinding = await getSubscriptionForOrg(metadataOrgId);
+  const orgBinding = await withTenantDb(metadataOrgId, (db) =>
+    getSubscriptionForOrg(metadataOrgId, db)
+  );
   const conflict = Boolean(
     orgBinding?.stripe_customer_id &&
       stripeCustomerId &&
@@ -219,18 +223,34 @@ async function mirrorSubscription(
     };
   }
   const stripeCustomerId = identity.stripeCustomerId ?? objectId(data.customer);
-  const affected = await upsertSubscriptionFromWebhook({
-    authoritativeTie,
-    cancelAtPeriodEnd: data.cancel_at_period_end,
+  const { affected, organisationId } = await withTenantDb(
     clerkOrgId,
-    currentPeriodEnd: dateFromSeconds(data.current_period_end),
-    endedAt: dateFromSeconds(data.ended_at),
-    planKey: plan.value,
-    status: data.status,
-    stripeCustomerId,
-    stripeEventCreatedAt: eventCreatedAt,
-    stripeSubscriptionId: data.id,
-  });
+    async (db) => {
+      const preparedAffected = await upsertSubscriptionFromWebhook(
+        {
+          authoritativeTie,
+          cancelAtPeriodEnd: data.cancel_at_period_end,
+          clerkOrgId,
+          currentPeriodEnd: dateFromSeconds(data.current_period_end),
+          endedAt: dateFromSeconds(data.ended_at),
+          planKey: plan.value,
+          status: data.status,
+          stripeCustomerId,
+          stripeEventCreatedAt: eventCreatedAt,
+          stripeSubscriptionId: data.id,
+        },
+        db
+      );
+      const scopedOrganisationId =
+        Number(preparedAffected) === 0
+          ? null
+          : await getFirstActiveOrganisationIdForClerkOrg(clerkOrgId, db);
+      return {
+        affected: preparedAffected,
+        organisationId: scopedOrganisationId,
+      };
+    }
+  );
   if (Number(affected) === 0) {
     if (authoritativeTie) {
       return {
@@ -266,8 +286,6 @@ async function mirrorSubscription(
     }
     return mirrorSubscription(authoritative.data, eventCreatedAt, true);
   }
-  const organisationId =
-    await getFirstActiveOrganisationIdForClerkOrg(clerkOrgId);
   if (!organisationId) {
     log.error(
       "Stripe subscription mirror skipped recount-usage because no active organisation was found.",
@@ -490,6 +508,7 @@ async function handleCheckoutSession(
 export async function processStripeEvent(
   event: StripeEventLike
 ): Promise<MirrorResult> {
+  assertNoTenantTransaction("processStripeEvent");
   if (event.type === "checkout.session.completed") {
     return await handleCheckoutSession(event);
   }
@@ -515,6 +534,7 @@ export interface StripeDeliveryResult {
 export async function deliverStripeEvent(
   event: StripeEventLike
 ): Promise<StripeDeliveryResult> {
+  assertNoTenantTransaction("deliverStripeEvent");
   if (await isStripeEventProcessed(event.id)) {
     return { alreadyComplete: true, ok: true, status: 200 };
   }

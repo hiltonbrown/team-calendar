@@ -1,6 +1,7 @@
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { withTenantDb } from "@repo/database";
 import {
   feedCacheKey,
   invalidateFeedCache,
@@ -54,6 +55,7 @@ export const rebuildFeedCacheFunction: InngestFunction.Any =
       })
   );
 export async function rebuildFeedCache(input: unknown) {
+  assertNoTenantTransaction("rebuildFeedCache");
   const parsed = RebuildFeedCacheInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -69,21 +71,23 @@ async function rebuildFeedCacheInternal(
   }
   const context = parsed.data;
   try {
-    const feed = await tenantDatabase(context.clerkOrgId).feed.findFirst({
-      select: {
-        id: true,
-        name: true,
-        privacy_mode: true,
-        updated_at: true,
-      },
-      where: {
-        archived_at: null,
-        clerk_org_id: context.clerkOrgId,
-        id: context.feedId,
-        organisation_id: context.organisationId,
-        status: "active",
-      },
-    });
+    const feed = await withTenantDb(context.clerkOrgId, (db) =>
+      db.feed.findFirst({
+        select: {
+          id: true,
+          name: true,
+          privacy_mode: true,
+          updated_at: true,
+        },
+        where: {
+          archived_at: null,
+          clerk_org_id: context.clerkOrgId,
+          id: context.feedId,
+          organisation_id: context.organisationId,
+          status: "active",
+        },
+      })
+    );
     if (!feed) {
       // Feed is paused, archived, or out of this tenant's scope. Drop any cached body so a
       // stale feed is never served, then treat the rebuild as a no-op.
@@ -126,15 +130,17 @@ async function rebuildFeedCacheInternal(
     if (!cached.ok) {
       return { error: cached.error, ok: false };
     }
-    await tenantDatabase(context.clerkOrgId).feed.updateMany({
-      data: { last_etag: rendered.value.etag, last_rendered_at: new Date() },
-      where: {
-        clerk_org_id: context.clerkOrgId,
-        id: feed.id,
-        organisation_id: context.organisationId,
-        representation_generation: rendered.value.generation,
-      },
-    });
+    await withTenantDb(context.clerkOrgId, (db) =>
+      db.feed.updateMany({
+        data: { last_etag: rendered.value.etag, last_rendered_at: new Date() },
+        where: {
+          clerk_org_id: context.clerkOrgId,
+          id: feed.id,
+          organisation_id: context.organisationId,
+          representation_generation: rendered.value.generation,
+        },
+      })
+    );
     return {
       ok: true,
       value: { feedId: feed.id, rebuilt: true, skipped: false },

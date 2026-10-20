@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -32,7 +33,14 @@ vi.mock("../client", () => ({
   },
 }));
 vi.mock("@repo/auth/server", () => ({ clerkClient: vi.fn() }));
-vi.mock("@repo/database", () => {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       $transaction: vi.fn(async (callback) =>
@@ -61,7 +69,7 @@ vi.mock("@repo/database", () => {
     },
     scopedTo: mocks.scopedTo,
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -71,13 +79,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<
+    typeof import("../../../database/src/tenant-db")
+  >("../../../database/src/tenant-db");
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/database/generated/client", () => ({
   Prisma: { DbNull: "DbNull" },
@@ -236,6 +249,7 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     expect(mocks.auditEventCreate).toHaveBeenCalledTimes(1);
     expect(mocks.dispatchNotification).toHaveBeenCalledWith(
       expect.objectContaining({ type: "leave_declined" }),
+      {},
       expect.anything()
     );
   });

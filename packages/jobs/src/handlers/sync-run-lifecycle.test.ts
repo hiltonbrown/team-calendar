@@ -1,5 +1,7 @@
 import { systemDatabase as database } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   deriveXeroStableSourceKey: vi.fn(),
@@ -8,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   materialiseAvailabilityPublication: vi.fn(),
   normaliseInboundLeaveRecord: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -29,7 +32,20 @@ vi.mock("@repo/availability", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
   normaliseInboundLeaveRecord: mocks.normaliseInboundLeaveRecord,
 }));
-vi.mock("@repo/database", () => {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({
+        ...mocks.scopeDatabase,
+        $queryRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
+          strings[0]?.includes("set_config")
+            ? Promise.resolve([])
+            : database.$queryRaw(strings, ...values),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       $executeRaw: vi.fn(async () => 1),
@@ -46,7 +62,7 @@ vi.mock("@repo/database", () => {
     },
     scopedTo: mocks.scopedTo,
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -56,13 +72,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<
+    typeof import("../../../database/src/tenant-db")
+  >("../../../database/src/tenant-db");
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/notifications", () => ({
   publishOrganisationNotificationEvent:
@@ -181,10 +202,15 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       records_upserted: 7,
       status: "partial_success",
     });
-    const result = await acquireSyncRun(
-      { ...input(), runId: RUN_ID },
-      "leave_records",
-      new Date()
+    const result = await withTestTenantDb(
+      tenantTestAccount({ ...input(), runId: RUN_ID }),
+      (db) =>
+        acquireSyncRun(
+          { ...input(), runId: RUN_ID },
+          "leave_records",
+          new Date(),
+          db
+        )
     );
     expect(result).toEqual({
       kind: "terminal",
@@ -210,10 +236,15 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       records_upserted: 5,
       status: "running",
     });
-    const result = await acquireSyncRun(
-      { ...input(), runId: RUN_ID },
-      "leave_records",
-      new Date()
+    const result = await withTestTenantDb(
+      tenantTestAccount({ ...input(), runId: RUN_ID }),
+      (db) =>
+        acquireSyncRun(
+          { ...input(), runId: RUN_ID },
+          "leave_records",
+          new Date(),
+          db
+        )
     );
     expect(result).toEqual({
       kind: "active",
@@ -229,7 +260,9 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       started_at: new Date(),
     });
     mocks.syncRunCreate.mockResolvedValueOnce({ id: CANCELLED_ID });
-    const result = await acquireSyncRun(input(), "leave_records", new Date());
+    const result = await withTestTenantDb(tenantTestAccount(input()), (db) =>
+      acquireSyncRun(input(), "leave_records", new Date(), db)
+    );
     expect(result).toEqual({
       kind: "cancelled_competing",
       run: { id: CANCELLED_ID },
@@ -251,7 +284,9 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       id: COMPETING_ID,
       started_at: new Date(),
     });
-    await acquireSyncRun(input(), "leave_balances", new Date());
+    await withTestTenantDb(tenantTestAccount(input()), (db) =>
+      acquireSyncRun(input(), "leave_balances", new Date(), db)
+    );
     expect(mocks.syncRunFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -265,7 +300,9 @@ describe("acquireSyncRun and fencing lifecycle", () => {
   it("reclaims expired running runs (>30m) by updating status to failed", async () => {
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 2 });
-    await acquireSyncRun(input(), "people", new Date());
+    await withTestTenantDb(tenantTestAccount(input()), (db) =>
+      acquireSyncRun(input(), "people", new Date(), db)
+    );
     expect(mocks.syncRunUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -280,7 +317,7 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       })
     );
   });
-  it("handles P2002 race condition on creation by returning existing run", async () => {
+  it("recovers a P2002 race in a fresh entry-point transaction", async () => {
     const error = new Error("Unique constraint failed");
     (
       error as unknown as {
@@ -300,10 +337,25 @@ describe("acquireSyncRun and fencing lifecycle", () => {
         records_upserted: 0,
         status: "succeeded",
       });
-    const result = await acquireSyncRun(
-      { ...input(), runId: RUN_ID },
-      "leave_records",
-      new Date()
+    await expect(
+      withTestTenantDb(tenantTestAccount(input()), (db) =>
+        acquireSyncRun(
+          { ...input(), runId: RUN_ID },
+          "leave_records",
+          new Date(),
+          db
+        )
+      )
+    ).rejects.toBe(error);
+    const result = await withTestTenantDb(
+      tenantTestAccount({ ...input(), runId: RUN_ID }),
+      (db) =>
+        acquireSyncRun(
+          { ...input(), runId: RUN_ID },
+          "leave_records",
+          new Date(),
+          db
+        )
     );
     expect(result).toEqual({
       kind: "terminal",
@@ -319,18 +371,34 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       status: "running",
     });
     await expect(
-      assertRunActive(
-        { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
-        RUN_ID
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId: CLERK_ORG_ID,
+          organisationId: ORGANISATION_ID,
+        }),
+        (db) =>
+          assertRunActive(
+            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            RUN_ID,
+            db
+          )
       )
     ).resolves.toBeUndefined();
   });
   it("assertRunActive throws XeroSyncRunFencedError when run is not found", async () => {
     mocks.syncRunFindFirst.mockResolvedValueOnce(null);
     await expect(
-      assertRunActive(
-        { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
-        RUN_ID
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId: CLERK_ORG_ID,
+          organisationId: ORGANISATION_ID,
+        }),
+        (db) =>
+          assertRunActive(
+            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            RUN_ID,
+            db
+          )
       )
     ).rejects.toThrow(XeroSyncRunFencedError);
   });
@@ -340,9 +408,17 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       status: "cancelled",
     });
     await expect(
-      assertRunActive(
-        { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
-        RUN_ID
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId: CLERK_ORG_ID,
+          organisationId: ORGANISATION_ID,
+        }),
+        (db) =>
+          assertRunActive(
+            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            RUN_ID,
+            db
+          )
       )
     ).rejects.toThrow(XeroSyncRunFencedError);
   });
@@ -352,9 +428,17 @@ describe("acquireSyncRun and fencing lifecycle", () => {
       status: "running",
     });
     await expect(
-      assertRunActive(
-        { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
-        RUN_ID
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId: CLERK_ORG_ID,
+          organisationId: ORGANISATION_ID,
+        }),
+        (db) =>
+          assertRunActive(
+            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            RUN_ID,
+            db
+          )
       )
     ).rejects.toThrow(XeroSyncRunFencedError);
   });
@@ -362,17 +446,33 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     mocks.syncRunFindFirst.mockResolvedValueOnce({
       cancel_requested_at: new Date(),
     });
-    const cancelled = await isRunCancelled(
-      { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
-      RUN_ID
+    const cancelled = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+      }),
+      (db) =>
+        isRunCancelled(
+          { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+          RUN_ID,
+          db
+        )
     );
     expect(cancelled).toBe(true);
     mocks.syncRunFindFirst.mockResolvedValueOnce({
       cancel_requested_at: null,
     });
-    const notCancelled = await isRunCancelled(
-      { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
-      RUN_ID
+    const notCancelled = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+      }),
+      (db) =>
+        isRunCancelled(
+          { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+          RUN_ID,
+          db
+        )
     );
     expect(notCancelled).toBe(false);
   });

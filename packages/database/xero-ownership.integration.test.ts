@@ -7,7 +7,11 @@ import {
   isXeroTenantBindingConflict,
 } from "./src/queries/xero-ownership";
 import { systemDatabase } from "./src/system-client";
-import { tenantTransaction } from "./src/tenant-client";
+import {
+  withTenantDb,
+  withTenantDb as withTestTenantDb,
+} from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 import { lockActiveScopedXeroConnection } from "./src/xero-locks";
 
 const ownerUrl = process.env.DATABASE_URL;
@@ -42,7 +46,7 @@ const claimAndInsert = (
   tenantId: string,
   remoteId?: string
 ) =>
-  tenantTransaction(
+  withTenantDb(
     scope.clerkOrgId,
     async (tx) => {
       const ownership = await claimXeroTenant(tx, scope, tenantId);
@@ -131,9 +135,11 @@ test("account resolver keeps manual companies and excludes inactive, archived, r
     where: { id: inactive.organisationId },
   });
   expect(
-    (await resolveAccountCompanies(manual.clerkOrgId)).map(
-      (company) => company.id
-    )
+    (
+      await withTestTenantDb(tenantTestAccount(manual.clerkOrgId), (db) =>
+        resolveAccountCompanies(manual.clerkOrgId, db)
+      )
+    ).map((company) => company.id)
   ).toEqual([manual.organisationId]);
 });
 
@@ -142,7 +148,7 @@ test("partial unique-index violations map to the neutral tenant binding conflict
   const second = await createCompany();
   const tenantId = randomUUID();
   await claimAndInsert(first, tenantId);
-  const failure = await tenantTransaction(second.clerkOrgId, (tx) =>
+  const failure = await withTenantDb(second.clerkOrgId, (tx) =>
     tx.xeroConnection.create({
       data: {
         clerk_org_id: second.clerkOrgId,
@@ -185,8 +191,8 @@ test("released bindings cannot acquire the active outbound connection fence", as
       where: { organisation_id: scope.organisationId },
     });
     expect(
-      await tenantTransaction(scope.clerkOrgId, (tx) =>
-        lockActiveScopedXeroConnection(tx, scope)
+      await withTenantDb(scope.clerkOrgId, (tx) =>
+        lockActiveScopedXeroConnection(scope, tx)
       )
     ).toBe(true);
     await systemDatabase.xeroConnection.update({
@@ -194,8 +200,8 @@ test("released bindings cannot acquire the active outbound connection fence", as
       where: { organisation_id: scope.organisationId },
     });
     expect(
-      await tenantTransaction(scope.clerkOrgId, (tx) =>
-        lockActiveScopedXeroConnection(tx, scope)
+      await withTenantDb(scope.clerkOrgId, (tx) =>
+        lockActiveScopedXeroConnection(scope, tx)
       )
     ).toBe(false);
   } finally {

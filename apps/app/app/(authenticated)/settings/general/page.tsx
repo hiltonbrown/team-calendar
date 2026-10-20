@@ -1,9 +1,9 @@
 import { auth, clerkClient } from "@repo/auth/server";
-import { isCountryCode, REGIONS } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { type ClerkOrgId, isCountryCode, REGIONS } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { GeneralClient } from "./general-client";
 
 export const metadata: Metadata = {
@@ -21,38 +21,38 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
   await requirePageRole("org:admin");
 
   const { org: orgParam } = await searchParams;
-  const [{ orgId }, { clerkOrgId, organisationId }] = await Promise.all([
-    auth(),
-    requireActiveOrgPageContext(orgParam),
-  ]);
-
+  const { orgId } = await auth();
   if (!orgId) {
     throw new Error("No active account selected.");
   }
-
-  const [clerk, organisation] = await Promise.all([
-    clerkClient(),
-    tenantDatabase(clerkOrgId).organisation.findFirst({
-      select: {
-        country_code: true,
-        name: true,
-        region_code: true,
-        timezone: true,
-      },
-      where: {
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-  ]);
-
-  if (!organisation) {
-    throw new Error("Organisation not found.");
-  }
-
+  const clerk = await clerkClient();
   const account = await clerk.organizations.getOrganization({
     organizationId: orgId,
   });
+  const clerkOrgId = orgId as ClerkOrgId;
+  const { organisation, organisationId } = await withTenantDb(
+    clerkOrgId,
+    async (db) => {
+      const { organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+      const preparedOrganisation = await db.organisation.findFirst({
+        select: {
+          country_code: true,
+          name: true,
+          region_code: true,
+          timezone: true,
+        },
+        where: { clerk_org_id: clerkOrgId, id: scopedOrganisationId },
+      });
+      if (!preparedOrganisation) {
+        throw new Error("Organisation not found.");
+      }
+      return {
+        organisation: preparedOrganisation,
+        organisationId: scopedOrganisationId,
+      };
+    }
+  );
 
   return (
     <GeneralClient

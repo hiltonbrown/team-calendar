@@ -208,15 +208,15 @@ const declOf = (dtsText, name) => {
   const m = dtsText.match(new RegExp(`declare (?:function|const) ${name}\\b[^;]*;`, "s"));
   return m ? m[0].replace(/^declare /, "").replace(/\s+/g, " ") : null;
 };
-for (const { module, root, parts } of roots) {
-  const [group, purpose] = meta[root] ?? ["General", ""];
+for (const { module, root: preparedRoot, parts } of roots) {
+  const [group, purpose] = meta[preparedRoot] ?? ["General", ""];
   const dtsText = readFileSync(join(dist, `types/${module}.d.ts`), "utf8");
   const lines = ["---", `category: ${group}`, "---", "", purpose, ""];
   if (parts.length) {
     lines.push(
       "## Parts",
       "",
-      `Compose \`${root}\` from these exports (all on \`window.TeamCalendar\`):`,
+      `Compose \`${preparedRoot}\` from these exports (all on \`window.TeamCalendar\`):`,
       "",
       "```ts",
       ...parts.map((p) => declOf(dtsText, p) ?? `${p}: React.ComponentType<any>;`),
@@ -224,7 +224,7 @@ for (const { module, root, parts } of roots) {
       ""
     );
   }
-  const preview = join(import.meta.dirname, "previews", `${root}.tsx`);
+  const preview = join(import.meta.dirname, "previews", `${preparedRoot}.tsx`);
   if (existsSync(preview)) {
     const body = readFileSync(preview, "utf8")
       .split("\n")
@@ -233,7 +233,7 @@ for (const { module, root, parts } of roots) {
       .trim();
     lines.push("## Examples", "", "```tsx", body, "```", "");
   }
-  writeFileSync(join(docsDir, `${root}.md`), lines.join("\n"));
+  writeFileSync(join(docsDir, `${preparedRoot}.md`), lines.join("\n"));
 }
 
 writeFileSync(

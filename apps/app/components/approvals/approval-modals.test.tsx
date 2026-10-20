@@ -40,8 +40,9 @@ const record = {
   employeeName: "Ari Report",
   endsAt: "2026-04-16T23:59:59.999Z",
   id: "00000000-0000-4000-8000-000000000099",
-  organisationId: "00000000-0000-4000-8000-000000000001",
+  organisationName: "Company A",
   recordType: "annual_leave",
+  requireDeclineReason: true,
   startsAt: "2026-04-15T00:00:00.000Z",
 };
 
@@ -116,14 +117,13 @@ describe("approval modals", () => {
       screen.getByText("The reason will be visible to the employee.")
     ).toBeDefined();
 
-    fireEvent.change(screen.getByLabelText("Reason"), {
+    fireEvent.change(screen.getByLabelText("Reason (required)"), {
       target: { value: "Coverage is not available." },
     });
     fireEvent.click(screen.getByRole("button", { name: "Confirm decline" }));
 
     await waitFor(() => {
       expect(mocks.declineAction).toHaveBeenCalledWith({
-        organisationId: record.organisationId,
         reason: "Coverage is not available.",
         recordId: record.id,
       });

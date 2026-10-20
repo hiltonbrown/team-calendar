@@ -3,21 +3,24 @@
 import { requireRole } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import {
-  cancelRun,
   exportFailedRecordsCsv,
   getRedactedFailedRecordPayload,
   listRunFailedRecords,
   listRunTimeline,
+  prepareSyncCancellation,
   type RunDetailPage,
+  recordSyncCancellation,
   type SyncMonitorError,
   type SyncMonitorRole,
+  sendPreparedSyncCancellation,
   type TimelinePage,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
+import { type TenantDb, withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getPublicApiUrl } from "@/lib/public-api-url";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
   CancelRunActionSchema,
   DispatchManualSyncActionSchema,
@@ -91,6 +94,7 @@ export async function dispatchManualSyncAction(input: {
   runType: string;
   connectionId: string;
 }): Promise<Result<DispatchResultValue, SyncActionError>> {
+  assertNoTenantTransaction("dispatchManualSyncAction");
   const [admin, owner] = await Promise.all([
     requireRole("org:admin"),
     requireRole("org:owner"),
@@ -170,6 +174,7 @@ export async function cancelRunAction(input: {
 }): Promise<
   Result<{ cancellationRequested: true; eventQueued: boolean }, SyncActionError>
 > {
+  assertNoTenantTransaction("cancelRunAction");
   const [admin, owner] = await Promise.all([
     requireRole("org:admin"),
     requireRole("org:owner"),
@@ -181,14 +186,37 @@ export async function cancelRunAction(input: {
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await syncActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  let result: Awaited<ReturnType<typeof sendPreparedSyncCancellation>>;
+  try {
+    const prepared = await runSyncOperation(
+      parsed.data.organisationId,
+      (context, db) =>
+        prepareSyncCancellation({ ...context, runId: parsed.data.runId }, db)
+    );
+    if (!prepared.ok) {
+      return prepared;
+    }
+    const sent = await sendPreparedSyncCancellation(prepared.value);
+    result = sent;
+    if (sent.ok) {
+      const { value: cancellation } = prepared;
+      const { eventQueued } = sent.value;
+      const audited = await withTenantResult(cancellation.clerkOrgId, (db) =>
+        recordSyncCancellation(cancellation, eventQueued, db)
+      );
+      if (!audited.ok) {
+        result = audited;
+      }
+    }
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to request sync cancellation.",
+      },
+      ok: false,
+    };
   }
-  const result = await cancelRun({
-    ...context.value,
-    runId: parsed.data.runId,
-  });
   if (result.ok) {
     revalidatePath("/sync");
     revalidatePath(`/sync/${parsed.data.runId}`);
@@ -200,18 +228,22 @@ export async function exportFailedRecordsCsvAction(input: {
   organisationId: string;
   runId: string;
 }): Promise<Result<{ csvContent: string; filename: string }, SyncActionError>> {
+  assertNoTenantTransaction("exportFailedRecordsCsvAction");
   const parsed = ExportFailedRecordsCsvActionSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
+    return await validationError(parsed.error.issues[0]?.message);
   }
-  const context = await syncActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await exportFailedRecordsCsv({
-    ...context.value,
-    runId: parsed.data.runId,
-  });
+  return await runSyncOperation(
+    parsed.data.organisationId,
+    async (context, db) =>
+      await exportFailedRecordsCsv(
+        {
+          ...context,
+          runId: parsed.data.runId,
+        },
+        db
+      )
+  );
 }
 
 const DetailPageActionSchema = z.object({
@@ -231,15 +263,16 @@ export async function loadFailedRecordsPageAction(input: {
   organisationId: string;
   runId: string;
 }): Promise<Result<RunDetailPage, SyncActionError>> {
+  assertNoTenantTransaction("loadFailedRecordsPageAction");
   const parsed = DetailPageActionSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
+    return await validationError(parsed.error.issues[0]?.message);
   }
-  const context = await syncActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await listRunFailedRecords({ ...context.value, ...parsed.data });
+  return await runSyncOperation(
+    parsed.data.organisationId,
+    async (context, db) =>
+      await listRunFailedRecords({ ...context, ...parsed.data }, db)
+  );
 }
 
 export async function loadTimelinePageAction(input: {
@@ -247,15 +280,16 @@ export async function loadTimelinePageAction(input: {
   organisationId: string;
   runId: string;
 }): Promise<Result<TimelinePage, SyncActionError>> {
+  assertNoTenantTransaction("loadTimelinePageAction");
   const parsed = DetailPageActionSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
+    return await validationError(parsed.error.issues[0]?.message);
   }
-  const context = await syncActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await listRunTimeline({ ...context.value, ...parsed.data });
+  return await runSyncOperation(
+    parsed.data.organisationId,
+    async (context, db) =>
+      await listRunTimeline({ ...context, ...parsed.data }, db)
+  );
 }
 
 export async function loadRedactedFailurePayloadAction(input: {
@@ -263,45 +297,77 @@ export async function loadRedactedFailurePayloadAction(input: {
   organisationId: string;
   runId: string;
 }): Promise<Result<{ payload: unknown }, SyncActionError>> {
+  assertNoTenantTransaction("loadRedactedFailurePayloadAction");
   const parsed = RawFailureActionSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
+    return await validationError(parsed.error.issues[0]?.message);
   }
-  const context = await syncActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await getRedactedFailedRecordPayload({
-    ...context.value,
-    failureId: parsed.data.failureId,
-    runId: parsed.data.runId,
-  });
+  return await runSyncOperation(
+    parsed.data.organisationId,
+    async (context, db) =>
+      await getRedactedFailedRecordPayload(
+        {
+          ...context,
+          failureId: parsed.data.failureId,
+          runId: parsed.data.runId,
+        },
+        db
+      )
+  );
 }
 
-async function syncActionContext(
+async function syncActionIdentity(
   organisationId: string
 ): Promise<Result<SyncActionContext, SyncActionError>> {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   const role = effectiveRole(orgRole);
-  if (!(user && role)) {
+  if (!(orgId && user && role)) {
     return notAuthorised();
-  }
-  if (!context.ok) {
-    return notAuthorised(context.error.message);
   }
   return {
     ok: true,
     value: {
       actingRole: role,
       actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
+      clerkOrgId: orgId,
+      organisationId,
     },
   };
+}
+
+async function runSyncOperation<T>(
+  organisationId: string,
+  operation: (
+    context: SyncActionContext,
+    db: TenantDb
+  ) => Promise<Result<T, SyncActionError>>
+): Promise<Result<T, SyncActionError>> {
+  const identity = await syncActionIdentity(organisationId);
+  if (!identity.ok) {
+    return identity;
+  }
+  const { value: context } = identity;
+  return withTenantResult(context.clerkOrgId, async (db) => {
+    const company = await db.organisation.findFirst({
+      select: { id: true },
+      where: { clerk_org_id: context.clerkOrgId, id: organisationId },
+    });
+    if (!company) {
+      return notAuthorised(
+        "Organisation not found or not accessible in your context"
+      );
+    }
+    return operation(context, db);
+  });
+}
+
+async function syncActionContext(
+  organisationId: string
+): Promise<Result<SyncActionContext, SyncActionError>> {
+  return await runSyncOperation(organisationId, async (context) => ({
+    ok: true,
+    value: context,
+  }));
 }
 
 function effectiveRole(

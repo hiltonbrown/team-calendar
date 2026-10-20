@@ -4,7 +4,12 @@ import {
   getApprovalSummaryCounts,
   listForApprover,
 } from "@repo/availability";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId } from "@repo/core";
+import {
+  resolveAccountCompanies,
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantDb,
+} from "@repo/database";
 import { z } from "zod";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -12,7 +17,6 @@ import {
   PermissionDeniedError,
   requirePageRole,
 } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { LeaveApprovalsClient } from "./leave-approvals-client";
@@ -74,30 +78,13 @@ const LeaveApprovalsPage = async ({
   }
 
   const params = await searchParams;
-  const { org } = params;
-  const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId } =
-    await requireActiveOrgPageContext(orgParam);
-  const [{ orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!user) {
-    return <PermissionDeniedState />;
-  }
-
-  const actingPerson = await tenantDatabase(clerkOrgId).person.findFirst({
-    select: { id: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: clerkOrgId,
-      clerk_user_id: user.id,
-      organisation_id: organisationId,
-    },
-  });
-
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   const role = effectiveApprovalRole(orgRole);
-  if (!role || (role === "manager" && !actingPerson)) {
+  if (!(orgId && user && role)) {
     return <PermissionDeniedState />;
   }
-
+  // Authenticated Clerk account, resolved before the read scope.
+  const clerkOrgId = orgId as ClerkOrgId;
   const parsedFilters = parseFilterParams(params, FilterSchema);
   const status: ApprovalStatusFilter[] | undefined = parsedFilters?.status;
   const statusWithFailed: ApprovalStatusFilter[] | undefined =
@@ -114,26 +101,46 @@ const LeaveApprovalsPage = async ({
     status: statusWithFailed,
   };
 
-  const serviceInput = {
-    actingPersonId: actingPerson?.id ?? null,
-    actingUserId: user.id,
+  const prepared = await withTenantDb(
     clerkOrgId,
-    organisationId,
-    role,
-  };
-  const [approvalsResult, summaryResult] = await Promise.all([
-    listForApprover({
-      ...serviceInput,
-      cursor: parsedFilters?.cursor ?? null,
-      filters,
-    }),
-    getApprovalSummaryCounts(serviceInput),
-  ]);
-
+    async (db) => {
+      const companies = await resolveAccountCompanies(clerkOrgId, db);
+      const actingPerson = await db.person.findFirst({
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          clerk_user_id: user.id,
+          organisation_id: { in: companies.map((company) => company.id) },
+        },
+      });
+      if (role === "manager" && !actingPerson) {
+        return null;
+      }
+      const serviceInput = {
+        actingPersonId: actingPerson?.id ?? null,
+        actingUserId: user.id,
+        clerkOrgId,
+        role,
+      };
+      const approvalsResult = await listForApprover(
+        { ...serviceInput, cursor: parsedFilters?.cursor ?? null, filters },
+        db
+      );
+      const summaryResult = await getApprovalSummaryCounts(serviceInput, db);
+      return { approvalsResult, summaryResult };
+    },
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
+  if (!prepared) {
+    return <PermissionDeniedState />;
+  }
+  const { approvalsResult, summaryResult } = prepared;
   if (!(approvalsResult.ok && summaryResult.ok)) {
     return (
       <>
-        <Header page="Leave Approvals" />
+        <Header page="Leave Approvals" showCompanySelector={false} />
         <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
           <FetchErrorState entityName="leave approvals" />
         </div>
@@ -143,7 +150,7 @@ const LeaveApprovalsPage = async ({
 
   return (
     <>
-      <Header page="Leave Approvals" />
+      <Header page="Leave Approvals" showCompanySelector={false} />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <LeaveApprovalsClient
           canDispatchReconciliation={role === "admin"}
@@ -153,7 +160,6 @@ const LeaveApprovalsPage = async ({
           }}
           items={approvalsResult.value.items}
           nextCursor={approvalsResult.value.nextCursor}
-          organisationId={organisationId}
           summary={summaryResult.value}
         />
       </div>

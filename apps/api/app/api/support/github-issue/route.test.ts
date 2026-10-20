@@ -105,7 +105,8 @@ describe("support GitHub issue route", () => {
 
     expect(mocks.getOrganisationById).toHaveBeenCalledWith(
       "org_clerk_123",
-      "00000000-0000-4000-8000-000000000001"
+      "00000000-0000-4000-8000-000000000001",
+      expect.any(Object)
     );
     expect(mocks.createSupportGitHubIssue).toHaveBeenCalledWith({
       clerk_org_id: "org_clerk_123",
@@ -123,18 +124,21 @@ describe("support GitHub issue route", () => {
       },
       user_id: "user_123",
     });
-    expect(mocks.persistSupportSubmissionAudit).toHaveBeenCalledWith({
-      category: "support",
-      clerkOrgId: "org_clerk_123",
-      issueNumber: 123,
-      issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
-      labelAssignmentSucceeded: true,
-      labelsAttempted: ["support", "priority:normal"],
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      status: "created",
-      subject: "Missing leave entry",
-      userId: "user_123",
-    });
+    expect(mocks.persistSupportSubmissionAudit).toHaveBeenCalledWith(
+      {
+        category: "support",
+        clerkOrgId: "org_clerk_123",
+        issueNumber: 123,
+        issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
+        labelAssignmentSucceeded: true,
+        labelsAttempted: ["support", "priority:normal"],
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        status: "created",
+        subject: "Missing leave entry",
+        userId: "user_123",
+      },
+      expect.any(Object)
+    );
   });
 
   it("returns a validation error for invalid payloads", async () => {
@@ -467,3 +471,10 @@ describe("support GitHub issue route", () => {
     );
   });
 });
+
+vi.mock("../../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

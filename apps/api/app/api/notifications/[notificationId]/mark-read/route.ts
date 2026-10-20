@@ -1,15 +1,14 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
+import { withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { markAsRead } from "@repo/notifications";
 import { z } from "zod";
 
-const BodySchema = z.object({
-  organisationId: z.string().uuid(),
-});
-
 export async function POST(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ notificationId: string }> }
 ): Promise<Response> {
+  assertNoTenantTransaction("POST");
   let clerkOrgId: string;
   try {
     clerkOrgId = await requireOrg();
@@ -31,13 +30,10 @@ export async function POST(
     );
   }
 
-  const [{ notificationId }, body] = await Promise.all([
-    params,
-    request.json().catch(() => null),
-  ]);
-  const parsed = BodySchema.extend({
-    notificationId: z.string().uuid(),
-  }).safeParse({ ...body, notificationId });
+  const { notificationId } = await params;
+  const parsed = z
+    .object({ notificationId: z.string().uuid() })
+    .safeParse({ notificationId });
   if (!parsed.success) {
     return Response.json(
       {
@@ -48,12 +44,16 @@ export async function POST(
     );
   }
 
-  const result = await markAsRead({
-    clerkOrgId,
-    notificationId: parsed.data.notificationId,
-    organisationId: parsed.data.organisationId,
-    userId: user.id,
-  });
+  const result = await withTenantResult(clerkOrgId, (db) =>
+    markAsRead(
+      {
+        clerkOrgId,
+        notificationId: parsed.data.notificationId,
+        userId: user.id,
+      },
+      db
+    )
+  );
   if (!result.ok) {
     const status = result.error.code === "not_recipient" ? 403 : 404;
     return Response.json({ error: result.error, ok: false }, { status });

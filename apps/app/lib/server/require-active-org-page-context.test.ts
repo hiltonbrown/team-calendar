@@ -105,3 +105,10 @@ describe("requireActiveOrgPageContext", () => {
     expect(mocks.ensureDefaultOrganisation).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

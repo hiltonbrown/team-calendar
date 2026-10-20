@@ -1,6 +1,11 @@
+import {
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult,
+} from "@repo/database";
 import "server-only";
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import {
   feedIdsForPeople,
   materialiseAvailabilityPublication,
@@ -56,6 +61,7 @@ export const reconcileFeedPublicationsFunction: InngestFunction.Any =
       })
   );
 export async function reconcileFeedPublications(input: unknown) {
+  assertNoTenantTransaction("reconcileFeedPublications");
   const parsed = ReconcileFeedPublicationsInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -84,8 +90,8 @@ async function reconcileFeedPublicationsInternal(
       const records: Array<{
         id: string;
         person_id: string;
-      }> = await tenantDatabase(context.clerkOrgId).availabilityRecord.findMany(
-        {
+      }> = await withTenantDb(context.clerkOrgId, (db) =>
+        db.availabilityRecord.findMany({
           cursor: cursor ? { id: cursor } : undefined,
           orderBy: { id: "asc" },
           select: { id: true, person_id: true },
@@ -95,7 +101,7 @@ async function reconcileFeedPublicationsInternal(
             clerk_org_id: context.clerkOrgId,
             organisation_id: context.organisationId,
           },
-        }
+        })
       );
       if (records.length === 0) {
         break;
@@ -129,23 +135,19 @@ async function reconcileFeedPublicationsInternal(
       });
     }
     if (changedPersonIds.size > 0) {
-      const feedIds = await feedIdsForPeople({
+      const rebuildInput = {
         clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
         personIds: [...changedPersonIds],
-      });
-      await inngest.send(
-        feedIds.map((feed) => ({
-          data: {
-            clerkOrgId: context.clerkOrgId,
-            feedId: feed.id,
-            organisationId: feed.organisationId,
-            reason: "publication_reconciled",
-          },
-          name: "rebuild-feed-cache" as const,
-        }))
+      };
+      const feeds = await withTenantDb(context.clerkOrgId, (db) =>
+        prepareFeedRebuilds(rebuildInput, db)
       );
-      counts.feedsQueued = feedIds.length;
+      const sent = await sendPreparedFeedRebuilds(context, feeds);
+      if (!sent.ok) {
+        return sent;
+      }
+      counts.feedsQueued = sent.value.feedsQueued;
     }
     return { ok: true, value: counts };
   } catch (error) {
@@ -159,7 +161,45 @@ async function reconcileFeedPublicationsInternal(
     };
   }
 }
-async function reconcileOne(
+export async function prepareFeedRebuilds(
+  input: Parameters<typeof feedIdsForPeople>[0],
+  db: TenantDb
+): Promise<Awaited<ReturnType<typeof feedIdsForPeople>>> {
+  assertTenantDb(db, input.clerkOrgId);
+  return await feedIdsForPeople(input, db);
+}
+
+export async function sendPreparedFeedRebuilds(
+  context: { clerkOrgId: string; organisationId: string },
+  feeds: Awaited<ReturnType<typeof feedIdsForPeople>>
+): Promise<Result<{ feedsQueued: number }, ReconcileFeedPublicationsError>> {
+  assertNoTenantTransaction("sendPreparedFeedRebuilds");
+  try {
+    await inngest.send(
+      feeds.map((feed) => ({
+        data: {
+          clerkOrgId: context.clerkOrgId,
+          feedId: feed.id,
+          organisationId: feed.organisationId,
+          reason: "publication_reconciled",
+        },
+        name: "rebuild-feed-cache" as const,
+      }))
+    );
+    return { ok: true, value: { feedsQueued: feeds.length } };
+  } catch (error) {
+    log.error("Failed to dispatch reconciled feed rebuilds", { error });
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to reconcile feed publications.",
+      },
+      ok: false,
+    };
+  }
+}
+
+export async function reconcileOne(
   context: {
     clerkOrgId: string;
     organisationId: string;
@@ -171,15 +211,21 @@ async function reconcileOne(
   counts: ReconcileCounts,
   changedPersonIds: Set<string>
 ): Promise<void> {
+  assertNoTenantTransaction("reconcileOne");
   // Record-level isolation: a single record's failure must not abort the run.
   // Skip cache invalidation per record; we batch one rebuild per affected feed below.
   try {
-    const result = await materialiseAvailabilityPublication({
+    const phaseInput1 = {
       availabilityRecordId: record.id,
       clerkOrgId: context.clerkOrgId,
       invalidateCache: false,
       organisationId: context.organisationId,
-    });
+    } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
+    const result = await withTenantResult(
+      phaseInput1.clerkOrgId,
+      (db) => materialiseAvailabilityPublication(phaseInput1, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
     if (!result.ok) {
       counts.failed += 1;
       log.error("Failed to reconcile availability publication", {

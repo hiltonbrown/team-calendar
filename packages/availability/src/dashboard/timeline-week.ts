@@ -42,6 +42,7 @@ export interface TimelineWeekEntry {
 }
 
 export interface TimelineWeekRow {
+  companyName?: string;
   entries: TimelineWeekEntry[];
   firstName: string;
   isSelf: boolean;
@@ -202,6 +203,7 @@ function toRow(
   actingPersonId: string | null
 ): TimelineWeekRow {
   return {
+    companyName: person.companyName,
     entries,
     firstName: person.firstName,
     isSelf: person.id === actingPersonId,

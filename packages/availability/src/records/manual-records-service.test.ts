@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   availabilityCreate: vi.fn(),
@@ -14,13 +16,25 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       availabilityRecord: {
         create: mocks.availabilityCreate,
         findFirst: mocks.availabilityFindFirst,
@@ -30,27 +44,9 @@ vi.mock("@repo/database", () => ({
       person: {
         findFirst: mocks.personFindFirst,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        availabilityRecord: {
-          create: mocks.availabilityCreate,
-          findFirst: mocks.availabilityFindFirst,
-          findMany: mocks.availabilityFindMany,
-          update: mocks.availabilityUpdate,
-        },
-        person: {
-          findFirst: mocks.personFindFirst,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
@@ -126,10 +122,17 @@ describe("manual-records-service authorisation", () => {
       .mockResolvedValueOnce(targetPerson)
       .mockResolvedValueOnce({ id: "99999999-9999-4999-a999-999999999999" });
 
-    const result = await createManualAvailability(tenant, validInput, {
-      orgRole: "org:viewer",
-      userId: "user_peer",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      createManualAvailability(
+        tenant,
+        validInput,
+        {
+          orgRole: "org:viewer",
+          userId: "user_peer",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       error: expect.objectContaining({ code: "not_authorised" }),
@@ -143,10 +146,17 @@ describe("manual-records-service authorisation", () => {
       .mockResolvedValueOnce(targetPerson)
       .mockResolvedValueOnce({ id: "99999999-9999-4999-a999-999999999999" });
 
-    const result = await createManualAvailability(tenant, validInput, {
-      orgRole: "org:viewer",
-      userId: "user_target",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      createManualAvailability(
+        tenant,
+        validInput,
+        {
+          orgRole: "org:viewer",
+          userId: "user_target",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -161,10 +171,17 @@ describe("manual-records-service authorisation", () => {
   it("allows an admin to create a manual record for another person", async () => {
     mocks.personFindFirst.mockResolvedValueOnce(targetPerson);
 
-    const result = await createManualAvailability(tenant, validInput, {
-      orgRole: "org:admin",
-      userId: "user_admin",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      createManualAvailability(
+        tenant,
+        validInput,
+        {
+          orgRole: "org:admin",
+          userId: "user_admin",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({ ok: true });
     expect(mocks.personFindFirst).toHaveBeenCalledTimes(1);
@@ -181,16 +198,19 @@ describe("manual-records-service authorisation", () => {
         source_type: "manual",
       })
       .mockResolvedValueOnce(null);
-    const result = await updateManualAvailability(
-      tenant,
-      recordView.id,
-      {
-        ...validInput,
-        endsAt: new Date("2026-07-02T17:00:00.000Z"),
-        recordType: "training",
-        startsAt: new Date("2026-07-02T09:00:00.000Z"),
-      },
-      { orgRole: "org:admin", userId: "user_admin" }
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      updateManualAvailability(
+        tenant,
+        recordView.id,
+        {
+          ...validInput,
+          endsAt: new Date("2026-07-02T17:00:00.000Z"),
+          recordType: "training",
+          startsAt: new Date("2026-07-02T09:00:00.000Z"),
+        },
+        { orgRole: "org:admin", userId: "user_admin" },
+        db
+      )
     );
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdate).toHaveBeenCalledWith(
@@ -217,11 +237,14 @@ describe("manual-records-service authorisation", () => {
       id: "99999999-9999-4999-a999-999999999999",
     });
 
-    const result = await updateManualAvailability(
-      tenant,
-      recordView.id,
-      validInput,
-      { orgRole: "org:viewer", userId: "user_peer" }
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      updateManualAvailability(
+        tenant,
+        recordView.id,
+        validInput,
+        { orgRole: "org:viewer", userId: "user_peer" },
+        db
+      )
     );
 
     expect(result).toMatchObject({
@@ -237,10 +260,17 @@ describe("manual-records-service authorisation", () => {
       id: "99999999-9999-4999-a999-999999999999",
     });
 
-    const result = await archiveManualAvailability(tenant, recordView.id, {
-      orgRole: "org:viewer",
-      userId: "user_peer",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      archiveManualAvailability(
+        tenant,
+        recordView.id,
+        {
+          orgRole: "org:viewer",
+          userId: "user_peer",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       error: expect.objectContaining({ code: "not_authorised" }),
@@ -254,13 +284,18 @@ describe("manual-records-service authorisation", () => {
       .mockResolvedValueOnce(targetPerson)
       .mockResolvedValueOnce({ id: targetPerson.manager_person_id });
 
-    const directManagerResult = await createManualAvailability(
-      tenant,
-      validInput,
-      {
-        orgRole: "org:viewer",
-        userId: "user_manager",
-      }
+    const directManagerResult = await withTestTenantResult(
+      tenantTestAccount(tenant),
+      (db) =>
+        createManualAvailability(
+          tenant,
+          validInput,
+          {
+            orgRole: "org:viewer",
+            userId: "user_manager",
+          },
+          db
+        )
     );
 
     expect(directManagerResult).toMatchObject({ ok: true });
@@ -269,13 +304,18 @@ describe("manual-records-service authorisation", () => {
       .mockResolvedValueOnce(targetPerson)
       .mockResolvedValueOnce({ id: "55555555-5555-4555-a555-555555555555" });
 
-    const indirectManagerResult = await createManualAvailability(
-      tenant,
-      validInput,
-      {
-        orgRole: "org:viewer",
-        userId: "user_indirect_manager",
-      }
+    const indirectManagerResult = await withTestTenantResult(
+      tenantTestAccount(tenant),
+      (db) =>
+        createManualAvailability(
+          tenant,
+          validInput,
+          {
+            orgRole: "org:viewer",
+            userId: "user_indirect_manager",
+          },
+          db
+        )
     );
 
     expect(indirectManagerResult).toMatchObject({

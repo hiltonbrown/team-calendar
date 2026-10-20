@@ -4,9 +4,11 @@ import { auth, currentUser } from "@repo/auth/server";
 import {
   defaultOrganisationSettingsPatch,
   type OrganisationSettingsPatch,
+  updateAccountApprovalSettings,
   updateSettings,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
+import { withTenantResult } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
@@ -24,9 +26,6 @@ const PatchSchema = z.object({
         .optional(),
       defaultPrivacyMode: z.enum(["masked", "named", "private"]).optional(),
       feedsIncludePublicHolidaysDefault: z.boolean().optional(),
-      managerVisibilityScope: z
-        .enum(["all_team_leave", "direct_reports_only"])
-        .optional(),
       notifyManagersOnStatusChange: z.boolean().optional(),
       requireDeclineReason: z.literal(true).optional(),
       showDeclinedOnApprovals: z.boolean().optional(),
@@ -56,29 +55,44 @@ export async function updateLeaveApprovalSettingsAction(input: {
     return context;
   }
 
-  const result = await updateSettings({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    patch: parsed.data.patch,
-  });
-  if (!result.ok) {
+  try {
+    const result = await withTenantResult(context.value.clerkOrgId, (db) =>
+      updateSettings(
+        {
+          actingRole: context.value.role,
+          actingUserId: context.value.actingUserId,
+          clerkOrgId: context.value.clerkOrgId,
+          organisationId: context.value.organisationId,
+          patch: parsed.data.patch,
+        },
+        db
+      )
+    );
+    if (!result.ok) {
+      return {
+        error: {
+          code:
+            result.error.code === "not_authorised" ||
+            result.error.code === "validation_error"
+              ? result.error.code
+              : "unknown_error",
+          message: result.error.message,
+        },
+        ok: false,
+      };
+    }
+
+    revalidatePaths();
+    return { ok: true, value: { updated: true } };
+  } catch {
     return {
       error: {
-        code:
-          result.error.code === "not_authorised" ||
-          result.error.code === "validation_error"
-            ? result.error.code
-            : "unknown_error",
-        message: result.error.message,
+        code: "unknown_error",
+        message: "Failed to update leave approval settings.",
       },
       ok: false,
     };
   }
-
-  revalidatePaths();
-  return { ok: true, value: { updated: true } };
 }
 
 export async function restoreLeaveApprovalDefaultsAction(input: {
@@ -151,4 +165,51 @@ function validationError(message?: string): ActionResult<never> {
     },
     ok: false,
   };
+}
+
+const AccountManagerVisibilitySchema = z
+  .object({
+    managerVisibilityScope: z.enum(["direct_reports_only", "all_team_leave"]),
+  })
+  .strict();
+export async function updateAccountManagerVisibilityAction(input: {
+  managerVisibilityScope: "direct_reports_only" | "all_team_leave";
+}): Promise<ActionResult<{ updated: true }>> {
+  const parsed = AccountManagerVisibilitySchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const { orgId, userId, orgRole } = await auth();
+  if (
+    !(orgId && userId) ||
+    (orgRole !== "org:owner" && orgRole !== "org:admin")
+  ) {
+    return notAuthorised();
+  }
+  try {
+    const result = await withTenantResult(orgId, (db) =>
+      updateAccountApprovalSettings(
+        {
+          actingRole: orgRole === "org:owner" ? "owner" : "admin",
+          actingUserId: userId,
+          clerkOrgId: orgId,
+          managerVisibilityScope: parsed.data.managerVisibilityScope,
+        },
+        db
+      )
+    );
+    if (!result.ok) {
+      return result;
+    }
+    revalidatePaths();
+    return { ok: true, value: { updated: true } };
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to update account manager visibility.",
+      },
+      ok: false,
+    };
+  }
 }

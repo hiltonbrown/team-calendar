@@ -7,8 +7,7 @@ import {
   type OrganisationId,
   type Result,
 } from "@repo/core";
-import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
-import { Prisma } from "@repo/database/generated/client";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import { z } from "zod";
 
 export type HolidayPreferenceError =
@@ -46,11 +45,7 @@ const scopeOf = (input: Base) =>
     input.clerkOrgId as ClerkOrgId,
     input.organisationId as OrganisationId
   );
-const isUniqueConflict = (error: unknown): boolean =>
-  error instanceof Prisma.PrismaClientKnownRequestError &&
-  error.code === "P2002";
-
-type Transaction = Prisma.TransactionClient;
+type Transaction = TenantDb;
 
 const failure = (
   code: HolidayPreferenceError["code"],
@@ -74,15 +69,16 @@ function referenceDefault(kind: string): HolidayClassification | null {
   return kind === "part_day" ? "working" : "non_working";
 }
 
-async function resolveHoliday(input: Base): Promise<PreferenceTarget | null> {
+async function resolveHoliday(
+  input: Base,
+  db: TenantDb
+): Promise<PreferenceTarget | null> {
   if (input.holidayKey.startsWith(CUSTOM_HOLIDAY_KEY_PREFIX)) {
     const id = input.holidayKey.slice(CUSTOM_HOLIDAY_KEY_PREFIX.length);
     if (!z.string().uuid().safeParse(id).success) {
       return null;
     }
-    const custom = await tenantDatabase(
-      input.clerkOrgId
-    ).publicHoliday.findFirst({
+    const custom = await db.publicHoliday.findFirst({
       select: { default_classification: true, name: true },
       where: {
         ...scopeOf(input),
@@ -110,12 +106,13 @@ async function resolveHoliday(input: Base): Promise<PreferenceTarget | null> {
 
 async function resolveLocationName(
   input: Base,
-  locationId: string | null
+  locationId: string | null,
+  db: TenantDb
 ): Promise<{ ok: true; name: string | null } | { ok: false }> {
   if (locationId === null) {
     return { name: null, ok: true };
   }
-  const location = await tenantDatabase(input.clerkOrgId).location.findFirst({
+  const location = await db.location.findFirst({
     select: { id: true, name: true },
     where: {
       ...scopeOf(input),
@@ -167,16 +164,18 @@ async function applyPreference(
     | null
     | ((holiday: PreferenceTarget) => HolidayPreferenceSetting | null),
   action: string,
-  check?: (holiday: PreferenceTarget) => string | null
+  check: ((holiday: PreferenceTarget) => string | null | undefined) | undefined,
+  db: TenantDb
 ): Promise<Result<HolidayPreferenceReceipt, HolidayPreferenceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   if (!(input.actingRole === "owner" || input.actingRole === "admin")) {
     return failure(
       "not_authorised",
       "Only owners and admins can change public holidays."
     );
   }
-  try {
-    const holiday = await resolveHoliday(input);
+  const run = async (client: TenantDb): ReturnType<typeof applyPreference> => {
+    const holiday = await resolveHoliday(input, client);
     if (!holiday) {
       return failure("validation_error", "That public holiday was not found.");
     }
@@ -184,9 +183,8 @@ async function applyPreference(
     if (problem) {
       return failure("validation_error", problem);
     }
-    const setting =
-      typeof requested === "function" ? requested(holiday) : requested;
-    const location = await resolveLocationName(input, input.locationId);
+    const setting = requestedPreferenceSetting(requested, holiday);
+    const location = await resolveLocationName(input, input.locationId, client);
     if (!location.ok) {
       return failure(
         "validation_error",
@@ -199,56 +197,61 @@ async function applyPreference(
       holiday_key: input.holidayKey,
       location_id: input.locationId,
     };
-    const write = () =>
-      tenantTransaction(input.clerkOrgId, async (tx) => {
-        const existing = await tx.publicHolidayPreference.findFirst({
+    const existing = await client.publicHolidayPreference.findFirst({
+      select: { id: true, setting: true },
+      where,
+    });
+    let previous = existing?.setting ?? null;
+    if (setting === null) {
+      await client.publicHolidayPreference.deleteMany({ where });
+    } else if (existing) {
+      await client.publicHolidayPreference.updateMany({
+        data: { setting, updated_by_user_id: input.actingUserId },
+        where: { ...where, id: existing.id },
+      });
+    } else {
+      const inserted = await client.publicHolidayPreference.createMany({
+        data: {
+          clerk_org_id: input.clerkOrgId,
+          created_by_user_id: input.actingUserId,
+          holiday_key: input.holidayKey,
+          location_id: input.locationId,
+          organisation_id: input.organisationId,
+          setting,
+          updated_by_user_id: input.actingUserId,
+        },
+        skipDuplicates: true,
+      });
+      if (inserted.count === 0) {
+        const concurrent = await client.publicHolidayPreference.findFirst({
           select: { id: true, setting: true },
           where,
         });
-        if (setting === null) {
-          await tx.publicHolidayPreference.deleteMany({ where });
-        } else if (existing) {
-          await tx.publicHolidayPreference.update({
-            data: { setting, updated_by_user_id: input.actingUserId },
-            where: { id: existing.id },
-          });
-        } else {
-          await tx.publicHolidayPreference.create({
-            data: {
-              clerk_org_id: input.clerkOrgId,
-              created_by_user_id: input.actingUserId,
-              holiday_key: input.holidayKey,
-              location_id: input.locationId,
-              organisation_id: input.organisationId,
-              setting,
-              updated_by_user_id: input.actingUserId,
-            },
-          });
+        if (!concurrent) {
+          throw new Error("Holiday preference disappeared during insertion.");
         }
-        await writeAudit(tx, input, action, {
-          after: setting,
-          before: existing?.setting ?? null,
-          locationId: input.locationId,
+        previous = concurrent.setting;
+        await client.publicHolidayPreference.updateMany({
+          data: { setting, updated_by_user_id: input.actingUserId },
+          where: { ...where, id: concurrent.id },
         });
-      });
-    try {
-      await write();
-    } catch (error) {
-      // Two admins can insert the same preference at once; the unique indexes
-      // reject the second insert, and one retry then updates the winning row.
-      if (!isUniqueConflict(error)) {
-        throw error;
       }
-      await write();
     }
+    await writeAudit(client, input, action, {
+      after: setting,
+      before: previous,
+      locationId: input.locationId,
+    });
 
     return {
       ok: true,
       value: { holidayName: holiday.name, locationName: location.name },
     };
-  } catch {
-    return failure("unknown_error", "Failed to update the public holiday.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 function parsed<T extends z.ZodType>(
@@ -267,24 +270,46 @@ function parsed<T extends z.ZodType>(
 }
 
 /** Hides a holiday for one location, or for every location when locationId is null. */
-export function hidePublicHoliday(input: z.input<typeof ScopeSchema>) {
+export function hidePublicHoliday(
+  input: z.input<typeof ScopeSchema>,
+  db: TenantDb
+) {
+  assertTenantDb(db, input.clerkOrgId);
   const value = parsed(ScopeSchema, input);
   return value.ok
-    ? applyPreference(value.value, "hidden", "public_holidays.hidden")
+    ? applyPreference(
+        value.value,
+        "hidden",
+        "public_holidays.hidden",
+        undefined,
+        db
+      )
     : Promise.resolve(value);
 }
 
 /** Removes the preference at that scope, returning the holiday to its default. */
-export function restorePublicHoliday(input: z.input<typeof ScopeSchema>) {
+export function restorePublicHoliday(
+  input: z.input<typeof ScopeSchema>,
+  db: TenantDb
+) {
+  assertTenantDb(db, input.clerkOrgId);
   const value = parsed(ScopeSchema, input);
   return value.ok
-    ? applyPreference(value.value, null, "public_holidays.restored")
+    ? applyPreference(
+        value.value,
+        null,
+        "public_holidays.restored",
+        undefined,
+        db
+      )
     : Promise.resolve(value);
 }
 
 export function setPublicHolidayClassification(
-  input: z.input<typeof ClassificationSchema>
+  input: z.input<typeof ClassificationSchema>,
+  db: TenantDb
 ) {
+  assertTenantDb(db, input.clerkOrgId);
   const value = parsed(ClassificationSchema, input);
   return value.ok
     ? applyPreference(
@@ -295,12 +320,18 @@ export function setPublicHolidayClassification(
           holiday.defaultClassification === value.value.classification
             ? null
             : value.value.classification,
-        "public_holidays.classification_changed"
+        "public_holidays.classification_changed",
+        undefined,
+        db
       )
     : Promise.resolve(value);
 }
 
-export function setLocalHolidayEnabled(input: z.input<typeof LocalDaySchema>) {
+export function setLocalHolidayEnabled(
+  input: z.input<typeof LocalDaySchema>,
+  db: TenantDb
+) {
+  assertTenantDb(db, input.clerkOrgId);
   const value = parsed(LocalDaySchema, input);
   if (!value.ok) {
     return Promise.resolve(value);
@@ -314,12 +345,21 @@ export function setLocalHolidayEnabled(input: z.input<typeof LocalDaySchema>) {
         value.value,
         "non_working",
         "public_holidays.local_day_enabled",
-        onlyLocal
+        onlyLocal,
+        db
       )
     : applyPreference(
         value.value,
         null,
         "public_holidays.local_day_disabled",
-        onlyLocal
+        onlyLocal,
+        db
       );
+}
+
+function requestedPreferenceSetting(
+  requested: Parameters<typeof applyPreference>[1],
+  holiday: PreferenceTarget
+) {
+  return typeof requested === "function" ? requested(holiday) : requested;
 }

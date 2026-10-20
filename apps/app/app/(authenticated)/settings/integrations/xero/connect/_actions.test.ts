@@ -46,13 +46,30 @@ vi.mock("@repo/xero", () => ({
 vi.mock("@repo/database/queries/xero-connection-state", () => ({
   getXeroConnectionState: mocks.getXeroConnectionState,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("../../../../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../../../../packages/database/src/tenant-db")
+  >("../../../../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
     auditEvent: { create: mocks.auditEventCreate },
     xeroConnection: { findFirst: mocks.xeroConnectionFindFirst },
     xeroOAuthSession: { findFirst: mocks.sessionFind },
-  })),
-}));
+  };
+}
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));

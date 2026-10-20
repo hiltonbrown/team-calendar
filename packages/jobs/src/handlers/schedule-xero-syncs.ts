@@ -1,3 +1,4 @@
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 import type { Result } from "@repo/core";
 import {
@@ -230,6 +231,7 @@ export interface ScheduleXeroSyncsPageResult {
 export async function scheduleXeroSyncsPage(
   options: ScheduleXeroSyncsPageOptions = {}
 ): Promise<Result<ScheduleXeroSyncsPageResult>> {
+  assertNoTenantTransaction("scheduleXeroSyncsPage");
   const now = options.now ?? new Date();
   const listResult = await listSchedulableXeroConnections({
     cursor: options.cursor,

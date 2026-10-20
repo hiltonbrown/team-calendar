@@ -1,3 +1,8 @@
+import { withTenantResult as withTestTenantResult } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
+
+vi.mock("server-only", () => ({}));
+
 import { describe, expect, test, vi } from "vitest";
 
 const findFirst = vi.fn();
@@ -12,18 +17,35 @@ vi.mock("../system-client", () => ({
   },
 }));
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({ xeroConnection: { findFirst, updateMany } }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async () => [],
+        ...{ xeroConnection: { findFirst, updateMany } },
+      }),
+  },
 }));
-const module = await import("./xero-connections").catch(() => null);
+const module = await import("./xero-connections");
 describe("canonical scoped connections", () => {
   test("does not reveal sibling account metadata", async () => {
-    expect(module?.getScopedXeroConnection).toBeTypeOf("function");
+    expect(module.getScopedXeroConnection).toBeTypeOf("function");
     findFirst.mockResolvedValue(null);
-    const result = await module?.getScopedXeroConnection({
-      clerkOrgId: "account",
-      connectionId: "connection",
-      organisationId: "payroll",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "account",
+        connectionId: "connection",
+        organisationId: "payroll",
+      }),
+      (db) =>
+        module.getScopedXeroConnection(
+          {
+            clerkOrgId: "account",
+            connectionId: "connection",
+            organisationId: "payroll",
+          },
+          db
+        )
+    );
     expect(findFirst).toHaveBeenCalledWith({
       where: {
         clerk_org_id: "account",
@@ -41,7 +63,7 @@ describe("canonical scoped connections", () => {
 
 describe("provider disconnect compare-and-set", () => {
   test("marks only the scoped captured link and grant, retaining all provider data", async () => {
-    expect(module?.markScopedXeroConnectionReconnectRequired).toBeTypeOf(
+    expect(module.markScopedXeroConnectionReconnectRequired).toBeTypeOf(
       "function"
     );
     findFirst.mockResolvedValue({ id: "connection" });
@@ -57,7 +79,7 @@ describe("provider disconnect compare-and-set", () => {
       xeroTenantId: "tenant",
     };
     expect(
-      await module?.markScopedXeroConnectionReconnectRequired(captured)
+      await module.markScopedXeroConnectionReconnectRequired(captured)
     ).toBe(true);
     expect(updateMany).toHaveBeenCalledWith({
       data: {

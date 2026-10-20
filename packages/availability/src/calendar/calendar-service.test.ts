@@ -1,5 +1,7 @@
-import { tenantTransaction } from "@repo/database";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const ids = {
   clerkOrg: "org_1",
@@ -19,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   getXeroConnectionStateForScope: vi.fn(),
   organisationFindFirst: vi.fn(),
   personFindMany: vi.fn(),
+  poolTransaction: vi.fn(),
   resolvePublicHolidays: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
@@ -30,45 +33,43 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>, options: unknown) =>
+      mocks.poolTransaction(run, options),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual("../../../database/src/tenant-db")),
+  getAccountSettings: async (account: string, db: unknown) => {
+    const settings = await mocks.getSettings(
+      { clerkOrgId: account, organisationId: ids.org },
+      db
+    );
+    if (!settings.ok) {
+      throw new Error("Account settings unavailable");
+    }
+    return {
+      manager_visibility_scope:
+        settings.value.managerVisibilityScope ?? "direct_reports_only",
+    };
+  },
   resolveAccountCompanies: mocks.accountCompanies,
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
-  TENANT_READ_TRANSACTION_OPTIONS: { maxWait: 10_000, timeout: 30_000 },
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
-      availabilityRecord: {
-        findFirst: mocks.availabilityFindFirst,
-        findMany: mocks.availabilityFindMany,
-      },
-      organisation: { findFirst: mocks.organisationFindFirst },
-      person: { findMany: mocks.personFindMany },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    async (accountId: string, callback: (tx: unknown) => Promise<unknown>) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return await callback({
-        availabilityRecord: {
-          findFirst: mocks.availabilityFindFirst,
-          findMany: mocks.availabilityFindMany,
-        },
-        organisation: { findFirst: mocks.organisationFindFirst },
-        person: { findMany: mocks.personFindMany },
-      });
-    }
-  ),
 }));
+
 vi.mock("../holidays/resolve-public-holidays", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
 vi.mock("../settings/organisation-settings-service", () => ({
   getSettings: mocks.getSettings,
+}));
+vi.mock("../settings/account-approval-settings-service", () => ({
+  getAccountApprovalSettings: async (
+    input: { clerkOrgId: string },
+    db: unknown
+  ) => mocks.getSettings({ ...input, organisationId: ids.org }, db),
 }));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
@@ -93,16 +94,31 @@ const baseInput = {
 } as const;
 describe("calendar-service", () => {
   it("loads the calendar through one account transaction", async () => {
-    const result = await getCalendarRange(baseInput);
-    expect(result.ok).toBe(true);
-    expect(tenantTransaction).toHaveBeenCalledExactlyOnceWith(
+    const result = await withTenantDb(
       ids.clerkOrg,
+      (db) => getCalendarRange(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
+    expect(result.ok).toBe(true);
+    expect(mocks.poolTransaction).toHaveBeenCalledExactlyOnceWith(
       expect.any(Function),
       { maxWait: 10_000, timeout: 30_000 }
     );
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.poolTransaction.mockImplementation(
+      async (run: (db: unknown) => Promise<unknown>) =>
+        run({
+          $queryRaw: vi.fn(async () => []),
+          availabilityRecord: {
+            findFirst: mocks.availabilityFindFirst,
+            findMany: mocks.availabilityFindMany,
+          },
+          organisation: { findFirst: mocks.organisationFindFirst },
+          person: { findMany: mocks.personFindMany },
+        })
+    );
     mocks.accountCompanies.mockResolvedValue([
       {
         country_code: "AU",
@@ -151,11 +167,22 @@ describe("calendar-service", () => {
 
   it("returns an empty calendar without provisioning a company on a read", async () => {
     mocks.accountCompanies.mockResolvedValue([]);
-    const result = await getCalendarRange({
-      ...baseInput,
-      organisationId: undefined,
-      role: "owner",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        organisationId: undefined,
+        role: "owner",
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            organisationId: undefined,
+            role: "owner",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       ok: true,
       value: { companies: [], people: [], totalPeopleInScope: 0 },
@@ -186,13 +213,26 @@ describe("calendar-service", () => {
         ].filter((item) => where.person_id.in.includes(item.person_id))
       )
     );
-    const result = await getCalendarRange({
-      ...baseInput,
-      actingPersonId: null,
-      organisationId: undefined,
-      role: "viewer",
-      scope: { type: "all_teams" },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId: null,
+        organisationId: undefined,
+        role: "viewer",
+        scope: { type: "all_teams" },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            actingPersonId: null,
+            organisationId: undefined,
+            role: "viewer",
+            scope: { type: "all_teams" },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -221,10 +261,20 @@ describe("calendar-service", () => {
     );
   });
   it("rejects unknown company filters before reading people or records", async () => {
-    const result = await getCalendarRange({
-      ...baseInput,
-      companyIds: [ids.otherOrg],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        companyIds: [ids.otherOrg],
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            companyIds: [ids.otherOrg],
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "validation_error" },
       ok: false,
@@ -232,18 +282,13 @@ describe("calendar-service", () => {
     expect(mocks.personFindMany).not.toHaveBeenCalled();
     expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
   });
-  it("resolves the manager separately in each company and applies each company's settings", async () => {
-    const secondManager = {
-      ...person(ids.otherOrg, "Other", "Manager", null),
-      clerk_user_id: "user_1",
-      organisation_id: ids.otherOrg,
-    };
+  it("resolves one account manager across companies and applies each company's settings", async () => {
     const secondReport = {
       ...person(
         "00000000-0000-4000-8000-000000000014",
         "Other",
         "Report",
-        secondManager.id
+        ids.manager
       ),
       clerk_user_id: null,
       organisation_id: ids.otherOrg,
@@ -252,11 +297,7 @@ describe("calendar-service", () => {
       company(ids.org, "First"),
       company(ids.otherOrg, "Second"),
     ]);
-    mocks.personFindMany.mockResolvedValue([
-      ...people,
-      secondManager,
-      secondReport,
-    ]);
+    mocks.personFindMany.mockResolvedValue([...people, secondReport]);
     mocks.getSettings.mockImplementation(({ organisationId }) =>
       Promise.resolve({
         ok: true,
@@ -270,17 +311,27 @@ describe("calendar-service", () => {
       Promise.resolve(
         [
           {
-            ...record("second-own", secondManager.id),
-            person: secondManager,
+            ...record("second-report", secondReport.id),
+            person: secondReport,
             privacy_mode: "private",
           },
         ].filter((item) => where.person_id.in.includes(item.person_id))
       )
     );
-    const result = await getCalendarRange({
-      ...baseInput,
-      organisationId: undefined,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        organisationId: undefined,
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            organisationId: undefined,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -288,12 +339,11 @@ describe("calendar-service", () => {
     expect(result.value.people.map((item) => item.id)).toEqual([
       ids.manager,
       ids.person,
-      secondManager.id,
       secondReport.id,
     ]);
     expect(result.value.days.flatMap((day) => day.events)[0]).toMatchObject({
       companyId: ids.otherOrg,
-      displayName: "Other Manager",
+      displayName: "Other Report",
       notesInternal: "Private note",
       recordType: "annual_leave",
     });
@@ -314,7 +364,11 @@ describe("calendar-service", () => {
     expect(secondWhere?.OR[0].approval_status.in).not.toContain("submitted");
   });
   it("returns direct reports plus self for my_team and uses Monday week range", async () => {
-    const result = await getCalendarRange(baseInput);
+    const result = await withTenantDb(
+      ids.clerkOrg,
+      (db) => getCalendarRange(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -329,7 +383,11 @@ describe("calendar-service", () => {
     );
   });
   it("shows a one-day all-day record on its own date only in Brisbane", async () => {
-    const result = await getCalendarRange(baseInput);
+    const result = await withTenantDb(
+      ids.clerkOrg,
+      (db) => getCalendarRange(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -342,7 +400,11 @@ describe("calendar-service", () => {
     expect(daysWithRecord).toEqual(["2026-04-15"]);
   });
   it("returns each person's job title and team id", async () => {
-    const result = await getCalendarRange(baseInput);
+    const result = await withTenantDb(
+      ids.clerkOrg,
+      (db) => getCalendarRange(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -381,10 +443,20 @@ describe("calendar-service", () => {
         record("direct", ids.person),
         record("indirect", ids.indirect),
       ]);
-      const result = await getCalendarRange({
-        ...baseInput,
-        scope: type === "team" ? { type, value: ids.team } : { type },
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          scope: type === "team" ? { type, value: ids.team } : { type },
+        }),
+        (db) =>
+          getCalendarRange(
+            {
+              ...baseInput,
+              scope: type === "team" ? { type, value: ids.team } : { type },
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -406,10 +478,20 @@ describe("calendar-service", () => {
     }
   );
   it("denies explicit indirect-person range under direct-only visibility", async () => {
-    const result = await getCalendarRange({
-      ...baseInput,
-      scope: { type: "person", value: ids.indirect },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scope: { type: "person", value: ids.indirect },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            scope: { type: "person", value: ids.indirect },
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "invalid_scope" },
       ok: false,
@@ -426,10 +508,20 @@ describe("calendar-service", () => {
     mocks.availabilityFindMany.mockResolvedValue([
       record("indirect", ids.indirect),
     ]);
-    const result = await getCalendarRange({
-      ...baseInput,
-      scope: { type: "person", value: ids.indirect },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scope: { type: "person", value: ids.indirect },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            scope: { type: "person", value: ids.indirect },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -438,38 +530,38 @@ describe("calendar-service", () => {
       notesInternal: "Private note",
     });
   });
-  it("fails closed to self when settings cannot be read", async () => {
+  it("aborts the account read when settings SQL cannot be read", async () => {
     mocks.getSettings.mockResolvedValue({
       error: { code: "unknown_error" },
       ok: false,
     });
-    const result = await getCalendarRange({
-      ...baseInput,
-      scope: { type: "all_teams" },
-    });
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-    expect(result.value.people.map((candidate) => candidate.id)).toEqual([
-      ids.manager,
-    ]);
-    expect(await getEventDetail(detailInput())).toMatchObject({
-      error: { code: "not_authorised" },
-      ok: false,
-    });
+    await expect(
+      withTestTenantResult(
+        tenantTestAccount({ ...baseInput, scope: { type: "all_teams" } }),
+        (db) =>
+          getCalendarRange({ ...baseInput, scope: { type: "all_teams" } }, db)
+      )
+    ).rejects.toThrow("Account settings unavailable");
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
   });
   it.each([null, ids.otherOrg])(
     "denies missing or inactive manager identity %s",
     async (actingPersonId) => {
       expect(
-        await getCalendarRange({ ...baseInput, actingPersonId })
+        await withTestTenantResult(
+          tenantTestAccount({ ...baseInput, actingPersonId }),
+          (db) => getCalendarRange({ ...baseInput, actingPersonId }, db)
+        )
       ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
     }
   );
   it("scopes range and detail people and records to both tenant boundaries", async () => {
-    await getCalendarRange(baseInput);
-    await getEventDetail(detailInput());
+    await withTestTenantResult(tenantTestAccount(baseInput), (db) =>
+      getCalendarRange(baseInput, db)
+    );
+    await withTestTenantResult(tenantTestAccount(detailInput()), (db) =>
+      getEventDetail(detailInput(), db)
+    );
     const scope = {
       archived_at: null,
       clerk_org_id: ids.clerkOrg,
@@ -496,7 +588,11 @@ describe("calendar-service", () => {
     mocks.personFindMany.mockResolvedValue(
       people.filter((candidate) => candidate.id !== ids.person)
     );
-    expect(await getEventDetail(detailInput())).toMatchObject({
+    expect(
+      await withTestTenantResult(tenantTestAccount(detailInput()), (db) =>
+        getEventDetail(detailInput(), db)
+      )
+    ).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
     });
@@ -509,11 +605,22 @@ describe("calendar-service", () => {
   ])(
     "ends the %s month grid after the final day's week",
     async (anchor, first, last, count) => {
-      const result = await getCalendarRange({
-        ...baseInput,
-        anchorDate: new Date(`${anchor}T12:00:00Z`),
-        view: "month",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          anchorDate: new Date(`${anchor}T12:00:00Z`),
+          view: "month",
+        }),
+        (db) =>
+          getCalendarRange(
+            {
+              ...baseInput,
+              anchorDate: new Date(`${anchor}T12:00:00Z`),
+              view: "month",
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -530,11 +637,22 @@ describe("calendar-service", () => {
       company(ids.otherOrg, "Brisbane office"),
       { ...company(ids.org, "Perth office"), timezone: "Australia/Perth" },
     ]);
-    const result = await getCalendarRange({
-      ...baseInput,
-      anchorDate: new Date("2026-10-07T00:00:00Z"),
-      view: "day",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        anchorDate: new Date("2026-10-07T00:00:00Z"),
+        view: "day",
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            anchorDate: new Date("2026-10-07T00:00:00Z"),
+            view: "day",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       ok: true,
       value: {
@@ -578,11 +696,22 @@ describe("calendar-service", () => {
           starts_at: new Date(end),
         },
       ]);
-      const result = await getCalendarRange({
-        ...baseInput,
-        anchorDate: new Date(`${anchor}T00:00:00Z`),
-        view: "day",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          anchorDate: new Date(`${anchor}T00:00:00Z`),
+          view: "day",
+        }),
+        (db) =>
+          getCalendarRange(
+            {
+              ...baseInput,
+              anchorDate: new Date(`${anchor}T00:00:00Z`),
+              view: "day",
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -604,10 +733,20 @@ describe("calendar-service", () => {
     }
   );
   it("maps source category filters to source type predicates", async () => {
-    await getCalendarRange({
-      ...baseInput,
-      filters: { recordTypeCategory: "xero_leave" },
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        filters: { recordTypeCategory: "xero_leave" },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            filters: { recordTypeCategory: "xero_leave" },
+          },
+          db
+        )
+    );
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -617,12 +756,24 @@ describe("calendar-service", () => {
     );
   });
   it("includes own drafts only when includeDrafts is true", async () => {
-    await getCalendarRange({
-      ...baseInput,
-      actingPersonId: ids.person,
-      filters: { includeDrafts: true },
-      scope: { type: "my_self" },
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId: ids.person,
+        filters: { includeDrafts: true },
+        scope: { type: "my_self" },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            actingPersonId: ids.person,
+            filters: { includeDrafts: true },
+            scope: { type: "my_self" },
+          },
+          db
+        )
+    );
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -634,21 +785,47 @@ describe("calendar-service", () => {
     );
   });
   it("applies privacy transformation before returning events", async () => {
-    const result = await getCalendarRange({
-      ...baseInput,
-      actingPersonId: ids.peer,
-      role: "viewer",
-      scope: { type: "all_teams" },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId: ids.peer,
+        role: "viewer",
+        scope: { type: "all_teams" },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            actingPersonId: ids.peer,
+            role: "viewer",
+            scope: { type: "all_teams" },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
-    const detail = await getEventDetail({
-      actingPersonId: ids.peer,
-      actingUserId: "user_2",
-      clerkOrgId: ids.clerkOrg,
-      organisationId: ids.org,
-      recordId: "00000000-0000-4000-8000-000000000099",
-      role: "owner",
-    });
+    const detail = await withTestTenantResult(
+      tenantTestAccount({
+        actingPersonId: ids.peer,
+        actingUserId: "user_2",
+        clerkOrgId: ids.clerkOrg,
+        organisationId: ids.org,
+        recordId: "00000000-0000-4000-8000-000000000099",
+        role: "owner",
+      }),
+      (db) =>
+        getEventDetail(
+          {
+            actingPersonId: ids.peer,
+            actingUserId: "user_2",
+            clerkOrgId: ids.clerkOrg,
+            organisationId: ids.org,
+            recordId: "00000000-0000-4000-8000-000000000099",
+            role: "owner",
+          },
+          db
+        )
+    );
     expect(detail.ok).toBe(true);
     if (!detail.ok) {
       return;
@@ -657,11 +834,22 @@ describe("calendar-service", () => {
     expect(detail.value.notesInternal).toBe("Private note");
   });
   it("redacts private peer records in range output", async () => {
-    const result = await getCalendarRange({
-      ...baseInput,
-      role: "owner",
-      scope: { type: "all_teams" },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        role: "owner",
+        scope: { type: "all_teams" },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            role: "owner",
+            scope: { type: "all_teams" },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -682,10 +870,20 @@ describe("calendar-service", () => {
         showPendingOnCalendar: true,
       },
     });
-    const result = await getCalendarRange({
-      ...baseInput,
-      scope: { type: "team", value: ids.team },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scope: { type: "team", value: ids.team },
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...baseInput,
+            scope: { type: "team", value: ids.team },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -703,14 +901,28 @@ describe("calendar-service", () => {
         clerk_org_id: "org_2",
         organisation_id: ids.otherOrg,
       });
-    const result = await getEventDetail({
-      actingPersonId: ids.manager,
-      actingUserId: "user_1",
-      clerkOrgId: ids.clerkOrg,
-      organisationId: ids.org,
-      recordId: "00000000-0000-4000-8000-000000000099",
-      role: "manager",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingPersonId: ids.manager,
+        actingUserId: "user_1",
+        clerkOrgId: ids.clerkOrg,
+        organisationId: ids.org,
+        recordId: "00000000-0000-4000-8000-000000000099",
+        role: "manager",
+      }),
+      (db) =>
+        getEventDetail(
+          {
+            actingPersonId: ids.manager,
+            actingUserId: "user_1",
+            clerkOrgId: ids.clerkOrg,
+            organisationId: ids.org,
+            recordId: "00000000-0000-4000-8000-000000000099",
+            role: "manager",
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
     if (result.ok) {
       return;
@@ -721,7 +933,10 @@ describe("calendar-service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       record("indirect-detail", ids.indirect)
     );
-    const result = await getEventDetail(detailInput());
+    const result = await withTestTenantResult(
+      tenantTestAccount(detailInput()),
+      (db) => getEventDetail(detailInput(), db)
+    );
     expect(result.ok).toBe(false);
     if (result.ok) {
       return;
@@ -739,11 +954,17 @@ describe("calendar-service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       record("indirect-detail", ids.indirect)
     );
-    const result = await getEventDetail(detailInput());
+    const result = await withTestTenantResult(
+      tenantTestAccount(detailInput()),
+      (db) => getEventDetail(detailInput(), db)
+    );
     expect(result.ok).toBe(true);
   });
   it("allows direct-report detail under direct-only manager visibility", async () => {
-    const result = await getEventDetail(detailInput());
+    const result = await withTestTenantResult(
+      tenantTestAccount(detailInput()),
+      (db) => getEventDetail(detailInput(), db)
+    );
     expect(result.ok).toBe(true);
   });
   it("builds holiday cells from resolved holidays for locations in view", async () => {
@@ -775,7 +996,11 @@ describe("calendar-service", () => {
         }),
       ],
     });
-    const result = await getCalendarRange(baseInput);
+    const result = await withTenantDb(
+      ids.clerkOrg,
+      (db) => getCalendarRange(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;

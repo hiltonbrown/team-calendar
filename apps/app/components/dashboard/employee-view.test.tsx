@@ -30,8 +30,8 @@ describe("EmployeeView", () => {
     ).toBe("/plans/new");
     expect(
       screen.getByRole("link", { name: "Open calendar" }).getAttribute("href")
-    ).toBe("/calendar?scopeType=my_self&view=week");
-    expect(screen.getByText("Me")).toBeDefined();
+    ).toBe("/calendar?scopeType=all_teams&view=week");
+    expect(screen.getByText("All teams")).toBeDefined();
     expect(sectionHeadings()).toEqual([
       "Who is in this week",
       "Needs your reply (1)",

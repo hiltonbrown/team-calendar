@@ -1,7 +1,11 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, tenantDatabase } from "@repo/database";
+import {
+  afterTenantCommit,
+  assertTenantDb,
+  type TenantDb,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type { notification_type } from "@repo/database/generated/enums";
 import { z } from "zod";
@@ -32,6 +36,8 @@ export interface NotificationListItem {
   label: string;
   objectId: string | null;
   objectType: string | null;
+  organisationId: string;
+  organisationName: string;
   readAt: Date | null;
   title: string;
   type: notification_type;
@@ -48,14 +54,6 @@ export interface NotificationFilters {
 export interface NotificationPagination {
   cursor?: string | null;
   pageSize?: number;
-}
-
-export interface NotificationServiceDatabase {
-  notification: Pick<
-    Database["notification"],
-    "count" | "findFirst" | "findMany" | "updateMany"
-  >;
-  person: Pick<Database["person"], "findMany">;
 }
 
 const CategorySchema = z.enum([
@@ -76,7 +74,6 @@ const ListSchema = z.object({
       unreadOnly: z.boolean().optional(),
     })
     .optional(),
-  organisationId: z.string().uuid(),
   pagination: z
     .object({
       cursor: z.string().nullable().optional(),
@@ -88,7 +85,6 @@ const ListSchema = z.object({
 
 const ScopedUserSchema = z.object({
   clerkOrgId: z.string().min(1),
-  organisationId: z.string().uuid(),
   userId: z.string().min(1),
 });
 
@@ -107,7 +103,7 @@ const unreadCountCache = new Map<
 
 export async function listForUser(
   input: z.input<typeof ListSchema>,
-  providedClient?: NotificationServiceDatabase
+  db: TenantDb
 ): Promise<
   Result<
     {
@@ -122,40 +118,34 @@ export async function listForUser(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof listForUser> => {
+    const filters = normaliseFilters(parsed.data.filters);
+    if (!filters.ok) {
+      return filters;
+    }
+    const pageSize = parsed.data.pagination?.pageSize ?? 25;
+    const cursor = decodeCursor(parsed.data.pagination?.cursor ?? null);
+    if (parsed.data.pagination?.cursor && !cursor) {
+      return {
+        error: {
+          code: "validation_error",
+          message: "Invalid notification cursor.",
+        },
+        ok: false,
+      };
+    }
 
-  const filters = normaliseFilters(parsed.data.filters);
-  if (!filters.ok) {
-    return filters;
-  }
-  const pageSize = parsed.data.pagination?.pageSize ?? 25;
-  const cursor = decodeCursor(parsed.data.pagination?.cursor ?? null);
-  if (parsed.data.pagination?.cursor && !cursor) {
-    return {
-      error: {
-        code: "validation_error",
-        message: "Invalid notification cursor.",
-      },
-      ok: false,
-    };
-  }
-
-  try {
     const where = buildWhere(parsed.data, filters.value, cursor);
-    const [rows, unreadCount] = await Promise.all([
-      client.notification.findMany({
+    const [rows, unreadCount] = [
+      await client.notification.findMany({
         orderBy: [{ created_at: "desc" }, { id: "desc" }],
         select: notificationSelect,
         take: pageSize + 1,
         where,
       }),
-      client.notification.count({
-        where: {
-          ...buildWhere(parsed.data, { ...filters.value, unreadOnly: false }),
-          read_at: null,
-        },
-      }),
-    ]);
+      await countUnreadDirect(client, parsed.data),
+    ];
     const pageRows = rows.slice(0, pageSize);
     const actors = await loadActorDisplays(
       client,
@@ -174,14 +164,14 @@ export async function listForUser(
         unreadCount,
       },
     };
-  } catch {
-    return unknownError("Failed to load notifications.");
-  }
+  };
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  return await run(db);
 }
 
 export async function markAsRead(
   input: z.input<typeof MarkReadSchema>,
-  providedClient?: NotificationServiceDatabase
+  db: TenantDb
 ): Promise<
   Result<
     { notification: NotificationListItem; unreadCount: number },
@@ -192,15 +182,16 @@ export async function markAsRead(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof markAsRead> => {
+    const ownedDb = client;
 
-  try {
     const existing = await client.notification.findFirst({
       select: notificationSelect,
       where: {
         clerk_org_id: parsed.data.clerkOrgId,
         id: parsed.data.notificationId,
-        organisation_id: parsed.data.organisationId,
+        organisation: { clerk_org_id: parsed.data.clerkOrgId },
       },
     });
     if (!existing) {
@@ -223,40 +214,44 @@ export async function markAsRead(
         where: {
           clerk_org_id: parsed.data.clerkOrgId,
           id: parsed.data.notificationId,
-          organisation_id: parsed.data.organisationId,
+          organisation: { clerk_org_id: parsed.data.clerkOrgId },
           read_at: null,
           recipient_user_id: parsed.data.userId,
         },
       });
-      invalidateUnreadCount(parsed.data);
     }
 
     const unreadCount = await countUnreadDirect(client, parsed.data);
     const item = toListItem({ ...existing, read_at: readAt }, new Map());
-    publishNotificationEvent(
-      {
-        organisationId: parsed.data.organisationId,
-        userId: parsed.data.userId,
-      },
-      {
-        payload: {
-          notificationId: parsed.data.notificationId,
-          readAt: readAt.toISOString(),
-          unreadCount,
+    runNotificationEffect(ownedDb, async () => {
+      invalidateUnreadCount(parsed.data);
+      await publishNotificationEvent(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          userId: parsed.data.userId,
         },
-        type: "notification.read",
-      }
-    ).catch(() => undefined);
+        {
+          payload: {
+            notificationId: parsed.data.notificationId,
+            readAt: readAt.toISOString(),
+            unreadCount,
+          },
+          type: "notification.read",
+        }
+      );
+    });
 
     return { ok: true, value: { notification: item, unreadCount } };
-  } catch {
-    return unknownError("Failed to mark notification as read.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function markAllAsRead(
   input: z.input<typeof ScopedUserSchema>,
-  providedClient?: NotificationServiceDatabase
+  db: TenantDb
 ): Promise<
   Result<{ markedCount: number; unreadCount: 0 }, NotificationServiceError>
 > {
@@ -264,76 +259,88 @@ export async function markAllAsRead(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof markAllAsRead> => {
+    const ownedDb = client;
 
-  try {
     const result = await client.notification.updateMany({
       data: { read_at: new Date() },
       where: {
         clerk_org_id: parsed.data.clerkOrgId,
-        organisation_id: parsed.data.organisationId,
+        organisation: { clerk_org_id: parsed.data.clerkOrgId },
         read_at: null,
         recipient_user_id: parsed.data.userId,
       },
     });
-    invalidateUnreadCount(parsed.data);
-    publishNotificationEvent(
-      {
-        organisationId: parsed.data.organisationId,
-        userId: parsed.data.userId,
-      },
-      { payload: { unreadCount: 0 }, type: "notification.all_read" }
-    ).catch(() => undefined);
-    return { ok: true, value: { markedCount: result.count, unreadCount: 0 } };
-  } catch {
-    return unknownError("Failed to mark notifications as read.");
-  }
+    runNotificationEffect(ownedDb, async () => {
+      invalidateUnreadCount(parsed.data);
+      await publishNotificationEvent(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          userId: parsed.data.userId,
+        },
+        { payload: { unreadCount: 0 }, type: "notification.all_read" }
+      );
+    });
+    return {
+      ok: true,
+      value: { markedCount: result.count, unreadCount: 0 },
+    };
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function getUnreadCount(
   input: z.input<typeof ScopedUserSchema>,
-  providedClient?: NotificationServiceDatabase
+  db: TenantDb
 ): Promise<Result<number, NotificationServiceError>> {
   const parsed = ScopedUserSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof getUnreadCount> => {
+    const ownedDb = client;
+    const key = cacheKey(parsed.data);
+    const cached = unreadCountCache.get(key);
+    if (!db && cached && cached.expiresAt > Date.now()) {
+      return { ok: true, value: cached.value };
+    }
 
-  const key = cacheKey(parsed.data);
-  const cached = unreadCountCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
-    return { ok: true, value: cached.value };
-  }
-
-  try {
     const value = await countUnreadDirect(client, parsed.data);
-    unreadCountCache.set(key, { expiresAt: Date.now() + 2000, value });
+    runNotificationEffect(ownedDb, () => {
+      unreadCountCache.set(key, { expiresAt: Date.now() + 2000, value });
+
+      return Promise.resolve();
+    });
     return { ok: true, value };
-  } catch {
-    return unknownError("Failed to count unread notifications.");
-  }
+  };
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  return await run(db);
 }
 
 export async function listRecentUnread(
   input: z.input<typeof RecentUnreadSchema>,
-  providedClient?: NotificationServiceDatabase
+  db: TenantDb
 ): Promise<Result<NotificationListItem[], NotificationServiceError>> {
   const parsed = RecentUnreadSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
-  const limit = parsed.data.limit ?? 3;
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof listRecentUnread> => {
+    const limit = parsed.data.limit ?? 3;
 
-  try {
     const rows = await client.notification.findMany({
       orderBy: [{ created_at: "desc" }, { id: "desc" }],
       select: notificationSelect,
       take: limit,
       where: {
         clerk_org_id: parsed.data.clerkOrgId,
-        organisation_id: parsed.data.organisationId,
+        organisation: { clerk_org_id: parsed.data.clerkOrgId },
         read_at: null,
         recipient_user_id: parsed.data.userId,
       },
@@ -344,39 +351,34 @@ export async function listRecentUnread(
       rows.map((row) => row.actor_user_id)
     );
     return { ok: true, value: rows.map((row) => toListItem(row, actors)) };
-  } catch {
-    return unknownError("Failed to load recent unread notifications.");
-  }
+  };
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  return await run(db);
 }
 
 export function invalidateUnreadCount(input: {
   clerkOrgId: string;
-  organisationId: string;
   userId: string;
 }): void {
   unreadCountCache.delete(cacheKey(input));
 }
 
 async function countUnreadDirect(
-  client: NotificationServiceDatabase,
-  input: { clerkOrgId: string; organisationId: string; userId: string }
+  client: TenantDb,
+  input: { clerkOrgId: string; userId: string }
 ): Promise<number> {
   return await client.notification.count({
     where: {
       clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
+      organisation: { clerk_org_id: input.clerkOrgId },
       read_at: null,
       recipient_user_id: input.userId,
     },
   });
 }
 
-function cacheKey(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  userId: string;
-}): string {
-  return `${input.clerkOrgId}:${input.organisationId}:${input.userId}`;
+function cacheKey(input: { clerkOrgId: string; userId: string }): string {
+  return `${input.clerkOrgId}:${input.userId}`;
 }
 
 function normaliseFilters(
@@ -405,7 +407,7 @@ function normaliseFilters(
 }
 
 function buildWhere(
-  input: { clerkOrgId: string; organisationId: string; userId: string },
+  input: { clerkOrgId: string; userId: string },
   filters: NotificationFilters,
   cursor?: DecodedCursor | null
 ): Prisma.NotificationWhereInput {
@@ -425,7 +427,7 @@ function buildWhere(
 
   return {
     clerk_org_id: input.clerkOrgId,
-    organisation_id: input.organisationId,
+    organisation: { clerk_org_id: input.clerkOrgId },
     recipient_user_id: input.userId,
     ...(filters.unreadOnly ? { read_at: null } : {}),
     ...(hasTypeConstraint ? { type: { in: typeFilter ?? [] } } : {}),
@@ -456,6 +458,8 @@ const notificationSelect = {
   id: true,
   object_id: true,
   object_type: true,
+  organisation: { select: { name: true } },
+  organisation_id: true,
   read_at: true,
   recipient_user_id: true,
   title: true,
@@ -470,6 +474,8 @@ interface NotificationRow {
   id: string;
   object_id: string | null;
   object_type: string | null;
+  organisation: { name: string };
+  organisation_id: string;
   read_at: Date | null;
   recipient_user_id: string;
   title: string;
@@ -477,8 +483,8 @@ interface NotificationRow {
 }
 
 async function loadActorDisplays(
-  client: NotificationServiceDatabase,
-  input: { clerkOrgId: string; organisationId: string },
+  client: TenantDb,
+  input: { clerkOrgId: string },
   actorUserIds: Array<string | null>
 ): Promise<Map<string, string>> {
   const unique = [
@@ -496,7 +502,7 @@ async function loadActorDisplays(
     where: {
       clerk_org_id: input.clerkOrgId,
       clerk_user_id: { in: unique },
-      organisation_id: input.organisationId,
+      organisation: { clerk_org_id: input.clerkOrgId },
     },
   });
   return new Map(
@@ -529,6 +535,8 @@ function toListItem(
     label: config.label,
     objectId: row.object_id,
     objectType: row.object_type,
+    organisationId: row.organisation_id,
+    organisationName: row.organisation.name,
     readAt: row.read_at,
     title: row.title,
     type: row.type,
@@ -586,8 +594,9 @@ function notFound(): Result<never, NotificationServiceError> {
   };
 }
 
-function unknownError(
-  message: string
-): Result<never, NotificationServiceError> {
-  return { error: { code: "unknown_error", message }, ok: false };
+function runNotificationEffect(
+  db: TenantDb,
+  effect: () => Promise<void>
+): void {
+  afterTenantCommit(db, effect);
 }

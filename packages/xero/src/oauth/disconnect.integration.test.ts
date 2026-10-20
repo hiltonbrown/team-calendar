@@ -11,6 +11,8 @@ import {
   it,
   vi,
 } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 vi.mock("./identity", () => ({
@@ -925,13 +927,26 @@ describe("canonical disconnect isolation", () => {
     const stopping = disconnect();
     await deleting;
     const { acquireXeroWriteClaim } = await import("@repo/availability");
-    const claiming = acquireXeroWriteClaim({
-      clerkOrgId: tenantA.clerkOrgId,
-      expectedSequence: 0,
-      expectedStatus: "approved",
-      organisationId: tenantA.organisationId,
-      recordId: tenantA.availabilityRecordId,
-    });
+    const claiming = withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: tenantA.clerkOrgId,
+        expectedSequence: 0,
+        expectedStatus: "approved",
+        organisationId: tenantA.organisationId,
+        recordId: tenantA.availabilityRecordId,
+      }),
+      (db) =>
+        acquireXeroWriteClaim(
+          {
+            clerkOrgId: tenantA.clerkOrgId,
+            expectedSequence: 0,
+            expectedStatus: "approved",
+            organisationId: tenantA.organisationId,
+            recordId: tenantA.availabilityRecordId,
+          },
+          db
+        )
+    );
     resume();
     expect(await stopping).toMatchObject({ ok: true });
     expect(await claiming).toBeNull();

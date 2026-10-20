@@ -8,7 +8,17 @@ import {
   loadWorkingDaysReferenceData,
   type RecordListItem,
 } from "@repo/availability";
-import { toXeroConnectionDisplayState } from "@repo/core";
+import {
+  type ClerkOrgId,
+  type OrganisationId,
+  type Result,
+  toXeroConnectionDisplayState,
+} from "@repo/core";
+import {
+  resolveAccountCompanies,
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult,
+} from "@repo/database";
 import { Button } from "@repo/design-system/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -18,7 +28,6 @@ import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { XeroRecoveryNotice } from "@/components/xero/xero-recovery-notice";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { withOrg } from "@/lib/navigation/org-url";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { type PlansFilterInput, PlansFilterSchema } from "./_schemas";
@@ -30,142 +39,215 @@ export const metadata: Metadata = {
 interface PlansPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Authentication, scope and filter failures are rendered at the route boundary.
+interface PreparedPlansPage {
+  organisationId: OrganisationId;
+  orgQueryValue: string;
+  records: PlansClientRecord[];
+  recordsPage: Extract<
+    Awaited<ReturnType<typeof listMyRecordsPage>>,
+    { ok: true }
+  >["value"];
+  xeroConnectionState: ReturnType<typeof toXeroConnectionDisplayState>;
+}
+interface PlansPageError {
+  code: "person" | "records";
+  message: string;
+  orgQueryValue: string;
+}
 const PlansPage = async ({ searchParams }: PlansPageProps) => {
   await requirePageRole("org:viewer");
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(orgParam);
   const filters = parseFilterParams(filterParams, PlansFilterSchema) ?? {
     includeArchived: false,
     recordTypeCategory: "all",
     tab: "my",
   };
-  const { orgRole } = await auth();
-  const user = await currentUser();
-  if (!user) {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  if (!(orgId && user)) {
     redirect("/");
   }
+  // Clerk supplies the authenticated account before one Result preparation scope.
+  const clerkOrgId = orgId as ClerkOrgId;
   const canViewTeam = isManagerOrAbove(orgRole);
-  if (filters.tab === "team" && !canViewTeam) {
-    redirect(withOrg("/plans?tab=my", orgQueryValue));
-  }
-  const currentPersonResult = await ensureCurrentUserPerson(
-    {
-      clerkOrgId,
-      organisationId,
-    },
-    {
-      avatarUrl: user.imageUrl,
-      clerkUserId: user.id,
-      displayName:
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.emailAddresses[0]?.emailAddress ||
-        user.id,
-      email: user.emailAddresses[0]?.emailAddress,
-      firstName: user.firstName,
-      lastName: user.lastName,
-    }
-  );
-  if (!currentPersonResult.ok) {
-    return (
-      <>
-        <Header page="Plans" />
-        <div className="flex flex-1 flex-col p-6 pt-0">
-          <EmptyState
-            actionSlot={
-              <Button asChild variant="outline">
-                <Link href={withOrg("/people", orgQueryValue)}>
-                  Review people
-                </Link>
-              </Button>
-            }
-            description="Your Clerk account could not be linked to a single person profile. Review the people directory, then reload plans."
-            title="Person profile needs review"
-          />
-        </div>
-      </>
-    );
-  }
-  const serviceFilters = {
-    approvalStatus: filters.approvalStatus,
-    dateRange: {
-      from: filters.dateFrom
-        ? new Date(`${filters.dateFrom}T00:00:00.000Z`)
-        : undefined,
-      to: filters.dateTo
-        ? new Date(`${filters.dateTo}T23:59:59.999Z`)
-        : undefined,
-    },
-    includeArchived: filters.includeArchived,
-    personId: filters.tab === "team" ? filters.personId : undefined,
-    recordType: filters.recordType,
-    recordTypeCategory: filters.recordTypeCategory,
-    sourceType: filters.sourceType,
-  };
-  const [recordsResult, xeroStateResult] = await Promise.all([
-    filters.tab === "team"
-      ? listTeamRecordsPage({
-          actingOrgRole: orgRole,
-          allHistory: filters.allHistory ?? false,
-          clerkOrgId,
-          cursor: filters.cursor,
-          filters: serviceFilters,
-          managerPersonId: currentPersonResult.value.id,
-          organisationId,
-          pageSize: filters.pageSize ?? 50,
-        })
-      : listMyRecordsPage({
-          allHistory: filters.allHistory ?? false,
-          clerkOrgId,
-          cursor: filters.cursor,
-          filters: serviceFilters,
-          organisationId,
-          pageSize: filters.pageSize ?? 50,
-          userId: user.id,
-        }),
-    getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
-  ]);
-  const xeroConnectionState = toXeroConnectionDisplayState(xeroStateResult);
-  if (!recordsResult.ok) {
-    return (
-      <>
-        <Header page="Plans" />
-        <div className="flex flex-1 flex-col p-6 pt-0">
-          <FetchErrorState
-            description="We could not load leave and availability records. Reload the page, then check the Xero connection if leave records still look out of date."
-            entityName="plans"
-          />
-        </div>
-      </>
-    );
-  }
-  const durationInputs = recordsResult.value.items.map((record) => ({
-    allDay: record.allDay,
+  const prepared = await withTenantResult(
     clerkOrgId,
-    endsAt: record.endsAt,
-    locationId: record.person.locationId,
-    organisationId,
-    startsAt: record.startsAt,
-  }));
-  const durationReference = await loadWorkingDaysReferenceData(durationInputs);
-  const records = recordsResult.value.items.map((record, index) => {
-    const durationInput = durationInputs[index];
-    if (!durationInput) {
-      return toClientRecord(record, null, "Duration input is unavailable");
-    }
-    const duration = computeWorkingDaysFromReferenceData(
-      durationInput,
-      durationReference
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Authentication, scope and filter failures are rendered at the route boundary.
+    async (db): Promise<Result<PreparedPlansPage, PlansPageError>> => {
+      const companies = await resolveAccountCompanies(clerkOrgId, db);
+      const existingPerson = await db.person.findFirst({
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
+        select: { organisation_id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          clerk_user_id: user.id,
+          organisation_id: {
+            in: companies.map((preparedCompany) => preparedCompany.id),
+          },
+        },
+      });
+      const company = orgParam
+        ? companies.find((preparedCompany2) => preparedCompany2.id === orgParam)
+        : (companies.find(
+            (preparedCompany3) =>
+              preparedCompany3.id === existingPerson?.organisation_id
+          ) ?? companies[0]);
+      if (!company) {
+        redirect("/onboarding");
+      }
+      // The UUID belongs to the authenticated account's owned company set.
+      const organisationId = company.id as OrganisationId;
+      const orgQueryValue = organisationId;
+      if (filters.tab === "team" && !canViewTeam) {
+        redirect(withOrg("/plans?tab=my", orgQueryValue));
+      }
+      const currentPersonResult = await ensureCurrentUserPerson(
+        { clerkOrgId, organisationId },
+        {
+          avatarUrl: user.imageUrl,
+          clerkUserId: user.id,
+          displayName:
+            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+            user.emailAddresses[0]?.emailAddress ||
+            user.id,
+          email: user.emailAddresses[0]?.emailAddress,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        db
+      );
+      if (!currentPersonResult.ok) {
+        return {
+          error: {
+            code: "person",
+            message: currentPersonResult.error.message,
+            orgQueryValue,
+          },
+          ok: false,
+        };
+      }
+      const serviceFilters = {
+        approvalStatus: filters.approvalStatus,
+        dateRange: {
+          from: filters.dateFrom
+            ? new Date(`${filters.dateFrom}T00:00:00.000Z`)
+            : undefined,
+          to: filters.dateTo
+            ? new Date(`${filters.dateTo}T23:59:59.999Z`)
+            : undefined,
+        },
+        includeArchived: filters.includeArchived,
+        personId: filters.tab === "team" ? filters.personId : undefined,
+        recordType: filters.recordType,
+        recordTypeCategory: filters.recordTypeCategory,
+        sourceType: filters.sourceType,
+      };
+      const common = {
+        allHistory: filters.allHistory ?? false,
+        clerkOrgId,
+        cursor: filters.cursor,
+        filters: serviceFilters,
+        organisationId,
+        pageSize: filters.pageSize ?? 50,
+      };
+      const recordsResult =
+        filters.tab === "team"
+          ? await listTeamRecordsPage(
+              {
+                ...common,
+                actingOrgRole: orgRole,
+                managerPersonId: currentPersonResult.value.id,
+              },
+              db
+            )
+          : await listMyRecordsPage({ ...common, userId: user.id }, db);
+      if (!recordsResult.ok) {
+        return {
+          error: {
+            code: "records",
+            message: recordsResult.error.message,
+            orgQueryValue,
+          },
+          ok: false,
+        };
+      }
+      const xeroStateResult = await getXeroConnectionStateForScope(
+        { clerkOrgId, organisationId },
+        db
+      );
+      const xeroConnectionState = toXeroConnectionDisplayState(xeroStateResult);
+      const durationInputs = recordsResult.value.items.map((record) => ({
+        allDay: record.allDay,
+        clerkOrgId,
+        endsAt: record.endsAt,
+        locationId: record.person.locationId,
+        organisationId,
+        startsAt: record.startsAt,
+      }));
+      const durationReference = await loadWorkingDaysReferenceData(
+        durationInputs,
+        db
+      );
+      const records = recordsResult.value.items.map((record, index) => {
+        const durationInput = durationInputs[index];
+        if (!durationInput) {
+          return toClientRecord(record, null, "Duration input is unavailable");
+        }
+        const duration = computeWorkingDaysFromReferenceData(
+          durationInput,
+          durationReference
+        );
+        return toClientRecord(
+          record,
+          duration.ok ? duration.value : null,
+          duration.ok ? null : duration.error.message
+        );
+      });
+      return {
+        ok: true,
+        value: {
+          organisationId,
+          orgQueryValue,
+          records,
+          recordsPage: recordsResult.value,
+          xeroConnectionState,
+        },
+      };
+    },
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
+  if (!prepared.ok) {
+    return (
+      <>
+        <Header page="Plans" />
+        <div className="flex flex-1 flex-col p-6 pt-0">
+          {prepared.error.code === "person" ? (
+            <EmptyState
+              actionSlot={
+                <Button asChild variant="outline">
+                  <Link href={withOrg("/people", prepared.error.orgQueryValue)}>
+                    Review people
+                  </Link>
+                </Button>
+              }
+              description="Your Clerk account could not be linked to a single person profile. Review the people directory, then reload plans."
+              title="Person profile needs review"
+            />
+          ) : (
+            <FetchErrorState entityName="plans" />
+          )}
+        </div>
+      </>
     );
-    return toClientRecord(
-      record,
-      duration.ok ? duration.value : null,
-      duration.ok ? null : duration.error.message
-    );
-  });
+  }
+  const { organisationId, orgQueryValue, records, xeroConnectionState } =
+    prepared.value;
+  const recordsResult = {
+    ok: true as const,
+    value: prepared.value.recordsPage,
+  };
   return (
     <>
       <Header page="Plans" />

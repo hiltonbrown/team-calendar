@@ -1,3 +1,7 @@
+vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: () => Promise.resolve("org_1"),
+}));
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,17 +13,35 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("../../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../../packages/database/src/tenant-db")
+  >("../../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
     person: { findMany: mocks.personFindMany },
     team: { findMany: mocks.teamFindMany },
-  })),
-}));
+  };
+}
 vi.mock("@repo/feeds", () => ({
   normaliseRole: (role: string | null) => role,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("../../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,

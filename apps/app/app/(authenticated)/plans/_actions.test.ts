@@ -25,12 +25,38 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  resolveAccountCompanies: async () => [
+    { id: validInput.organisationId, name: "Company A" },
+  ],
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
     availabilityRecord: { findFirst: mocks.availabilityFindFirst },
     organisation: { findFirst: mocks.organisationFindFirst },
-  })),
-}));
+    person: {
+      findFirst: vi.fn(async () => ({
+        id: validInput.personId,
+        organisation_id: validInput.organisationId,
+      })),
+    },
+  };
+}
 vi.mock("@repo/xero", () => ({
   XeroWriteAdapter: {},
 }));
@@ -85,16 +111,18 @@ describe("plans actions", () => {
     mocks.organisationFindFirst.mockResolvedValue({
       timezone: "Australia/Brisbane",
     });
-    mocks.availabilityFindFirst.mockImplementation(({ select }) =>
-      Promise.resolve(
-        select.starts_at
-          ? null
-          : {
-              submitted_at: new Date("2026-09-19T01:00:00.000Z"),
-            }
-      )
-    );
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.availabilityFindFirst.mockImplementation(({ select }) => {
+      if (select.organisation_id) {
+        return Promise.resolve({ organisation_id: validInput.organisationId });
+      }
+      if (select.starts_at) {
+        return Promise.resolve(null);
+      }
+      return Promise.resolve({
+        submitted_at: new Date("2026-09-19T01:00:00.000Z"),
+      });
+    });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
@@ -105,7 +133,7 @@ describe("plans actions", () => {
     });
   });
   it("rejects unauthorised callers", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: null });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: null });
     const result = await createRecordAction(validInput);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -115,7 +143,7 @@ describe("plans actions", () => {
   it.each(["org:viewer", "org:manager"])(
     "denies imported recovery reads for %s",
     async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
       await expect(
         listSubmitRecoveryCandidatesAction({
           organisationId: validInput.organisationId,
@@ -131,7 +159,7 @@ describe("plans actions", () => {
   it.each(["org:admin", "org:owner"])(
     "scopes imported recovery reads for %s",
     async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
       mocks.listSubmitRecoveryCandidates.mockResolvedValue({
         ok: true,
         value: { candidates: [] },
@@ -211,7 +239,8 @@ describe("plans actions", () => {
         allDay: false,
         endsAt: new Date("2026-04-15T00:00:00Z"),
         startsAt: new Date("2026-04-14T23:00:00Z"),
-      })
+      }),
+      expect.any(Object)
     );
   });
   it("rejects nonexistent local times without writing a record", async () => {
@@ -241,6 +270,7 @@ describe("plans actions", () => {
     mocks.availabilityFindFirst.mockResolvedValue({
       all_day: false,
       ends_at: endsAt,
+      organisation_id: validInput.organisationId,
       starts_at: startsAt,
     });
     mocks.updateRecord.mockResolvedValue({ ok: true, value: { id: "record" } });
@@ -258,7 +288,8 @@ describe("plans actions", () => {
     expect(mocks.updateRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         patch: expect.objectContaining({ endsAt, startsAt }),
-      })
+      }),
+      expect.any(Object)
     );
     expect(mocks.availabilityFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -280,6 +311,7 @@ describe("plans actions", () => {
       mocks.availabilityFindFirst.mockResolvedValue({
         all_day: false,
         ends_at: endsAt,
+        organisation_id: validInput.organisationId,
         starts_at: startsAt,
       });
       mocks.updateRecord.mockResolvedValue({
@@ -301,7 +333,8 @@ describe("plans actions", () => {
       expect(mocks.updateRecord).toHaveBeenCalledWith(
         expect.objectContaining({
           patch: expect.objectContaining({ endsAt, notesInternal, startsAt }),
-        })
+        }),
+        expect.any(Object)
       );
       expect(endsAt.getTime() - startsAt.getTime()).toBe(20 * 60_000);
     }
@@ -346,6 +379,7 @@ describe("plans actions", () => {
     mocks.availabilityFindFirst.mockResolvedValue({
       all_day: false,
       ends_at: new Date("2026-04-04T16:10:00Z"),
+      organisation_id: validInput.organisationId,
       starts_at: new Date("2026-04-04T15:50:00Z"),
     });
     const result = await updateRecordAction({
@@ -372,6 +406,7 @@ describe("plans actions", () => {
     mocks.availabilityFindFirst.mockResolvedValue({
       all_day: true,
       ends_at: instant,
+      organisation_id: validInput.organisationId,
       starts_at: instant,
     });
     mocks.updateRecord.mockResolvedValue({ ok: true, value: { id: "record" } });
@@ -392,7 +427,8 @@ describe("plans actions", () => {
           notesInternal: "Changed note",
           startsAt: instant,
         }),
-      })
+      }),
+      expect.any(Object)
     );
   });
   it.each(["create", "update"])(
@@ -401,6 +437,7 @@ describe("plans actions", () => {
       mocks.availabilityFindFirst.mockResolvedValue({
         all_day: true,
         ends_at: new Date("2026-04-15T00:00:00Z"),
+        organisation_id: validInput.organisationId,
         starts_at: new Date("2026-04-15T00:00:00Z"),
       });
       const input = {
@@ -433,6 +470,7 @@ describe("plans actions", () => {
       mocks.availabilityFindFirst.mockResolvedValue({
         all_day: false,
         ends_at: new Date("2026-04-15T00:00:00Z"),
+        organisation_id: validInput.organisationId,
         starts_at: new Date("2026-04-14T23:00:00Z"),
       });
       const input = {

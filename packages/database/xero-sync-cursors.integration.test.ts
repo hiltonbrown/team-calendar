@@ -3,7 +3,7 @@ import {
   advanceXeroSyncCursor,
   completeXeroInitialSync,
 } from "./src/queries/xero-sync-cursors";
-import { tenantTransaction } from "./src/tenant-client";
+import { TenantMismatchError, withTenantDb } from "./src/tenant-db";
 import {
   createXeroConnectionFixture,
   xeroSimplificationFixture,
@@ -19,7 +19,7 @@ test("provider cursor commits are scoped, conditional and monotonic; old reconne
     organisationId: connection.organisation_id,
   };
   try {
-    await tenantTransaction(scope.clerkOrgId, async (tx) => {
+    await withTenantDb(scope.clerkOrgId, async (tx) => {
       const first = new Date("2026-10-07T12:00:00Z");
       const next = new Date("2026-10-07T12:01:00Z");
       const cursor = {
@@ -29,12 +29,12 @@ test("provider cursor commits are scoped, conditional and monotonic; old reconne
         nextModifiedSince: first,
         scope,
       };
-      expect(
-        await advanceXeroSyncCursor(
+      await expect(
+        advanceXeroSyncCursor(
           { ...cursor, scope: { ...scope, clerkOrgId: "foreign" } },
           tx
         )
-      ).toBe(false);
+      ).rejects.toBeInstanceOf(TenantMismatchError);
       expect(await advanceXeroSyncCursor(cursor, tx)).toBe(true);
       expect(
         await advanceXeroSyncCursor({ ...cursor, nextModifiedSince: next }, tx)

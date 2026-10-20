@@ -3,7 +3,10 @@ export {
   type DispatchNotificationResult,
   dispatchNotification,
   type NotificationDispatchDatabase,
+  type PreparedNotificationPublication,
+  prepareNotificationPublication,
   publishPersistedNotification,
+  sendPreparedNotificationPublication,
 } from "./src/dispatch";
 export {
   type EmailQueueServiceError,

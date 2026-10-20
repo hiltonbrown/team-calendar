@@ -10,13 +10,41 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>,
+      options: unknown
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await Reflect.apply(
+        tenantTestState.client.$transaction,
+        tenantTestState.client,
+        [
+          async (client: object) =>
+            executeTransaction({
+              $executeRaw: vi.fn(async () => 1),
+              $queryRaw: vi.fn(async () => []),
+              ...client,
+            }),
+          options,
+        ]
+      );
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = { $transaction: mocks.transaction };
+  tenantTestState.client = client;
   return {
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback, options) =>
-      client.$transaction(callback, options)
-    ),
+    ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+      "../../../database/src/tenant-db"
+    )),
   };
 });
 vi.mock("../projection/feed-projection", () => ({
@@ -88,18 +116,16 @@ describe("durable feed representation", () => {
     expect(await establishFeedRepresentation(input)).toMatchObject({
       ok: true,
     });
-    const { tenantTransaction } = await import("@repo/database");
-    expect(tenantTransaction).toHaveBeenCalledWith(
-      input.clerkOrgId,
+    expect(mocks.transaction).toHaveBeenCalledExactlyOnceWith(
       expect.any(Function),
       expect.objectContaining({ isolationLevel: "Serializable" })
     );
-    expect(mocks.transaction).toHaveBeenCalledWith(
-      expect.any(Function),
-      expect.objectContaining({ isolationLevel: "Serializable" })
-    );
+    const projectionClient = mocks.project.mock.calls[0]?.[1];
+    expect(projectionClient).toBeDefined();
+    expect(projectionClient.feedEventPublication).toBe(tx.feedEventPublication);
     expect(mocks.project).toHaveBeenCalledWith(
-      expect.objectContaining({ ...input, client: tx })
+      expect.objectContaining(input),
+      projectionClient
     );
     expect(mocks.create).toHaveBeenCalledWith(
       expect.objectContaining({

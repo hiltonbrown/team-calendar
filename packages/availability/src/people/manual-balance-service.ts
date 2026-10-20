@@ -1,7 +1,7 @@
 import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
   availability_record_type,
@@ -67,18 +67,21 @@ const ManualBalanceSchema = z.object({
     .nullable()
     .optional(),
 });
-export async function setManualLeaveBalance(input: {
-  actingRole: PeopleRole;
-  actingUserId: string;
-  balance: number;
-  balanceUnit?: leave_balance_unit | null;
-  clerkOrgId: string;
-  leaveTypeName?: null | string;
-  leaveTypeXeroId: string;
-  organisationId: string;
-  personId: string;
-  recordType?: availability_record_type | null;
-}): Promise<
+export async function setManualLeaveBalance(
+  input: {
+    actingRole: PeopleRole;
+    actingUserId: string;
+    balance: number;
+    balanceUnit?: leave_balance_unit | null;
+    clerkOrgId: string;
+    leaveTypeName?: null | string;
+    leaveTypeXeroId: string;
+    organisationId: string;
+    personId: string;
+    recordType?: availability_record_type | null;
+  },
+  db: TenantDb
+): Promise<
   Result<
     {
       id: string;
@@ -86,24 +89,32 @@ export async function setManualLeaveBalance(input: {
     ManualBalanceServiceError
   >
 > {
-  const parsed = ManualBalanceSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  if (
-    !(parsed.data.actingRole === "admin" || parsed.data.actingRole === "owner")
-  ) {
-    return notAuthorised();
-  }
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof setManualLeaveBalance> => {
+    const parsed = ManualBalanceSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
+    if (
+      !(
+        parsed.data.actingRole === "admin" || parsed.data.actingRole === "owner"
+      )
+    ) {
+      return notAuthorised();
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const xeroStateResult = await getXeroConnectionStateForScope({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
+    const xeroStateResult = await getXeroConnectionStateForScope(
+      {
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      },
+      client
+    );
     if (!xeroStateResult.ok) {
       return {
         error: {
@@ -126,32 +137,27 @@ export async function setManualLeaveBalance(input: {
         ok: false,
       };
     }
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await client.person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, client);
     }
-    return await createOrUpdateManualBalance(parsed.data, scoped);
-  } catch {
-    return {
-      error: {
-        code: "unknown_error",
-        message: "Failed to save manual leave balance.",
-      },
-      ok: false,
-    };
-  }
+    return await createOrUpdateManualBalance(parsed.data, scoped, client);
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 async function createOrUpdateManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   scoped: {
     clerk_org_id: ClerkOrgId;
     organisation_id: OrganisationId;
-  }
+  },
+  db: TenantDb
 ): Promise<
   Result<
     {
@@ -160,33 +166,29 @@ async function createOrUpdateManualBalance(
     ManualBalanceServiceError
   >
 > {
-  const existing = await findManualBalance(input, scoped);
+  const existing = await findManualBalance(input, scoped, db);
   if (existing) {
-    return await updateManualBalance(input, scoped, existing.id);
+    return updateManualBalance(input, scoped, existing.id, db);
   }
-  try {
-    const created = await tenantDatabase(input.clerkOrgId).leaveBalance.create({
-      data: {
-        ...scoped,
-        ...manualBalanceData(input),
-        leave_type_xero_id: input.leaveTypeXeroId,
-        person_id: input.personId,
-        xero_connection_id: null,
-      },
-      select: { id: true },
-    });
-    await auditManualBalance(input, created.id);
-    return { ok: true, value: created };
-  } catch (error) {
-    if (!isUniqueConflict(error)) {
-      throw error;
-    }
-    const conflicting = await findManualBalance(input, scoped);
-    if (!conflicting) {
-      throw error;
-    }
-    return await updateManualBalance(input, scoped, conflicting.id);
+  const inserted = await db.leaveBalance.createMany({
+    data: {
+      ...scoped,
+      ...manualBalanceData(input),
+      leave_type_xero_id: input.leaveTypeXeroId,
+      person_id: input.personId,
+      xero_connection_id: null,
+    },
+    skipDuplicates: true,
+  });
+  const balance = await findManualBalance(input, scoped, db);
+  if (!balance) {
+    throw new Error("Manual balance was not available after insertion.");
   }
+  if (inserted.count === 0) {
+    return updateManualBalance(input, scoped, balance.id, db);
+  }
+  await auditManualBalance(input, balance.id, db);
+  return { ok: true, value: { id: balance.id } };
 }
 async function updateManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
@@ -194,7 +196,8 @@ async function updateManualBalance(
     clerk_org_id: ClerkOrgId;
     organisation_id: OrganisationId;
   },
-  balanceId: string
+  balanceId: string,
+  db: TenantDb
 ): Promise<
   Result<
     {
@@ -203,14 +206,14 @@ async function updateManualBalance(
     ManualBalanceServiceError
   >
 > {
-  await tenantDatabase(input.clerkOrgId).leaveBalance.updateMany({
+  await db.leaveBalance.updateMany({
     data: {
       ...manualBalanceData(input),
       updated_at: new Date(),
     },
     where: { ...scoped, id: balanceId },
   });
-  await auditManualBalance(input, balanceId);
+  await auditManualBalance(input, balanceId, db);
   return { ok: true, value: { id: balanceId } };
 }
 function manualBalanceData(input: z.infer<typeof ManualBalanceSchema>) {
@@ -225,14 +228,15 @@ function manualBalanceData(input: z.infer<typeof ManualBalanceSchema>) {
     source_payload_json: Prisma.DbNull,
   };
 }
-function findManualBalance(
+async function findManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   scoped: {
     clerk_org_id: ClerkOrgId;
     organisation_id: OrganisationId;
-  }
+  },
+  db: TenantDb
 ) {
-  return tenantDatabase(input.clerkOrgId).leaveBalance.findFirst({
+  return await db.leaveBalance.findFirst({
     select: { id: true },
     where: {
       ...scoped,
@@ -244,9 +248,10 @@ function findManualBalance(
 }
 async function auditManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
-  balanceId: string
+  balanceId: string,
+  db: TenantDb
 ) {
-  await tenantDatabase(input.clerkOrgId).auditEvent.create({
+  await db.auditEvent.create({
     data: {
       action: "leave_balances.manual_balance_saved",
       actor_user_id: input.actingUserId,
@@ -263,14 +268,17 @@ async function auditManualBalance(
     },
   });
 }
-async function personNotFound(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-}): Promise<Result<never, ManualBalanceServiceError>> {
-  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
+async function personNotFound(
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<Result<never, ManualBalanceServiceError>> {
+  const exists = await db.person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.personId },
+    where: { clerk_org_id: input.clerkOrgId, id: input.personId },
   });
   if (
     exists &&
@@ -288,12 +296,6 @@ async function personNotFound(input: {
     error: { code: "person_not_found", message: "Person not found." },
     ok: false,
   };
-}
-function isUniqueConflict(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2002"
-  );
 }
 function validationError(
   error: z.ZodError

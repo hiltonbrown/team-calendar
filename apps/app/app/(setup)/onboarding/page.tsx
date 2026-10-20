@@ -1,6 +1,7 @@
 import { auth, currentUser } from "@repo/auth/server";
 import { isOnboardingAdmin, loadWizardSnapshot } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { type TenantDb, withTenantDb } from "@repo/database";
 import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { ChevronLeftIcon } from "lucide-react";
@@ -13,7 +14,7 @@ import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { withOrg } from "@/lib/navigation/org-url";
 import { ensureDefaultOrganisation } from "@/lib/server/ensure-default-organisation";
 import { loadOnboardingPeople } from "@/lib/server/load-onboarding-people";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { DetailsStep } from "./steps/details-step";
 import { FinishStep } from "./steps/finish-step";
 import { InviteStep } from "./steps/invite-step";
@@ -52,51 +53,62 @@ const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
   if (!(orgId && user && isOnboardingAdmin(orgRole))) {
     redirect("/");
   }
-  let requestedOrganisationId = first(params.org) ?? undefined;
-  if (!requestedOrganisationId) {
-    const companies = await resolveAccountCompanies(orgId);
-    if (companies.length === 0) {
-      // First-run onboarding explicitly provisions the account's initial company.
-      const initial = await ensureDefaultOrganisation(orgId as ClerkOrgId);
-      requestedOrganisationId = initial.organisationId;
-    }
+  const clerkOrgId = orgId as ClerkOrgId;
+  const requestedOrganisationId = first(params.org) ?? undefined;
+  let prepared = await withTenantDb(clerkOrgId, (db) =>
+    prepareOnboardingPage(
+      clerkOrgId,
+      user.id,
+      orgRole,
+      requestedOrganisationId,
+      params,
+      db
+    )
+  );
+  if (prepared.kind === "provision") {
+    // First-run company provisioning has Clerk and database phases, outside the page read scope.
+    const initial = await ensureDefaultOrganisation(clerkOrgId);
+    prepared = await withTenantDb(clerkOrgId, (db) =>
+      prepareOnboardingPage(
+        clerkOrgId,
+        user.id,
+        orgRole,
+        initial.organisationId,
+        params,
+        db
+      )
+    );
   }
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(requestedOrganisationId);
-  const actor = {
-    actingRole: orgRole,
-    clerkOrgId,
-    organisationId,
-    userId: user.id,
-  };
-  const snapshot = await loadWizardSnapshot(actor);
-  if (!snapshot.ok) {
+  if (prepared.kind === "provision") {
+    throw new Error("Initial company could not be prepared.");
+  }
+  if (prepared.kind === "error") {
     return (
       <SetupColumn>
         <FetchErrorState entityName="setup progress" />
       </SetupColumn>
     );
   }
-  if (snapshot.value.completed) {
-    redirect(withOrg("/calendar", orgQueryValue));
-  }
-
-  const storedStep = snapshot.value.step;
-  // Earlier steps can be revisited with Back; later steps cannot be skipped to.
-  const requested = STEPS.find((item) => item.id === first(params.step));
-  const viewStep =
-    requested && stepIndex(requested.id) < stepIndex(storedStep)
-      ? requested.id
-      : storedStep;
+  const {
+    organisationId,
+    orgQueryValue,
+    snapshot,
+    storedStep,
+    viewStep,
+    organisation,
+    people,
+  } = prepared;
   const doneHref = withOrg("/onboarding", orgQueryValue);
   const previous = STEPS[stepIndex(viewStep) - 1];
-  const content = await stepContent({
+  const content = stepContent({
     clerkOrgId,
     doneHref,
+    organisation,
     organisationId,
     orgQueryValue,
     params,
-    snapshot: snapshot.value,
+    people,
+    snapshot,
     userId: user.id,
     viewStep,
   });
@@ -125,7 +137,65 @@ const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
   );
 };
 
-async function stepContent(props: {
+async function prepareOnboardingPage(
+  clerkOrgId: ClerkOrgId,
+  userId: string,
+  orgRole: string | null | undefined,
+  requestedOrganisationId: string | undefined,
+  params: Record<string, string | string[] | undefined>,
+  db: TenantDb
+) {
+  let selectedOrganisationId = requestedOrganisationId;
+  if (!selectedOrganisationId) {
+    const companies = await resolveAccountCompanies(clerkOrgId, db);
+    if (!companies.length) {
+      return { kind: "provision" as const };
+    }
+    selectedOrganisationId = companies[0]?.id;
+  }
+  const { organisationId, orgQueryValue } = await resolveActiveOrgPageContext(
+    clerkOrgId,
+    selectedOrganisationId,
+    db
+  );
+  const result = await loadWizardSnapshot(
+    { actingRole: orgRole, clerkOrgId, organisationId, userId },
+    db
+  );
+  if (!result.ok) {
+    return { kind: "error" as const, message: result.error.message };
+  }
+  const { value: snapshot } = result;
+  if (snapshot.completed) {
+    redirect(withOrg("/calendar", orgQueryValue));
+  }
+  const { step: storedStep } = snapshot;
+  const requested = STEPS.find((item) => item.id === first(params.step));
+  const viewStep =
+    requested && stepIndex(requested.id) < stepIndex(storedStep)
+      ? requested.id
+      : storedStep;
+  const organisation =
+    viewStep === "details"
+      ? await getOrganisationById(clerkOrgId, organisationId, db)
+      : null;
+  const people =
+    viewStep === "people" || viewStep === "invites"
+      ? await loadOnboardingPeople({ clerkOrgId, organisationId, userId }, db)
+      : null;
+  return {
+    kind: "ready" as const,
+    organisation,
+    organisationId,
+    orgQueryValue,
+    people,
+    snapshot,
+    storedStep,
+    viewStep,
+  };
+}
+
+function stepContent(props: {
   clerkOrgId: ClerkOrgId;
   doneHref: string;
   orgQueryValue: string | null;
@@ -137,19 +207,18 @@ async function stepContent(props: {
   >["value"];
   userId: string;
   viewStep: StepId;
+  organisation: Awaited<ReturnType<typeof getOrganisationById>> | null;
+  people: Awaited<ReturnType<typeof loadOnboardingPeople>> | null;
 }) {
   const { snapshot } = props;
   if (props.viewStep === "details") {
-    const organisation = await getOrganisationById(
-      props.clerkOrgId,
-      props.organisationId
-    );
+    const { organisation } = props;
     return (
       <DetailsStep
         doneHref={props.doneHref}
-        name={organisation.ok ? organisation.value.name : ""}
+        name={organisation?.ok ? organisation.value.name : ""}
         organisationId={props.organisationId}
-        timezone={organisation.ok ? organisation.value.timezone : null}
+        timezone={organisation?.ok ? organisation.value.timezone : null}
       />
     );
   }
@@ -176,11 +245,10 @@ async function stepContent(props: {
       />
     );
   }
-  const people = await loadOnboardingPeople({
-    clerkOrgId: props.clerkOrgId,
-    organisationId: props.organisationId,
-    userId: props.userId,
-  });
+  const { people } = props;
+  if (!people) {
+    return <FetchErrorState entityName="people" />;
+  }
   if (props.viewStep === "people") {
     return (
       <PeopleStep

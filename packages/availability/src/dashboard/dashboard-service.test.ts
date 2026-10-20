@@ -1,5 +1,8 @@
 import { addDaysToDateKey, zonedStartOfDay } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 import type {
   CalendarDay,
   CalendarEvent,
@@ -27,34 +30,40 @@ const mocks = vi.hoisted(() => ({
   resolvePublicHolidays: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
+  resolveAccountCompanies: async () => [
+    {
+      country_code: "AU",
+      id: "00000000-0000-4000-8000-000000000001",
+      name: "Acme Org",
+      timezone: "Australia/Brisbane",
+    },
+  ],
+}));
+function buildTestDatabase() {
+  // Only the delegates consumed by this area are implemented; transaction ownership is real.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       organisation: { findFirst: mocks.organisationFindFirst },
       person: {
         count: mocks.personCount,
         findFirst: mocks.personFindFirst,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        organisation: { findFirst: mocks.organisationFindFirst },
-        person: {
-          count: mocks.personCount,
-          findFirst: mocks.personFindFirst,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("@repo/notifications", () => ({
   listForUser: mocks.listForUser,
 }));
@@ -63,6 +72,10 @@ vi.mock("../approvals/approval-service", () => ({
 }));
 vi.mock("../calendar/calendar-service", () => ({
   getCalendarRange: mocks.getCalendarRange,
+  selectCalendarCompanies: (_input: unknown, companies: unknown[]) => ({
+    ok: true,
+    value: companies,
+  }),
 }));
 vi.mock("../duration/working-days", () => ({
   computeWorkingDaysFromReferenceData:
@@ -82,8 +95,8 @@ vi.mock("../plans/plan-service", () => ({
 vi.mock("../settings/manager-scope", () => ({
   managerScopePersonIds: mocks.managerScopePersonIds,
 }));
-vi.mock("../settings/organisation-settings-service", () => ({
-  getSettings: mocks.getSettings,
+vi.mock("../settings/account-approval-settings-service", () => ({
+  getAccountApprovalSettings: mocks.getSettings,
 }));
 vi.mock("../team-coverage/load-manager-coverage", () => ({
   loadManagerCoverage: mocks.loadManagerCoverage,
@@ -114,6 +127,8 @@ const baseInput = {
 function buildPerson(overrides: Partial<CalendarPerson> = {}): CalendarPerson {
   return {
     avatarUrl: null,
+    companyId: baseInput.organisationId,
+    companyName: "Acme Org",
     displayName: "Ava Nguyen",
     firstName: "Ava",
     id: ids.self,
@@ -134,6 +149,8 @@ function buildEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     allDay: true,
     approvalStatus: "approved",
     avatarUrl: null,
+    companyId: baseInput.organisationId,
+    companyName: "Acme Org",
     contactabilityStatus: null,
     displayName: "Ava Nguyen",
     endsAt: zonedStartOfDay("2026-10-07", TIMEZONE),
@@ -227,8 +244,11 @@ function buildApprovalItem(
     endsAt: new Date("2026-10-20T23:59:59.999Z"),
     failedAction: null,
     id: "approval_1",
+    organisationId: baseInput.organisationId,
+    organisationName: "All companies",
     person: { firstName: "Luca", lastName: "Brown" },
     recordType: "annual_leave",
+    requireDeclineReason: true,
     sourceType: "team_calendar_leave",
     startsAt: new Date("2026-10-19T00:00:00.000Z"),
     submittedAt: new Date("2026-10-01T08:00:00.000Z"),
@@ -331,8 +351,11 @@ describe("dashboard-service", () => {
     });
     mocks.listForApprover.mockResolvedValue({
       ok: true,
-      value: [buildApprovalItem()],
+      value: { items: [buildApprovalItem()], nextCursor: null },
     });
+    mocks.personCount.mockImplementation(async ({ where }) =>
+      where.manager_person_id ? 0 : 48
+    );
     mocks.getCalendarRange.mockResolvedValue({
       ok: true,
       value: buildWeekRange(),
@@ -359,34 +382,49 @@ describe("dashboard-service", () => {
     }) => {
       mocks.personFindFirst.mockResolvedValue(person);
       mocks.personCount.mockResolvedValue(directReportCount);
-      const result = await resolveDashboardRole({
-        clerkOrgId: baseInput.clerkOrgId,
-        organisationId: baseInput.organisationId,
-        orgRole,
-        userId: baseInput.userId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          clerkOrgId: baseInput.clerkOrgId,
+          organisationId: baseInput.organisationId,
+          orgRole,
+          userId: baseInput.userId,
+        }),
+        (db) =>
+          resolveDashboardRole(
+            {
+              clerkOrgId: baseInput.clerkOrgId,
+              organisationId: baseInput.organisationId,
+              orgRole,
+              userId: baseInput.userId,
+            },
+            db
+          )
+      );
       expect(result).toEqual({ ok: true, value: expectedRole });
     }
   );
 
   describe("employee view", () => {
-    it("loads a self-only timeline for the requested week", async () => {
+    it("loads the approved account timeline for the requested week", async () => {
       const weekAnchor = new Date("2026-10-12T00:00:00.000Z");
-      const result = await getEmployeeView({ ...baseInput, weekAnchor });
+      const result = await withTestTenantResult(
+        tenantTestAccount({ ...baseInput, weekAnchor }),
+        (db) => getEmployeeView({ ...baseInput, weekAnchor }, undefined, db)
+      );
       expect(calendarCalls()).toEqual([
         {
           actingPersonId: ids.self,
           actingUserId: baseInput.userId,
           anchorDate: weekAnchor,
           clerkOrgId: baseInput.clerkOrgId,
+          companyIds: undefined,
           filters: {
             approvalStatus: ["approved"],
             includeDrafts: false,
             recordTypeCategory: "all",
           },
-          organisationId: baseInput.organisationId,
           role: "viewer",
-          scope: { type: "my_self" },
+          scope: { type: "all_teams" },
           view: "week",
         },
       ]);
@@ -406,14 +444,19 @@ describe("dashboard-service", () => {
     });
 
     it("defaults the timeline week to today", async () => {
-      await getEmployeeView(baseInput);
+      await withTestTenantResult(tenantTestAccount(baseInput), (db) =>
+        getEmployeeView(baseInput, undefined, db)
+      );
       expect(calendarCalls()).toEqual([
         expect.objectContaining({ anchorDate: NOW }),
       ]);
     });
 
     it("keeps only the sections the employee dashboard renders", async () => {
-      const result = await getEmployeeView(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
       if (!result.ok) {
         throw new Error("Expected an employee view");
       }
@@ -454,7 +497,10 @@ describe("dashboard-service", () => {
         error: { code: "state_unavailable" },
         ok: false,
       });
-      const result = await getEmployeeView(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
       expect(result.ok && result.value.balances).toMatchObject({
         data: { xeroConnectionState: "unavailable" },
         status: "ready",
@@ -506,17 +552,23 @@ describe("dashboard-service", () => {
         error: { code: "location_not_found", message: "Missing" },
         ok: false,
       });
-      const result = await getEmployeeView(baseInput);
-      expect(mocks.listMyRecords).toHaveBeenCalledWith({
-        clerkOrgId: baseInput.clerkOrgId,
-        filters: {
-          approvalStatus: ["submitted", "approved", "declined"],
-          dateRange: { from: new Date("2026-10-09T00:00:00.000Z") },
-          includeArchived: false,
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
+      expect(mocks.listMyRecords).toHaveBeenCalledWith(
+        {
+          clerkOrgId: baseInput.clerkOrgId,
+          filters: {
+            approvalStatus: ["submitted", "approved", "declined"],
+            dateRange: { from: new Date("2026-10-09T00:00:00.000Z") },
+            includeArchived: false,
+          },
+          organisationId: baseInput.organisationId,
+          userId: baseInput.userId,
         },
-        organisationId: baseInput.organisationId,
-        userId: baseInput.userId,
-      });
+        expect.any(Object)
+      );
       if (!(result.ok && result.value.myRequests.status === "ready")) {
         throw new Error("Expected ready requests");
       }
@@ -564,7 +616,10 @@ describe("dashboard-service", () => {
         error: { code: "unknown_error", message: "Notifications unavailable" },
         ok: false,
       });
-      const result = await getEmployeeView(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
       expect(result).toMatchObject({
         ok: true,
         value: {
@@ -584,9 +639,11 @@ describe("dashboard-service", () => {
       const cache = createDashboardCache();
       const first = new Date("2026-10-12T00:00:00.000Z");
       const second = new Date("2026-10-19T00:00:00.000Z");
-      await getEmployeeView({ ...baseInput, weekAnchor: first }, cache);
-      await getEmployeeView({ ...baseInput, weekAnchor: first }, cache);
-      await getEmployeeView({ ...baseInput, weekAnchor: second }, cache);
+      await withTenantDb(baseInput.clerkOrgId, async (db) => {
+        await getEmployeeView({ ...baseInput, weekAnchor: first }, cache, db);
+        await getEmployeeView({ ...baseInput, weekAnchor: first }, cache, db);
+        await getEmployeeView({ ...baseInput, weekAnchor: second }, cache, db);
+      });
       expect(calendarCalls().map((call) => call.anchorDate)).toEqual([
         first,
         second,
@@ -611,27 +668,33 @@ describe("dashboard-service", () => {
       );
       mocks.listForApprover.mockResolvedValue({
         ok: true,
-        value: [
-          buildApprovalItem({
-            id: "approval_new",
-            submittedAt: new Date("2026-10-08T08:00:00.000Z"),
-          }),
-          ...Array.from({ length: 5 }, (_, index) =>
+        value: {
+          items: [
             buildApprovalItem({
-              id: `approval_old_${index}`,
-              submittedAt: new Date(`2026-10-0${index + 1}T08:00:00.000Z`),
-            })
-          ),
-        ],
+              id: "approval_new",
+              submittedAt: new Date("2026-10-08T08:00:00.000Z"),
+            }),
+            ...Array.from({ length: 5 }, (_, index) =>
+              buildApprovalItem({
+                id: `approval_old_${index}`,
+                submittedAt: new Date(`2026-10-0${index + 1}T08:00:00.000Z`),
+              })
+            ),
+          ],
+          nextCursor: null,
+        },
       });
-      const result = await getManagerView({ ...managerInput, weekAnchor });
+      const result = await withTestTenantResult(
+        tenantTestAccount({ ...managerInput, weekAnchor }),
+        (db) => getManagerView({ ...managerInput, weekAnchor }, undefined, db)
+      );
       expect(calendarCalls()).toHaveLength(3);
       for (const call of calendarCalls()) {
         expect(call).toMatchObject({
           actingPersonId: ids.self,
           filters: { approvalStatus: ["approved"] },
           role: "manager",
-          scope: { type: "my_team" },
+          scope: { type: "all_teams" },
           view: "week",
         });
       }
@@ -642,19 +705,22 @@ describe("dashboard-service", () => {
           weekAnchor,
         ])
       );
-      expect(mocks.loadManagerCoverage).toHaveBeenCalledWith({
-        clerkOrgId: baseInput.clerkOrgId,
-        organisationId: baseInput.organisationId,
-        ranges: [currentWeek, expect.objectContaining({ view: "week" })],
-        today: NOW,
-      });
+      expect(mocks.loadManagerCoverage).toHaveBeenCalledWith(
+        {
+          clerkOrgId: baseInput.clerkOrgId,
+          organisationId: baseInput.organisationId,
+          ranges: [currentWeek, expect.objectContaining({ view: "week" })],
+          today: NOW,
+        },
+        expect.any(Object)
+      );
       expect(mocks.listForApprover).toHaveBeenCalledWith(
         expect.objectContaining({
           clerkOrgId: baseInput.clerkOrgId,
           filters: { status: ["submitted"] },
-          organisationId: baseInput.organisationId,
           role: "manager",
-        })
+        }),
+        expect.any(Object)
       );
       if (!result.ok) {
         throw new Error("Expected a manager view");
@@ -701,7 +767,9 @@ describe("dashboard-service", () => {
     });
 
     it("reuses the current week for the timeline when no week is requested", async () => {
-      await getManagerView(managerInput);
+      await withTestTenantResult(tenantTestAccount(managerInput), (db) =>
+        getManagerView(managerInput, undefined, db)
+      );
       expect(calendarCalls()).toHaveLength(2);
     });
 
@@ -719,7 +787,10 @@ describe("dashboard-service", () => {
         ok: true,
         value: buildWeekRange({ events: [], people: people.reverse() }),
       });
-      const result = await getManagerView(managerInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(managerInput),
+        (db) => getManagerView(managerInput, undefined, db)
+      );
       if (!(result.ok && result.value.timeline.status === "ready")) {
         throw new Error("Expected a ready timeline");
       }
@@ -733,7 +804,10 @@ describe("dashboard-service", () => {
         ok: true,
         value: { managerVisibilityScope: "all_team_leave" },
       });
-      const result = await getManagerView(managerInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(managerInput),
+        (db) => getManagerView(managerInput, undefined, db)
+      );
       expect(result.ok && result.value.header.scopeLabel).toBe(
         "1 team members (direct + indirect)"
       );
@@ -748,7 +822,10 @@ describe("dashboard-service", () => {
         error: { code: "unknown_error", message: "Approvals unavailable" },
         ok: false,
       });
-      const result = await getManagerView(managerInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(managerInput),
+        (db) => getManagerView(managerInput, undefined, db)
+      );
       expect(result).toMatchObject({
         ok: true,
         value: {
@@ -764,7 +841,10 @@ describe("dashboard-service", () => {
         error: { code: "unknown_error", message: "Calendar unavailable" },
         ok: false,
       });
-      const result = await getManagerView(managerInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(managerInput),
+        (db) => getManagerView(managerInput, undefined, db)
+      );
       expect(mocks.loadManagerCoverage).not.toHaveBeenCalled();
       expect(result).toMatchObject({
         ok: true,
@@ -794,7 +874,10 @@ describe("dashboard-service", () => {
             ],
           }),
         });
-        const result = await getAdminView({ ...baseInput, actingRole });
+        const result = await withTestTenantResult(
+          tenantTestAccount({ ...baseInput, actingRole }),
+          (db) => getAdminView({ ...baseInput, actingRole }, undefined, db)
+        );
         expect(calendarCalls()).toEqual([
           expect.objectContaining({
             anchorDate: NOW,
@@ -807,7 +890,8 @@ describe("dashboard-service", () => {
           expect.objectContaining({
             filters: { status: ["submitted"] },
             role: actingRole,
-          })
+          }),
+          expect.any(Object)
         );
         if (!result.ok) {
           throw new Error("Expected an admin view");
@@ -821,7 +905,7 @@ describe("dashboard-service", () => {
           "timeline",
         ]);
         expect(result.value.header).toMatchObject({
-          organisationName: "Acme Org",
+          organisationName: "All companies",
           roleLabel,
           totalActivePeopleCount: 48,
         });
@@ -869,7 +953,10 @@ describe("dashboard-service", () => {
           resolvedHoliday({ date: "2026-04-25", name: "ANZAC Day" }),
         ],
       });
-      const result = await getEmployeeView(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -885,16 +972,23 @@ describe("dashboard-service", () => {
         },
         status: "ready",
       });
-      expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
-        clerkOrgId: baseInput.clerkOrgId,
-        from: "2026-04-20",
-        organisationId: baseInput.organisationId,
-        to: "2027-05-25",
-      });
+      expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
+        {
+          clerkOrgId: baseInput.clerkOrgId,
+          from: "2026-04-20",
+          organisationId: baseInput.organisationId,
+          to: "2027-05-25",
+        },
+        undefined,
+        expect.any(Object)
+      );
     });
 
     it("returns no holiday when none applies", async () => {
-      const result = await getEmployeeView(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
       expect(result.ok && result.value.publicHolidays).toEqual({
         data: { daysUntil: null, next: null },
         status: "ready",
@@ -909,12 +1003,29 @@ describe("dashboard-service", () => {
         },
         ok: false,
       });
-      const result = await getEmployeeView(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => getEmployeeView(baseInput, undefined, db)
+      );
       expect(result.ok && result.value.publicHolidays).toEqual({
         message: "Failed to resolve public holidays",
         status: "error",
       });
     });
+  });
+
+  it("does not reuse a dashboard snapshot across transaction roots", async () => {
+    const cache = createDashboardCache();
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => getEmployeeView(baseInput, cache, db)
+    );
+    const second = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => getEmployeeView(baseInput, cache, db)
+    );
+    expect(first.ok && second.ok).toBe(true);
+    expect(mocks.getCalendarRange).toHaveBeenCalledTimes(2);
   });
 });
 

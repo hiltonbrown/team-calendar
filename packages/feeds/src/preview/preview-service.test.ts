@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult as withTestTenantResult,
+} from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   canViewFeed: vi.fn(),
@@ -10,21 +15,47 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: vi.fn(
+      async (executeTransaction: (client: unknown) => Promise<unknown>) => {
+        if (!tenantTestState.client) {
+          throw new Error("Missing feed fixture delegates");
+        }
+        return await executeTransaction({
+          $executeRaw: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => []),
+          ...tenantTestState.client,
+        });
+      }
+    ),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     feed: {
       findFirst: mocks.feedFindFirst,
     },
     person: { findFirst: mocks.personFindFirst },
   };
+  tenantTestState.client = client;
   return {
+    getAccountSettings: async () => ({
+      manager_visibility_scope: "direct_reports_only",
+    }),
+    resolveAccountCompanies: async () => [
+      { id: baseInput.organisationId, name: "Company A" },
+    ],
     scopedTo: (input: { clerkOrgId: string; organisationId: string }) => ({
       clerk_org_id: input.clerkOrgId,
       organisation_id: input.organisationId,
     }),
-    TENANT_READ_TRANSACTION_OPTIONS: { maxWait: 10_000, timeout: 30_000 },
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+      "../../../database/src/tenant-db"
+    )),
   };
 });
 
@@ -98,11 +129,22 @@ describe("previewFeed", () => {
       mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
       mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
-      const result = await previewFeed({
-        ...baseInput,
-        actingPersonId,
-        actingRole,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          actingPersonId,
+          actingRole,
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              actingPersonId,
+              actingRole,
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(true);
       expect(mocks.personFindFirst).toHaveBeenCalledWith({
         select: { id: true },
@@ -115,10 +157,12 @@ describe("previewFeed", () => {
         },
       });
       expect(mocks.canViewFeed).toHaveBeenCalledWith(
-        expect.objectContaining({ actingPersonId: validPersonId })
+        expect.objectContaining({ actingPersonId: validPersonId }),
+        expect.any(Object)
       );
       expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
-        expect.objectContaining({ actingPersonId: validPersonId })
+        expect.objectContaining({ actingPersonId: validPersonId }),
+        expect.any(Object)
       );
     }
   );
@@ -129,11 +173,22 @@ describe("previewFeed", () => {
       mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
       mocks.personFindFirst.mockResolvedValueOnce(null);
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: false });
-      const result = await previewFeed({
-        ...baseInput,
-        actingPersonId: undefined,
-        actingRole,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          actingPersonId: undefined,
+          actingRole,
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              actingPersonId: undefined,
+              actingRole,
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(false);
       expect(mocks.personFindFirst).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -146,7 +201,8 @@ describe("previewFeed", () => {
         })
       );
       expect(mocks.canViewFeed).toHaveBeenCalledWith(
-        expect.objectContaining({ actingPersonId: null })
+        expect.objectContaining({ actingPersonId: null }),
+        expect.any(Object)
       );
       expect(mocks.projectFeedEvents).not.toHaveBeenCalled();
     }
@@ -160,19 +216,25 @@ describe("previewFeed", () => {
       value: [sampleEvent],
     });
 
-    const result = await previewFeed(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => previewFeed(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
 
     expect(result).toEqual({ ok: true, value: [sampleEvent] });
-    const { tenantTransaction } = await import("@repo/database");
-    expect(tenantTransaction).toHaveBeenCalledExactlyOnceWith(
-      baseInput.clerkOrgId,
+    const { referenceDatabase } = await import(
+      "../../../database/src/tenant-client"
+    );
+    expect(referenceDatabase.$transaction).toHaveBeenCalledExactlyOnceWith(
       expect.any(Function),
       { maxWait: 10_000, timeout: 30_000 }
     );
-    const visibilityClient = mocks.canViewFeed.mock.calls[0]?.[0].client;
+    const visibilityClient = mocks.canViewFeed.mock.calls[0]?.[1];
     expect(visibilityClient).toBeDefined();
     expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
-      expect.objectContaining({ client: visibilityClient })
+      expect.objectContaining({ clerkOrgId: validClerkOrgId }),
+      visibilityClient
     );
   });
 
@@ -181,7 +243,9 @@ describe("previewFeed", () => {
     mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
     mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
 
-    await previewFeed(baseInput);
+    await withTestTenantResult(tenantTestAccount(baseInput), (db) =>
+      previewFeed(baseInput, db)
+    );
 
     expect(mocks.feedFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -205,17 +269,29 @@ describe("previewFeed", () => {
         mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
         mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
 
-        const result = await previewFeed({
-          ...baseInput,
-          actingRole: "org:admin",
-          privacyMode,
-        });
+        const result = await withTestTenantResult(
+          tenantTestAccount({
+            ...baseInput,
+            actingRole: "org:admin",
+            privacyMode,
+          }),
+          (db) =>
+            previewFeed(
+              {
+                ...baseInput,
+                actingRole: "org:admin",
+                privacyMode,
+              },
+              db
+            )
+        );
 
         expect(result.ok).toBe(true);
         expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
           expect.objectContaining({
             privacyMode,
-          })
+          }),
+          expect.any(Object)
         );
       }
     );
@@ -228,16 +304,27 @@ describe("previewFeed", () => {
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
       mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
 
-      const result = await previewFeed({
-        ...baseInput,
-        privacyMode: undefined,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          privacyMode: undefined,
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              privacyMode: undefined,
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
         expect.objectContaining({
           privacyMode: "masked",
-        })
+        }),
+        expect.any(Object)
       );
     });
 
@@ -247,11 +334,22 @@ describe("previewFeed", () => {
         privacy_mode: "masked",
       });
 
-      const result = await previewFeed({
-        ...baseInput,
-        actingRole: "org:viewer",
-        privacyMode: "named",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          actingRole: "org:viewer",
+          privacyMode: "named",
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              actingRole: "org:viewer",
+              privacyMode: "named",
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -273,12 +371,24 @@ describe("previewFeed", () => {
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
       mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
 
-      const result = await previewFeed({
-        ...baseInput,
-        actingRole: "org:viewer",
-        actingUserId: "user_owner",
-        privacyMode: "named",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          actingRole: "org:viewer",
+          actingUserId: "user_owner",
+          privacyMode: "named",
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              actingRole: "org:viewer",
+              actingUserId: "user_owner",
+              privacyMode: "named",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
     });
@@ -291,11 +401,22 @@ describe("previewFeed", () => {
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
       mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
 
-      const result = await previewFeed({
-        ...baseInput,
-        actingRole: "org:viewer",
-        privacyMode: "masked",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          actingRole: "org:viewer",
+          privacyMode: "masked",
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              actingRole: "org:viewer",
+              privacyMode: "masked",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
     });
@@ -303,10 +424,20 @@ describe("previewFeed", () => {
 
   describe("PreviewServiceError variants", () => {
     it("returns validation_error for invalid input schema", async () => {
-      const result = await previewFeed({
-        ...baseInput,
-        feedId: "invalid-uuid",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          feedId: "invalid-uuid",
+        }),
+        (db) =>
+          previewFeed(
+            {
+              ...baseInput,
+              feedId: "invalid-uuid",
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -322,7 +453,10 @@ describe("previewFeed", () => {
         .mockResolvedValueOnce(null) // feed lookup
         .mockResolvedValueOnce(null); // feedNotFoundOrLeak lookup
 
-      const result = await previewFeed(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => previewFeed(baseInput, db)
+      );
 
       expect(result).toEqual({
         error: {
@@ -341,7 +475,10 @@ describe("previewFeed", () => {
           organisation_id: validOrgId,
         }); // lookup by id only
 
-      const result = await previewFeed(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => previewFeed(baseInput, db)
+      );
 
       expect(result).toEqual({
         error: {
@@ -356,7 +493,10 @@ describe("previewFeed", () => {
       mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: false });
 
-      const result = await previewFeed(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => previewFeed(baseInput, db)
+      );
 
       expect(result).toEqual({
         error: {
@@ -370,7 +510,10 @@ describe("previewFeed", () => {
     it("returns unknown_error when unexpected exception is thrown", async () => {
       mocks.feedFindFirst.mockRejectedValueOnce(new Error("DB failure"));
 
-      const result = await previewFeed(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => previewFeed(baseInput, db)
+      );
 
       expect(result).toEqual({
         error: {
@@ -388,7 +531,10 @@ describe("previewFeed", () => {
         ok: false,
       });
 
-      const result = await previewFeed(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => previewFeed(baseInput, db)
+      );
 
       expect(result).toEqual({
         error: { code: "invalid_scope", message: "Invalid scope parameter" },
@@ -402,7 +548,11 @@ describe("previewFeed", () => {
     mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
     mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
 
-    const result = await previewFeed(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => previewFeed(baseInput, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
 
     expect(result).toEqual({ ok: true, value: [] });
   });

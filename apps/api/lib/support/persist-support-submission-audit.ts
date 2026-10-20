@@ -6,8 +6,7 @@ import type {
   Result,
   SupportSubmissionCategory,
 } from "@repo/core";
-import { appError } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { assertTenantDb, type TenantDb } from "@repo/database";
 
 export interface PersistSupportSubmissionAuditInput {
   category: SupportSubmissionCategory;
@@ -23,12 +22,14 @@ export interface PersistSupportSubmissionAuditInput {
 }
 
 export async function persistSupportSubmissionAudit(
-  input: PersistSupportSubmissionAuditInput
+  input: PersistSupportSubmissionAuditInput,
+  db: TenantDb
 ): Promise<Result<void>> {
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (client: TenantDb): Promise<Result<void>> => {
     const issueId = String(input.issueNumber);
 
-    await tenantDatabase(input.clerkOrgId).auditEvent.create({
+    await client.auditEvent.create({
       data: {
         action: "support_submissions.github_issue_created",
         actor_user_id: input.userId,
@@ -54,10 +55,9 @@ export async function persistSupportSubmissionAudit(
       ok: true,
       value: undefined,
     };
-  } catch {
-    return {
-      error: appError("internal", "Failed to persist the support audit event."),
-      ok: false,
-    };
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }

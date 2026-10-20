@@ -1,7 +1,12 @@
 import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import {
+  assertTenantDb,
+  resolveAccountCompanies,
+  scopedQuery,
+  type TenantDb,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
@@ -61,6 +66,8 @@ export interface PeoplePagination {
 export interface PersonListItem {
   archivedAt: Date | null;
   avatarUrl: string | null;
+  companyId: string;
+  companyName: string;
   currentStatus: CurrentStatus;
   email: string;
   firstName: string;
@@ -130,6 +137,8 @@ export interface PersonProfile {
   currentStatus: CurrentStatus;
   fieldOwnership: FieldOwnership;
   header: {
+    companyId: string;
+    companyName: string;
     archivedAt: Date | null;
     avatarUrl: string | null;
     email: string;
@@ -203,8 +212,9 @@ const PaginationSchema = z
 const ListPeopleSchema = z.object({
   actingPersonId: z.string().uuid().nullable().optional(),
   clerkOrgId: z.string().min(1),
+  companyIds: z.array(z.string().uuid()).optional(),
   filters: FiltersSchema,
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().optional(),
   pagination: PaginationSchema,
   role: RoleSchema.default("viewer"),
 });
@@ -225,28 +235,39 @@ const HistorySchema = z.object({
   personId: z.string().uuid(),
   role: RoleSchema,
 });
-export async function canAccessPerson(input: {
-  actingPersonId?: null | string;
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-  role: PeopleRole;
-}): Promise<boolean> {
-  if (input.role === "owner" || input.role === "admin") {
-    return true;
+export async function canAccessPerson(
+  input: {
+    actingPersonId?: null | string;
+    clerkOrgId: string;
+    organisationId: string;
+    personId: string;
+    role: PeopleRole;
+  },
+  db: TenantDb
+): Promise<boolean> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    if (input.role === "owner" || input.role === "admin") {
+      return true;
+    }
+    if (!input.actingPersonId) {
+      return false;
+    }
+    if (input.role === "viewer") {
+      return input.actingPersonId === input.personId;
+    }
+    const visiblePersonIds = await managerScopePersonIds(
+      {
+        actingPersonId: input.actingPersonId,
+        clerkOrgId: input.clerkOrgId,
+      },
+      client
+    );
+    return visiblePersonIds.includes(input.personId);
   }
-  if (!input.actingPersonId) {
-    return false;
-  }
-  if (input.role === "viewer") {
-    return input.actingPersonId === input.personId;
-  }
-  const visiblePersonIds = await managerScopePersonIds({
-    actingPersonId: input.actingPersonId,
-    clerkOrgId: input.clerkOrgId,
-    organisationId: input.organisationId,
-  });
-  return visiblePersonIds.includes(input.personId);
 }
 const UpcomingSchema = z.object({
   clerkOrgId: z.string().min(1),
@@ -254,14 +275,18 @@ const UpcomingSchema = z.object({
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
 });
-export async function listPeople(input: {
-  actingPersonId?: null | string;
-  clerkOrgId: string;
-  filters?: Partial<PeopleFilters>;
-  organisationId: string;
-  pagination?: Partial<PeoplePagination>;
-  role?: PeopleRole;
-}): Promise<
+export async function listPeople(
+  input: {
+    actingPersonId?: null | string;
+    clerkOrgId: string;
+    filters?: Partial<PeopleFilters>;
+    organisationId?: string;
+    companyIds?: string[];
+    pagination?: Partial<PeoplePagination>;
+    role?: PeopleRole;
+  },
+  db: TenantDb
+): Promise<
   Result<
     {
       nextCursor: string | null;
@@ -271,6 +296,7 @@ export async function listPeople(input: {
     PeopleServiceError
   >
 > {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = ListPeopleSchema.safeParse({
     ...input,
     filters: input.filters ?? {},
@@ -279,30 +305,28 @@ export async function listPeople(input: {
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  try {
-    const {
-      actingPersonId,
-      clerkOrgId,
-      organisationId,
-      filters,
-      pagination,
-      role,
-    } = parsed.data;
-    const scoped = scopedQuery(
-      clerkOrgId as ClerkOrgId,
-      organisationId as OrganisationId
-    );
-    if (role === "manager" && !actingPersonId) {
-      return notAuthorised();
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const { clerkOrgId, filters, pagination } = parsed.data;
+    const companies = await resolveAccountCompanies(clerkOrgId, client);
+    const selection = selectDirectoryCompanies(parsed.data, companies);
+    if (!selection.ok) {
+      return selection;
     }
-    const visiblePersonIds =
-      role === "manager" && actingPersonId
-        ? await managerScopePersonIds({
-            actingPersonId,
-            clerkOrgId,
-            organisationId,
-          })
-        : null;
+    const selectedCompanies = selection.value;
+    const scoped = {
+      clerk_org_id: clerkOrgId,
+      organisation_id: {
+        in: selectedCompanies.map((company) => company.id),
+      },
+    };
+    const visibility = await directoryVisibility(parsed.data, client);
+    if (!visibility.ok) {
+      return visibility;
+    }
+    const visiblePersonIds = visibility.value;
     if (visiblePersonIds?.length === 0) {
       return {
         ok: true,
@@ -310,12 +334,15 @@ export async function listPeople(input: {
       };
     }
     const at = new Date();
-    const statusWhere = await buildCurrentStatusWhere({
-      at,
-      clerkOrgId,
-      organisationId,
-      statuses: filters.status ?? [],
-    });
+    const statusWhere = await directoryStatusWhere(
+      {
+        at,
+        clerkOrgId,
+        companies: selectedCompanies,
+        statuses: filters.status ?? [],
+      },
+      client
+    );
     const baseWhere = buildPeopleWhere({
       filters,
       scoped,
@@ -325,7 +352,7 @@ export async function listPeople(input: {
     const personWhere: Prisma.PersonWhereInput = statusWhere
       ? { AND: [baseWhere, statusWhere] }
       : baseWhere;
-    const people = await tenantDatabase(clerkOrgId).person.findMany({
+    const people = await client.person.findMany({
       orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
       select: personListSelect,
       take: pagination.pageSize + 1,
@@ -333,13 +360,11 @@ export async function listPeople(input: {
         ? { AND: [personWhere, peopleCursorWhere(cursor)] }
         : personWhere,
     });
-    const totalCount = await tenantDatabase(clerkOrgId).person.count({
+    const totalCount = await client.person.count({
       where: personWhere,
     });
     const pageRows = people.slice(0, pagination.pageSize);
-    const failedCounts = await tenantDatabase(
-      clerkOrgId
-    ).availabilityRecord.groupBy({
+    const failedCounts = await client.availabilityRecord.groupBy({
       _count: { _all: true },
       by: ["person_id"],
       where: {
@@ -351,26 +376,31 @@ export async function listPeople(input: {
     const failedCountByPersonId = new Map(
       failedCounts.map((row) => [row.person_id, row._count._all])
     );
-    const currentStatusesByPersonId = await computeCurrentStatusForPeople({
-      at,
-      clerkOrgId: scoped.clerk_org_id,
-      organisationId: scoped.organisation_id,
-      people: pageRows.map((person) => ({
-        locationId: person.location_id,
-        personId: person.id,
-      })),
-    });
-    const page = pageRows.map((person) => {
-      const currentStatus = currentStatusesByPersonId.get(person.id);
-      if (!currentStatus) {
-        throw new Error("Current status missing for person list item");
-      }
-      return toPersonListItem(
-        person,
-        currentStatus,
-        failedCountByPersonId.get(person.id) ?? 0
+    const currentStatusesByPersonId = new Map<string, CurrentStatus>();
+    for (const company of selectedCompanies) {
+      const statuses = await computeCurrentStatusForPeople(
+        {
+          at,
+          clerkOrgId,
+          organisationId: company.id,
+          people: pageRows
+            .filter((person) => person.organisation_id === company.id)
+            .map((person) => ({
+              locationId: person.location_id,
+              personId: person.id,
+            })),
+        },
+        client
       );
-    });
+      for (const [personId, status] of statuses) {
+        currentStatusesByPersonId.set(personId, status);
+      }
+    }
+    const page = personDirectoryPage(
+      pageRows,
+      currentStatusesByPersonId,
+      failedCountByPersonId
+    );
     const nextCursor =
       people.length > pagination.pageSize
         ? encodePeopleCursor(page.at(-1))
@@ -383,8 +413,6 @@ export async function listPeople(input: {
         totalCount,
       },
     };
-  } catch {
-    return unknownError("Failed to list people.");
   }
 }
 function buildPeopleWhere({
@@ -394,8 +422,8 @@ function buildPeopleWhere({
 }: {
   filters: PeopleFilters;
   scoped: {
-    clerk_org_id: ClerkOrgId;
-    organisation_id: OrganisationId;
+    clerk_org_id: string;
+    organisation_id: { in: string[] };
   };
   visiblePersonIds: null | string[];
 }): Prisma.PersonWhereInput {
@@ -482,12 +510,15 @@ const LOCAL_RUNGS: Array<{
   { key: "alternative_contact", types: ["alternative_contact"] },
   { key: "other", types: ["other"] },
 ];
-async function buildCurrentStatusWhere(input: {
-  at: Date;
-  clerkOrgId: string;
-  organisationId: string;
-  statuses: CurrentStatusKey[];
-}): Promise<Prisma.PersonWhereInput | null> {
+async function buildCurrentStatusWhere(
+  input: {
+    at: Date;
+    clerkOrgId: string;
+    organisationId: string;
+    statuses: NonNullable<DirectoryInput["filters"]["status"]>;
+  },
+  db: TenantDb
+): Promise<Prisma.PersonWhereInput | null> {
   if (!input.statuses.length) {
     return null;
   }
@@ -508,16 +539,19 @@ async function buildCurrentStatusWhere(input: {
   });
   const approved = active(LEAVE_TYPES, "approved");
   const pending = active(LEAVE_TYPES, "submitted");
-  const locations = await tenantDatabase(input.clerkOrgId).location.findMany({
+  const locations = await db.location.findMany({
     select: { id: true },
     where: scoped,
   });
-  const holidayApplicability = await computePublicHolidayApplicability({
-    at: input.at,
-    clerkOrgId: input.clerkOrgId,
-    locationIds: locations.map(({ id }) => id),
-    organisationId: input.organisationId,
-  });
+  const holidayApplicability = await computePublicHolidayApplicability(
+    {
+      at: input.at,
+      clerkOrgId: input.clerkOrgId,
+      locationIds: locations.map(({ id }) => id),
+      organisationId: input.organisationId,
+    },
+    db
+  );
   const applicableHolidayLocations: Prisma.PersonWhereInput[] = [
     ...(holidayApplicability.locationIds.size
       ? [{ location_id: { in: [...holidayApplicability.locationIds] } }]
@@ -599,32 +633,37 @@ function peopleCursorWhere(cursor: PeopleCursor): Prisma.PersonWhereInput {
     ],
   };
 }
-export async function getPersonProfile(input: {
-  actingPersonId?: null | string;
-  actingUserId: string;
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-  role: PeopleRole;
-}): Promise<Result<PersonProfile, PeopleServiceError>> {
-  const parsed = PersonProfileSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  if (!RoleSchema.safeParse(parsed.data.role).success) {
-    return notAuthorised();
-  }
-  if (!(await canAccessPerson(parsed.data))) {
-    return notAuthorised();
-  }
-  try {
+export async function getPersonProfile(
+  input: {
+    actingPersonId?: null | string;
+    actingUserId: string;
+    clerkOrgId: string;
+    organisationId: string;
+    personId: string;
+    role: PeopleRole;
+  },
+  db: TenantDb
+): Promise<Result<PersonProfile, PeopleServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const parsed = PersonProfileSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
+    if (!RoleSchema.safeParse(parsed.data.role).success) {
+      return notAuthorised();
+    }
+    if (!(await canAccessPerson(parsed.data, client))) {
+      return notAuthorised();
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await client.person.findFirst({
       select: personProfileSelect,
       where: {
         ...scoped,
@@ -632,7 +671,7 @@ export async function getPersonProfile(input: {
       },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, client);
     }
     const [
       currentStatus,
@@ -641,21 +680,27 @@ export async function getPersonProfile(input: {
       xeroSyncFailedCount,
       xeroStateResult,
       alternativeContacts,
-    ] = await Promise.all([
-      computeCurrentStatus({
-        at: new Date(),
-        clerkOrgId: parsed.data.clerkOrgId,
-        locationId: person.location_id,
-        organisationId: parsed.data.organisationId,
-        personId: person.id,
-      }),
-      listUpcomingRecords({
-        clerkOrgId: parsed.data.clerkOrgId,
-        horizonDays: 30,
-        organisationId: parsed.data.organisationId,
-        personId: person.id,
-      }),
-      tenantDatabase(parsed.data.clerkOrgId).leaveBalance.findMany({
+    ] = [
+      await computeCurrentStatus(
+        {
+          at: new Date(),
+          clerkOrgId: parsed.data.clerkOrgId,
+          locationId: person.location_id,
+          organisationId: parsed.data.organisationId,
+          personId: person.id,
+        },
+        client
+      ),
+      await listUpcomingRecords(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          horizonDays: 30,
+          organisationId: parsed.data.organisationId,
+          personId: person.id,
+        },
+        client
+      ),
+      await client.leaveBalance.findMany({
         orderBy: [{ leave_type_name: "asc" }, { leave_type_xero_id: "asc" }],
         select: leaveBalanceProfileSelect,
         where: {
@@ -663,18 +708,21 @@ export async function getPersonProfile(input: {
           person_id: person.id,
         },
       }),
-      tenantDatabase(parsed.data.clerkOrgId).availabilityRecord.count({
+      await client.availabilityRecord.count({
         where: {
           ...scoped,
           approval_status: "xero_sync_failed",
           person_id: person.id,
         },
       }),
-      getXeroConnectionStateForScope({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      }),
-      tenantDatabase(parsed.data.clerkOrgId).alternativeContact.findMany({
+      await getXeroConnectionStateForScope(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        },
+        client
+      ),
+      await client.alternativeContact.findMany({
         orderBy: [{ display_order: "asc" }, { created_at: "asc" }],
         select: alternativeContactSelect,
         where: {
@@ -682,7 +730,7 @@ export async function getPersonProfile(input: {
           person_id: person.id,
         },
       }),
-    ]);
+    ];
     const xeroConnectionState = xeroStateResult.ok
       ? xeroStateResult.value.state
       : "unavailable";
@@ -712,56 +760,25 @@ export async function getPersonProfile(input: {
         fieldOwnership: fieldOwnershipForPerson({
           xeroEmployeeId: person.xero_employee_id,
         }),
-        header: {
-          archivedAt: person.archived_at,
-          avatarUrl: person.avatar_url,
-          email: person.email,
-          firstName: person.first_name,
-          id: person.id,
-          jobTitle: person.job_title,
-          lastName: person.last_name,
-          location: person.location
-            ? {
-                countryCode: person.location.country_code,
-                id: person.location.id,
-                name: person.location.name,
-                regionCode: person.location.region_code,
-                timezone: person.location.timezone,
-              }
-            : null,
-          manager: person.manager
-            ? {
-                firstName: person.manager.first_name,
-                id: person.manager.id,
-                lastName: person.manager.last_name,
-              }
-            : null,
-          personType: effectivePersonType(
-            person.person_type,
-            person.employment_type
-          ),
-          startDate: person.start_date,
-          statusNote: person.status_note,
-          team: person.team,
-          xeroLinked,
-        },
+        header: personProfileHeader(person, xeroLinked),
         upcomingRecords: upcomingResult.ok ? upcomingResult.value.records : [],
         xeroSyncFailedCount,
       },
     };
-  } catch {
-    return unknownError("Failed to load this profile.");
   }
 }
-export async function listHistoryPage(input: {
-  actingPersonId?: null | string;
-  clerkOrgId: string;
-  cursor?: null | string;
-  organisationId: string;
-  pageSize?: number;
-  personId: string;
-  role: PeopleRole;
-}): Promise<
+export async function listHistoryPage(
+  input: {
+    actingPersonId?: null | string;
+    clerkOrgId: string;
+    cursor?: null | string;
+    organisationId: string;
+    pageSize?: number;
+    personId: string;
+    role: PeopleRole;
+  },
+  db: TenantDb
+): Promise<
   Result<
     {
       nextCursor: string | null;
@@ -770,31 +787,31 @@ export async function listHistoryPage(input: {
     PeopleServiceError
   >
 > {
-  const parsed = HistorySchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  if (!(await canAccessPerson(parsed.data))) {
-    return notAuthorised();
-  }
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const parsed = HistorySchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
+    if (!(await canAccessPerson(parsed.data, client))) {
+      return notAuthorised();
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await client.person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, client);
     }
     const cursor = decodeDateCursor(parsed.data.cursor ?? null);
-    const records = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).availabilityRecord.findMany({
+    const records = await client.availabilityRecord.findMany({
       orderBy: [{ starts_at: "desc" }, { id: "desc" }],
       select: availabilityRecordSelect,
       take: parsed.data.pageSize + 1,
@@ -814,16 +831,17 @@ export async function listHistoryPage(input: {
         ? encodeDateCursor(page.at(-1))
         : null;
     return { ok: true, value: { nextCursor, records: page } };
-  } catch {
-    return unknownError("Failed to load history.");
   }
 }
-export async function listUpcomingRecords(input: {
-  clerkOrgId: string;
-  horizonDays?: number;
-  organisationId: string;
-  personId: string;
-}): Promise<
+export async function listUpcomingRecords(
+  input: {
+    clerkOrgId: string;
+    horizonDays?: number;
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<
   Result<
     {
       records: AvailabilityRecordSummary[];
@@ -831,30 +849,30 @@ export async function listUpcomingRecords(input: {
     PeopleServiceError
   >
 > {
-  const parsed = UpcomingSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const parsed = UpcomingSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await client.person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, client);
     }
     const now = new Date();
     const horizonEnd = new Date(now);
     horizonEnd.setUTCDate(horizonEnd.getUTCDate() + parsed.data.horizonDays);
-    const records = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).availabilityRecord.findMany({
+    const records = await client.availabilityRecord.findMany({
       orderBy: [{ starts_at: "asc" }, { id: "asc" }],
       select: availabilityRecordSelect,
       where: {
@@ -872,8 +890,6 @@ export async function listUpcomingRecords(input: {
       ok: true,
       value: { records: records.map(toAvailabilityRecordSummary) },
     };
-  } catch {
-    return unknownError("Failed to load upcoming records.");
   }
 }
 const personListSelect = {
@@ -902,6 +918,8 @@ const personListSelect = {
       last_name: true,
     },
   },
+  organisation: { select: { id: true, name: true } },
+  organisation_id: true,
   person_type: true,
   team: {
     select: {
@@ -970,6 +988,8 @@ export function toBalanceRow(balance: LeaveBalanceProfileRow): BalanceRow {
 }
 function toPersonListItem(
   person: {
+    organisation_id: string;
+    organisation: { name: string };
     archived_at: Date | null;
     avatar_url: string | null;
     email: string;
@@ -1004,6 +1024,8 @@ function toPersonListItem(
   return {
     archivedAt: person.archived_at,
     avatarUrl: person.avatar_url,
+    companyId: person.organisation_id,
+    companyName: person.organisation.name,
     currentStatus,
     email: person.email,
     firstName: person.first_name,
@@ -1167,14 +1189,17 @@ function maxDate(values: Array<Date | null>): Date | null {
     return latest;
   }, null);
 }
-async function personNotFound(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-}): Promise<Result<never, PeopleServiceError>> {
-  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
+async function personNotFound(
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<Result<never, PeopleServiceError>> {
+  const exists = await db.person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.personId },
+    where: { clerk_org_id: input.clerkOrgId, id: input.personId },
   });
   if (
     exists &&
@@ -1214,12 +1239,136 @@ function notAuthorised(): Result<never, PeopleServiceError> {
     ok: false,
   };
 }
-function unknownError(message: string): Result<never, PeopleServiceError> {
+
+type DirectoryInput = z.infer<typeof ListPeopleSchema>;
+type DirectoryCompanies = Awaited<ReturnType<typeof resolveAccountCompanies>>;
+function selectDirectoryCompanies(
+  input: DirectoryInput,
+  companies: DirectoryCompanies
+): Result<DirectoryCompanies, PeopleServiceError> {
+  const ids =
+    input.companyIds ??
+    (input.organisationId ? [input.organisationId] : undefined);
+  if (ids?.some((id) => !companies.some((company) => company.id === id))) {
+    return {
+      error: {
+        code: "validation_error",
+        message: "Company filter is invalid.",
+      },
+      ok: false,
+    };
+  }
   return {
-    error: {
-      code: "unknown_error",
-      message,
-    },
-    ok: false,
+    ok: true,
+    value: ids
+      ? companies.filter((company) => ids.includes(company.id))
+      : companies,
+  };
+}
+async function directoryVisibility(
+  input: DirectoryInput,
+  db: TenantDb
+): Promise<Result<string[] | null, PeopleServiceError>> {
+  if (input.role === "viewer") {
+    return {
+      ok: true,
+      value: input.actingPersonId ? [input.actingPersonId] : [],
+    };
+  }
+  if (input.role !== "manager") {
+    return { ok: true, value: null };
+  }
+  if (!input.actingPersonId) {
+    return notAuthorised();
+  }
+  const value = await managerScopePersonIds(
+    { actingPersonId: input.actingPersonId, clerkOrgId: input.clerkOrgId },
+    db
+  );
+  return { ok: true, value };
+}
+async function directoryStatusWhere(
+  input: {
+    at: Date;
+    clerkOrgId: string;
+    companies: DirectoryCompanies;
+    statuses: NonNullable<DirectoryInput["filters"]["status"]>;
+  },
+  db: TenantDb
+): Promise<Prisma.PersonWhereInput | null> {
+  if (!input.statuses.length) {
+    return null;
+  }
+  const branches: Prisma.PersonWhereInput[] = [];
+  for (const company of input.companies) {
+    const branch = await buildCurrentStatusWhere(
+      {
+        at: input.at,
+        clerkOrgId: input.clerkOrgId,
+        organisationId: company.id,
+        statuses: input.statuses,
+      },
+      db
+    );
+    if (branch) {
+      branches.push({ AND: [{ organisation_id: company.id }, branch] });
+    }
+  }
+  return { OR: branches };
+}
+
+function personDirectoryPage(
+  rows: Prisma.PersonGetPayload<{ select: typeof personListSelect }>[],
+  statuses: Map<string, CurrentStatus>,
+  failedCounts: Map<string, number>
+) {
+  return rows.map((person) => {
+    const currentStatus = statuses.get(person.id);
+    if (!currentStatus) {
+      throw new Error("Current status missing for person list item");
+    }
+    return toPersonListItem(
+      person,
+      currentStatus,
+      failedCounts.get(person.id) ?? 0
+    );
+  });
+}
+
+function personProfileHeader(
+  person: Prisma.PersonGetPayload<{ select: typeof personProfileSelect }>,
+  xeroLinked: boolean
+) {
+  return {
+    archivedAt: person.archived_at,
+    avatarUrl: person.avatar_url,
+    companyId: person.organisation_id,
+    companyName: person.organisation.name,
+    email: person.email,
+    firstName: person.first_name,
+    id: person.id,
+    jobTitle: person.job_title,
+    lastName: person.last_name,
+    location: person.location
+      ? {
+          countryCode: person.location.country_code,
+          id: person.location.id,
+          name: person.location.name,
+          regionCode: person.location.region_code,
+          timezone: person.location.timezone,
+        }
+      : null,
+    manager: person.manager
+      ? {
+          firstName: person.manager.first_name,
+          id: person.manager.id,
+          lastName: person.manager.last_name,
+        }
+      : null,
+    personType: effectivePersonType(person.person_type, person.employment_type),
+    startDate: person.start_date,
+    statusNote: person.status_note,
+    team: person.team,
+    xeroLinked,
   };
 }

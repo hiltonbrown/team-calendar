@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 interface DashboardLiveUpdatesProps {
-  organisationId: string;
+  organisationIds: readonly string[];
 }
 
 export function DashboardLiveUpdates({
-  organisationId,
+  organisationIds,
 }: DashboardLiveUpdatesProps) {
   const router = useRouter();
   const { subscribe } = useNotificationEvents();
@@ -40,7 +40,7 @@ export function DashboardLiveUpdates({
 
         if (
           event.type === "sync.run_status_changed" &&
-          event.payload.organisationId === organisationId
+          organisationIds.includes(event.payload.organisationId)
         ) {
           const toastKey = `${event.payload.runId}:${event.payload.status}`;
           if (shownToast.current === toastKey) {
@@ -56,7 +56,7 @@ export function DashboardLiveUpdates({
           setLiveText("Sync activity updated. Refresh available.");
         }
       }),
-    [organisationId, router, subscribe]
+    [organisationIds, router, subscribe]
   );
 
   return (

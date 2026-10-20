@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   companies: vi.fn(async () => [
+    { id: "10000000-0000-4000-8000-000000000001", name: "A" },
     { id: "company-a", name: "A" },
     { id: "company-b", name: "B" },
   ]),
@@ -9,16 +12,40 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     person: {
       findMany: mocks.personFindMany,
     },
   };
+  tenantTestState.client = client;
   return {
+    getAccountSettings: async () => ({
+      manager_visibility_scope: "direct_reports_only",
+    }),
     resolveAccountCompanies: mocks.companies,
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+      "../../../database/src/tenant-db"
+    )),
   };
 });
 
@@ -44,6 +71,7 @@ function buildPerson(input: {
   teamId?: string | null;
 }) {
   return {
+    clerk_org_id: baseInput.clerkOrgId,
     clerk_user_id: input.clerkUserId ?? null,
     display_name: input.displayName,
     first_name: input.firstName,
@@ -53,6 +81,7 @@ function buildPerson(input: {
     location: null,
     location_id: null,
     manager_person_id: input.managerPersonId ?? null,
+    organisation_id: baseInput.organisationId,
     team: input.teamId ? { id: input.teamId, name: "Operations" } : null,
     team_id: input.teamId ?? null,
   };
@@ -98,19 +127,40 @@ describe("resolvePeopleForFeed", () => {
   it("fetches person-scoped feeds by person id and returns matching people", async () => {
     const personId = "00000000-0000-4000-8000-000000000002";
     const scopes = [{ scopeType: "person", scopeValue: personId }] as const;
-    const expected = await resolvePeopleForFeed({
-      ...baseInput,
-      preloaded: { people: activePeople, teams: [] },
-      scopes,
-    });
+    const expected = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: { people: activePeople, teams: [] },
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            preloaded: { people: activePeople, teams: [] },
+            scopes,
+          },
+          db
+        )
+    );
     mocks.personFindMany.mockResolvedValueOnce(
       activePeople.filter((person) => person.id === personId)
     );
 
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      scopes,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            scopes,
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -126,19 +176,40 @@ describe("resolvePeopleForFeed", () => {
   it("fetches team-scoped feeds by team id and returns matching people", async () => {
     const teamId = "20000000-0000-4000-8000-000000000001";
     const scopes = [{ scopeType: "team", scopeValue: teamId }] as const;
-    const expected = await resolvePeopleForFeed({
-      ...baseInput,
-      preloaded: { people: activePeople, teams: [] },
-      scopes,
-    });
+    const expected = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: { people: activePeople, teams: [] },
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            preloaded: { people: activePeople, teams: [] },
+            scopes,
+          },
+          db
+        )
+    );
     mocks.personFindMany.mockResolvedValueOnce(
       activePeople.filter((person) => person.team_id === teamId)
     );
 
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      scopes,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            scopes,
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -158,21 +229,42 @@ describe("resolvePeopleForFeed", () => {
       { scopeType: "person", scopeValue: personId },
       { scopeType: "team", scopeValue: teamId },
     ] as const;
-    const expected = await resolvePeopleForFeed({
-      ...baseInput,
-      preloaded: { people: activePeople, teams: [] },
-      scopes,
-    });
+    const expected = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: { people: activePeople, teams: [] },
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            preloaded: { people: activePeople, teams: [] },
+            scopes,
+          },
+          db
+        )
+    );
     mocks.personFindMany.mockResolvedValueOnce(
       activePeople.filter(
         (person) => person.id === personId || person.team_id === teamId
       )
     );
 
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      scopes,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            scopes,
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -187,17 +279,38 @@ describe("resolvePeopleForFeed", () => {
 
   it("keeps org-scoped feeds on the broad people fetch", async () => {
     const scopes = [{ scopeType: "org", scopeValue: null }] as const;
-    const expected = await resolvePeopleForFeed({
-      ...baseInput,
-      preloaded: { people: activePeople, teams: [] },
-      scopes,
-    });
+    const expected = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: { people: activePeople, teams: [] },
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            preloaded: { people: activePeople, teams: [] },
+            scopes,
+          },
+          db
+        )
+    );
     mocks.personFindMany.mockResolvedValueOnce(activePeople);
 
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      scopes,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            scopes,
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -209,17 +322,38 @@ describe("resolvePeopleForFeed", () => {
 
   it("keeps self-scoped feeds on the broad people fetch", async () => {
     const scopes = [{ scopeType: "self", scopeValue: null }] as const;
-    const expected = await resolvePeopleForFeed({
-      ...baseInput,
-      preloaded: { people: activePeople, teams: [] },
-      scopes,
-    });
+    const expected = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: { people: activePeople, teams: [] },
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            preloaded: { people: activePeople, teams: [] },
+            scopes,
+          },
+          db
+        )
+    );
     mocks.personFindMany.mockResolvedValueOnce(activePeople);
 
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      scopes,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            scopes,
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -230,18 +364,40 @@ describe("resolvePeopleForFeed", () => {
   });
 
   it("keeps manager-team-scoped feeds on the broad people fetch", async () => {
+    mocks.personFindMany.mockResolvedValue(activePeople);
     const scopes = [{ scopeType: "manager_team", scopeValue: null }] as const;
-    const expected = await resolvePeopleForFeed({
-      ...baseInput,
-      preloaded: { people: activePeople, teams: [] },
-      scopes,
-    });
+    const expected = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: { people: activePeople, teams: [] },
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            preloaded: { people: activePeople, teams: [] },
+            scopes,
+          },
+          db
+        )
+    );
     mocks.personFindMany.mockResolvedValueOnce(activePeople);
 
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      scopes,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        scopes,
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            scopes,
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -260,12 +416,28 @@ describe("canViewFeed", () => {
   it.each(["admin", "owner"] as const)(
     "allows %s callers without resolving people",
     async (role) => {
-      const result = await canViewFeed({
-        ...baseInput,
-        actingPersonId: null,
-        role,
-        scopes: [{ scopeType: "person", scopeValue: baseInput.actingPersonId }],
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          actingPersonId: null,
+          role,
+          scopes: [
+            { scopeType: "person", scopeValue: baseInput.actingPersonId },
+          ],
+        }),
+        (db) =>
+          canViewFeed(
+            {
+              ...baseInput,
+              actingPersonId: null,
+              role,
+              scopes: [
+                { scopeType: "person", scopeValue: baseInput.actingPersonId },
+              ],
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: true });
       expect(mocks.personFindMany).not.toHaveBeenCalled();
@@ -282,11 +454,24 @@ describe("canViewFeed", () => {
       }),
     ]);
 
-    const result = await canViewFeed({
-      ...baseInput,
-      role: "viewer",
-      scopes: [{ scopeType: "person", scopeValue: baseInput.actingPersonId }],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        role: "viewer",
+        scopes: [{ scopeType: "person", scopeValue: baseInput.actingPersonId }],
+      }),
+      (db) =>
+        canViewFeed(
+          {
+            ...baseInput,
+            role: "viewer",
+            scopes: [
+              { scopeType: "person", scopeValue: baseInput.actingPersonId },
+            ],
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: true });
   });
@@ -307,16 +492,32 @@ describe("canViewFeed", () => {
       }),
     ]);
 
-    const result = await canViewFeed({
-      ...baseInput,
-      role: "viewer",
-      scopes: [
-        {
-          scopeType: "person",
-          scopeValue: "00000000-0000-4000-8000-000000000002",
-        },
-      ],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        role: "viewer",
+        scopes: [
+          {
+            scopeType: "person",
+            scopeValue: "00000000-0000-4000-8000-000000000002",
+          },
+        ],
+      }),
+      (db) =>
+        canViewFeed(
+          {
+            ...baseInput,
+            role: "viewer",
+            scopes: [
+              {
+                scopeType: "person",
+                scopeValue: "00000000-0000-4000-8000-000000000002",
+              },
+            ],
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: false });
   });
@@ -351,45 +552,93 @@ describe("canViewFeed", () => {
       }),
     ]);
 
-    const result = await canViewFeed({
-      ...baseInput,
-      role: "manager",
-      scopes: [{ scopeType: "team", scopeValue: teamId }],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        role: "manager",
+        scopes: [{ scopeType: "team", scopeValue: teamId }],
+      }),
+      (db) =>
+        canViewFeed(
+          {
+            ...baseInput,
+            role: "manager",
+            scopes: [{ scopeType: "team", scopeValue: teamId }],
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: true });
   });
 
   it("denies non-admin callers without an acting person", async () => {
-    const result = await canViewFeed({
-      ...baseInput,
-      actingPersonId: null,
-      role: "viewer",
-      scopes: [{ scopeType: "org", scopeValue: null }],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId: null,
+        role: "viewer",
+        scopes: [{ scopeType: "org", scopeValue: null }],
+      }),
+      (db) =>
+        canViewFeed(
+          {
+            ...baseInput,
+            actingPersonId: null,
+            role: "viewer",
+            scopes: [{ scopeType: "org", scopeValue: null }],
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: false });
     expect(mocks.personFindMany).not.toHaveBeenCalled();
   });
 
   it("ignores inactive preloaded people for viewer visibility", async () => {
-    const result = await canViewFeed({
-      ...baseInput,
-      preloaded: {
-        people: [
-          buildPerson({
-            displayName: "Avery Viewer",
-            firstName: "Avery",
-            id: baseInput.actingPersonId,
-            isActive: false,
-            lastName: "Viewer",
-          }),
-        ],
-        teams: [],
-      },
-      role: "viewer",
-      scopes: [{ scopeType: "person", scopeValue: baseInput.actingPersonId }],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        preloaded: {
+          people: [
+            buildPerson({
+              displayName: "Avery Viewer",
+              firstName: "Avery",
+              id: baseInput.actingPersonId,
+              isActive: false,
+              lastName: "Viewer",
+            }),
+          ],
+          teams: [],
+        },
+        role: "viewer",
+        scopes: [{ scopeType: "person", scopeValue: baseInput.actingPersonId }],
+      }),
+      (db) =>
+        canViewFeed(
+          {
+            ...baseInput,
+            preloaded: {
+              people: [
+                buildPerson({
+                  displayName: "Avery Viewer",
+                  firstName: "Avery",
+                  id: baseInput.actingPersonId,
+                  isActive: false,
+                  lastName: "Viewer",
+                }),
+              ],
+              teams: [],
+            },
+            role: "viewer",
+            scopes: [
+              { scopeType: "person", scopeValue: baseInput.actingPersonId },
+            ],
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: false });
     expect(mocks.personFindMany).not.toHaveBeenCalled();
@@ -402,29 +651,58 @@ describe("resolveScopeRows", () => {
   });
 
   it("uses inactive unarchived preloaded people for labels", async () => {
-    const result = await resolveScopeRows({
-      clerkOrgId: baseInput.clerkOrgId,
-      organisationId: baseInput.organisationId,
-      preloaded: {
-        people: [
-          buildPerson({
-            displayName: "Avery Viewer",
-            firstName: "Avery",
-            id: baseInput.actingPersonId,
-            isActive: false,
-            lastName: "Viewer",
-          }),
-        ],
-        teams: [],
-      },
-      scopes: [
-        {
-          id: "30000000-0000-4000-8000-000000000001",
-          scope_type: "person",
-          scope_value: baseInput.actingPersonId,
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+        preloaded: {
+          people: [
+            buildPerson({
+              displayName: "Avery Viewer",
+              firstName: "Avery",
+              id: baseInput.actingPersonId,
+              isActive: false,
+              lastName: "Viewer",
+            }),
+          ],
+          teams: [],
         },
-      ],
-    });
+        scopes: [
+          {
+            id: "30000000-0000-4000-8000-000000000001",
+            scope_type: "person",
+            scope_value: baseInput.actingPersonId,
+          },
+        ],
+      }),
+      (db) =>
+        resolveScopeRows(
+          {
+            clerkOrgId: baseInput.clerkOrgId,
+            organisationId: baseInput.organisationId,
+            preloaded: {
+              people: [
+                buildPerson({
+                  displayName: "Avery Viewer",
+                  firstName: "Avery",
+                  id: baseInput.actingPersonId,
+                  isActive: false,
+                  lastName: "Viewer",
+                }),
+              ],
+              teams: [],
+            },
+            scopes: [
+              {
+                id: "30000000-0000-4000-8000-000000000001",
+                scope_type: "person",
+                scope_value: baseInput.actingPersonId,
+              },
+            ],
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -442,7 +720,13 @@ describe("resolveScopeRows", () => {
 });
 
 describe("account feed scopes", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.companies.mockResolvedValue([
+      { id: "company-a", name: "A" },
+      { id: "company-b", name: "B" },
+    ]);
+  });
   const accountPeople = [
     {
       ...activePeople[0],
@@ -482,12 +766,24 @@ describe("account feed scopes", () => {
   ];
   it("resolves self in every owned company and excludes another account", async () => {
     mocks.personFindMany.mockResolvedValue(accountPeople);
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      createdByUserId: "manager",
-      organisationId: null,
-      scopes: [{ scopeType: "self" }],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        createdByUserId: "manager",
+        organisationId: null,
+        scopes: [{ scopeType: "self" }],
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            createdByUserId: "manager",
+            organisationId: null,
+            scopes: [{ scopeType: "self" }],
+          },
+          db
+        )
+    );
     expect(result.ok && result.value.map((person) => person.id).sort()).toEqual(
       ["manager-a", "manager-b"]
     );
@@ -502,12 +798,24 @@ describe("account feed scopes", () => {
   });
   it("includes a manager's reports in both companies", async () => {
     mocks.personFindMany.mockResolvedValue(accountPeople);
-    const result = await resolvePeopleForFeed({
-      ...baseInput,
-      createdByUserId: "manager",
-      organisationId: null,
-      scopes: [{ scopeType: "manager_team" }],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        createdByUserId: "manager",
+        organisationId: null,
+        scopes: [{ scopeType: "manager_team" }],
+      }),
+      (db) =>
+        resolvePeopleForFeed(
+          {
+            ...baseInput,
+            createdByUserId: "manager",
+            organisationId: null,
+            scopes: [{ scopeType: "manager_team" }],
+          },
+          db
+        )
+    );
     expect(result.ok && result.value.map((person) => person.id).sort()).toEqual(
       ["manager-a", "manager-b", "report-a", "report-b"]
     );

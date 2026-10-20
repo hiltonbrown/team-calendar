@@ -1,14 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../database/src/tenant-db";
+import { tenantTestAccount } from "../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
+vi.mock(
+  "@repo/database",
+  async () =>
+    await vi.importActual<typeof import("../../database/src/tenant-db")>(
+      "../../database/src/tenant-db"
+    )
+);
+vi.mock("../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      mocks.poolTransaction(run),
+  },
+}));
 
 const mocks = vi.hoisted(() => ({
   count: vi.fn(),
   findFirst: vi.fn(),
   findMany: vi.fn(),
   personFindMany: vi.fn(),
-  tenantDatabase: vi.fn(),
+  poolTransaction: vi.fn(),
   updateMany: vi.fn(),
 }));
 
@@ -46,6 +60,8 @@ const row = {
   id: "00000000-0000-4000-8000-000000000101",
   object_id: "00000000-0000-4000-8000-000000000099",
   object_type: "availability_record",
+  organisation: { name: "Company A" },
+  organisation_id: input.organisationId,
   read_at: null,
   recipient_user_id: "user_1",
   title: "Leave submitted for approval",
@@ -55,7 +71,10 @@ const row = {
 describe("notification-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.tenantDatabase.mockReturnValue(client);
+    mocks.poolTransaction.mockImplementation(
+      async (run: (db: unknown) => Promise<unknown>) =>
+        run({ ...client, $queryRaw: vi.fn(async () => []) })
+    );
     mocks.count.mockResolvedValue(1);
     mocks.findMany.mockResolvedValue([row]);
     mocks.personFindMany.mockResolvedValue([
@@ -69,23 +88,27 @@ describe("notification-service", () => {
   });
 
   it("loads notifications through the account-bound default client", async () => {
-    const result = await listForUser(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      listForUser(input, db)
+    );
     expect(result).toMatchObject({
       ok: true,
       value: { notifications: [expect.objectContaining({ id: row.id })] },
     });
-    expect(mocks.tenantDatabase).toHaveBeenCalledWith(input.clerkOrgId);
+    expect(mocks.poolTransaction).toHaveBeenCalledOnce();
   });
 
-  it("lists notifications scoped to user and organisation", async () => {
-    const result = await listForUser(input, client);
+  it("lists notifications scoped to the account recipient", async () => {
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      listForUser(input, db)
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: input.clerkOrgId,
-          organisation_id: input.organisationId,
+          organisation: { clerk_org_id: input.clerkOrgId },
           recipient_user_id: input.userId,
         }),
       })
@@ -103,9 +126,9 @@ describe("notification-service", () => {
   it("marks a recipient notification as read idempotently", async () => {
     mocks.findFirst.mockResolvedValue(row);
 
-    const result = await markAsRead(
-      { ...input, notificationId: row.id },
-      client
+    const result = await withTestTenantResult(
+      tenantTestAccount({ ...input, notificationId: row.id }),
+      (db) => markAsRead({ ...input, notificationId: row.id }, db)
     );
 
     expect(result.ok).toBe(true);
@@ -113,7 +136,7 @@ describe("notification-service", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: input.clerkOrgId,
-          organisation_id: input.organisationId,
+          organisation: { clerk_org_id: input.clerkOrgId },
           recipient_user_id: input.userId,
         }),
       })
@@ -123,9 +146,9 @@ describe("notification-service", () => {
   it("rejects non-recipient read attempts", async () => {
     mocks.findFirst.mockResolvedValue({ ...row, recipient_user_id: "other" });
 
-    const result = await markAsRead(
-      { ...input, notificationId: row.id },
-      client
+    const result = await withTestTenantResult(
+      tenantTestAccount({ ...input, notificationId: row.id }),
+      (db) => markAsRead({ ...input, notificationId: row.id }, db)
     );
 
     expect(result.ok).toBe(false);
@@ -134,8 +157,10 @@ describe("notification-service", () => {
     }
   });
 
-  it("marks all unread only for the scoped user and organisation", async () => {
-    const result = await markAllAsRead(input, client);
+  it("marks all unread only for the account recipient", async () => {
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      markAllAsRead(input, db)
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -144,7 +169,7 @@ describe("notification-service", () => {
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          organisation_id: input.organisationId,
+          organisation: { clerk_org_id: input.clerkOrgId },
           read_at: null,
         }),
       })
@@ -152,11 +177,19 @@ describe("notification-service", () => {
   });
 
   it("returns unread count and recent unread rows", async () => {
-    await expect(getUnreadCount(input, client)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(input), (db) =>
+        getUnreadCount(input, db)
+      )
+    ).resolves.toEqual({
       ok: true,
       value: 1,
     });
-    await expect(listRecentUnread(input, client)).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(input), (db) =>
+        listRecentUnread(input, db)
+      )
+    ).resolves.toMatchObject({
       ok: true,
       value: [expect.objectContaining({ id: row.id })],
     });

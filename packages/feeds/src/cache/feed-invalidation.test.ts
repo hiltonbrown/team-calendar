@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   feedFindMany: vi.fn(),
@@ -11,14 +16,36 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+  queryRaw: vi.fn(async () => []),
+}));
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: tenantTestState.queryRaw,
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     feed: { findMany: mocks.feedFindMany },
     person: { findMany: mocks.personFindMany },
   };
+  tenantTestState.client = client;
   return {
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+      "../../../database/src/tenant-db"
+    )),
   };
 });
 vi.mock("../scope/feed-scope", () => ({
@@ -93,11 +120,22 @@ describe("feed cache invalidation", () => {
   });
 
   it("invalidates only the feeds whose scope includes the changed person", async () => {
-    const result = await invalidateFeedCachesForPerson({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personId: PERSON_IN_SCOPE,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personId: PERSON_IN_SCOPE,
+      }),
+      (db) =>
+        invalidateFeedCachesForPerson(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personId: PERSON_IN_SCOPE,
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -115,32 +153,67 @@ describe("feed cache invalidation", () => {
   });
 
   it("does not invalidate any feed for an out-of-scope person", async () => {
-    const result = await invalidateFeedCachesForPerson({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personId: PERSON_OUT_OF_SCOPE,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personId: PERSON_OUT_OF_SCOPE,
+      }),
+      (db) =>
+        invalidateFeedCachesForPerson(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personId: PERSON_OUT_OF_SCOPE,
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: { feedIds: [] } });
     expect(mocks.invalidateFeedCache).not.toHaveBeenCalled();
   });
 
   it("binds feed invalidation reads to the caller account", async () => {
-    const { tenantDatabase } = await import("@repo/database");
-    await feedIdsForPeople({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_IN_SCOPE],
-    });
-    expect(tenantDatabase).toHaveBeenCalledWith(CLERK_ORG_ID);
+    await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [PERSON_IN_SCOPE],
+      }),
+      (db) =>
+        feedIdsForPeople(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personIds: [PERSON_IN_SCOPE],
+          },
+          db
+        )
+    );
+    expect(tenantTestState.queryRaw).toHaveBeenCalledWith(
+      expect.any(Array),
+      CLERK_ORG_ID
+    );
   });
 
   it("scopes the feed lookup by both clerk org and organisation", async () => {
-    await feedIdsForPeople({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_IN_SCOPE],
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [PERSON_IN_SCOPE],
+      }),
+      (db) =>
+        feedIdsForPeople(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personIds: [PERSON_IN_SCOPE],
+          },
+          db
+        )
+    );
 
     expect(mocks.feedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -154,22 +227,44 @@ describe("feed cache invalidation", () => {
   });
 
   it("returns no feeds when there are no people to match", async () => {
-    const feeds = await feedIdsForPeople({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [],
-    });
+    const feeds = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [],
+      }),
+      (db) =>
+        feedIdsForPeople(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personIds: [],
+          },
+          db
+        )
+    );
 
     expect(feeds).toEqual([]);
     expect(mocks.feedFindMany).not.toHaveBeenCalled();
   });
 
   it("calls loadFeedScopeData once across all active feeds rather than once per feed", async () => {
-    await feedIdsForPeople({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_IN_SCOPE],
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [PERSON_IN_SCOPE],
+      }),
+      (db) =>
+        feedIdsForPeople(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personIds: [PERSON_IN_SCOPE],
+          },
+          db
+        )
+    );
 
     expect(mocks.loadFeedScopeData).toHaveBeenCalledTimes(1);
     expect(mocks.resolvePeopleForFeed).toHaveBeenCalledTimes(3);
@@ -178,26 +273,31 @@ describe("feed cache invalidation", () => {
     }
   });
 
-  it("proceeds with invalidation when loadFeedScopeData fails", async () => {
+  it("aborts scope reads when the shared SQL lookup fails", async () => {
     mocks.loadFeedScopeData.mockResolvedValue({
       error: { code: "unknown_error", message: "scope load failed" },
       ok: false,
     });
-
-    const feeds = await feedIdsForPeople({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_IN_SCOPE],
-    });
-
-    expect(feeds).toEqual([
-      { id: "feed-a", organisationId: ORGANISATION_ID, privacyMode: "named" },
-      { id: "feed-c", organisationId: ORGANISATION_ID, privacyMode: "private" },
-    ]);
-    expect(mocks.resolvePeopleForFeed).toHaveBeenCalledTimes(3);
-    for (const call of mocks.resolvePeopleForFeed.mock.calls) {
-      expect(call[0].preloaded).toBeUndefined();
-    }
+    await expect(
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId: CLERK_ORG_ID,
+          organisationId: ORGANISATION_ID,
+          personIds: [PERSON_IN_SCOPE],
+        }),
+        (db) =>
+          feedIdsForPeople(
+            {
+              clerkOrgId: CLERK_ORG_ID,
+              organisationId: ORGANISATION_ID,
+              personIds: [PERSON_IN_SCOPE],
+            },
+            db
+          )
+      )
+    ).rejects.toThrow("scope load failed");
+    expect(mocks.resolvePeopleForFeed).not.toHaveBeenCalled();
+    expect(mocks.invalidateFeedCache).not.toHaveBeenCalled();
   });
 
   it("invalidates defensively when scope resolution fails for a feed", async () => {
@@ -206,11 +306,22 @@ describe("feed cache invalidation", () => {
       ok: false,
     });
 
-    const feeds = await feedIdsForPeople({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_IN_SCOPE],
-    });
+    const feeds = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [PERSON_IN_SCOPE],
+      }),
+      (db) =>
+        feedIdsForPeople(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personIds: [PERSON_IN_SCOPE],
+          },
+          db
+        )
+    );
 
     expect(feeds).toEqual([
       { id: "feed-a", organisationId: ORGANISATION_ID, privacyMode: "named" },
@@ -230,14 +341,28 @@ describe("feed cache invalidation", () => {
         value: { deletedCount: 1 },
       });
 
-    const result = await invalidateFeedCachesForPerson({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personId: PERSON_IN_SCOPE,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personId: PERSON_IN_SCOPE,
+      }),
+      (db) =>
+        invalidateFeedCachesForPerson(
+          {
+            clerkOrgId: CLERK_ORG_ID,
+            organisationId: ORGANISATION_ID,
+            personId: PERSON_IN_SCOPE,
+          },
+          db
+        )
+    );
 
-    expect(result.ok).toBe(false);
-    expect(mocks.invalidateFeedCache).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      ok: true,
+      value: { feedIds: ["feed-a", "feed-c"] },
+    });
+    expect(mocks.invalidateFeedCache).toHaveBeenCalledTimes(4);
     expect(mocks.invalidateFeedCache).toHaveBeenNthCalledWith(1, {
       feedId: "feed-a",
       privacyModes: ["named", "masked", "private"],
@@ -264,11 +389,22 @@ it("invalidates every account feed when a company record changes, including depa
     value: { people: [], teams: [] },
   });
   mocks.resolvePeopleForFeed.mockResolvedValue({ ok: true, value: [] });
-  const result = await invalidateFeedCachesForPerson({
-    clerkOrgId: CLERK_ORG_ID,
-    organisationId: ORGANISATION_ID,
-    personId: PERSON_OUT_OF_SCOPE,
-  });
+  const result = await withTestTenantResult(
+    tenantTestAccount({
+      clerkOrgId: CLERK_ORG_ID,
+      organisationId: ORGANISATION_ID,
+      personId: PERSON_OUT_OF_SCOPE,
+    }),
+    (db) =>
+      invalidateFeedCachesForPerson(
+        {
+          clerkOrgId: CLERK_ORG_ID,
+          organisationId: ORGANISATION_ID,
+          personId: PERSON_OUT_OF_SCOPE,
+        },
+        db
+      )
+  );
   expect(result).toEqual({ ok: true, value: { feedIds: ["account-feed"] } });
   expect(mocks.feedFindMany).toHaveBeenCalledWith(
     expect.objectContaining({

@@ -1,8 +1,10 @@
 import { currentUser, requireOrg, requireRole } from "@repo/auth/helpers";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { buildXeroOAuthStartUrl } from "@repo/xero";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
+  assertNoTenantTransaction("GET");
   let authenticatedClerkOrgId: string;
   try {
     authenticatedClerkOrgId = await requireOrg();

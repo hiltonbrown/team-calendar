@@ -89,6 +89,7 @@ interface ApprovalItem {
   mutedActionNote: string | null;
   notesInternal?: string | null;
   organisationId: string;
+  organisationName: string;
   person: {
     email: string;
     firstName: string;
@@ -97,6 +98,7 @@ interface ApprovalItem {
     teamName: string | null;
   };
   recordType: string;
+  requireDeclineReason: boolean;
   startsAt: string | Date;
   submittedAt: string | Date | null;
   xeroWriteError: string | null;
@@ -117,7 +119,6 @@ interface LeaveApprovalsClientProps {
   };
   items: ApprovalItem[];
   nextCursor: string | null;
-  organisationId: string;
   summary: ApprovalSummaryCounts;
 }
 
@@ -132,10 +133,12 @@ export function LeaveApprovalsClient({
   filters,
   items,
   nextCursor,
-  organisationId,
   summary,
 }: LeaveApprovalsClientProps) {
   const router = useRouter();
+  const [syncResults, setSyncResults] = useState<
+    import("./_actions").AccountApprovalSyncResult["companies"]
+  >([]);
   const [, setFilterParams] = useFilterParams(FilterSchema);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modal, setModal] = useState<{
@@ -193,7 +196,6 @@ export function LeaveApprovalsClient({
         fn = retryDeclineAction;
       }
       const result = await fn({
-        organisationId: record.organisationId,
         recordId: record.id,
       });
       setPendingRecordId(null);
@@ -216,18 +218,15 @@ export function LeaveApprovalsClient({
 
   const syncXeroLeave = () => {
     startTransition(async () => {
-      const result = await dispatchXeroLeaveSyncAction({
-        organisationId,
-      });
+      const result = await dispatchXeroLeaveSyncAction();
       if (!result.ok) {
         toast.error(result.error.message);
         return;
       }
-      if (!result.value.queued) {
-        toast.message("Xero leave sync is not yet enabled");
-        return;
+      setSyncResults(result.value.companies);
+      if (!result.value.companies.length) {
+        toast.message("No active Xero connections are available to sync.");
       }
-      toast.success("Xero leave sync queued");
       router.refresh();
     });
   };
@@ -257,6 +256,15 @@ export function LeaveApprovalsClient({
         ) : null}
       </div>
 
+      {syncResults.length > 0 ? (
+        <ul aria-live="polite" className="space-y-1 text-label-lg">
+          {syncResults.map((item) => (
+            <li key={item.companyId}>
+              {item.companyName}: {syncResultMessage(item.result)}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <QueueSummary summary={summary} />
 
       <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 md:flex-row md:items-center">
@@ -350,7 +358,7 @@ export function LeaveApprovalsClient({
               {items.map((record) => {
                 const isExpanded = expandedId === record.id;
                 const detailId = `approval-details-${record.id}`;
-                const name = personName(record);
+                const name = `${personName(record)} (${record.organisationName})`;
                 const isRecordPending =
                   isPending && pendingRecordId === record.id;
                 return (
@@ -553,7 +561,7 @@ function QueueDatum({
 }
 
 function PersonCell({ record }: { record: ApprovalItem }) {
-  const name = personName(record);
+  const name = `${personName(record)} (${record.organisationName})`;
   return (
     <div className="flex items-center gap-3">
       <Avatar className="size-9">
@@ -850,11 +858,12 @@ function modalRecord(record: ApprovalItem): ApprovalModalRecord {
       record.balanceSnapshot?.balanceRemainingAfterApproval ?? null,
     balanceUnit: record.balanceSnapshot?.unit ?? null,
     durationWorkingDays: record.durationWorkingDays,
-    employeeName: personName(record),
+    employeeName: `${personName(record)} (${record.organisationName})`,
     endsAt: record.endsAt,
     id: record.id,
-    organisationId: record.organisationId,
+    organisationName: record.organisationName,
     recordType: record.recordType,
+    requireDeclineReason: record.requireDeclineReason,
     startsAt: record.startsAt,
   };
 }
@@ -922,4 +931,15 @@ function initials(name: string) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+}
+
+function syncResultMessage(
+  result: import("./_actions").AccountApprovalSyncResult["companies"][number]["result"]
+): string {
+  if (!result.ok) {
+    return result.error.message;
+  }
+  return result.value.queued
+    ? "Sync queued"
+    : (result.value.reason ?? "Sync unavailable");
 }

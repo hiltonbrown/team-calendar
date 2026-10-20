@@ -8,21 +8,34 @@ import {
   type ClerkAccessServiceError,
   type ClerkInvitationDispatchResult,
   deleteAlternativeContact,
-  dispatchBalanceRefresh,
   getXeroConnectionStateForScope,
   loadClerkAccessReview,
+  type ManagerAssignmentError,
   type ManualBalanceServiceError,
   type PeopleRole,
+  prepareBalanceRefresh,
+  recordBalanceRefreshDispatch,
   reorderAlternativeContacts,
+  sendPreparedBalanceRefresh,
   inviteClerkAccessCandidates as serviceInviteClerkAccessCandidates,
   setManualLeaveBalance,
+  setPersonManager,
   updateAlternativeContact,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import {
+  afterTenantCommit,
+  assertTenantDb,
+  resolveAccountCompanies,
+  scopedQuery,
+  type TenantDb,
+  withTenantDb,
+  withTenantResult,
+} from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { syncXeroLeaveBalances } from "@repo/jobs";
 import { revalidatePath } from "next/cache";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
   type AddAlternativeContactActionInput,
   AddAlternativeContactActionSchema,
@@ -41,6 +54,7 @@ import {
   type UpdateAlternativeContactActionInput,
   UpdateAlternativeContactActionSchema,
 } from "./_schemas";
+
 export type PeopleActionError =
   | AlternativeContactServiceError
   | BalanceRefreshError
@@ -62,32 +76,58 @@ export async function addAlternativeContactAction(
     id: string;
   }>
 > {
+  assertNoTenantTransaction("addAlternativeContactAction");
   const parsed = AddAlternativeContactActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await resolveAuthenticatedPeopleActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const result = await addAlternativeContact({
-    actingPersonId: context.value.actingPersonId,
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    email: parsed.data.email,
-    name: parsed.data.name,
-    notes: parsed.data.notes,
-    organisationId: context.value.organisationId,
-    personId: parsed.data.personId,
-    phone: parsed.data.phone,
-    role: parsed.data.role,
-  });
-  if (!result.ok) {
-    return result;
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const context = await resolvePeopleActionContext(
+        actor.value,
+        parsed.data.organisationId,
+        db
+      );
+      if (!context.ok) {
+        return context;
+      }
+      const result = await addAlternativeContact(
+        {
+          actingPersonId: context.value.actingPersonId,
+          actingRole: context.value.role,
+          actingUserId: context.value.actingUserId,
+          clerkOrgId: context.value.clerkOrgId,
+          email: parsed.data.email,
+          name: parsed.data.name,
+          notes: parsed.data.notes,
+          organisationId: context.value.organisationId,
+          personId: parsed.data.personId,
+          phone: parsed.data.phone,
+          role: parsed.data.role,
+        },
+        db
+      );
+      if (!result.ok) {
+        return result;
+      }
+      afterTenantCommit(db, async () =>
+        revalidatePeoplePaths(parsed.data.personId)
+      );
+      return { ok: true, value: { id: result.value.id } };
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to save person changes.",
+      },
+      ok: false,
+    };
   }
-  revalidatePeoplePaths(parsed.data.personId);
-  return { ok: true, value: { id: result.value.id } };
 }
 export async function updateAlternativeContactAction(
   input: UpdateAlternativeContactActionInput
@@ -96,37 +136,62 @@ export async function updateAlternativeContactAction(
     id: string;
   }>
 > {
+  assertNoTenantTransaction("updateAlternativeContactAction");
   const parsed = UpdateAlternativeContactActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await resolveAuthenticatedPeopleActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const personId = await resolveContactPersonId(
-    context.value.clerkOrgId,
-    context.value.organisationId,
-    parsed.data.contactId
-  );
-  const result = await updateAlternativeContact({
-    actingPersonId: context.value.actingPersonId,
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    contactId: parsed.data.contactId,
-    organisationId: context.value.organisationId,
-    patch: parsed.data.patch,
-  });
-  if (!result.ok) {
-    return result;
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const context = await resolvePeopleActionContext(
+        actor.value,
+        parsed.data.organisationId,
+        db
+      );
+      if (!context.ok) {
+        return context;
+      }
+      const personId = await resolveContactPersonId(
+        context.value.clerkOrgId,
+        context.value.organisationId,
+        parsed.data.contactId,
+        db
+      );
+      const result = await updateAlternativeContact(
+        {
+          actingPersonId: context.value.actingPersonId,
+          actingRole: context.value.role,
+          actingUserId: context.value.actingUserId,
+          clerkOrgId: context.value.clerkOrgId,
+          contactId: parsed.data.contactId,
+          organisationId: context.value.organisationId,
+          patch: parsed.data.patch,
+        },
+        db
+      );
+      if (!result.ok) {
+        return result;
+      }
+      if (personId) {
+        afterTenantCommit(db, async () => revalidatePeoplePaths(personId));
+      } else {
+        afterTenantCommit(db, async () => revalidatePath("/people"));
+      }
+      return { ok: true, value: { id: result.value.id } };
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to save person changes.",
+      },
+      ok: false,
+    };
   }
-  if (personId) {
-    revalidatePeoplePaths(personId);
-  } else {
-    revalidatePath("/people");
-  }
-  return { ok: true, value: { id: result.value.id } };
 }
 export async function deleteAlternativeContactAction(
   input: DeleteAlternativeContactActionInput
@@ -135,27 +200,53 @@ export async function deleteAlternativeContactAction(
     personId: string;
   }>
 > {
+  assertNoTenantTransaction("deleteAlternativeContactAction");
   const parsed = DeleteAlternativeContactActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await resolveAuthenticatedPeopleActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const result = await deleteAlternativeContact({
-    actingPersonId: context.value.actingPersonId,
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    contactId: parsed.data.contactId,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
-    return result;
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const context = await resolvePeopleActionContext(
+        actor.value,
+        parsed.data.organisationId,
+        db
+      );
+      if (!context.ok) {
+        return context;
+      }
+      const result = await deleteAlternativeContact(
+        {
+          actingPersonId: context.value.actingPersonId,
+          actingRole: context.value.role,
+          actingUserId: context.value.actingUserId,
+          clerkOrgId: context.value.clerkOrgId,
+          contactId: parsed.data.contactId,
+          organisationId: context.value.organisationId,
+        },
+        db
+      );
+      if (!result.ok) {
+        return result;
+      }
+      afterTenantCommit(db, async () =>
+        revalidatePeoplePaths(result.value.personId)
+      );
+      return result;
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to save person changes.",
+      },
+      ok: false,
+    };
   }
-  revalidatePeoplePaths(result.value.personId);
-  return result;
 }
 export async function reorderAlternativeContactsAction(
   input: ReorderAlternativeContactsActionInput
@@ -164,28 +255,54 @@ export async function reorderAlternativeContactsAction(
     personId: string;
   }>
 > {
+  assertNoTenantTransaction("reorderAlternativeContactsAction");
   const parsed = ReorderAlternativeContactsActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await resolveAuthenticatedPeopleActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const result = await reorderAlternativeContacts({
-    actingPersonId: context.value.actingPersonId,
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    orderedContactIds: parsed.data.orderedContactIds,
-    organisationId: context.value.organisationId,
-    personId: parsed.data.personId,
-  });
-  if (!result.ok) {
-    return result;
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const context = await resolvePeopleActionContext(
+        actor.value,
+        parsed.data.organisationId,
+        db
+      );
+      if (!context.ok) {
+        return context;
+      }
+      const result = await reorderAlternativeContacts(
+        {
+          actingPersonId: context.value.actingPersonId,
+          actingRole: context.value.role,
+          actingUserId: context.value.actingUserId,
+          clerkOrgId: context.value.clerkOrgId,
+          orderedContactIds: parsed.data.orderedContactIds,
+          organisationId: context.value.organisationId,
+          personId: parsed.data.personId,
+        },
+        db
+      );
+      if (!result.ok) {
+        return result;
+      }
+      afterTenantCommit(db, async () =>
+        revalidatePeoplePaths(parsed.data.personId)
+      );
+      return result;
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to save person changes.",
+      },
+      ok: false,
+    };
   }
-  revalidatePeoplePaths(parsed.data.personId);
-  return result;
 }
 export async function refreshBalancesAction(
   input: RefreshBalancesActionInput
@@ -195,6 +312,7 @@ export async function refreshBalancesAction(
     reason?: string;
   }>
 > {
+  assertNoTenantTransaction("refreshBalancesAction");
   const parsed = RefreshBalancesActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -203,30 +321,66 @@ export async function refreshBalancesAction(
   if (!context.ok) {
     return context;
   }
-  const result = await dispatchBalanceRefresh({
+  const refreshInput = {
     actingRole: context.value.role,
     actingUserId: context.value.actingUserId,
     clerkOrgId: context.value.clerkOrgId,
     organisationId: context.value.organisationId,
     personId: parsed.data.personId,
-  });
-  if (!result.ok) {
-    return result;
+  };
+  let result: Awaited<ReturnType<typeof sendPreparedBalanceRefresh>>;
+  try {
+    const prepared = await withTenantDb(context.value.clerkOrgId, (db) =>
+      prepareBalanceRefresh(refreshInput, db)
+    );
+    if (!prepared.ok) {
+      return prepared;
+    }
+    result = await sendPreparedBalanceRefresh(prepared.value);
+    if (!result.ok) {
+      return result;
+    }
+    const outcome = result.value;
+    const audited = await withTenantDb(context.value.clerkOrgId, (db) =>
+      recordBalanceRefreshDispatch(refreshInput, outcome, db)
+    );
+    if (!audited.ok) {
+      return audited;
+    }
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to dispatch balance refresh.",
+      },
+      ok: false,
+    };
   }
   if (result.value.queued) {
-    const xeroConnection = await tenantDatabase(
-      context.value.clerkOrgId
-    ).xeroConnection.findFirst({
-      select: { id: true },
-      where: {
-        clerk_org_id: context.value.clerkOrgId,
-        organisation_id: context.value.organisationId,
-      },
-    });
-    const connectionState = await getXeroConnectionStateForScope({
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-    });
+    const { xeroConnection, connectionState } = await withTenantDb(
+      context.value.clerkOrgId,
+      async (db) => {
+        const preparedXeroConnection = await db.xeroConnection.findFirst({
+          select: { id: true },
+          where: {
+            archived_at: null,
+            clerk_org_id: context.value.clerkOrgId,
+            organisation_id: context.value.organisationId,
+          },
+        });
+        const preparedConnectionState = await getXeroConnectionStateForScope(
+          {
+            clerkOrgId: context.value.clerkOrgId,
+            organisationId: context.value.organisationId,
+          },
+          db
+        );
+        return {
+          connectionState: preparedConnectionState,
+          xeroConnection: preparedXeroConnection,
+        };
+      }
+    );
     if (
       xeroConnection &&
       connectionState.ok &&
@@ -258,31 +412,119 @@ export async function setManualBalanceAction(
     id: string;
   }>
 > {
+  assertNoTenantTransaction("setManualBalanceAction");
   const parsed = SetManualBalanceActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await resolveAuthenticatedPeopleActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const result = await setManualLeaveBalance({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    balance: parsed.data.balance,
-    balanceUnit: parsed.data.balanceUnit ?? null,
-    clerkOrgId: context.value.clerkOrgId,
-    leaveTypeName: parsed.data.leaveTypeName ?? null,
-    leaveTypeXeroId: parsed.data.leaveTypeXeroId,
-    organisationId: context.value.organisationId,
-    personId: parsed.data.personId,
-    recordType: parsed.data.recordType ?? null,
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const context = await resolvePeopleActionContext(
+        actor.value,
+        parsed.data.organisationId,
+        db
+      );
+      if (!context.ok) {
+        return context;
+      }
+      const result = await setManualLeaveBalance(
+        {
+          actingRole: context.value.role,
+          actingUserId: context.value.actingUserId,
+          balance: parsed.data.balance,
+          balanceUnit: parsed.data.balanceUnit ?? null,
+          clerkOrgId: context.value.clerkOrgId,
+          leaveTypeName: parsed.data.leaveTypeName ?? null,
+          leaveTypeXeroId: parsed.data.leaveTypeXeroId,
+          organisationId: context.value.organisationId,
+          personId: parsed.data.personId,
+          recordType: parsed.data.recordType ?? null,
+        },
+        db
+      );
+      if (!result.ok) {
+        return result;
+      }
+      afterTenantCommit(db, async () =>
+        revalidatePeoplePaths(parsed.data.personId)
+      );
+      return result;
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to save person changes.",
+      },
+      ok: false,
+    };
+  }
+}
+interface AuthenticatedPeopleActor {
+  actingUserId: string;
+  clerkOrgId: ClerkOrgId;
+  role: PeopleRole;
+}
+async function resolveAuthenticatedPeopleActor(): Promise<
+  PeopleActionResult<AuthenticatedPeopleActor>
+> {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  const role = effectiveRole(orgRole);
+  if (!(orgId && role && user)) {
+    return notAuthorised();
+  }
+  // The account comes from the authenticated Clerk session.
+  return {
+    ok: true,
+    value: { actingUserId: user.id, clerkOrgId: orgId as ClerkOrgId, role },
+  };
+}
+async function resolvePeopleActionContext(
+  actor: AuthenticatedPeopleActor,
+  organisationId: string,
+  db: TenantDb
+): Promise<
+  PeopleActionResult<
+    AuthenticatedPeopleActor & {
+      actingPersonId: string | null;
+      organisationId: OrganisationId;
+    }
+  >
+> {
+  assertTenantDb(db, actor.clerkOrgId);
+  const company = await getOrganisationById(
+    actor.clerkOrgId,
+    organisationId as OrganisationId,
+    db
+  );
+  if (!company.ok) {
+    return notAuthorised();
+  }
+  const companies = await resolveAccountCompanies(actor.clerkOrgId, db);
+  const actingPerson = await db.person.findFirst({
+    orderBy: [{ created_at: "asc" }, { id: "asc" }],
+    select: { id: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: actor.clerkOrgId,
+      clerk_user_id: actor.actingUserId,
+      organisation_id: {
+        in: companies.map((preparedCompany) => preparedCompany.id),
+      },
+    },
   });
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePeoplePaths(parsed.data.personId);
-  return result;
+  return {
+    ok: true,
+    value: {
+      ...actor,
+      actingPersonId: actingPerson?.id ?? null,
+      organisationId: company.value.id as OrganisationId,
+    },
+  };
 }
 async function resolveActionContext(organisationId: string): Promise<
   PeopleActionResult<{
@@ -293,53 +535,27 @@ async function resolveActionContext(organisationId: string): Promise<
     role: PeopleRole;
   }>
 > {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
-  const role = effectiveRole(orgRole);
-  if (!(role && user)) {
-    return notAuthorised();
+  const actor = await resolveAuthenticatedPeopleActor();
+  if (!actor.ok) {
+    return actor;
   }
-  if (!context.ok) {
-    return notAuthorised(context.error.message);
-  }
-  const actingPerson = await tenantDatabase(
-    context.value.clerkOrgId
-  ).person.findFirst({
-    select: { id: true },
-    where: {
-      ...scopedQuery(context.value.clerkOrgId, context.value.organisationId),
-      archived_at: null,
-      clerk_user_id: user.id,
-    },
-  });
-  return {
-    ok: true,
-    value: {
-      actingPersonId: actingPerson?.id ?? null,
-      actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      role,
-    },
-  };
+  return withTenantDb(actor.value.clerkOrgId, (db) =>
+    resolvePeopleActionContext(actor.value, organisationId, db)
+  );
 }
 async function resolveContactPersonId(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  contactId: string
+  contactId: string,
+  db: TenantDb
 ): Promise<string | null> {
-  const contact = await tenantDatabase(clerkOrgId).alternativeContact.findFirst(
-    {
-      select: { person_id: true },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        id: contactId,
-      },
-    }
-  );
+  const contact = await db.alternativeContact.findFirst({
+    select: { person_id: true },
+    where: {
+      ...scopedQuery(clerkOrgId, organisationId),
+      id: contactId,
+    },
+  });
   return contact?.person_id ?? null;
 }
 function effectiveRole(role: string | null | undefined): PeopleRole | null {
@@ -364,6 +580,7 @@ function revalidatePeoplePaths(personId: string) {
 export async function loadClerkAccessCandidates(
   input: LoadClerkAccessCandidatesInput
 ): Promise<PeopleActionResult<ClerkAccessReviewResult>> {
+  assertNoTenantTransaction("loadClerkAccessCandidates");
   const parsed = LoadClerkAccessCandidatesSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -381,34 +598,37 @@ export async function loadClerkAccessCandidates(
   if (!reviewResult.ok) {
     return reviewResult;
   }
-  await tenantDatabase(context.value.clerkOrgId).auditEvent.create({
-    data: {
-      action: "people.clerk_access_reviewed",
-      actor_user_id: context.value.actingUserId,
-      clerk_org_id: context.value.clerkOrgId,
-      entity_id: context.value.organisationId,
-      entity_type: "people",
-      metadata: {
-        alreadyInvitedCount: reviewResult.value.alreadyInvitedCount,
-        candidateCount: reviewResult.value.candidateCount,
-        conflictCount: reviewResult.value.conflictCount,
-        invitableCount: reviewResult.value.invitableCount,
-        inviterId: context.value.actingUserId,
-        linkableCount: reviewResult.value.linkableCount,
-        memberCount: reviewResult.value.memberCount,
-        organisationId: context.value.organisationId,
+  await withTenantDb(context.value.clerkOrgId, (db) =>
+    db.auditEvent.create({
+      data: {
+        action: "people.clerk_access_reviewed",
+        actor_user_id: context.value.actingUserId,
+        clerk_org_id: context.value.clerkOrgId,
+        entity_id: context.value.organisationId,
+        entity_type: "people",
+        metadata: {
+          alreadyInvitedCount: reviewResult.value.alreadyInvitedCount,
+          candidateCount: reviewResult.value.candidateCount,
+          conflictCount: reviewResult.value.conflictCount,
+          invitableCount: reviewResult.value.invitableCount,
+          inviterId: context.value.actingUserId,
+          linkableCount: reviewResult.value.linkableCount,
+          memberCount: reviewResult.value.memberCount,
+          organisationId: context.value.organisationId,
+        },
+        organisation_id: context.value.organisationId,
+        resource_id: context.value.organisationId,
+        resource_type: "people",
       },
-      organisation_id: context.value.organisationId,
-      resource_id: context.value.organisationId,
-      resource_type: "people",
-    },
-  });
+    })
+  );
   return reviewResult;
 }
 export const loadClerkAccessCandidatesAction = loadClerkAccessCandidates;
 export async function inviteClerkAccessCandidates(
   input: InviteClerkAccessCandidatesInput
 ): Promise<PeopleActionResult<ClerkInvitationDispatchResult>> {
+  assertNoTenantTransaction("inviteClerkAccessCandidates");
   const parsed = InviteClerkAccessCandidatesSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -428,28 +648,30 @@ export async function inviteClerkAccessCandidates(
   if (!inviteResult.ok) {
     return inviteResult;
   }
-  await tenantDatabase(context.value.clerkOrgId).auditEvent.create({
-    data: {
-      action: "people.clerk_invitations_sent",
-      actor_user_id: context.value.actingUserId,
-      clerk_org_id: context.value.clerkOrgId,
-      entity_id: context.value.organisationId,
-      entity_type: "people",
-      metadata: {
-        candidateCount: inviteResult.value.candidateCount,
-        failedCount: inviteResult.value.failedCount,
-        inviterId: context.value.actingUserId,
-        organisationId: context.value.organisationId,
-        ...(inviteResult.value.providerRequestId
-          ? { providerRequestId: inviteResult.value.providerRequestId }
-          : {}),
-        succeededCount: inviteResult.value.succeededCount,
+  await withTenantDb(context.value.clerkOrgId, (db) =>
+    db.auditEvent.create({
+      data: {
+        action: "people.clerk_invitations_sent",
+        actor_user_id: context.value.actingUserId,
+        clerk_org_id: context.value.clerkOrgId,
+        entity_id: context.value.organisationId,
+        entity_type: "people",
+        metadata: {
+          candidateCount: inviteResult.value.candidateCount,
+          failedCount: inviteResult.value.failedCount,
+          inviterId: context.value.actingUserId,
+          organisationId: context.value.organisationId,
+          ...(inviteResult.value.providerRequestId
+            ? { providerRequestId: inviteResult.value.providerRequestId }
+            : {}),
+          succeededCount: inviteResult.value.succeededCount,
+        },
+        organisation_id: context.value.organisationId,
+        resource_id: context.value.organisationId,
+        resource_type: "people",
       },
-      organisation_id: context.value.organisationId,
-      resource_id: context.value.organisationId,
-      resource_type: "people",
-    },
-  });
+    })
+  );
   revalidatePath("/people");
   return inviteResult;
 }
@@ -461,28 +683,32 @@ async function resolveAdminAccessContext(organisationId: string): Promise<
     organisationId: OrganisationId;
   }>
 > {
-  const [{ has, orgRole }, user, context] = await Promise.all([
+  const [{ orgId, has, orgRole }, user] = await Promise.all([
     auth(),
     currentUser(),
-    getActiveOrgContext(organisationId),
   ]);
   const isOwnerOrAdmin =
     orgRole === "org:owner" ||
     orgRole === "org:admin" ||
     Boolean(has?.({ role: "org:owner" })) ||
     Boolean(has?.({ role: "org:admin" }));
-  if (!(isOwnerOrAdmin && user)) {
+  if (!(orgId && isOwnerOrAdmin && user)) {
     return notAuthorised();
   }
+  // Authenticated Clerk account precedes an owned-company scope.
+  const clerkOrgId = orgId as ClerkOrgId;
+  const context = await withTenantDb(clerkOrgId, (db) =>
+    getOrganisationById(clerkOrgId, organisationId as OrganisationId, db)
+  );
   if (!context.ok) {
-    return notAuthorised(context.error.message);
+    return notAuthorised();
   }
   return {
     ok: true,
     value: {
       actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
+      clerkOrgId,
+      organisationId: context.value.id as OrganisationId,
     },
   };
 }
@@ -503,4 +729,67 @@ function validationError(message?: string): PeopleActionResult<never> {
     },
     ok: false,
   };
+}
+
+export async function setPersonManagerAction(input: {
+  personId: string;
+  managerPersonId: string | null;
+}): Promise<
+  Result<
+    { managerPersonId: string | null },
+    ManagerAssignmentError | { code: "unknown_error"; message: string }
+  >
+> {
+  assertNoTenantTransaction("setPersonManagerAction");
+  const { orgId, userId, orgRole } = await auth();
+  if (
+    !(orgId && userId) ||
+    (orgRole !== "org:owner" && orgRole !== "org:admin")
+  ) {
+    return {
+      error: {
+        code: "not_authorised",
+        message: "Only owners and admins can assign managers.",
+      },
+      ok: false,
+    };
+  }
+  try {
+    return await withTenantResult(orgId, async (db) => {
+      const result = await setPersonManager(
+        {
+          ...input,
+          actingRole: orgRole === "org:owner" ? "owner" : "admin",
+          actingUserId: userId,
+          clerkOrgId: orgId,
+        },
+        db
+      );
+      if (result.ok) {
+        afterTenantCommit(db, () => {
+          for (const path of [
+            "/people",
+            "/calendar",
+            "/leave-approvals",
+            "/plans",
+            "/analytics",
+            "/",
+          ]) {
+            revalidatePath(path);
+          }
+
+          return Promise.resolve();
+        });
+      }
+      return result;
+    });
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to assign the person's manager.",
+      },
+      ok: false,
+    };
+  }
 }

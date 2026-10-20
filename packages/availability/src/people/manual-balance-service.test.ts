@@ -1,5 +1,7 @@
 import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
@@ -14,47 +16,39 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../../../database/src/tenant-db")>(
+    "../../../database/src/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       auditEvent: {
         create: mocks.auditCreate,
       },
       leaveBalance: {
-        create: mocks.leaveBalanceCreate,
+        createMany: mocks.leaveBalanceCreate,
         findFirst: mocks.leaveBalanceFindFirst,
         updateMany: mocks.leaveBalanceUpdateMany,
       },
       person: {
         findFirst: mocks.personFindFirst,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        auditEvent: {
-          create: mocks.auditCreate,
-        },
-        leaveBalance: {
-          create: mocks.leaveBalanceCreate,
-          findFirst: mocks.leaveBalanceFindFirst,
-          updateMany: mocks.leaveBalanceUpdateMany,
-        },
-        person: {
-          findFirst: mocks.personFindFirst,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
@@ -78,7 +72,7 @@ describe("manual balance service", () => {
       ok: true,
       value: { state: "not_connected" },
     });
-    mocks.leaveBalanceCreate.mockResolvedValue({ id: "balance_1" });
+    mocks.leaveBalanceCreate.mockResolvedValue({ count: 1 });
     mocks.leaveBalanceFindFirst.mockResolvedValue(null);
     mocks.leaveBalanceUpdateMany.mockResolvedValue({ count: 1 });
     mocks.personFindFirst.mockResolvedValue({ id: input.personId });
@@ -88,7 +82,9 @@ describe("manual balance service", () => {
       error: { code: "state_unavailable" },
       ok: false,
     });
-    const result = await setManualLeaveBalance(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      setManualLeaveBalance(input, db)
+    );
     expect(result).toMatchObject({
       error: {
         message:
@@ -104,7 +100,9 @@ describe("manual balance service", () => {
       ok: true,
       value: { state: "connected" },
     });
-    const result = await setManualLeaveBalance(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      setManualLeaveBalance(input, db)
+    );
     expect(result).toEqual({
       error: {
         code: "xero_connected",
@@ -116,7 +114,12 @@ describe("manual balance service", () => {
     expect(mocks.leaveBalanceCreate).not.toHaveBeenCalled();
   });
   it("creates a scoped manual balance while Xero is disconnected", async () => {
-    const result = await setManualLeaveBalance(input);
+    mocks.leaveBalanceFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ id: "balance_1" });
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      setManualLeaveBalance(input, db)
+    );
     expect(result).toEqual({ ok: true, value: { id: "balance_1" } });
     expect(mocks.leaveBalanceCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -129,12 +132,14 @@ describe("manual balance service", () => {
         source_payload_json: Prisma.DbNull,
         xero_connection_id: null,
       }),
-      select: { id: true },
+      skipDuplicates: true,
     });
   });
   it("updates the existing manual row by person and leave type", async () => {
     mocks.leaveBalanceFindFirst.mockResolvedValue({ id: "balance_existing" });
-    const result = await setManualLeaveBalance(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      setManualLeaveBalance(input, db)
+    );
     expect(result).toEqual({
       ok: true,
       value: { id: "balance_existing" },
@@ -163,10 +168,20 @@ describe("manual balance service", () => {
     });
   });
   it("rejects a currency balance unit; manual balances are hours/days only", async () => {
-    const result = await setManualLeaveBalance({
-      ...input,
-      balanceUnit: "currency",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        balanceUnit: "currency",
+      }),
+      (db) =>
+        setManualLeaveBalance(
+          {
+            ...input,
+            balanceUnit: "currency",
+          },
+          db
+        )
+    );
     expect(result).toEqual({
       error: {
         code: "validation_error",

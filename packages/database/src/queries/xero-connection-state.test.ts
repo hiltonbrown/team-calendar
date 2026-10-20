@@ -1,8 +1,19 @@
+import { withTenantResult as withTestTenantResult } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
+
+vi.mock("server-only", () => ({}));
+
 import { beforeEach, expect, test, vi } from "vitest";
 
 const findFirst = vi.fn();
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({ xeroConnection: { findFirst } }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async () => [],
+        ...{ xeroConnection: { findFirst } },
+      }),
+  },
 }));
 const { getXeroConnectionState } = await import("./xero-connection-state");
 vi.mock("../system-client", () => ({
@@ -39,7 +50,11 @@ test.each([
   "derives safe connection state from persisted grant and selected connection",
   async (row, expected) => {
     findFirst.mockResolvedValue(row);
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: expected },
     });
@@ -50,10 +65,11 @@ test.each([
     });
   }
 );
-test("database failures remain unavailable rather than suggesting no connection", async () => {
+test("database failures abort the owning transaction", async () => {
   findFirst.mockRejectedValue(new Error("database unavailable"));
-  expect(await getXeroConnectionState(scope)).toEqual({
-    error: { code: "state_unavailable" },
-    ok: false,
-  });
+  await expect(
+    withTestTenantResult(tenantTestAccount(scope), (db) =>
+      getXeroConnectionState(scope, db)
+    )
+  ).rejects.toThrow("database unavailable");
 });

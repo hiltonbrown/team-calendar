@@ -2,18 +2,26 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   dispatchInitialXeroSync: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
   syncRunFindFirst: vi.fn(),
   xeroConnectionFindMany: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       syncRun: { findFirst: mocks.syncRunFindFirst },
       xeroConnection: { findMany: mocks.xeroConnectionFindMany },
     },
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -23,13 +31,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<
+    typeof import("../../../database/src/tenant-db")
+  >("../../../database/src/tenant-db");
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn() },

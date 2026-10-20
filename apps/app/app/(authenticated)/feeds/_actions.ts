@@ -2,8 +2,15 @@
 
 import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
-import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import {
+  afterTenantCommit,
+  type TenantDb,
+  withTenantDb,
+  withTenantResult,
+} from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import {
   archiveFeed,
   buildFeedSubscribeUrl,
@@ -24,7 +31,6 @@ import { dispatchNotification } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import { revalidatePath } from "next/cache";
 import { withOrg } from "@/lib/navigation/org-url";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
   type CreateFeedActionInput,
   CreateFeedActionSchema,
@@ -52,6 +58,7 @@ export async function createFeedAction(input: CreateFeedActionInput): Promise<
     subscribeUrl: string;
   }>
 > {
+  assertNoTenantTransaction("createFeedAction");
   const parsed = CreateFeedActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -60,17 +67,21 @@ export async function createFeedAction(input: CreateFeedActionInput): Promise<
   if (!context.ok) {
     return context;
   }
-  const result = await createFeed({
-    ...parsed.data,
-    actingRole: context.value.role,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-  });
+  const result = await runFeedWrite(
+    context.value,
+    createFeed,
+    {
+      ...parsed.data,
+      actingRole: context.value.role,
+      actingUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+    },
+    true
+  );
   if (!result.ok) {
     return result;
   }
-  revalidateFeedPaths(result.value.feedId, { includeSettings: true });
   return {
     ok: true,
     value: {
@@ -83,6 +94,7 @@ export async function createFeedAction(input: CreateFeedActionInput): Promise<
 export async function updateFeedAction(
   input: UpdateFeedActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
+  assertNoTenantTransaction("updateFeedAction");
   const parsed = UpdateFeedActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -93,47 +105,56 @@ export async function updateFeedAction(
   if (!context.ok) {
     return context;
   }
-  const result = await updateFeed({
-    ...parsed.data,
-    actingRole: context.value.role,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-  });
+  const result = await runFeedWrite(
+    context.value,
+    updateFeed,
+    {
+      ...parsed.data,
+      actingRole: context.value.role,
+      actingUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+    },
+    true
+  );
   if (!result.ok) {
     return result;
   }
-  revalidateFeedPaths(parsed.data.feedId, { includeSettings: true });
   return { ok: true, value: { feedId: parsed.data.feedId } };
 }
 
 export async function pauseFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
+  assertNoTenantTransaction("pauseFeedAction");
   return await command(input, pauseFeed, resolveMemberContext);
 }
 
 export async function resumeFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
+  assertNoTenantTransaction("resumeFeedAction");
   return await command(input, resumeFeed, resolveMemberContext);
 }
 
 export async function archiveFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
+  assertNoTenantTransaction("archiveFeedAction");
   return await command(input, archiveFeed, resolveMemberContext);
 }
 
 export async function restoreFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
+  assertNoTenantTransaction("restoreFeedAction");
   return await command(input, restoreFeed, resolveAdminContext);
 }
 
 export async function createOwnFeedAction(
   input: CreateOwnFeedActionInput
 ): Promise<FeedActionResult<{ created: boolean; feedId: string }>> {
+  assertNoTenantTransaction("createOwnFeedAction");
   const parsed = CreateOwnFeedActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -142,13 +163,18 @@ export async function createOwnFeedAction(
   if (!context.ok) {
     return context;
   }
-  const result = await createOwnFeed({
-    actingRole: context.value.role,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    kind: parsed.data.kind,
-    organisationId: context.value.organisationId,
-  });
+  const result = await runFeedWrite(
+    context.value,
+    createOwnFeed,
+    {
+      actingRole: context.value.role,
+      actingUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      kind: parsed.data.kind,
+      organisationId: context.value.organisationId,
+    },
+    true
+  );
   if (!result.ok) {
     return result;
   }
@@ -164,13 +190,13 @@ export async function createOwnFeedAction(
       log.warn("Personal feed analytics capture failed", { error });
     }
   }
-  revalidateFeedPaths(result.value.feedId, { includeSettings: true });
   return { ok: true, value: result.value };
 }
 
 export async function issueTokenAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ subscribeUrl: string; tokenId: string }>> {
+  assertNoTenantTransaction("issueTokenAction");
   const parsed = FeedCommandActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid feed");
@@ -179,7 +205,7 @@ export async function issueTokenAction(
   if (!context.ok) {
     return context;
   }
-  const result = await issueToken({
+  const result = await runFeedWrite(context.value, issueToken, {
     ...parsed.data,
     actingRole: context.value.role,
     actingUserId: context.value.userId,
@@ -189,7 +215,6 @@ export async function issueTokenAction(
   if (!result.ok) {
     return result;
   }
-  revalidateFeedPaths(parsed.data.feedId);
   return {
     ok: true,
     value: {
@@ -202,6 +227,7 @@ export async function issueTokenAction(
 export async function rotateTokenAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ subscribeUrl: string; tokenId: string }>> {
+  assertNoTenantTransaction("rotateTokenAction");
   const parsed = FeedCommandActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid feed");
@@ -210,7 +236,7 @@ export async function rotateTokenAction(
   if (!context.ok) {
     return context;
   }
-  const result = await rotateToken({
+  const result = await runFeedWrite(context.value, rotateToken, {
     ...parsed.data,
     actingRole: context.value.role,
     actingUserId: context.value.userId,
@@ -220,21 +246,22 @@ export async function rotateTokenAction(
   if (!result.ok) {
     return result;
   }
-  revalidateFeedPaths(parsed.data.feedId);
 
   // Fetch feed name cheaply to include in notification body
   let feedName: string | null = null;
   try {
-    const feed = await tenantDatabase(context.value.clerkOrgId).feed.findFirst({
-      select: { name: true },
-      where: {
-        // Both tenant keys: one Clerk Organisation can own several Organisation
-        // rows (one per Xero file), so clerk_org_id alone spans payroll entities.
-        clerk_org_id: context.value.clerkOrgId,
-        id: parsed.data.feedId,
-        organisation_id: context.value.organisationId,
-      },
-    });
+    const feed = await withTenantDb(context.value.clerkOrgId, (db) =>
+      db.feed.findFirst({
+        select: { name: true },
+        where: {
+          // Both tenant keys: one Clerk Organisation can own several Organisation
+          // rows (one per Xero file), so clerk_org_id alone spans payroll entities.
+          clerk_org_id: context.value.clerkOrgId,
+          id: parsed.data.feedId,
+          organisation_id: context.value.organisationId,
+        },
+      })
+    );
     if (feed) {
       feedName = feed.name;
     }
@@ -254,7 +281,7 @@ export async function rotateTokenAction(
     : "A calendar feed token has been rotated.";
 
   try {
-    const dispatchResult = await dispatchNotification({
+    const phaseInput1 = {
       actionUrl,
       actorUserId: context.value.userId,
       body,
@@ -266,7 +293,11 @@ export async function rotateTokenAction(
       recipientUserId: context.value.userId,
       title: "Feed token rotated",
       type: "feed_token_rotated",
-    });
+    } satisfies Parameters<typeof dispatchNotification>[0];
+    const dispatchResult = await withTenantResult(
+      phaseInput1.clerkOrgId,
+      (db) => dispatchNotification(phaseInput1, undefined, db)
+    );
 
     if (!dispatchResult.ok) {
       log.error("Failed to dispatch feed token rotation notification", {
@@ -296,6 +327,7 @@ export async function rotateTokenAction(
 export async function revokeTokenAction(
   input: RevokeTokenActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
+  assertNoTenantTransaction("revokeTokenAction");
   const parsed = RevokeTokenActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid token");
@@ -304,7 +336,7 @@ export async function revokeTokenAction(
   if (!context.ok) {
     return context;
   }
-  const result = await revokeToken({
+  const result = await runFeedWrite(context.value, revokeToken, {
     ...parsed.data,
     actingRole: context.value.role,
     actingUserId: context.value.userId,
@@ -314,13 +346,15 @@ export async function revokeTokenAction(
   if (!result.ok) {
     return result;
   }
-  revalidateFeedPaths(result.value.feedId);
   return { ok: true, value: { feedId: result.value.feedId } };
 }
 
 async function command(
   input: FeedCommandActionInput,
-  service: (input: unknown) => Promise<Result<unknown, FeedServiceError>>,
+  service: (
+    input: unknown,
+    db: TenantDb
+  ) => Promise<Result<unknown, FeedServiceError>>,
   resolveContext: typeof resolveAdminContext
 ): Promise<FeedActionResult<{ feedId: string }>> {
   const parsed = FeedCommandActionSchema.safeParse(input);
@@ -331,17 +365,21 @@ async function command(
   if (!context.ok) {
     return context;
   }
-  const result = await service({
-    ...parsed.data,
-    actingRole: context.value.role,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-  });
+  const result = await runFeedWrite(
+    context.value,
+    service,
+    {
+      ...parsed.data,
+      actingRole: context.value.role,
+      actingUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+    },
+    true
+  );
   if (!result.ok) {
     return result;
   }
-  revalidateFeedPaths(parsed.data.feedId, { includeSettings: true });
   return { ok: true, value: { feedId: parsed.data.feedId } };
 }
 
@@ -365,18 +403,14 @@ async function resolveActorContext(
   organisationId: string,
   options: { requireAdmin: boolean }
 ): Promise<ActorContext> {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
+  const [{ orgRole, orgId }, user] = await Promise.all([auth(), currentUser()]);
   const role = normaliseRole(orgRole);
   const isAdmin =
     role === "admin" ||
     role === "owner" ||
     role === "org:admin" ||
     role === "org:owner";
-  if (!(user && orgRole && (isAdmin || !options.requireAdmin))) {
+  if (!(user && orgRole && orgId && (isAdmin || !options.requireAdmin))) {
     return {
       error: {
         code: "not_authorised",
@@ -385,17 +419,11 @@ async function resolveActorContext(
       ok: false,
     };
   }
-  if (!context.ok) {
-    return {
-      error: { code: "not_authorised", message: context.error.message },
-      ok: false,
-    };
-  }
   return {
     ok: true,
     value: {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
+      clerkOrgId: orgId,
+      organisationId,
       role,
       userId: user.id,
     },
@@ -423,4 +451,69 @@ function validationError(message?: string): FeedActionResult<never> {
     },
     ok: false,
   };
+}
+
+async function runFeedWrite<T>(
+  actor: {
+    clerkOrgId: string;
+    organisationId: string;
+    role: string;
+    userId: string;
+  },
+  service: (input: unknown, db: TenantDb) => Promise<FeedActionResult<T>>,
+  input: unknown,
+  includeSettings = false
+): Promise<FeedActionResult<T>> {
+  try {
+    return await withTenantResult(
+      actor.clerkOrgId,
+      async (db): Promise<FeedActionResult<T>> => {
+        // The IDs come from Clerk auth and validated action schemas; query ownership is checked in this scope.
+        const company = await getOrganisationById(
+          actor.clerkOrgId as ClerkOrgId,
+          actor.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return {
+            error: {
+              code: "not_authorised",
+              message: "This company is not available in your account.",
+            },
+            ok: false,
+          };
+        }
+        const result = await service(input, db);
+        if (result.ok) {
+          const inputFeedId =
+            typeof input === "object" &&
+            input !== null &&
+            "feedId" in input &&
+            typeof input.feedId === "string"
+              ? input.feedId
+              : undefined;
+          const resultFeedId =
+            typeof result.value === "object" &&
+            result.value !== null &&
+            "feedId" in result.value &&
+            typeof result.value.feedId === "string"
+              ? result.value.feedId
+              : undefined;
+          const feedId = resultFeedId ?? inputFeedId;
+          afterTenantCommit(db, async () =>
+            revalidateFeedPaths(feedId, { includeSettings })
+          );
+        }
+        return result;
+      }
+    );
+  } catch {
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Failed to update calendar feeds.",
+      },
+      ok: false,
+    };
+  }
 }

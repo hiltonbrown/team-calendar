@@ -6,7 +6,7 @@ import {
   SupportSubmissionCategorySchema,
 } from "@repo/core";
 import { z } from "zod";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 const SupportSubmissionAuditPayloadSchema = z.object({
@@ -37,64 +37,73 @@ export interface SupportSubmissionAuditData {
 export async function listRecentSupportSubmissionAudits(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  limit?: number
+  limit: number | undefined,
+  db: TenantDb
 ): Promise<Result<SupportSubmissionAuditData[]>> {
-  try {
-    const auditEvents = await tenantDatabase(clerkOrgId).auditEvent.findMany({
-      orderBy: { created_at: "desc" },
-      select: {
-        action: true,
-        actor_user_id: true,
-        clerk_org_id: true,
-        created_at: true,
-        id: true,
-        organisation_id: true,
-        payload: true,
-      },
-      take: limit ?? 20,
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        action: "support_submissions.github_issue_created",
-      },
-    });
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb = db;
 
-    return {
-      ok: true,
-      value: auditEvents.flatMap((event) => {
-        const parsedPayload = SupportSubmissionAuditPayloadSchema.safeParse(
-          event.payload
-        );
+    try {
+      const auditEvents = await tenantDb.auditEvent.findMany({
+        orderBy: { created_at: "desc" },
+        select: {
+          action: true,
+          actor_user_id: true,
+          clerk_org_id: true,
+          created_at: true,
+          id: true,
+          organisation_id: true,
+          payload: true,
+        },
+        take: limit ?? 20,
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          action: "support_submissions.github_issue_created",
+        },
+      });
 
-        if (!parsedPayload.success) {
-          return [];
-        }
+      return {
+        ok: true,
+        value: auditEvents.flatMap((event) => {
+          const parsedPayload = SupportSubmissionAuditPayloadSchema.safeParse(
+            event.payload
+          );
 
-        return [
-          {
-            actorUserId: event.actor_user_id,
-            category: parsedPayload.data.category,
-            clerkOrgId: event.clerk_org_id,
-            createdAt: event.created_at,
-            id: event.id,
-            issueNumber: parsedPayload.data.issueNumber,
-            issueUrl: parsedPayload.data.issueUrl,
-            labelAssignmentSucceeded:
-              parsedPayload.data.labelAssignmentSucceeded ?? false,
-            labelsAttempted: parsedPayload.data.labelsAttempted ?? [],
-            organisationId: event.organisation_id as OrganisationId,
-            status: parsedPayload.data.status,
-            subject: parsedPayload.data.subject,
-          },
-        ];
-      }),
-    };
-  } catch {
-    return {
-      error: appError(
-        "internal",
-        "Failed to list support submission audit events"
-      ),
-      ok: false,
-    };
+          if (!parsedPayload.success) {
+            return [];
+          }
+
+          return [
+            {
+              actorUserId: event.actor_user_id,
+              category: parsedPayload.data.category,
+              clerkOrgId: event.clerk_org_id,
+              createdAt: event.created_at,
+              id: event.id,
+              issueNumber: parsedPayload.data.issueNumber,
+              issueUrl: parsedPayload.data.issueUrl,
+              labelAssignmentSucceeded:
+                parsedPayload.data.labelAssignmentSucceeded ?? false,
+              labelsAttempted: parsedPayload.data.labelsAttempted ?? [],
+              organisationId: event.organisation_id as OrganisationId,
+              status: parsedPayload.data.status,
+              subject: parsedPayload.data.subject,
+            },
+          ];
+        }),
+      };
+    } catch (error) {
+      if (tenantDb) {
+        throw error;
+      }
+      return {
+        error: appError(
+          "internal",
+          "Failed to list support submission audit events"
+        ),
+        ok: false,
+      };
+    }
   }
 }

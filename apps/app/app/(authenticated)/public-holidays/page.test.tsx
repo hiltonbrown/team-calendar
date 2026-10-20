@@ -1,3 +1,7 @@
+vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: () => Promise.resolve("org_1"),
+}));
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,17 +20,35 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/availability", () => ({
   resolvePublicHolidays: mocks.resolvePublicHolidays,
 }));
-vi.mock("@repo/database", () => ({
-  scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn(() => ({
-    location: { findMany: mocks.locationFindMany },
-  })),
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  scopedQuery: mocks.scopedQuery,
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
+    location: { findMany: mocks.locationFindMany },
+  };
+}
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
 vi.mock("../components/header", () => ({
@@ -106,13 +128,17 @@ describe("PublicHolidaysPage", () => {
     );
 
     expect(mocks.requirePageRole).toHaveBeenCalledWith("org:viewer");
-    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith({
-      clerkOrgId: "org_1",
-      from: "2026-01-01",
-      includeHidden: true,
-      organisationId,
-      to: "2026-12-31",
-    });
+    expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
+      {
+        clerkOrgId: "org_1",
+        from: "2026-01-01",
+        includeHidden: true,
+        organisationId,
+        to: "2026-12-31",
+      },
+      undefined,
+      expect.any(Object)
+    );
     expect(mocks.locationFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { clerk_org_id: "org_1", organisation_id: organisationId },

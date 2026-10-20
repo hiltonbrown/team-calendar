@@ -1,3 +1,4 @@
+import { getAccountApprovalSettings } from "../settings/account-approval-settings-service";
 import "server-only";
 import {
   type ClerkOrgId,
@@ -7,7 +8,11 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import {
+  assertTenantDb,
+  resolveAccountCompanies,
+  type TenantDb,
+} from "@repo/database";
 import type {
   availability_approval_status,
   availability_record_type,
@@ -27,20 +32,16 @@ import {
   type CalendarScope,
   type CalendarServiceError,
   getCalendarRange,
+  selectCalendarCompanies,
 } from "../calendar/calendar-service";
 import {
   computeWorkingDaysFromReferenceData,
   loadWorkingDaysReferenceData,
 } from "../duration/working-days";
 import { resolvePublicHolidays } from "../holidays/resolve-public-holidays";
-import {
-  type BalanceRow,
-  getPersonProfile,
-  listPeople,
-} from "../people/people-service";
+import { type BalanceRow, getPersonProfile } from "../people/people-service";
 import { listMyRecords, type RecordListItem } from "../plans/plan-service";
 import { managerScopePersonIds } from "../settings/manager-scope";
-import { getSettings } from "../settings/organisation-settings-service";
 import type { CoverageMap } from "../team-coverage/coverage-map";
 import { loadManagerCoverage } from "../team-coverage/load-manager-coverage";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
@@ -168,6 +169,7 @@ const ResolveRoleSchema = z.object({
 const ViewSchema = z.object({
   actingRole: z.enum(["admin", "employee", "manager", "owner", "viewer"]),
   clerkOrgId: z.string().min(1),
+  companyIds: z.array(z.string().uuid()).optional(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
   userId: z.string().min(1),
@@ -183,7 +185,7 @@ export interface DashboardHoliday {
   startsAt: string | null;
 }
 const LIST_ROW_LIMIT = 5;
-const EMPLOYEE_TIMELINE_ROW_LIMIT = 1;
+const EMPLOYEE_TIMELINE_ROW_LIMIT = 10;
 const MANAGER_TIMELINE_ROW_LIMIT = 12;
 const ADMIN_TIMELINE_ROW_LIMIT = 10;
 const COVERAGE_SECOND_WEEK_OFFSET_DAYS = 7;
@@ -194,20 +196,28 @@ const MY_REQUEST_STATUSES: availability_approval_status[] = [
   "declined",
 ];
 export async function resolveDashboardRole(
-  input: z.input<typeof ResolveRoleSchema>
+  input: z.input<typeof ResolveRoleSchema>,
+  db: TenantDb
 ): Promise<Result<DashboardRole, DashboardServiceError>> {
-  const parsed = ResolveRoleSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  try {
-    const person = await tenantDatabase(input.clerkOrgId).person.findFirst({
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const parsed = ResolveRoleSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
+    const person = await client.person.findFirst({
       select: { id: true },
       where: {
         archived_at: null,
         clerk_org_id: parsed.data.clerkOrgId,
         clerk_user_id: parsed.data.userId,
-        organisation_id: parsed.data.organisationId,
+        organisation: {
+          archived_at: null,
+          clerk_org_id: parsed.data.clerkOrgId,
+        },
       },
     });
     if (parsed.data.orgRole === "org:owner") {
@@ -219,64 +229,91 @@ export async function resolveDashboardRole(
     if (!person) {
       return { ok: true, value: "viewer" };
     }
-    const directReportCount = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.count({
+    const directReportCount = await client.person.count({
       where: {
         archived_at: null,
         clerk_org_id: parsed.data.clerkOrgId,
         manager_person_id: person.id,
-        organisation_id: parsed.data.organisationId,
+        organisation: {
+          archived_at: null,
+          clerk_org_id: parsed.data.clerkOrgId,
+        },
       },
     });
     if (directReportCount > 0) {
       return { ok: true, value: "manager" };
     }
     return { ok: true, value: "employee" };
-  } catch {
-    return unknownError("Failed to resolve dashboard role.");
   }
 }
 export async function getEmployeeView(
   input: z.input<typeof ViewSchema>,
-  cache: DashboardCache = createDashboardCache()
+  _cache: DashboardCache | undefined,
+  db: TenantDb
 ): Promise<Result<EmployeeDashboardView, DashboardServiceError>> {
-  const parsed = ViewSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const cache = dashboardCacheForClient(client);
+
+    const parsed = ViewSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
+    return await cache.getOrLoad(
+      cacheKey("employee", parsed.data),
+      async () => await buildEmployeeView(parsed.data, cache, client)
+    );
   }
-  return await cache.getOrLoad(
-    cacheKey("employee", parsed.data),
-    async () => await buildEmployeeView(parsed.data, cache)
-  );
 }
 export async function getManagerView(
   input: z.input<typeof ViewSchema>,
-  cache: DashboardCache = createDashboardCache()
+  _cache: DashboardCache | undefined,
+  db: TenantDb
 ): Promise<Result<ManagerDashboardView, DashboardServiceError>> {
-  const parsed = ViewSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const cache = dashboardCacheForClient(client);
+
+    const parsed = ViewSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const { data } = parsed;
     const today = new Date();
-    const currentWeek = loadCalendarWeek(data, {
-      anchorDate: today,
-      role: "manager",
-      scope: { type: "my_team" },
-    });
-    const nextWeek = loadCalendarWeek(data, {
-      anchorDate: addDays(today, COVERAGE_SECOND_WEEK_OFFSET_DAYS),
-      role: "manager",
-      scope: { type: "my_team" },
-    });
+    const currentWeek = await loadCalendarWeek(
+      data,
+      {
+        anchorDate: today,
+        role: "manager",
+        scope: { type: "all_teams" },
+      },
+      client
+    );
+    const nextWeek = await loadCalendarWeek(
+      data,
+      {
+        anchorDate: addDays(today, COVERAGE_SECOND_WEEK_OFFSET_DAYS),
+        role: "manager",
+        scope: { type: "all_teams" },
+      },
+      client
+    );
     const timelineWeek = data.weekAnchor
-      ? loadCalendarWeek(data, {
-          anchorDate: data.weekAnchor,
-          role: "manager",
-          scope: { type: "my_team" },
-        })
+      ? await loadCalendarWeek(
+          data,
+          {
+            anchorDate: data.weekAnchor,
+            role: "manager",
+            scope: { type: "all_teams" },
+          },
+          client
+        )
       : currentWeek;
     const [
       baseResult,
@@ -286,34 +323,36 @@ export async function getManagerView(
       approvalQueue,
       timeline,
       coverage,
-    ] = await Promise.all([
-      loadBaseView(data, cache),
-      getSettings({
-        clerkOrgId: data.clerkOrgId,
-        organisationId: data.organisationId,
-      }),
-      tenantDatabase(data.clerkOrgId).person.count({
+    ] = [
+      await loadBaseView(data, cache, client),
+      await getAccountApprovalSettings({ clerkOrgId: data.clerkOrgId }, client),
+      await client.person.count({
         where: {
           archived_at: null,
           clerk_org_id: data.clerkOrgId,
           manager_person_id: data.personId,
-          organisation_id: data.organisationId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: data.clerkOrgId,
+          },
         },
       }),
-      managerScopePersonIds({
-        actingPersonId: data.personId,
-        clerkOrgId: data.clerkOrgId,
-        organisationId: data.organisationId,
-      }),
-      loadApprovalQueue(data, approvalRole(data.actingRole)),
-      timelineSection(timelineWeek, {
+      await managerScopePersonIds(
+        {
+          actingPersonId: data.personId,
+          clerkOrgId: data.clerkOrgId,
+        },
+        client
+      ),
+      await loadApprovalQueue(data, approvalRole(data.actingRole), client),
+      await timelineSection(timelineWeek, {
         actingPersonId: data.personId,
         onlyPeopleWithEntries: false,
         rowLimit: MANAGER_TIMELINE_ROW_LIMIT,
         today,
       }),
-      loadCoverageSection(data, [currentWeek, nextWeek], today),
-    ]);
+      await loadCoverageSection(data, [currentWeek, nextWeek], today, client),
+    ];
     if (!baseResult.ok) {
       return baseResult;
     }
@@ -338,19 +377,24 @@ export async function getManagerView(
         timeline,
       },
     };
-  } catch {
-    return unknownError("Failed to build manager dashboard.");
   }
 }
 export async function getAdminView(
   input: z.input<typeof ViewSchema>,
-  cache: DashboardCache = createDashboardCache()
+  _cache: DashboardCache | undefined,
+  db: TenantDb
 ): Promise<Result<AdminDashboardView, DashboardServiceError>> {
-  const parsed = ViewSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error);
-  }
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const cache = dashboardCacheForClient(client);
+
+    const parsed = ViewSchema.safeParse(input);
+    if (!parsed.success) {
+      return validationError(parsed.error);
+    }
     const { data } = parsed;
     const adminRole = data.actingRole === "owner" ? "owner" : "admin";
     const today = new Date();
@@ -360,35 +404,43 @@ export async function getAdminView(
       peopleCountResult,
       approvalQueue,
       timeline,
-    ] = await Promise.all([
-      loadBaseView(data, cache),
-      tenantDatabase(input.clerkOrgId).organisation.findFirst({
+    ] = [
+      await loadBaseView(data, cache, client),
+      await client.organisation.findFirst({
         select: { name: true },
         where: {
           clerk_org_id: data.clerkOrgId,
-          id: data.organisationId,
+          id:
+            data.companyIds?.length === 1
+              ? data.companyIds[0]
+              : data.organisationId,
         },
       }),
-      listPeople({
-        actingPersonId: data.personId,
-        clerkOrgId: data.clerkOrgId,
-        filters: {
-          includeArchived: false,
-          personType: "all",
-          xeroLinked: "all",
-          xeroSyncFailedOnly: false,
+      await client.person.count({
+        where: {
+          clerk_org_id: data.clerkOrgId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: data.clerkOrgId,
+          },
+          ...(data.companyIds
+            ? { organisation_id: { in: data.companyIds } }
+            : {}),
+          archived_at: null,
+          is_active: true,
         },
-        organisationId: data.organisationId,
-        pagination: { pageSize: 1 },
-        role: adminRole,
       }),
-      loadApprovalQueue(data, approvalRole(adminRole)),
-      timelineSection(
-        loadCalendarWeek(data, {
-          anchorDate: data.weekAnchor ?? today,
-          role: adminRole,
-          scope: { type: "all_teams" },
-        }),
+      await loadApprovalQueue(data, approvalRole(adminRole), client),
+      await timelineSection(
+        await loadCalendarWeek(
+          data,
+          {
+            anchorDate: data.weekAnchor ?? today,
+            role: adminRole,
+            scope: { type: "all_teams" },
+          },
+          client
+        ),
         {
           actingPersonId: data.personId,
           onlyPeopleWithEntries: true,
@@ -396,7 +448,7 @@ export async function getAdminView(
           today,
         }
       ),
-    ]);
+    ];
     if (!baseResult.ok) {
       return baseResult;
     }
@@ -407,151 +459,165 @@ export async function getAdminView(
         approvalQueue,
         header: {
           ...baseResult.value.header,
-          organisationName: organisation?.name ?? "Organisation",
+          organisationName:
+            data.companyIds?.length === 1
+              ? (organisation?.name ?? "Company")
+              : "All companies",
           roleLabel: adminRole === "owner" ? "Owner" : "Admin",
-          totalActivePeopleCount: peopleCountResult.ok
-            ? peopleCountResult.value.totalCount
-            : 0,
+          totalActivePeopleCount: peopleCountResult,
         },
         timeline,
       },
     };
-  } catch {
-    return unknownError("Failed to build admin dashboard.");
   }
 }
 async function buildEmployeeView(
   input: ViewInput,
-  cache: DashboardCache
+  cache: DashboardCache,
+  db: TenantDb
 ): Promise<Result<EmployeeDashboardView, DashboardServiceError>> {
-  try {
-    const today = new Date();
-    const [baseResult, timeline] = await Promise.all([
-      loadBaseView(input, cache),
-      timelineSection(
-        loadCalendarWeek(input, {
+  const today = new Date();
+  const [baseResult, timeline] = [
+    await loadBaseView(input, cache, db),
+    await timelineSection(
+      await loadCalendarWeek(
+        input,
+        {
           anchorDate: input.weekAnchor ?? today,
           role: "viewer",
-          scope: { type: "my_self" },
-        }),
-        {
-          actingPersonId: input.personId,
-          onlyPeopleWithEntries: false,
-          rowLimit: EMPLOYEE_TIMELINE_ROW_LIMIT,
-          today,
-        }
+          scope: { type: "all_teams" },
+        },
+        db
       ),
-    ]);
-    if (!baseResult.ok) {
-      return baseResult;
-    }
-    const myRequests = await loadMyRequests(input, {
+      {
+        actingPersonId: input.personId,
+        onlyPeopleWithEntries: false,
+        rowLimit: EMPLOYEE_TIMELINE_ROW_LIMIT,
+        today,
+      }
+    ),
+  ];
+  if (!baseResult.ok) {
+    return baseResult;
+  }
+  const myRequests = await loadMyRequests(
+    input,
+    {
       timezone: baseResult.value.header.timezone ?? DEFAULT_TIMEZONE,
       today,
-    });
-    return {
-      ok: true,
-      value: {
-        ...baseResult.value,
-        myRequests,
-        timeline,
-      },
-    };
-  } catch {
-    return unknownError("Failed to build employee dashboard.");
-  }
+    },
+    db
+  );
+  return {
+    ok: true,
+    value: {
+      ...baseResult.value,
+      myRequests,
+      timeline,
+    },
+  };
 }
 type DashboardBaseData = Omit<DashboardBaseView, "timeline">;
 async function loadBaseView(
   input: ViewInput,
-  cache: DashboardCache
+  cache: DashboardCache,
+  db: TenantDb
 ): Promise<Result<DashboardBaseData, DashboardServiceError>> {
   return await cache.getOrLoad(
     cacheKey("base", input),
-    async () => await buildBaseView(input, cache)
+    async () => await buildBaseView(input, cache, db)
   );
 }
 async function buildBaseView(
   input: ViewInput,
-  cache: DashboardCache
+  cache: DashboardCache,
+  db: TenantDb
 ): Promise<Result<DashboardBaseData, DashboardServiceError>> {
-  try {
-    const [profileResult, xeroStateResult] = await Promise.all([
-      getPersonProfile({
+  const [profileResult, xeroStateResult] = [
+    await getPersonProfile(
+      {
         actingPersonId: input.personId,
         actingUserId: input.userId,
         clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
         personId: input.personId,
         role: peopleRole(input.actingRole),
-      }),
-      getXeroConnectionStateForScope({
+      },
+      db
+    ),
+    await getXeroConnectionStateForScope(
+      {
         clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
-      }),
-    ]);
-    const xeroConnectionState = xeroStateResult.ok
-      ? xeroStateResult.value.state
-      : "unavailable";
-    if (!profileResult.ok) {
-      if (profileResult.error.code === "person_not_found") {
-        return personNotFound();
-      }
-      return unknownError(profileResult.error.message);
+      },
+      db
+    ),
+  ];
+  const xeroConnectionState = xeroStateResult.ok
+    ? xeroStateResult.value.state
+    : "unavailable";
+  if (!profileResult.ok) {
+    if (profileResult.error.code === "person_not_found") {
+      return personNotFound();
     }
-    const profile = profileResult.value;
-    const [actionItems, publicHolidays] = await Promise.all([
-      cache.getOrLoad(
-        cacheKey("action-items", input),
-        async () => await loadActionItemsCard(input)
-      ),
-      cache.getOrLoad(
-        cacheKey("public-holidays", input),
-        async () =>
-          await loadPublicHolidayCard({
+    return unknownError(profileResult.error.message);
+  }
+  const profile = profileResult.value;
+  const [actionItems, publicHolidays] = [
+    await cache.getOrLoad(
+      cacheKey("action-items", input),
+      async () => await loadActionItemsCard(input, db)
+    ),
+    await cache.getOrLoad(
+      cacheKey("public-holidays", input),
+      async () =>
+        await loadPublicHolidayCard(
+          {
             clerkOrgId: input.clerkOrgId,
             locationId: profile.header.location?.id ?? null,
             organisationId: input.organisationId,
-          })
-      ),
-    ]);
-    return {
-      ok: true,
-      value: {
-        actionItems,
-        balances: readySection({
-          isXeroLinked: profile.balances.xeroLinked,
-          lastFetchedAt: profile.balances.balancesLastFetchedAt,
-          rows: profile.balances.rows,
-          xeroConnectionState,
-        }),
-        header: {
-          firstName: profile.header.firstName,
-          lastName: profile.header.lastName,
-          locationName: profile.header.location?.name ?? null,
-          roleLabel: "Employee",
-          timezone: profile.header.location?.timezone ?? null,
-        },
-        publicHolidays,
+          },
+          db
+        )
+    ),
+  ];
+  return {
+    ok: true,
+    value: {
+      actionItems,
+      balances: readySection({
+        isXeroLinked: profile.balances.xeroLinked,
+        lastFetchedAt: profile.balances.balancesLastFetchedAt,
+        rows: profile.balances.rows,
+        xeroConnectionState,
+      }),
+      header: {
+        firstName: profile.header.firstName,
+        lastName: profile.header.lastName,
+        locationName: profile.header.location?.name ?? null,
+        roleLabel: "Employee",
+        timezone: profile.header.location?.timezone ?? null,
       },
-    };
-  } catch {
-    return unknownError("Failed to build dashboard.");
-  }
+      publicHolidays,
+    },
+  };
 }
 async function loadActionItemsCard(
-  input: ViewInput
+  input: ViewInput,
+  db: TenantDb
 ): Promise<DashboardBaseView["actionItems"]> {
-  const notificationsResult = await listForUser({
-    clerkOrgId: input.clerkOrgId,
-    filters: {
-      type: ["leave_info_requested"],
-      unreadOnly: true,
+  const notificationsResult = await listForUser(
+    {
+      clerkOrgId: input.clerkOrgId,
+      filters: {
+        type: ["leave_info_requested"],
+        unreadOnly: true,
+      },
+      pagination: { pageSize: LIST_ROW_LIMIT },
+      userId: input.userId,
     },
-    organisationId: input.organisationId,
-    pagination: { pageSize: LIST_ROW_LIMIT },
-    userId: input.userId,
-  });
+    db
+  );
   if (!notificationsResult.ok) {
     return errorSection(notificationsResult.error.message);
   }
@@ -575,21 +641,25 @@ async function loadActionItemsCard(
  */
 async function loadMyRequests(
   input: ViewInput,
-  options: { timezone: string; today: Date }
+  options: { timezone: string; today: Date },
+  db: TenantDb
 ): Promise<EmployeeDashboardView["myRequests"]> {
   const todayStart = new Date(
     `${dateKeyInTimeZone(options.today, options.timezone)}T00:00:00.000Z`
   );
-  const recordsResult = await listMyRecords({
-    clerkOrgId: input.clerkOrgId,
-    filters: {
-      approvalStatus: MY_REQUEST_STATUSES,
-      dateRange: { from: todayStart },
-      includeArchived: false,
+  const recordsResult = await listMyRecords(
+    {
+      clerkOrgId: input.clerkOrgId,
+      filters: {
+        approvalStatus: MY_REQUEST_STATUSES,
+        dateRange: { from: todayStart },
+        includeArchived: false,
+      },
+      organisationId: input.organisationId,
+      userId: input.userId,
     },
-    organisationId: input.organisationId,
-    userId: input.userId,
-  });
+    db
+  );
   if (!recordsResult.ok) {
     return errorSection(recordsResult.error.message);
   }
@@ -609,7 +679,7 @@ async function loadMyRequests(
     organisationId: input.organisationId,
     startsAt: record.startsAt,
   }));
-  const referenceData = await loadWorkingDaysReferenceData(durationInputs);
+  const referenceData = await loadWorkingDaysReferenceData(durationInputs, db);
   return readySection({
     records: records.map((record, index) => {
       const durationInput = durationInputs[index];
@@ -642,25 +712,65 @@ function toMyRequest(
     startsAt: record.startsAt,
   };
 }
-async function loadApprovalQueue(
-  input: ViewInput,
-  role: ApprovalRole
+type ApprovalQueueInput = Pick<
+  ViewInput,
+  "clerkOrgId" | "userId" | "companyIds"
+> & { personId: string | null };
+
+export async function getDashboardApprovalQueue(
+  input: ApprovalQueueInput & { actingRole: ApprovalRole },
+  db: TenantDb
 ): Promise<DashboardSection<DashboardApprovalQueue>> {
-  const result = await listForApprover({
-    actingPersonId: input.personId,
-    actingUserId: input.userId,
-    clerkOrgId: input.clerkOrgId,
-    filters: { status: ["submitted"] },
-    organisationId: input.organisationId,
-    pageSize: 200,
-    role,
-  });
-  if (!result.ok) {
-    return errorSection(result.error.message);
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+    return await loadApprovalQueue(input, input.actingRole, client);
   }
-  const submitted = unwrapApprovalItems(result.value).filter(
-    (record) => record.approvalStatus === "submitted"
+}
+
+async function loadApprovalQueue(
+  input: ApprovalQueueInput,
+  role: ApprovalRole,
+  db: TenantDb
+): Promise<DashboardSection<DashboardApprovalQueue>> {
+  const companies = await resolveAccountCompanies(input.clerkOrgId, db);
+  const selection = selectCalendarCompanies(
+    { companyIds: input.companyIds },
+    companies
   );
+  if (!selection.ok) {
+    return errorSection(selection.error.message);
+  }
+  const submitted: ApprovalListItem[] = [];
+  let cursor: string | null = null;
+  do {
+    const result = await listForApprover(
+      {
+        actingPersonId: input.personId,
+        actingUserId: input.userId,
+        clerkOrgId: input.clerkOrgId,
+        cursor,
+        filters: { status: ["submitted"] },
+        pageSize: 200,
+        role,
+      },
+      db
+    );
+    if (!result.ok) {
+      return errorSection(result.error.message);
+    }
+    submitted.push(
+      ...result.value.items.filter(
+        (record) =>
+          record.approvalStatus === "submitted" &&
+          selection.value.some(
+            (company) => company.id === record.organisationId
+          )
+      )
+    );
+    cursor = result.value.nextCursor;
+  } while (cursor);
   return readySection({
     count: submitted.length,
     rows: submitted
@@ -686,28 +796,32 @@ async function loadApprovalQueue(
 }
 type CalendarWeekResult = Result<CalendarRange, CalendarServiceError>;
 /** Approved records for one calendar week in the given scope. */
-function loadCalendarWeek(
+async function loadCalendarWeek(
   input: ViewInput,
-  options: { anchorDate: Date; role: CalendarRole; scope: CalendarScope }
+  options: { anchorDate: Date; role: CalendarRole; scope: CalendarScope },
+  db: TenantDb
 ): Promise<CalendarWeekResult> {
-  return getCalendarRange({
-    actingPersonId: input.personId,
-    actingUserId: input.userId,
-    anchorDate: options.anchorDate,
-    clerkOrgId: input.clerkOrgId,
-    filters: {
-      approvalStatus: ["approved"],
-      includeDrafts: false,
-      recordTypeCategory: "all",
+  return await getCalendarRange(
+    {
+      actingPersonId: input.personId,
+      actingUserId: input.userId,
+      anchorDate: options.anchorDate,
+      clerkOrgId: input.clerkOrgId,
+      companyIds: input.companyIds,
+      filters: {
+        approvalStatus: ["approved"],
+        includeDrafts: false,
+        recordTypeCategory: "all",
+      },
+      role: options.role,
+      scope: options.scope,
+      view: "week",
     },
-    organisationId: input.organisationId,
-    role: options.role,
-    scope: options.scope,
-    view: "week",
-  });
+    db
+  );
 }
 async function timelineSection(
-  week: Promise<CalendarWeekResult>,
+  week: CalendarWeekResult,
   options: {
     actingPersonId: string;
     onlyPeopleWithEntries: boolean;
@@ -715,18 +829,21 @@ async function timelineSection(
     today: Date;
   }
 ): Promise<DashboardSection<TimelineWeek>> {
-  const result = await week;
+  const result = week;
   if (!result.ok) {
-    return errorSection(result.error.message);
+    return await errorSection(result.error.message);
   }
-  return readySection(buildTimelineWeek({ ...options, range: result.value }));
+  return await readySection(
+    buildTimelineWeek({ ...options, range: result.value })
+  );
 }
 async function loadCoverageSection(
   input: ViewInput,
-  weeks: Promise<CalendarWeekResult>[],
-  today: Date
+  weeks: CalendarWeekResult[],
+  today: Date,
+  db: TenantDb
 ): Promise<DashboardSection<CoverageMap>> {
-  const results = await Promise.all(weeks);
+  const results = weeks;
   const ranges: CalendarRange[] = [];
   for (const result of results) {
     if (!result.ok) {
@@ -734,28 +851,39 @@ async function loadCoverageSection(
     }
     ranges.push(result.value);
   }
-  const coverage = await loadManagerCoverage({
-    clerkOrgId: input.clerkOrgId,
-    organisationId: input.organisationId,
-    ranges,
-    today,
-  });
+  const coverage = await loadManagerCoverage(
+    {
+      clerkOrgId: input.clerkOrgId,
+      companyIds: input.companyIds,
+      organisationId: input.organisationId,
+      ranges,
+      today,
+    },
+    db
+  );
   return coverage.ok
     ? readySection(coverage.value)
     : errorSection(coverage.error.message);
 }
-async function loadPublicHolidayCard(input: {
-  clerkOrgId: string;
-  locationId: string | null;
-  organisationId: string;
-}): Promise<EmployeeDashboardView["publicHolidays"]> {
+async function loadPublicHolidayCard(
+  input: {
+    clerkOrgId: string;
+    locationId: string | null;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<EmployeeDashboardView["publicHolidays"]> {
   const today = startOfDay(new Date());
-  const holidayResult = await resolvePublicHolidays({
-    clerkOrgId: input.clerkOrgId as ClerkOrgId,
-    from: toDateOnly(today),
-    organisationId: input.organisationId as OrganisationId,
-    to: toDateOnly(addDays(today, 400)),
-  });
+  const holidayResult = await resolvePublicHolidays(
+    {
+      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      from: toDateOnly(today),
+      organisationId: input.organisationId as OrganisationId,
+      to: toDateOnly(addDays(today, 400)),
+    },
+    undefined,
+    db
+  );
   if (!holidayResult.ok) {
     return errorSection(holidayResult.error.message);
   }
@@ -843,15 +971,16 @@ function unknownError(message: string): Result<never, DashboardServiceError> {
 }
 function cacheKey(scope: string, input: ViewInput) {
   const week = input.weekAnchor ? toDateOnly(input.weekAnchor) : "current";
-  return `${scope}:${input.clerkOrgId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}:${week}`;
+  return `${scope}:${input.clerkOrgId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}:${input.companyIds?.slice().sort().join(",") ?? "all"}:${week}`;
 }
-function unwrapApprovalItems(
-  value:
-    | ApprovalListItem[]
-    | {
-        items: ApprovalListItem[];
-        nextCursor: string | null;
-      }
-): ApprovalListItem[] {
-  return Array.isArray(value) ? value : value.items;
+
+const dashboardCaches = new WeakMap<TenantDb, DashboardCache>();
+function dashboardCacheForClient(db: TenantDb): DashboardCache {
+  const cached = dashboardCaches.get(db);
+  if (cached) {
+    return cached;
+  }
+  const cache = createDashboardCache();
+  dashboardCaches.set(db, cache);
+  return cache;
 }

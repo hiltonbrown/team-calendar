@@ -1,5 +1,5 @@
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { assertTenantDb, type TenantDb } from "@repo/database";
 import type { XeroAccessContext } from "../write/types";
 export type ResolutionError =
   | {
@@ -14,14 +14,18 @@ export type ResolutionError =
       code: "unknown_error";
       message: string;
     };
-export async function resolveXeroEmployeeId(input: {
-  personId: string;
-  xeroConnection: XeroAccessContext;
-}): Promise<Result<string, ResolutionError>> {
-  try {
-    const person = await tenantDatabase(
-      input.xeroConnection.clerk_org_id
-    ).person.findFirst({
+export async function resolveXeroEmployeeId(
+  input: {
+    personId: string;
+    xeroConnection: XeroAccessContext;
+  },
+  db: TenantDb
+): Promise<Result<string, ResolutionError>> {
+  assertTenantDb(db, input.xeroConnection.clerk_org_id);
+  const run = async (
+    client: TenantDb
+  ): Promise<Result<string, ResolutionError>> => {
+    const person = await client.person.findFirst({
       select: {
         source_person_key: true,
         source_system: true,
@@ -34,9 +38,7 @@ export async function resolveXeroEmployeeId(input: {
       },
     });
     if (!person) {
-      const exists = await tenantDatabase(
-        input.xeroConnection.clerk_org_id
-      ).person.findFirst({
+      const exists = await client.person.findFirst({
         select: { id: true },
         where: {
           clerk_org_id: input.xeroConnection.clerk_org_id,
@@ -63,13 +65,7 @@ export async function resolveXeroEmployeeId(input: {
       };
     }
     return { ok: true, value: person.source_person_key };
-  } catch {
-    return {
-      error: {
-        code: "unknown_error",
-        message: "Failed to resolve Xero employee mapping.",
-      },
-      ok: false,
-    };
-  }
+  };
+  assertTenantDb(db, input.xeroConnection.clerk_org_id);
+  return await run(db);
 }

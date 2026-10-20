@@ -8,7 +8,7 @@ import {
   startOfUtcDay,
   toDateOnly,
 } from "@repo/core";
-import { scopedQuery, tenantDatabase, tenantTransaction } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 
 /**
  * Custom holidays an organisation adds itself. Official holidays come from the
@@ -29,9 +29,11 @@ export interface AddCustomHolidayInput {
 }
 
 export async function addCustomHoliday(
-  input: AddCustomHolidayInput
+  input: AddCustomHolidayInput,
+  db: TenantDb
 ): Promise<Result<{ id: string }>> {
-  try {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof addCustomHoliday> => {
     const name = input.name.trim();
     if (name === "") {
       return {
@@ -62,9 +64,7 @@ export async function addCustomHoliday(
 
     const dateOnly = toDateOnly(input.date);
     const sourceRemoteId = `custom:${dateOnly}:${name.toLowerCase()}`;
-    const existing = await tenantDatabase(
-      input.clerkOrgId
-    ).publicHoliday.findFirst({
+    const existing = await client.publicHoliday.findFirst({
       select: { id: true },
       where: {
         ...scopedQuery(input.clerkOrgId, input.organisationId),
@@ -82,42 +82,43 @@ export async function addCustomHoliday(
       };
     }
 
-    const holiday = await tenantDatabase(input.clerkOrgId).publicHoliday.create(
-      {
-        data: {
-          clerk_org_id: input.clerkOrgId,
-          country_code: countryCode,
-          created_by_user_id: input.userId,
-          default_classification: "non_working",
-          holiday_date: startOfUtcDay(dateOnly),
-          holiday_type: "custom",
-          name,
-          organisation_id: input.organisationId,
-          region_code: regionCode,
-          source: "manual",
-          source_remote_id: sourceRemoteId,
-          updated_by_user_id: input.userId,
-        },
-        select: { id: true },
-      }
-    );
+    const holiday = await client.publicHoliday.create({
+      data: {
+        clerk_org_id: input.clerkOrgId,
+        country_code: countryCode,
+        created_by_user_id: input.userId,
+        default_classification: "non_working",
+        holiday_date: startOfUtcDay(dateOnly),
+        holiday_type: "custom",
+        name,
+        organisation_id: input.organisationId,
+        region_code: regionCode,
+        source: "manual",
+        source_remote_id: sourceRemoteId,
+        updated_by_user_id: input.userId,
+      },
+      select: { id: true },
+    });
 
     return { ok: true, value: { id: holiday.id } };
-  } catch {
-    return {
-      error: appError("internal", "Failed to add custom holiday"),
-      ok: false,
-    };
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function deleteCustomHoliday(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  holidayId: string
+  holidayId: string,
+  db: TenantDb
 ): Promise<Result<{ id: string }>> {
-  try {
-    const holiday = await tenantDatabase(clerkOrgId).publicHoliday.findFirst({
+  assertTenantDb(db, clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof deleteCustomHoliday> => {
+    const holiday = await client.publicHoliday.findFirst({
       select: { id: true },
       where: {
         ...scopedQuery(clerkOrgId, organisationId),
@@ -128,7 +129,7 @@ export async function deleteCustomHoliday(
     if (!holiday) {
       return { error: appError("not_found", "Holiday not found"), ok: false };
     }
-    await tenantTransaction(clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       await tx.publicHolidayPreference.deleteMany({
         where: {
           ...scopedQuery(clerkOrgId, organisationId),
@@ -138,12 +139,11 @@ export async function deleteCustomHoliday(
       await tx.publicHoliday.delete({
         where: { ...scopedQuery(clerkOrgId, organisationId), id: holidayId },
       });
-    });
+    })(client);
     return { ok: true, value: { id: holidayId } };
-  } catch {
-    return {
-      error: appError("internal", "Failed to delete custom holiday"),
-      ok: false,
-    };
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, clerkOrgId);
+    return await run(db);
+  })();
 }

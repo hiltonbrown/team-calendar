@@ -11,8 +11,16 @@ import {
   type WizardSnapshot,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import {
+  afterTenantCommit,
+  lockPlanLimitMutations,
+  type TenantDb,
+  withTenantDb,
+  withTenantResult,
+} from "@repo/database";
 import { setXeroSetupSkipped } from "@repo/database/queries/onboarding";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { updateOrganisationAction } from "@/app/(authenticated)/settings/general/_actions";
@@ -20,7 +28,6 @@ import { connectXeroAction } from "@/app/(authenticated)/settings/integrations/x
 import { inviteMember } from "@/app/actions/settings/invite-member";
 import { AU_TIMEZONE_VALUES } from "@/lib/onboarding/au-timezones";
 import { createManualPerson } from "@/lib/server/create-manual-person";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import { captureOnboardingEvent } from "@/lib/server/onboarding-analytics";
 
 type ActionError = WizardError | { code: "validation_error"; message: string };
@@ -40,6 +47,7 @@ const DetailsSchema = OrganisationInput.extend({
 export async function saveDetailsAction(
   input: z.input<typeof DetailsSchema>
 ): Promise<OnboardingActionResult<WizardSnapshot>> {
+  assertNoTenantTransaction("saveDetailsAction");
   const parsed = DetailsSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -64,6 +72,7 @@ export async function saveDetailsAction(
 export async function startXeroFromOnboardingAction(
   input: z.input<typeof OrganisationInput>
 ): Promise<OnboardingActionResult<{ redirectUrl: string }>> {
+  assertNoTenantTransaction("startXeroFromOnboardingAction");
   const parsed = OrganisationInput.safeParse(input);
   if (!parsed.success) {
     return validationError();
@@ -82,23 +91,36 @@ export async function startXeroFromOnboardingAction(
 export async function skipXeroAction(
   input: z.input<typeof OrganisationInput>
 ): Promise<OnboardingActionResult<WizardSnapshot>> {
+  assertNoTenantTransaction("skipXeroAction");
   const parsed = OrganisationInput.safeParse(input);
   if (!parsed.success) {
     return validationError();
   }
-  const actor = await resolveWizardActor(parsed.data.organisationId);
+  const actor = await resolveWizardIdentity(parsed.data.organisationId);
   if (!actor.ok) {
     return actor;
   }
-  const skipped = await setXeroSetupSkipped(
-    actor.value.clerkOrgId,
-    actor.value.organisationId,
-    true
-  );
-  if (!skipped.ok) {
-    return unknownError(skipped.error.message);
+  const result = await runWizardMutation(actor.value, async (db) => {
+    const skipped = await setXeroSetupSkipped(
+      actor.value.clerkOrgId,
+      actor.value.organisationId,
+      true,
+      db
+    );
+    if (!skipped.ok) {
+      return unknownError(skipped.error.message);
+    }
+    return advanceWizard(actor.value, "xero", db);
+  });
+  if (result.ok) {
+    await captureOnboardingEvent({
+      distinctId: actor.value.userId,
+      event: "Onboarding Step Completed",
+      properties: { mode: result.value.mode, step: "xero" },
+    });
+    revalidatePath("/onboarding");
   }
-  return await advance(actor.value, "xero");
+  return result;
 }
 
 const AdvanceSchema = OrganisationInput.extend({ from: StepSchema });
@@ -106,11 +128,12 @@ const AdvanceSchema = OrganisationInput.extend({ from: StepSchema });
 export async function advanceStepAction(
   input: z.input<typeof AdvanceSchema>
 ): Promise<OnboardingActionResult<WizardSnapshot>> {
+  assertNoTenantTransaction("advanceStepAction");
   const parsed = AdvanceSchema.safeParse(input);
   if (!parsed.success) {
     return validationError();
   }
-  const actor = await resolveWizardActor(parsed.data.organisationId);
+  const actor = await resolveWizardIdentity(parsed.data.organisationId);
   if (!actor.ok) {
     return actor;
   }
@@ -126,11 +149,12 @@ const LinkSelfSchema = OrganisationInput.extend({
 export async function linkSelfAction(
   input: z.input<typeof LinkSelfSchema>
 ): Promise<OnboardingActionResult<{ personId: string }>> {
+  assertNoTenantTransaction("linkSelfAction");
   const parsed = LinkSelfSchema.safeParse(input);
   if (!parsed.success) {
     return validationError();
   }
-  const actor = await resolveWizardActor(parsed.data.organisationId);
+  const actor = await resolveWizardIdentity(parsed.data.organisationId);
   if (!actor.ok) {
     return actor;
   }
@@ -139,54 +163,66 @@ export async function linkSelfAction(
     clerk_org_id: actor.value.clerkOrgId,
     organisation_id: actor.value.organisationId,
   };
-  try {
-    const alreadyLinked = await tenantDatabase(
-      actor.value.clerkOrgId
-    ).person.findFirst({
-      select: { id: true },
-      where: { ...scope, clerk_user_id: actor.value.userId },
-    });
-    if (alreadyLinked) {
-      return validationError("Your account is already linked to a person.");
+  return runWizardMutation(
+    actor.value,
+    async (db): ReturnType<typeof linkSelfAction> => {
+      await lockPlanLimitMutations(actor.value.clerkOrgId, db);
+
+      const alreadyLinked = await db.person.findFirst({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: actor.value.clerkOrgId,
+          clerk_user_id: actor.value.userId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: actor.value.clerkOrgId,
+          },
+        },
+      });
+      if (alreadyLinked) {
+        return validationError("Your account is already linked to a person.");
+      }
+      const linked = await db.person.updateMany({
+        data: { clerk_user_id: actor.value.userId },
+        where: { ...scope, clerk_user_id: null, id: parsed.data.personId },
+      });
+      if (linked.count === 0) {
+        return validationError(
+          "That person is already linked to another account. Choose someone else."
+        );
+      }
+      await db.auditEvent.create({
+        data: {
+          action: "person.linked_to_user",
+          actor_user_id: actor.value.userId,
+          clerk_org_id: actor.value.clerkOrgId,
+          metadata: { source: "onboarding" },
+          organisation_id: actor.value.organisationId,
+          resource_id: parsed.data.personId,
+          resource_type: "person",
+        },
+      });
+      afterTenantCommit(db, () => {
+        revalidatePath("/onboarding");
+
+        return Promise.resolve();
+      });
+      return { ok: true, value: { personId: parsed.data.personId } };
     }
-    const linked = await tenantDatabase(
-      actor.value.clerkOrgId
-    ).person.updateMany({
-      data: { clerk_user_id: actor.value.userId },
-      where: { ...scope, clerk_user_id: null, id: parsed.data.personId },
-    });
-    if (linked.count === 0) {
-      return validationError(
-        "That person is already linked to another account. Choose someone else."
-      );
-    }
-    await tenantDatabase(actor.value.clerkOrgId).auditEvent.create({
-      data: {
-        action: "person.linked_to_user",
-        actor_user_id: actor.value.userId,
-        clerk_org_id: actor.value.clerkOrgId,
-        metadata: { source: "onboarding" },
-        organisation_id: actor.value.organisationId,
-        resource_id: parsed.data.personId,
-        resource_type: "person",
-      },
-    });
-  } catch {
-    return unknownError("Your account could not be linked. Try again.");
-  }
-  revalidatePath("/onboarding");
-  return { ok: true, value: { personId: parsed.data.personId } };
+  );
 }
 
 // Links by matching email, or creates the admin's own person record.
 export async function createSelfAction(
   input: z.input<typeof OrganisationInput>
 ): Promise<OnboardingActionResult<{ personId: string }>> {
+  assertNoTenantTransaction("createSelfAction");
   const parsed = OrganisationInput.safeParse(input);
   if (!parsed.success) {
     return validationError();
   }
-  const actor = await resolveWizardActor(parsed.data.organisationId);
+  const actor = await resolveWizardIdentity(parsed.data.organisationId);
   if (!actor.ok) {
     return actor;
   }
@@ -194,28 +230,38 @@ export async function createSelfAction(
   if (!user) {
     return validationError();
   }
-  const person = await ensureCurrentUserPerson(
-    {
-      clerkOrgId: actor.value.clerkOrgId as ClerkOrgId,
-      organisationId: actor.value.organisationId as OrganisationId,
-    },
-    {
-      avatarUrl: user.imageUrl,
-      clerkUserId: user.id,
-      displayName:
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.emailAddresses[0]?.emailAddress ||
-        user.id,
-      email: user.emailAddresses[0]?.emailAddress,
-      firstName: user.firstName,
-      lastName: user.lastName,
+  return runWizardMutation(
+    actor.value,
+    async (db): ReturnType<typeof createSelfAction> => {
+      const person = await ensureCurrentUserPerson(
+        {
+          clerkOrgId: actor.value.clerkOrgId as ClerkOrgId,
+          organisationId: actor.value.organisationId as OrganisationId,
+        },
+        {
+          avatarUrl: user.imageUrl,
+          clerkUserId: user.id,
+          displayName:
+            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+            user.emailAddresses[0]?.emailAddress ||
+            user.id,
+          email: user.emailAddresses[0]?.emailAddress,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+        db
+      );
+      if (!person.ok) {
+        return unknownError(person.error.message);
+      }
+      afterTenantCommit(db, () => {
+        revalidatePath("/onboarding");
+
+        return Promise.resolve();
+      });
+      return { ok: true, value: { personId: person.value.id } };
     }
   );
-  if (!person.ok) {
-    return unknownError(person.error.message);
-  }
-  revalidatePath("/onboarding");
-  return { ok: true, value: { personId: person.value.id } };
 }
 
 const AddPersonSchema = OrganisationInput.extend({
@@ -227,27 +273,40 @@ const AddPersonSchema = OrganisationInput.extend({
 export async function addPersonAction(
   input: z.input<typeof AddPersonSchema>
 ): Promise<OnboardingActionResult<{ personId: string }>> {
+  assertNoTenantTransaction("addPersonAction");
   const parsed = AddPersonSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const actor = await resolveWizardActor(parsed.data.organisationId);
+  const actor = await resolveWizardIdentity(parsed.data.organisationId);
   if (!actor.ok) {
     return actor;
   }
-  const created = await createManualPerson({
-    clerkOrgId: actor.value.clerkOrgId as ClerkOrgId,
-    email: parsed.data.email,
-    employmentType: "employee",
-    firstName: parsed.data.firstName,
-    lastName: parsed.data.lastName,
-    organisationId: actor.value.organisationId as OrganisationId,
-  });
-  if (!created.ok) {
-    return { error: created.error, ok: false };
-  }
-  revalidatePath("/onboarding");
-  return created;
+  return runWizardMutation(
+    actor.value,
+    async (db): ReturnType<typeof addPersonAction> => {
+      const created = await createManualPerson(
+        {
+          clerkOrgId: actor.value.clerkOrgId as ClerkOrgId,
+          email: parsed.data.email,
+          employmentType: "employee",
+          firstName: parsed.data.firstName,
+          lastName: parsed.data.lastName,
+          organisationId: actor.value.organisationId as OrganisationId,
+        },
+        db
+      );
+      if (!created.ok) {
+        return { error: created.error, ok: false };
+      }
+      afterTenantCommit(db, () => {
+        revalidatePath("/onboarding");
+
+        return Promise.resolve();
+      });
+      return created;
+    }
+  );
 }
 
 const InviteRowsSchema = OrganisationInput.extend({
@@ -273,6 +332,7 @@ export interface InviteOutcome {
 export async function sendInvitesAction(
   input: z.input<typeof InviteRowsSchema>
 ): Promise<OnboardingActionResult<{ results: InviteOutcome[] }>> {
+  assertNoTenantTransaction("sendInvitesAction");
   const parsed = InviteRowsSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -313,15 +373,18 @@ const FinishSchema = OrganisationInput.extend({ force: z.boolean() });
 export async function finishAction(
   input: z.input<typeof FinishSchema>
 ): Promise<OnboardingActionResult<{ redirectTo: "/calendar" }>> {
+  assertNoTenantTransaction("finishAction");
   const parsed = FinishSchema.safeParse(input);
   if (!parsed.success) {
     return validationError();
   }
-  const actor = await resolveWizardActor(parsed.data.organisationId);
+  const actor = await resolveWizardIdentity(parsed.data.organisationId);
   if (!actor.ok) {
     return actor;
   }
-  const result = await finishWizard(actor.value, { force: parsed.data.force });
+  const result = await runWizardMutation(actor.value, (db) =>
+    finishWizard(actor.value, { force: parsed.data.force }, db)
+  );
   if (!result.ok) {
     return result;
   }
@@ -341,7 +404,9 @@ async function advance(
   actor: WizardActor,
   from: z.infer<typeof StepSchema>
 ): Promise<OnboardingActionResult<WizardSnapshot>> {
-  const result = await advanceWizard(actor, from);
+  const result = await runWizardMutation(actor, (db) =>
+    advanceWizard(actor, from, db)
+  );
   if (!result.ok) {
     return result;
   }
@@ -354,15 +419,11 @@ async function advance(
   return result;
 }
 
-async function resolveWizardActor(
+async function resolveWizardIdentity(
   organisationId: string
 ): Promise<OnboardingActionResult<WizardActor>> {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
-  if (!(user && context.ok && isOnboardingAdmin(orgRole))) {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  if (!(orgId && user && isOnboardingAdmin(orgRole))) {
     return {
       error: {
         code: "not_authorised",
@@ -375,8 +436,8 @@ async function resolveWizardActor(
     ok: true,
     value: {
       actingRole: orgRole,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
+      clerkOrgId: orgId,
+      organisationId,
       userId: user.id,
     },
   };
@@ -394,4 +455,65 @@ function validationError(message?: string): OnboardingActionResult<never> {
 
 function unknownError(message: string): OnboardingActionResult<never> {
   return { error: { code: "unknown_error", message }, ok: false };
+}
+
+async function runWizardMutation<T>(
+  actor: WizardActor,
+  run: (db: TenantDb) => Promise<OnboardingActionResult<T>>
+): Promise<OnboardingActionResult<T>> {
+  try {
+    return await withTenantResult(
+      actor.clerkOrgId,
+      async (db): Promise<OnboardingActionResult<T>> => {
+        const company = await getOrganisationById(
+          actor.clerkOrgId as ClerkOrgId,
+          actor.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return {
+            error: {
+              code: "not_authorised",
+              message: "Organisation not found.",
+            },
+            ok: false,
+          };
+        }
+        return run(db);
+      }
+    );
+  } catch {
+    return unknownError("Could not save setup progress. Try again.");
+  }
+}
+async function resolveWizardActor(
+  organisationId: string
+): Promise<OnboardingActionResult<WizardActor>> {
+  const identity = await resolveWizardIdentity(organisationId);
+  if (!identity.ok) {
+    return identity;
+  }
+  try {
+    return await withTenantDb(
+      identity.value.clerkOrgId,
+      async (db): Promise<OnboardingActionResult<WizardActor>> => {
+        const company = await getOrganisationById(
+          identity.value.clerkOrgId as ClerkOrgId,
+          organisationId as OrganisationId,
+          db
+        );
+        return company.ok
+          ? identity
+          : {
+              error: {
+                code: "not_authorised",
+                message: "Organisation not found.",
+              },
+              ok: false,
+            };
+      }
+    );
+  } catch {
+    return unknownError("Could not load setup context.");
+  }
 }

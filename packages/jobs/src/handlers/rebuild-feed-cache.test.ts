@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
       },
     })
   ),
+  scopeDatabase: null as Record<string, unknown> | null,
   setCachedFeedBody: vi.fn(() =>
     Promise.resolve({ ok: true, value: undefined })
   ),
@@ -30,7 +31,14 @@ vi.mock("../client", () => ({
     send: vi.fn(),
   },
 }));
-vi.mock("@repo/database", () => {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       feed: {
@@ -39,7 +47,7 @@ vi.mock("@repo/database", () => {
       },
     },
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -49,13 +57,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<
+    typeof import("../../../database/src/tenant-db")
+  >("../../../database/src/tenant-db");
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/feeds", () => ({
   feedCacheKey: mocks.feedCacheKey,

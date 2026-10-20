@@ -1,6 +1,11 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const mockInngestSend = vi.hoisted(() =>
@@ -27,8 +32,8 @@ vi.mock("@repo/database", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/database")>();
   return {
     ...original,
-    tenantTransaction: (clerkOrgId, operation, options) =>
-      original.tenantTransaction(
+    withTenantDb: (clerkOrgId, operation, options) =>
+      original.withTenantDb(
         clerkOrgId,
         async (tx) =>
           operation(
@@ -372,13 +377,21 @@ describe("local persistence integration", () => {
       };
       const outcomes = await Promise.all(
         Array.from({ length: 12 }, (_, index) =>
-          acquireSyncRun(
-            {
+          withTestTenantDb(
+            tenantTestAccount({
               ...context,
               runId: fixture.id("concurrent-admission-run", index),
-            },
-            "people",
-            new Date()
+            }),
+            (db) =>
+              acquireSyncRun(
+                {
+                  ...context,
+                  runId: fixture.id("concurrent-admission-run", index),
+                },
+                "people",
+                new Date(),
+                db
+              )
           )
         )
       );
@@ -392,7 +405,9 @@ describe("local persistence integration", () => {
       expect(active).toBeDefined();
       const runId = active?.run.id as string;
       expect(
-        await acquireSyncRun({ ...context, runId }, "people", new Date())
+        await withTestTenantDb(tenantTestAccount({ ...context, runId }), (db) =>
+          acquireSyncRun({ ...context, runId }, "people", new Date(), db)
+        )
       ).toEqual({
         kind: "active",
         run: { id: runId },
@@ -406,7 +421,9 @@ describe("local persistence integration", () => {
         },
       });
       expect(
-        await acquireSyncRun({ ...context, runId }, "people", new Date())
+        await withTestTenantDb(tenantTestAccount({ ...context, runId }), (db) =>
+          acquireSyncRun({ ...context, runId }, "people", new Date(), db)
+        )
       ).toMatchObject({
         kind: "terminal",
         run: { id: runId, status: "succeeded" },
@@ -1468,7 +1485,11 @@ describe("local persistence integration", () => {
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
     };
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "connected" },
     });
@@ -1479,7 +1500,11 @@ describe("local persistence integration", () => {
       },
       where: { id: tenantA.authorisationId },
     });
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "reauthorisation_required" },
     });
@@ -1491,7 +1516,11 @@ describe("local persistence integration", () => {
       data: { last_error_code: "client_credentials_invalid" },
       where: { id: tenantA.connectionId },
     });
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "connected" },
     });
@@ -1504,7 +1533,11 @@ describe("local persistence integration", () => {
       },
       where: { id: tenantA.connectionId },
     });
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "not_connected" },
     });

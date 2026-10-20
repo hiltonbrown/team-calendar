@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   availabilityUpdateMany: vi.fn(),
   count: vi.fn(),
   create: vi.fn(),
   findFirst: vi.fn(),
+  storedOperations: 0,
   updateMany: vi.fn(),
 }));
 
 const transactionClient = {
+  $queryRaw: async () => [],
   availabilityRecord: { updateMany: mocks.availabilityUpdateMany },
   outboundOperation: {
     count: mocks.count,
@@ -19,16 +23,17 @@ const transactionClient = {
 };
 
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({
-    $transaction: async (
-      callback: (client: typeof transactionClient) => unknown
-    ) => await callback(transactionClient),
-    outboundOperation: transactionClient.outboundOperation,
-  }),
-  tenantTransaction: async (
-    _org: string,
-    fn: (tx: unknown) => Promise<unknown>
-  ) => fn(transactionClient),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) => {
+      const before = mocks.storedOperations;
+      try {
+        return await callback(transactionClient);
+      } catch (error) {
+        mocks.storedOperations = before;
+        throw error;
+      }
+    },
+  },
 }));
 
 vi.mock("../xero-locks", () => ({
@@ -55,8 +60,37 @@ const scope = {
 };
 
 describe("outbound operation repository", () => {
+  it("translates an optimistic conflict to null only after the prepared operation rolls back", async () => {
+    mocks.findFirst.mockResolvedValueOnce(null);
+    mocks.create.mockImplementationOnce(async () => {
+      mocks.storedOperations += 1;
+      return await { id: "operation-1" };
+    });
+    mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(
+      prepareAndClaimSubmitOperation({
+        ...scope,
+        actorUserId: "user-1",
+        claimableBefore: new Date("2026-05-01"),
+        expectedFailedAction: null,
+        expectedSequence: 2,
+        expectedStatus: "draft",
+        request,
+        requestEmployeeId: "employee-1",
+        requestEndsAt: new Date("2026-05-02"),
+        requestFingerprint: "fingerprint",
+        requestLeaveTypeId: "leave-type-1",
+        requestStartsAt: new Date("2026-05-01"),
+        requestTitle: "Annual leave",
+        requestUnits: 2,
+      })
+    ).resolves.toBeNull();
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.storedOperations).toBe(0);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.storedOperations = 0;
   });
 
   it("creates one prepared operation with both tenant boundaries", async () => {
@@ -145,11 +179,23 @@ describe("outbound operation repository", () => {
     );
     mocks.findFirst.mockResolvedValue({ dispatch_started_at: null });
     mocks.updateMany.mockResolvedValue({ count: 1 });
-    await markSubmitDispatchStarted({
-      ...scope,
-      action: "approve",
-      attemptGeneration: 1,
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        ...scope,
+        action: "approve",
+        attemptGeneration: 1,
+      }),
+      (db) =>
+        markSubmitDispatchStarted(
+          {
+            ...scope,
+            action: "approve",
+            attemptGeneration: 1,
+          },
+          undefined,
+          db
+        )
+    );
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -280,7 +326,15 @@ describe("outbound operation repository", () => {
     mocks.updateMany.mockResolvedValue({ count: 1 });
 
     await expect(
-      markSubmitDispatchStarted({ ...scope, attemptGeneration: 1 })
+      withTestTenantDb(
+        tenantTestAccount({ ...scope, attemptGeneration: 1 }),
+        (db) =>
+          markSubmitDispatchStarted(
+            { ...scope, attemptGeneration: 1 },
+            undefined,
+            db
+          )
+      )
     ).resolves.toBe(true);
     expect(mocks.updateMany).toHaveBeenCalledWith({
       data: {
@@ -303,7 +357,11 @@ describe("outbound operation repository", () => {
   it("detects unresolved operations only inside the requested tenant", async () => {
     mocks.count.mockResolvedValue(1);
 
-    await expect(hasUnresolvedSubmitOperation(scope)).resolves.toBe(true);
+    await expect(
+      withTestTenantDb(tenantTestAccount(scope), (db) =>
+        hasUnresolvedSubmitOperation(scope, db)
+      )
+    ).resolves.toBe(true);
     expect(mocks.count).toHaveBeenCalledWith({
       where: expect.objectContaining({
         clerk_org_id: scope.clerkOrgId,
@@ -415,9 +473,14 @@ describe("outbound operation repository", () => {
       request,
     };
     expect(
-      await markSubmitDispatchStarted(
-        { ...scope, attemptGeneration: 1 },
-        mutation
+      await withTestTenantDb(
+        tenantTestAccount({ ...scope, attemptGeneration: 1 }),
+        (db) =>
+          markSubmitDispatchStarted(
+            { ...scope, attemptGeneration: 1 },
+            mutation,
+            db
+          )
       )
     ).toBe(true);
     expect(mutation.firstDispatchedAt).toEqual(dispatchAt);

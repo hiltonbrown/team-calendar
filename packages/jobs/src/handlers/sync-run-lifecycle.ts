@@ -1,10 +1,9 @@
 import "server-only";
 import {
+  assertTenantDb,
   scopedTo as scoped,
-  tenantDatabase,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
-import type { Prisma } from "@repo/database/generated/client";
 import { log } from "@repo/observability/log";
 export const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 export class XeroSyncRunFencedError extends Error {
@@ -70,14 +69,7 @@ export type AcquireRunResult =
  * 3. Checks for any active competing run within the stale window. If active: records this run as cancelled.
  * 4. Reclaims any expired running runs (>30m) by marking them failed.
  */
-function isPrismaUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    Boolean(error) &&
-    "code" in (error as Record<string, unknown>) &&
-    (error as Record<string, unknown>).code === "P2002"
-  );
-}
+
 function toAcquireResult(existing: {
   id: string;
   records_failed: number | null;
@@ -105,14 +97,12 @@ function toAcquireResult(existing: {
 }
 async function findExistingRun(
   context: AcquireSyncRunInput,
-  client?: Prisma.TransactionClient
+  client: TenantDb
 ): Promise<AcquireRunResult | null> {
   if (!context.runId) {
     return null;
   }
-  const existing = await (
-    client ?? tenantDatabase(context.clerkOrgId)
-  ).syncRun.findFirst({
+  const existing = await client.syncRun.findFirst({
     select: {
       id: true,
       records_failed: true,
@@ -135,7 +125,7 @@ async function checkCompetingRun(
   runType: SyncRunType,
   startedAt: Date,
   stalenessFloor: Date,
-  client: Prisma.TransactionClient
+  client: TenantDb
 ): Promise<AcquireRunResult | null> {
   const stalenessFilter =
     runType === "leave_balances"
@@ -177,7 +167,7 @@ async function reclaimExpiredRuns(
   context: AcquireSyncRunInput,
   runType: SyncRunType,
   stalenessFloor: Date,
-  client: Prisma.TransactionClient
+  client: TenantDb
 ): Promise<void> {
   const expiredFilter =
     runType === "leave_balances"
@@ -200,6 +190,7 @@ async function reclaimExpiredRuns(
     });
   } catch (err) {
     log.warn("Failed to reclaim expired sync runs", { err });
+    throw err;
   }
 }
 /**
@@ -207,41 +198,32 @@ async function reclaimExpiredRuns(
  * 1. If runId already completed, returns terminal outcome (idempotent duplicate).
  * 2. If runId is currently running, resumes active lease.
  * 3. If a competing run is running, cancels the competing attempt honestly.
- * 4. Reclaims expired leases older than 15 minutes.
+ * 4. Reclaims expired leases older than the configured 30-minute window.
  * 5. Creates and claims the new running run.
  */
 export async function acquireSyncRun(
   context: AcquireSyncRunInput,
   runType: SyncRunType,
-  startedAt: Date
+  startedAt: Date,
+  db: TenantDb
 ): Promise<AcquireRunResult> {
-  try {
-    return await tenantTransaction(
-      context.clerkOrgId,
-      async (tx) => {
-        await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
-        // Share the existing connection lock with batch persistence and teardown;
-        // the competing-run check and admission must be one atomic operation.
-        await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${context.connectionId}::uuid AND clerk_org_id = ${context.clerkOrgId} AND organisation_id = ${context.organisationId}::uuid FOR UPDATE`;
-        return await acquireSyncRunLocked(context, runType, startedAt, tx);
-      },
-      { maxWait: 10_000, timeout: 15_000 }
-    );
-  } catch (error) {
-    if (context.runId && isPrismaUniqueConstraintError(error)) {
-      const recovered = await findExistingRun(context);
-      if (recovered) {
-        return recovered;
-      }
-    }
-    throw error;
+  assertTenantDb(db, context.clerkOrgId);
+  {
+    assertTenantDb(db, context.clerkOrgId);
+    const tx = db;
+
+    await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
+    // Share the existing connection lock with batch persistence and teardown;
+    // the competing-run check and admission must be one atomic operation.
+    await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${context.connectionId}::uuid AND clerk_org_id = ${context.clerkOrgId} AND organisation_id = ${context.organisationId}::uuid FOR UPDATE`;
+    return await acquireSyncRunLocked(context, runType, startedAt, tx);
   }
 }
 async function acquireSyncRunLocked(
   context: AcquireSyncRunInput,
   runType: SyncRunType,
   startedAt: Date,
-  tx: Prisma.TransactionClient
+  tx: TenantDb
 ): Promise<AcquireRunResult> {
   const existing = await findExistingRun(context, tx);
   if (existing) {
@@ -287,15 +269,19 @@ export async function assertRunActive(
     organisationId: string;
   },
   runId: string,
-  tx?: Prisma.TransactionClient
+  db: TenantDb
 ): Promise<void> {
-  const client = tx ?? tenantDatabase(context.clerkOrgId);
-  const runState = await client.syncRun.findFirst({
-    select: { cancel_requested_at: true, status: true },
-    where: { ...scoped(context), id: runId },
-  });
-  if (runState?.status !== "running" || runState?.cancel_requested_at) {
-    throw new XeroSyncRunFencedError();
+  {
+    assertTenantDb(db, context.clerkOrgId);
+    const client = db;
+
+    const runState = await client.syncRun.findFirst({
+      select: { cancel_requested_at: true, status: true },
+      where: { ...scoped(context), id: runId },
+    });
+    if (runState?.status !== "running" || runState?.cancel_requested_at) {
+      throw new XeroSyncRunFencedError();
+    }
   }
 }
 export async function isRunCancelled(
@@ -303,11 +289,18 @@ export async function isRunCancelled(
     clerkOrgId: string;
     organisationId: string;
   },
-  runId: string
+  runId: string,
+  db: TenantDb
 ): Promise<boolean> {
-  const runState = await tenantDatabase(context.clerkOrgId).syncRun.findFirst({
-    select: { cancel_requested_at: true },
-    where: { ...scoped(context), id: runId },
-  });
-  return Boolean(runState?.cancel_requested_at);
+  assertTenantDb(db, context.clerkOrgId);
+  {
+    assertTenantDb(db, context.clerkOrgId);
+    const client = db;
+
+    const runState = await client.syncRun.findFirst({
+      select: { cancel_requested_at: true },
+      where: { ...scoped(context), id: runId },
+    });
+    return Boolean(runState?.cancel_requested_at);
+  }
 }

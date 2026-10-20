@@ -1,4 +1,7 @@
+import { withTenantDb } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../database/src/tenant-db";
+import { tenantTestAccount } from "../database/src/test-fixtures/tenant-scope";
 import { hasFeature, withinLimit } from "./entitlements";
 
 const mocks = vi.hoisted(() => ({
@@ -10,7 +13,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("../database/src/tenant-db")>(
+    "../database/src/tenant-db"
+  )),
   getAuthoritativeUsageCount: mocks.getAuthoritativeUsageCount,
   getPlanFeatures: mocks.getPlanFeatures,
   getPlanLimits: mocks.getPlanLimits,
@@ -34,7 +46,10 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(5);
 
-      const result = await withinLimit("org_123", "org_entity_123", "seats");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -50,7 +65,10 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(10);
 
-      const result = await withinLimit("org_123", "org_entity_123", "seats");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -66,7 +84,10 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(11);
 
-      const result = await withinLimit("org_123", "org_entity_123", "seats");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -82,7 +103,10 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: -1 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(999_999);
 
-      const result = await withinLimit("org_123", "org_entity_123", "seats");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -98,7 +122,10 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(7);
 
-      const result = await withinLimit("org_123", "org_entity_123", "seats");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -107,28 +134,29 @@ describe("entitlements", () => {
     });
 
     it("reads usage through the supplied transaction client", async () => {
-      const usageClient = { person: { count: vi.fn() } };
       mocks.getSubscriptionForOrg.mockResolvedValue(null);
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(4);
 
-      const result = await withinLimit(
-        "org_123",
-        "org_entity_123",
-        "seats",
-        // The mock only needs an identity because the database helper is mocked.
-        usageClient as never
-      );
+      const result = await withTenantDb("org_123", async (db) => {
+        const value = await withinLimit(
+          "org_123",
+          "org_entity_123",
+          "seats",
+          db
+        );
+        expect(mocks.getAuthoritativeUsageCount).toHaveBeenCalledWith(
+          "org_123",
+          "seats",
+          db
+        );
+        return value;
+      });
 
       expect(result).toMatchObject({
         ok: true,
         value: { allowed: true, current: 4, limit: 10 },
       });
-      expect(mocks.getAuthoritativeUsageCount).toHaveBeenCalledWith(
-        "org_123",
-        "seats",
-        usageClient
-      );
     });
 
     it("returns error result when getPlanLimits throws", async () => {
@@ -141,15 +169,11 @@ describe("entitlements", () => {
       });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      const result = await withinLimit("org_123", "org_entity_123", "seats");
+      const result = withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
-      expect(result).toEqual({
-        error: {
-          code: "internal",
-          message: "Failed to check billing limits.",
-        },
-        ok: false,
-      });
+      await expect(result).rejects.toThrow("Database error");
     });
   });
 
@@ -162,7 +186,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("premium");
     });
@@ -178,7 +204,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 5 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("basic");
       expect(mocks.hasUnresolvedStripeEventForOrg).toHaveBeenCalledWith(
@@ -198,7 +226,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("premium");
       expect(mocks.hasUnresolvedStripeEventForOrg).not.toHaveBeenCalled();
@@ -212,7 +242,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("premium");
     });
@@ -225,7 +257,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 5 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("basic");
     });
@@ -238,7 +272,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 5 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("basic");
     });
@@ -248,7 +284,9 @@ describe("entitlements", () => {
       mocks.getPlanLimits.mockReturnValue({ seats: 5 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
-      await withinLimit("org_123", "org_entity_123", "seats");
+      await withTestTenantResult(tenantTestAccount("org_123"), (db) =>
+        withinLimit("org_123", "org_entity_123", "seats", db)
+      );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("basic");
     });
@@ -265,7 +303,10 @@ describe("entitlements", () => {
         priority_support: false,
       });
 
-      const result = await hasFeature("org_123", "analytics");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => hasFeature("org_123", "analytics", db)
+      );
 
       expect(mocks.getPlanFeatures).toHaveBeenCalledWith("premium");
       expect(result).toEqual({ ok: true, value: true });
@@ -276,7 +317,10 @@ describe("entitlements", () => {
         new Error("Connection error")
       );
 
-      const result = await hasFeature("org_123", "analytics");
+      const result = await withTestTenantResult(
+        tenantTestAccount("org_123"),
+        (db) => hasFeature("org_123", "analytics", db)
+      );
 
       expect(result).toEqual({
         error: {

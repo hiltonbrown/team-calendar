@@ -3,6 +3,12 @@
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import {
+  afterTenantCommit,
+  type TenantDb,
+  withTenantResult,
+} from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
+import {
   getUnreadCount,
   isKnownNotificationType,
   listRecentUnread,
@@ -17,184 +23,110 @@ import {
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { hasPageRole } from "@/lib/auth/require-page-role";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 type ActionError =
   | NotificationServiceError
   | PreferencesServiceError
   | { code: "not_authorised"; message: string }
   | { code: "validation_error"; message: string };
-
-const NotificationTypeSchema = z
-  .string()
-  .refine(isKnownNotificationType, "Unknown notification type.");
-
-const OrganisationSchema = z.object({
-  organisationId: z.string().uuid(),
-});
-
-const MarkReadSchema = OrganisationSchema.extend({
-  notificationId: z.string().uuid(),
-});
-
-const PreferenceSchema = OrganisationSchema.extend({
+interface NotificationActor {
+  clerkOrgId: string;
+  userId: string;
+}
+const MarkReadSchema = z.object({ notificationId: z.string().uuid() });
+const PreferenceSchema = z.object({
   emailEnabled: z.boolean(),
   inAppEnabled: z.boolean(),
-  notificationType: NotificationTypeSchema,
+  notificationType: z
+    .string()
+    .refine(isKnownNotificationType, "Unknown notification type."),
+  organisationId: z.string().uuid(),
 });
 
 export async function markAsReadAction(input: {
   notificationId: string;
-  organisationId: string;
 }): Promise<
   Result<
     { notification: NotificationListItem; unreadCount: number },
     ActionError
   >
 > {
+  assertNoTenantTransaction("markAsReadAction");
   const parsed = MarkReadSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError("Invalid notification.");
+    return await validationError("Invalid notification.");
   }
-  const context = await actionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-
-  const result = await markAsRead({
-    clerkOrgId: context.value.clerkOrgId,
-    notificationId: parsed.data.notificationId,
-    organisationId: context.value.organisationId,
-    userId: context.value.userId,
-  });
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/notifications");
-  return result;
+  return await runAccountNotification(
+    (actor, db) =>
+      markAsRead({ ...actor, notificationId: parsed.data.notificationId }, db),
+    true
+  );
 }
-
-export async function markAllAsReadAction(input: {
-  organisationId: string;
-}): Promise<Result<{ markedCount: number; unreadCount: 0 }, ActionError>> {
-  const parsed = OrganisationSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError("Invalid notification request.");
-  }
-  const context = await actionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-
-  const result = await markAllAsRead({
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    userId: context.value.userId,
-  });
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/notifications");
-  return result;
+export async function markAllAsReadAction(): Promise<
+  Result<{ markedCount: number; unreadCount: 0 }, ActionError>
+> {
+  assertNoTenantTransaction("markAllAsReadAction");
+  return await runAccountNotification(
+    (actor, db) => markAllAsRead(actor, db),
+    true
+  );
 }
-
+export async function refreshUnreadCountAction(): Promise<
+  Result<number, ActionError>
+> {
+  assertNoTenantTransaction("refreshUnreadCountAction");
+  return await runAccountNotification((actor, db) => getUnreadCount(actor, db));
+}
+export async function listRecentUnreadAction(): Promise<
+  Result<NotificationListItem[], ActionError>
+> {
+  assertNoTenantTransaction("listRecentUnreadAction");
+  return await runAccountNotification((actor, db) =>
+    listRecentUnread({ ...actor, limit: 3 }, db)
+  );
+}
 export async function updatePreferenceAction(input: {
+  organisationId: string;
   emailEnabled: boolean;
   inAppEnabled: boolean;
   notificationType: string;
-  organisationId: string;
 }): Promise<Result<NotificationPreferenceRow, ActionError>> {
+  assertNoTenantTransaction("updatePreferenceAction");
   const parsed = PreferenceSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(
+    return await validationError(
       parsed.error.issues[0]?.message ?? "Invalid notification preference."
     );
   }
-  const context = await actionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-
-  const result = await upsertPreference({
-    clerkOrgId: context.value.clerkOrgId,
-    emailEnabled: parsed.data.emailEnabled,
-    inAppEnabled: parsed.data.inAppEnabled,
-    notificationType: parsed.data.notificationType,
-    organisationId: context.value.organisationId,
-    userId: context.value.userId,
-  });
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/notifications");
-  return result;
+  return await runAccountNotification(async (actor, db) => {
+    const company = await db.organisation.findFirst({
+      select: { id: true },
+      where: { clerk_org_id: actor.clerkOrgId, id: parsed.data.organisationId },
+    });
+    if (!company) {
+      return {
+        error: {
+          code: "not_authorised",
+          message: "Organisation not found or not accessible in your context.",
+        },
+        ok: false,
+      };
+    }
+    return upsertPreference({ ...actor, ...parsed.data }, db);
+  }, true);
 }
 
-export async function refreshUnreadCountAction(input: {
-  organisationId: string;
-}): Promise<Result<number, ActionError>> {
-  const parsed = OrganisationSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError("Invalid notification request.");
-  }
-  const context = await actionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await getUnreadCount({
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    userId: context.value.userId,
-  });
-}
-
-export async function listRecentUnreadAction(input: {
-  organisationId: string;
-}): Promise<Result<NotificationListItem[], ActionError>> {
-  const parsed = OrganisationSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError("Invalid notification request.");
-  }
-  const context = await actionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await listRecentUnread({
-    clerkOrgId: context.value.clerkOrgId,
-    limit: 3,
-    organisationId: context.value.organisationId,
-    userId: context.value.userId,
-  });
-}
-
-async function actionContext(
-  organisationId: string
-): Promise<
-  Result<
-    { clerkOrgId: string; organisationId: string; userId: string },
-    ActionError
-  >
+async function notificationActor(): Promise<
+  Result<NotificationActor, ActionError>
 > {
-  // Never throw inside a server action. Map unauthenticated / insufficient role to Result.
-  const [authObject, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
-
-  if (!(authObject.isAuthenticated && user)) {
+  const [authObject, user] = await Promise.all([auth(), currentUser()]);
+  if (!(authObject.isAuthenticated && authObject.orgId && user)) {
     return {
-      error: {
-        code: "not_authorised",
-        message: "You need to sign in again.",
-      },
+      error: { code: "not_authorised", message: "You need to sign in again." },
       ok: false,
     };
   }
-
-  // hasPageRole is safe (returns false, never throws). Reuse hierarchy check via has() directly for viewer.
-  const hasRole = await hasPageRole("org:viewer");
-  if (!hasRole) {
+  if (!(await hasPageRole("org:viewer"))) {
     return {
       error: {
         code: "not_authorised",
@@ -203,29 +135,41 @@ async function actionContext(
       ok: false,
     };
   }
+  return { ok: true, value: { clerkOrgId: authObject.orgId, userId: user.id } };
+}
+async function runAccountNotification<T>(
+  operation: (
+    actor: NotificationActor,
+    db: TenantDb
+  ) => Promise<Result<T, ActionError>>,
+  invalidate = false
+): Promise<Result<T, ActionError>> {
+  const actor = await notificationActor();
+  if (!actor.ok) {
+    return actor;
+  }
+  try {
+    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+      const result = await operation(actor.value, db);
+      if (result.ok && invalidate) {
+        afterTenantCommit(db, () => {
+          revalidatePath("/notifications");
 
-  if (!context.ok) {
+          return Promise.resolve();
+        });
+      }
+      return result;
+    });
+  } catch {
     return {
       error: {
-        code: "not_authorised",
-        message: context.error.message,
+        code: "unknown_error",
+        message: "Failed to update or load notifications. Try again shortly.",
       },
       ok: false,
     };
   }
-  return {
-    ok: true,
-    value: {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: user.id,
-    },
-  };
 }
-
 function validationError(message: string): Result<never, ActionError> {
-  return {
-    error: { code: "validation_error", message },
-    ok: false,
-  };
+  return { error: { code: "validation_error", message }, ok: false };
 }

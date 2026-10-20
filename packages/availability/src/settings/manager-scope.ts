@@ -1,52 +1,49 @@
 import "server-only";
+import {
+  assertTenantDb,
+  getAccountSettings,
+  resolveAccountCompanies,
+  type TenantDb,
+} from "@repo/database";
 
-import { tenantDatabase } from "@repo/database";
-import { getSettings } from "./organisation-settings-service";
+export async function managerScopePersonIds(
+  input: {
+    actingPersonId: string;
+    clerkOrgId: string;
+    excludeSelf?: boolean;
+  },
+  db: TenantDb
+): Promise<string[]> {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const tenantDb = db;
 
-export async function managerScopePersonIds(input: {
-  actingPersonId: string;
-  clerkOrgId: string;
-  excludeSelf?: boolean;
-  organisationId: string;
-}): Promise<string[]> {
-  const [settingsResult, people] = await Promise.all([
-    getSettings({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    }),
-    tenantDatabase(input.clerkOrgId).person.findMany({
+    const companyIds = (
+      await resolveAccountCompanies(input.clerkOrgId, tenantDb)
+    ).map((company) => company.id);
+    const settings = await getAccountSettings(input.clerkOrgId, tenantDb);
+    const people = await tenantDb.person.findMany({
       orderBy: { id: "asc" },
       select: { id: true, manager_person_id: true },
       where: {
         archived_at: null,
         clerk_org_id: input.clerkOrgId,
-        organisation_id: input.organisationId,
+        organisation_id: { in: companyIds },
       },
-    }),
-  ]);
-
-  if (!settingsResult.ok) {
-    return input.excludeSelf ? [] : [input.actingPersonId];
-  }
-
-  const personIds =
-    settingsResult.value.managerVisibilityScope === "all_team_leave"
-      ? [
-          input.actingPersonId,
-          ...transitiveReportIds(people, input.actingPersonId),
-        ]
-      : [
-          input.actingPersonId,
-          ...people
+    });
+    if (!people.some((person) => person.id === input.actingPersonId)) {
+      return [];
+    }
+    const reports =
+      settings.manager_visibility_scope === "all_team_leave"
+        ? transitiveReportIds(people, input.actingPersonId)
+        : people
             .filter(
               (person) => person.manager_person_id === input.actingPersonId
             )
-            .map((person) => person.id),
-        ];
-
-  return input.excludeSelf
-    ? personIds.filter((personId) => personId !== input.actingPersonId)
-    : personIds;
+            .map((person) => person.id);
+    return input.excludeSelf ? reports : [input.actingPersonId, ...reports];
+  }
 }
 
 function transitiveReportIds(

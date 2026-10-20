@@ -1,18 +1,22 @@
+import {
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult,
+} from "@repo/database";
 import "server-only";
 
 import type { Result } from "@repo/core";
 import {
   fenceSubmitRecoverySideEffectClaim,
   type OutboundOperationAttemptScope,
-  tenantDatabase,
-  tenantTransaction,
+  withTenantDb,
 } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import {
   dispatchNotification,
-  publishPersistedNotification,
+  prepareNotificationPublication,
+  sendPreparedNotificationPublication,
 } from "@repo/notifications";
-
 import { z } from "zod";
 
 class NotificationDispatchRollback extends Error {}
@@ -29,30 +33,38 @@ export async function completeSubmitSideEffects(input: {
   organisationId: string;
   recordId: string;
 }): Promise<Result<void, { message: string }>> {
-  const publication = await tenantDatabase(
-    input.clerkOrgId
-  ).auditEvent.findFirst({
-    select: { id: true },
-    where: checkpointWhere(
-      input,
-      "availability_records.submit_publication_completed"
-    ),
-  });
-  if (!publication) {
-    const result = await materialiseAvailabilityPublication({
-      availabilityRecordId: input.recordId,
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    });
-    if (!result.ok) {
-      return failure("Calendar publication is awaiting retry.");
-    }
-    await tenantDatabase(input.clerkOrgId).auditEvent.create({
-      data: checkpointData(
+  assertNoTenantTransaction("completeSubmitSideEffects");
+  const publication = await withTenantDb(input.clerkOrgId, (db) =>
+    db.auditEvent.findFirst({
+      select: { id: true },
+      where: checkpointWhere(
         input,
         "availability_records.submit_publication_completed"
       ),
-    });
+    })
+  );
+  if (!publication) {
+    const phaseInput1 = {
+      availabilityRecordId: input.recordId,
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+    } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
+    const result = await withTenantResult(
+      phaseInput1.clerkOrgId,
+      (db) => materialiseAvailabilityPublication(phaseInput1, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
+    if (!result.ok) {
+      return failure("Calendar publication is awaiting retry.");
+    }
+    await withTenantDb(input.clerkOrgId, (db) =>
+      db.auditEvent.create({
+        data: checkpointData(
+          input,
+          "availability_records.submit_publication_completed"
+        ),
+      })
+    );
   }
 
   const notification = notificationForAction(
@@ -66,7 +78,7 @@ export async function completeSubmitSideEffects(input: {
     const manager = recipient;
     let notified: false | { notificationId: string | null } = false;
     try {
-      notified = await tenantTransaction(input.clerkOrgId, async (tx) => {
+      notified = await withTenantDb(input.clerkOrgId, async (tx) => {
         if (
           !(await fenceSubmitRecoverySideEffectClaim(
             input.attempt,
@@ -104,8 +116,8 @@ export async function completeSubmitSideEffects(input: {
             recipientPersonId: manager.personId,
             recipientUserId: manager.clerkUserId,
           },
-          tx,
-          { publishRealtime: false }
+          { publishRealtime: false },
+          tx
         );
         if (!result.ok) {
           throw new NotificationDispatchRollback();
@@ -131,11 +143,18 @@ export async function completeSubmitSideEffects(input: {
     }
     if (notified.notificationId) {
       try {
-        await publishPersistedNotification({
-          clerkOrgId: input.clerkOrgId,
-          notificationId: notified.notificationId,
-          organisationId: input.organisationId,
-        });
+        const { notificationId } = notified;
+        const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+          prepareNotificationPublication(
+            {
+              clerkOrgId: input.clerkOrgId,
+              notificationId,
+              organisationId: input.organisationId,
+            },
+            db
+          )
+        );
+        await sendPreparedNotificationPublication(prepared);
       } catch {
         return failure("Leave notification delivery is awaiting retry.");
       }

@@ -1,9 +1,16 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { describe, expect, it, vi } from "vitest";
-import type { Prisma } from "../../generated/client";
+import { withTenantDb } from "../tenant-db";
 import { loadHolidayResolutionData } from "./public-holiday-resolution";
 
 vi.mock("server-only", () => ({}));
+const state = vi.hoisted(() => ({ client: {} as object }));
+vi.mock("../tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (client: object) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []), ...state.client }),
+  },
+}));
 
 const clerkOrgId = "org_a" as ClerkOrgId;
 const organisationId = "11111111-1111-4111-8111-111111111111" as OrganisationId;
@@ -41,19 +48,22 @@ function fakeClient(organisation: unknown) {
     },
   };
   // Only the delegates the loader uses are provided.
-  return { client, typed: client as unknown as Prisma.TransactionClient };
+  state.client = client;
+  return { client };
 }
 
 describe("loadHolidayResolutionData", () => {
   it("scopes every query by both tenancy keys and maps rows", async () => {
-    const { client, typed } = fakeClient({
+    const { client } = fakeClient({
       country_code: "AU",
       region_code: "QLD",
     });
 
-    const data = await loadHolidayResolutionData(
-      { clerkOrgId, from: "2026-01-01", organisationId, to: "2026-12-31" },
-      typed
+    const data = await withTenantDb(clerkOrgId, (db) =>
+      loadHolidayResolutionData(
+        { clerkOrgId, from: "2026-01-01", organisationId, to: "2026-12-31" },
+        db
+      )
     );
 
     expect(client.organisation.findFirst.mock.calls[0]?.[0]?.where).toEqual({
@@ -98,10 +108,12 @@ describe("loadHolidayResolutionData", () => {
   });
 
   it("returns null without further queries when the organisation is outside the tenant", async () => {
-    const { client, typed } = fakeClient(null);
-    const data = await loadHolidayResolutionData(
-      { clerkOrgId, from: "2026-01-01", organisationId, to: "2026-12-31" },
-      typed
+    const { client } = fakeClient(null);
+    const data = await withTenantDb(clerkOrgId, (db) =>
+      loadHolidayResolutionData(
+        { clerkOrgId, from: "2026-01-01", organisationId, to: "2026-12-31" },
+        db
+      )
     );
     expect(data).toBeNull();
     expect(client.location.findMany).not.toHaveBeenCalled();

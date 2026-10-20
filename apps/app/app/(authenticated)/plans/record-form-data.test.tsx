@@ -22,7 +22,7 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 const personId = "00000000-0000-4000-8000-000000000011";
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: async () => ({ orgRole: "org:viewer" }),
+  auth: async () => ({ orgId: "org_1", orgRole: "org:viewer" }),
   currentUser: async () => ({ id: "user_1" }),
 }));
 vi.mock("@repo/availability", () => ({
@@ -33,17 +33,43 @@ vi.mock("@repo/availability", () => ({
   }),
   isXeroLeaveType: (value: string) => value === "annual_leave",
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  resolveAccountCompanies: async () => [
+    { id: organisationId, name: "Company A" },
+  ],
   scopedQuery: (clerkOrgId: string, payrollOrganisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: payrollOrganisationId,
   }),
-  tenantDatabase: vi.fn(() => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+}));
+function buildTenantTestDatabase() {
+  return {
+    availabilityRecord: {
+      findFirst: vi.fn(async () => ({
+        organisation_id: organisationId,
+        person_id: personId,
+      })),
+    },
     leaveBalance: { findFirst: mocks.leaveBalance },
     organisation: { findFirst: mocks.organisation },
     person: { findFirst: mocks.person },
-  })),
-}));
+  };
+}
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
   redirect: vi.fn(),
@@ -81,16 +107,20 @@ describe("calendar slot plan form loading", () => {
       first_name: "Ari",
       id: personId,
       last_name: "Report",
+      organisation_id: organisationId,
     });
     mocks.organisation.mockResolvedValue({ timezone: "Australia/Brisbane" });
     mocks.leaveBalance.mockResolvedValue(null);
-    mocks.create.mockResolvedValue({ ok: true, value: { id: "record" } });
+    mocks.create.mockResolvedValue({
+      ok: true,
+      value: { id: "00000000-0000-4000-8000-000000000099" },
+    });
   });
   afterEach(cleanup);
 
   it("loads and submits the selected wall-clock hour in timed mode", async () => {
     const data = await loadPlanFormData({
-      org: "org_1",
+      org: organisationId,
       personId,
       startsAt: "2026-04-15T09:00",
     });
@@ -163,7 +193,7 @@ describe("calendar slot plan form loading", () => {
         allDay: false,
         contactabilityStatus: "contactable",
         endsAt: new Date("2026-04-15T00:00:00Z"),
-        id: "record",
+        id: "00000000-0000-4000-8000-000000000099",
         notesInternal: null,
         personId,
         privacyMode: "named",
@@ -171,7 +201,9 @@ describe("calendar slot plan form loading", () => {
         startsAt: new Date("2026-04-14T23:00:00Z"),
       },
     });
-    const data = await loadPlanFormData({ recordId: "record" });
+    const data = await loadPlanFormData({
+      recordId: "00000000-0000-4000-8000-000000000099",
+    });
     expect(data.record).toMatchObject({
       endsAt: "2026-04-15",
       endTime: "10:00",
@@ -187,7 +219,7 @@ describe("calendar slot plan form loading", () => {
         allDay: true,
         contactabilityStatus: "contactable",
         endsAt: new Date("2026-04-15T23:59:59Z"),
-        id: "record",
+        id: "00000000-0000-4000-8000-000000000099",
         notesInternal: null,
         personId,
         privacyMode: "named",
@@ -196,7 +228,11 @@ describe("calendar slot plan form loading", () => {
       },
     });
     expect(
-      (await loadPlanFormData({ recordId: "record" })).record
+      (
+        await loadPlanFormData({
+          recordId: "00000000-0000-4000-8000-000000000099",
+        })
+      ).record
     ).toMatchObject({ endsAt: "2026-04-15", startsAt: "2026-04-15" });
   });
 });

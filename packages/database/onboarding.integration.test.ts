@@ -1,6 +1,8 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
@@ -72,7 +74,9 @@ describe("onboarding queries", () => {
 
   test("starts at details with no completion or skip", async () => {
     await expect(
-      getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId)
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
+      )
     ).resolves.toEqual({
       ok: true,
       value: { completedAt: null, step: "details", xeroSkippedAt: null },
@@ -81,36 +85,43 @@ describe("onboarding queries", () => {
 
   test("advances only from the stored step", async () => {
     await expect(
-      advanceOnboardingStep(
-        tenantA.clerkOrgId,
-        tenantA.organisationId,
-        "details",
-        "xero"
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        advanceOnboardingStep(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          "details",
+          "xero",
+          db
+        )
       )
     ).resolves.toEqual({ ok: true, value: { advanced: true } });
     await expect(
-      advanceOnboardingStep(
-        tenantA.clerkOrgId,
-        tenantA.organisationId,
-        "details",
-        "xero"
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        advanceOnboardingStep(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          "details",
+          "xero",
+          db
+        )
       )
     ).resolves.toEqual({ ok: true, value: { advanced: false } });
-    const record = await getOnboardingRecord(
-      tenantA.clerkOrgId,
-      tenantA.organisationId
+    const record = await withTestTenantResult(
+      tenantTestAccount(tenantA.clerkOrgId),
+      (db) =>
+        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
     );
     expect(record.ok && record.value.step).toBe("xero");
   });
 
   test("keeps the first completion time", async () => {
-    const first = await completeOnboarding(
-      tenantA.clerkOrgId,
-      tenantA.organisationId
+    const first = await withTestTenantResult(
+      tenantTestAccount(tenantA.clerkOrgId),
+      (db) => completeOnboarding(tenantA.clerkOrgId, tenantA.organisationId, db)
     );
-    const second = await completeOnboarding(
-      tenantA.clerkOrgId,
-      tenantA.organisationId
+    const second = await withTestTenantResult(
+      tenantTestAccount(tenantA.clerkOrgId),
+      (db) => completeOnboarding(tenantA.clerkOrgId, tenantA.organisationId, db)
     );
     expect(first.ok && second.ok).toBe(true);
     expect(second.ok && second.value.completedAt).toEqual(
@@ -119,76 +130,111 @@ describe("onboarding queries", () => {
   });
 
   test("sets and clears the Xero skip", async () => {
-    await setXeroSetupSkipped(tenantA.clerkOrgId, tenantA.organisationId, true);
-    let record = await getOnboardingRecord(
-      tenantA.clerkOrgId,
-      tenantA.organisationId
+    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      setXeroSetupSkipped(tenantA.clerkOrgId, tenantA.organisationId, true, db)
+    );
+    let record = await withTestTenantResult(
+      tenantTestAccount(tenantA.clerkOrgId),
+      (db) =>
+        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
     );
     expect(record.ok && record.value.xeroSkippedAt).toBeInstanceOf(Date);
-    await setXeroSetupSkipped(
-      tenantA.clerkOrgId,
-      tenantA.organisationId,
-      false
+    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      setXeroSetupSkipped(tenantA.clerkOrgId, tenantA.organisationId, false, db)
     );
-    record = await getOnboardingRecord(
-      tenantA.clerkOrgId,
-      tenantA.organisationId
+    record = await withTestTenantResult(
+      tenantTestAccount(tenantA.clerkOrgId),
+      (db) =>
+        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
     );
     expect(record.ok && record.value.xeroSkippedAt).toBeNull();
   });
 
   test("isolates tenants", async () => {
-    await advanceOnboardingStep(
-      tenantA.clerkOrgId,
-      tenantB.organisationId,
-      "details",
-      "xero"
+    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      advanceOnboardingStep(
+        tenantA.clerkOrgId,
+        tenantB.organisationId,
+        "details",
+        "xero",
+        db
+      )
     );
-    await completeOnboarding(tenantA.clerkOrgId, tenantB.organisationId);
-    const other = await getOnboardingRecord(
-      tenantB.clerkOrgId,
-      tenantB.organisationId
+    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      completeOnboarding(tenantA.clerkOrgId, tenantB.organisationId, db)
+    );
+    const other = await withTestTenantResult(
+      tenantTestAccount(tenantB.clerkOrgId),
+      (db) =>
+        getOnboardingRecord(tenantB.clerkOrgId, tenantB.organisationId, db)
     );
     expect(other).toEqual({
       ok: true,
       value: { completedAt: null, step: "details", xeroSkippedAt: null },
     });
     await expect(
-      getOnboardingRecord(tenantA.clerkOrgId, tenantB.organisationId)
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        getOnboardingRecord(tenantA.clerkOrgId, tenantB.organisationId, db)
+      )
     ).resolves.toMatchObject({ error: { code: "not_found" }, ok: false });
   });
 
   test("tracks the member welcome for the person's own user only", async () => {
     const person = await seedPerson(tenantA, "user_member");
     await expect(
-      getWelcomeState(tenantA.clerkOrgId, tenantA.organisationId, "user_member")
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        getWelcomeState(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          "user_member",
+          db
+        )
+      )
     ).resolves.toEqual({
       ok: true,
       value: { completedAt: null, personId: person.id },
     });
     await expect(
-      getWelcomeState(tenantA.clerkOrgId, tenantA.organisationId, "user_none")
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        getWelcomeState(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          "user_none",
+          db
+        )
+      )
     ).resolves.toEqual({ ok: true, value: null });
     await expect(
-      completeWelcome(
-        tenantA.clerkOrgId,
-        tenantA.organisationId,
-        person.id,
-        "user_intruder"
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        completeWelcome(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          person.id,
+          "user_intruder",
+          db
+        )
       )
     ).resolves.toMatchObject({ error: { code: "not_found" }, ok: false });
     await expect(
-      completeWelcome(
-        tenantA.clerkOrgId,
-        tenantA.organisationId,
-        person.id,
-        "user_member"
+      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+        completeWelcome(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          person.id,
+          "user_member",
+          db
+        )
       )
     ).resolves.toEqual({ ok: true, value: undefined });
-    const state = await getWelcomeState(
-      tenantA.clerkOrgId,
-      tenantA.organisationId,
-      "user_member"
+    const state = await withTestTenantResult(
+      tenantTestAccount(tenantA.clerkOrgId),
+      (db) =>
+        getWelcomeState(
+          tenantA.clerkOrgId,
+          tenantA.organisationId,
+          "user_member",
+          db
+        )
     );
     expect(state.ok && state.value?.completedAt).toBeInstanceOf(Date);
   });

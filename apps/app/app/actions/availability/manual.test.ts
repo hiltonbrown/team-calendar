@@ -82,7 +82,28 @@ describe("manual availability actions", () => {
       {
         orgRole: "org:manager",
         userId: "user_123",
-      }
+      },
+      expect.any(Object)
     );
   });
 });
+
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: vi.fn(() =>
+            Promise.resolve({ id: "22222222-2222-4222-a222-222222222222" })
+          ),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
+}));

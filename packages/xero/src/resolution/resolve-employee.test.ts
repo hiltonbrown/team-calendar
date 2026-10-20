@@ -1,14 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantResult as withTestTenantResult } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
   personFindFirst: vi.fn(),
 }));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({ client: null as object | null }));
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("server-only", () => ({}));
+vi.mock("@repo/database", async () => {
+  const actualTenantCore = await vi.importActual<
+    typeof import("../../../database/src/tenant-db")
+  >("../../../database/src/tenant-db");
+
   const exports = {
     database: {
       person: { findFirst: mocks.personFindFirst },
     },
   };
+  tenantTestState.client = exports.database;
   return {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
@@ -19,12 +44,8 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
+
+    ...actualTenantCore,
   };
 });
 const { resolveXeroEmployeeId } = await import("./resolve-employee");
@@ -46,10 +67,20 @@ describe("resolveXeroEmployeeId", () => {
       source_person_key: "employee-1",
       source_system: "XERO",
     });
-    const result = await resolveXeroEmployeeId({
-      personId: "00000000-0000-4000-8000-000000000011",
-      xeroConnection,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        personId: "00000000-0000-4000-8000-000000000011",
+        xeroConnection,
+      }),
+      (db) =>
+        resolveXeroEmployeeId(
+          {
+            personId: "00000000-0000-4000-8000-000000000011",
+            xeroConnection,
+          },
+          db
+        )
+    );
     expect(result).toEqual({ ok: true, value: "employee-1" });
     expect(mocks.personFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -65,10 +96,20 @@ describe("resolveXeroEmployeeId", () => {
       source_person_key: null,
       source_system: "MANUAL",
     });
-    const result = await resolveXeroEmployeeId({
-      personId: "00000000-0000-4000-8000-000000000011",
-      xeroConnection,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        personId: "00000000-0000-4000-8000-000000000011",
+        xeroConnection,
+      }),
+      (db) =>
+        resolveXeroEmployeeId(
+          {
+            personId: "00000000-0000-4000-8000-000000000011",
+            xeroConnection,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("missing_mapping");
@@ -78,10 +119,20 @@ describe("resolveXeroEmployeeId", () => {
     mocks.personFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
       id: "00000000-0000-4000-8000-000000000011",
     });
-    const result = await resolveXeroEmployeeId({
-      personId: "00000000-0000-4000-8000-000000000011",
-      xeroConnection,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        personId: "00000000-0000-4000-8000-000000000011",
+        xeroConnection,
+      }),
+      (db) =>
+        resolveXeroEmployeeId(
+          {
+            personId: "00000000-0000-4000-8000-000000000011",
+            xeroConnection,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("person_not_in_tenant");

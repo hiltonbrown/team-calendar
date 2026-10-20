@@ -1,9 +1,12 @@
 import { currentUser, requireOrg, requireRole } from "@repo/auth/helpers";
 import {
-  dispatchManualSync,
+  prepareManualSync,
+  recordManualSyncDispatch,
   type SyncMonitorError,
   type SyncMonitorRole,
+  sendPreparedManualSync,
 } from "@repo/availability";
+import { withTenantDb } from "@repo/database";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -76,7 +79,32 @@ export async function POST(request: Request): Promise<Response> {
     organisationId: parsed.data.organisationId,
     runType: parsed.data.runType,
   };
-  const result = await dispatchManualSync(syncInput);
+  let result: Awaited<ReturnType<typeof sendPreparedManualSync>>;
+  try {
+    const prepared = await withTenantDb(clerkOrgId, (db) =>
+      prepareManualSync(syncInput, db)
+    );
+    const sent = prepared.ok
+      ? await sendPreparedManualSync(prepared.value)
+      : prepared;
+    result = sent;
+    if (sent.ok && sent.value.queued) {
+      const audited = await withTenantDb(clerkOrgId, (db) =>
+        recordManualSyncDispatch(syncInput, db)
+      );
+      if (!audited.ok) {
+        result = audited;
+      }
+    }
+  } catch {
+    result = {
+      error: {
+        code: "unknown_error",
+        message: "Failed to dispatch the manual sync.",
+      },
+      ok: false,
+    };
+  }
 
   if (
     !result.ok &&

@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../../../database/src/tenant-db";
+import { tenantTestAccount } from "../../../database/src/test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
-  executeRaw: vi.fn(() => Promise.resolve(1)),
+  executeRaw: vi.fn((_query: TemplateStringsArray) => Promise.resolve(1)),
   feedCount: vi.fn(),
   organisationCount: vi.fn(),
   personCount: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
 }));
 
 vi.mock("../client", () => ({
@@ -13,7 +16,14 @@ vi.mock("../client", () => ({
     send: vi.fn(),
   },
 }));
-vi.mock("@repo/database", () => {
+vi.mock("../../../database/src/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       $executeRaw: mocks.executeRaw,
@@ -22,7 +32,7 @@ vi.mock("@repo/database", () => {
       person: { count: mocks.personCount },
     },
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -32,13 +42,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<
+    typeof import("../../../database/src/tenant-db")
+  >("../../../database/src/tenant-db");
+  return { ...mockedModule, ...core };
 });
 
 const { recountUsage } = await import("./recount-usage");
@@ -64,7 +79,9 @@ describe("recountUsage", () => {
   });
 
   it("counts active seats, payroll entities and active feeds scoped to the org", async () => {
-    const result = await recountUsage(input());
+    const result = await withTestTenantDb(tenantTestAccount(input()), (db) =>
+      recountUsage(input(), db)
+    );
 
     expect(result).toEqual({ feeds: 3, payrollEntities: 2, seats: 7 });
     expect(mocks.personCount).toHaveBeenCalledWith({
@@ -91,19 +108,32 @@ describe("recountUsage", () => {
   });
 
   it("upserts one usage counter per metric", async () => {
-    await recountUsage(input());
+    await withTestTenantDb(tenantTestAccount(input()), (db) =>
+      recountUsage(input(), db)
+    );
 
-    expect(mocks.executeRaw).toHaveBeenCalledTimes(3);
+    expect(
+      mocks.executeRaw.mock.calls.filter(([query]) =>
+        query.join("").includes("INSERT INTO usage_counters")
+      )
+    ).toHaveLength(3);
   });
 
   it("rejects input with a missing clerkOrgId", async () => {
-    await expect(recountUsage(input({ clerkOrgId: "" }))).rejects.toThrow();
+    await expect(
+      withTestTenantDb(tenantTestAccount(input({ clerkOrgId: "" })), (db) =>
+        recountUsage(input({ clerkOrgId: "" }), db)
+      )
+    ).rejects.toThrow();
     expect(mocks.executeRaw).not.toHaveBeenCalled();
   });
 
   it("rejects input with a non-uuid organisationId", async () => {
     await expect(
-      recountUsage(input({ organisationId: "not-a-uuid" }))
+      withTestTenantDb(
+        tenantTestAccount(input({ organisationId: "not-a-uuid" })),
+        (db) => recountUsage(input({ organisationId: "not-a-uuid" }), db)
+      )
     ).rejects.toThrow();
     expect(mocks.executeRaw).not.toHaveBeenCalled();
   });

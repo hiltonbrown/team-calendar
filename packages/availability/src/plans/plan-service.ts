@@ -1,11 +1,17 @@
+import {
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult,
+} from "@repo/database";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { getAvailabilityRecordLabel, type Result } from "@repo/core";
 import {
+  afterTenantCommit,
+  assertTenantDb,
   hasUnresolvedSubmitOperation,
+  resolveAccountCompanies,
   scopedTo,
-  tenantDatabase,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
@@ -17,6 +23,7 @@ import type {
   availability_source_type,
   leave_balance_unit,
 } from "@repo/database/generated/enums";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
@@ -252,176 +259,225 @@ const RecordActionSchema = z.object({
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
 });
-export async function listMyRecords(input: {
-  clerkOrgId: string;
-  filters?: unknown;
-  organisationId: string;
-  userId: string;
-}): Promise<Result<RecordListItem[], PlanServiceError>> {
-  const parsedFilters = parseFilters(input.filters);
-  if (!parsedFilters.ok) {
-    return parsedFilters;
-  }
-  try {
+export async function listMyRecords(
+  input: {
+    clerkOrgId: string;
+    filters?: unknown;
+    organisationId: string;
+    userId: string;
+  },
+  db: TenantDb
+): Promise<Result<RecordListItem[], PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const parsedFilters = parseFilters(input.filters);
+    if (!parsedFilters.ok) {
+      return parsedFilters;
+    }
     const person = await resolvePersonForUser(
       input.clerkOrgId,
-      input.organisationId,
-      input.userId
+      input.userId,
+      client
     );
     if (!person) {
       return notAuthorised();
     }
-    return listRecordsForScope({
-      authorisedPersonIds: [person.id],
-      clerkOrgId: input.clerkOrgId,
-      filters: parsedFilters.value,
-      organisationId: input.organisationId,
-    });
-  } catch {
-    return unknownError();
+    return listRecordsForScope(
+      {
+        authorisedPersonIds: [person.id],
+        clerkOrgId: input.clerkOrgId,
+        filters: parsedFilters.value,
+        organisationId: input.organisationId,
+      },
+      client
+    );
   }
 }
-export async function listTeamRecords(input: {
-  actingOrgRole?: string | null;
-  clerkOrgId: string;
-  filters?: unknown;
-  managerPersonId?: null | string;
-  organisationId: string;
-}): Promise<Result<RecordListItem[], PlanServiceError>> {
+export async function listTeamRecords(
+  input: {
+    actingOrgRole?: string | null;
+    clerkOrgId: string;
+    filters?: unknown;
+    managerPersonId?: null | string;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<Result<RecordListItem[], PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsedFilters = parseFilters(input.filters);
   if (!parsedFilters.ok) {
     return parsedFilters;
   }
-  try {
+  const run = async (client: TenantDb): ReturnType<typeof listTeamRecords> => {
     const filters = parsedFilters.value;
     if (isAdminOrOwner(input.actingOrgRole)) {
-      return listRecordsForScope({
-        authorisedPersonIds: null,
-        clerkOrgId: input.clerkOrgId,
-        filters,
-        organisationId: input.organisationId,
-      });
+      return listRecordsForScope(
+        {
+          authorisedPersonIds: null,
+          clerkOrgId: input.clerkOrgId,
+          filters,
+          organisationId: input.organisationId,
+        },
+        client
+      );
     }
     if (!input.managerPersonId) {
       return notAuthorised();
     }
-    const reportIds = await managerScopePersonIds({
-      actingPersonId: input.managerPersonId,
-      clerkOrgId: input.clerkOrgId,
-      excludeSelf: true,
-      organisationId: input.organisationId,
-    });
-    return listRecordsForScope({
-      authorisedPersonIds: reportIds,
-      clerkOrgId: input.clerkOrgId,
-      filters,
-      organisationId: input.organisationId,
-    });
-  } catch {
-    return unknownError();
-  }
+    const reportIds = await managerScopePersonIds(
+      {
+        actingPersonId: input.managerPersonId,
+        clerkOrgId: input.clerkOrgId,
+        excludeSelf: true,
+      },
+      client
+    );
+    return listRecordsForScope(
+      {
+        authorisedPersonIds: reportIds,
+        clerkOrgId: input.clerkOrgId,
+        filters,
+        organisationId: input.organisationId,
+      },
+      client
+    );
+  };
+  assertTenantDb(db, input.clerkOrgId);
+  return await run(db);
 }
-export async function listMyRecordsPage(input: {
-  allHistory?: boolean;
-  clerkOrgId: string;
-  cursor?: string | null;
-  filters?: unknown;
-  organisationId: string;
-  pageSize?: number;
-  userId: string;
-}): Promise<Result<PlanListPage, PlanServiceError>> {
+export async function listMyRecordsPage(
+  input: {
+    allHistory?: boolean;
+    clerkOrgId: string;
+    cursor?: string | null;
+    filters?: unknown;
+    organisationId: string;
+    pageSize?: number;
+    userId: string;
+  },
+  db: TenantDb
+): Promise<Result<PlanListPage, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const filters = parseFilters(input.filters);
   if (!filters.ok) {
     return filters;
   }
-  try {
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof listMyRecordsPage> => {
     const person = await resolvePersonForUser(
       input.clerkOrgId,
-      input.organisationId,
-      input.userId
+      input.userId,
+      client
     );
     if (!person) {
       return notAuthorised();
     }
-    return listRecordsPageForScope({
-      ...input,
-      authorisedPersonIds: [person.id],
-      filters: filters.value,
-    });
-  } catch {
-    return unknownError();
-  }
+    return listRecordsPageForScope(
+      {
+        ...input,
+        authorisedPersonIds: [person.id],
+        filters: filters.value,
+      },
+      client
+    );
+  };
+  assertTenantDb(db, input.clerkOrgId);
+  return await run(db);
 }
-export async function listTeamRecordsPage(input: {
-  actingOrgRole?: string | null;
-  allHistory?: boolean;
-  clerkOrgId: string;
-  cursor?: string | null;
-  filters?: unknown;
-  managerPersonId?: null | string;
-  organisationId: string;
-  pageSize?: number;
-}): Promise<Result<PlanListPage, PlanServiceError>> {
+export async function listTeamRecordsPage(
+  input: {
+    actingOrgRole?: string | null;
+    allHistory?: boolean;
+    clerkOrgId: string;
+    cursor?: string | null;
+    filters?: unknown;
+    managerPersonId?: null | string;
+    organisationId: string;
+    pageSize?: number;
+  },
+  db: TenantDb
+): Promise<Result<PlanListPage, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const filters = parseFilters(input.filters);
   if (!filters.ok) {
     return filters;
   }
-  try {
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof listTeamRecordsPage> => {
     let authorisedPersonIds: string[] | null = null;
     if (!isAdminOrOwner(input.actingOrgRole)) {
       if (!input.managerPersonId) {
         return notAuthorised();
       }
-      authorisedPersonIds = await managerScopePersonIds({
-        actingPersonId: input.managerPersonId,
-        clerkOrgId: input.clerkOrgId,
-        excludeSelf: true,
-        organisationId: input.organisationId,
-      });
+      authorisedPersonIds = await managerScopePersonIds(
+        {
+          actingPersonId: input.managerPersonId,
+          clerkOrgId: input.clerkOrgId,
+          excludeSelf: true,
+        },
+        client
+      );
     }
-    return listRecordsPageForScope({
-      ...input,
-      authorisedPersonIds,
-      filters: filters.value,
-    });
-  } catch {
-    return unknownError();
-  }
+    return listRecordsPageForScope(
+      {
+        ...input,
+        authorisedPersonIds,
+        filters: filters.value,
+      },
+      client
+    );
+  };
+  assertTenantDb(db, input.clerkOrgId);
+  return await run(db);
 }
-export async function getRecord(input: {
-  actingOrgRole?: string | null;
-  actingUserId: string;
-  clerkOrgId: string;
-  organisationId: string;
-  recordId: string;
-}): Promise<Result<RecordDetail, PlanServiceError>> {
-  try {
-    const [record, actingPerson] = await Promise.all([
-      loadScopedRecord(input.clerkOrgId, input.organisationId, input.recordId),
-      resolvePersonForUser(
+export async function getRecord(
+  input: {
+    actingOrgRole?: string | null;
+    actingUserId: string;
+    clerkOrgId: string;
+    organisationId: string;
+    recordId: string;
+  },
+  db: TenantDb
+): Promise<Result<RecordDetail, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (client: TenantDb): ReturnType<typeof getRecord> => {
+    const [record, actingPerson] = [
+      await loadScopedRecord(
         input.clerkOrgId,
         input.organisationId,
-        input.actingUserId
+        input.recordId,
+        client
       ),
-    ]);
+      await resolvePersonForUser(input.clerkOrgId, input.actingUserId, client),
+    ];
     if (!record) {
       return recordNotFound();
     }
     if (
-      !canActOnPerson({
-        actingOrgRole: input.actingOrgRole,
-        actingPersonId: actingPerson?.id ?? null,
-        targetPerson: record.person,
-      })
+      !(await canActOnPerson(
+        {
+          actingOrgRole: input.actingOrgRole,
+          actingPersonId: actingPerson?.id ?? null,
+          clerkOrgId: input.clerkOrgId,
+          targetPerson: record.person,
+        },
+        client
+      ))
     ) {
       return notAuthorised();
     }
-    const xeroStateResult = await getXeroConnectionStateForScope(input);
+    const xeroStateResult = await getXeroConnectionStateForScope(input, client);
     const xeroConnectionState = xeroStateResult.ok
       ? xeroStateResult.value.state
       : "unavailable";
     const hasXero = connectionActionGate(xeroConnectionState);
-    const listItem = await toRecordListItem(record, hasXero);
+    const listItem = await toRecordListItem(record, hasXero, client);
     return {
       ok: true,
       value: {
@@ -429,42 +485,46 @@ export async function getRecord(input: {
         xeroWriteErrorMessage: record.xero_write_error,
       },
     };
-  } catch {
-    return unknownError();
-  }
+  };
+  assertTenantDb(db, input.clerkOrgId);
+  return await run(db);
 }
 export async function createRecord(
-  input: z.infer<typeof CreateRecordSchema> & RoleScopedInput
+  input: z.infer<typeof CreateRecordSchema> & RoleScopedInput,
+  db: TenantDb
 ): Promise<Result<PlanRecord, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = CreateRecordSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  try {
-    const [targetPerson, actingPerson, xeroStateResult, settingsResult] =
-      await Promise.all([
-        tenantDatabase(input.clerkOrgId).person.findFirst({
-          select: personSelect,
-          where: {
-            ...scopedTo({
-              clerkOrgId: parsed.data.clerkOrgId,
-              organisationId: parsed.data.organisationId,
-            }),
-            archived_at: null,
-            id: parsed.data.personId,
-          },
-        }),
-        resolvePersonForUser(
-          parsed.data.clerkOrgId,
-          parsed.data.organisationId,
-          parsed.data.createdByUserId
-        ),
-        getXeroConnectionStateForScope(parsed.data),
-        getSettings({
+  const run = async (client: TenantDb): ReturnType<typeof createRecord> => {
+    const [targetPerson, actingPerson, xeroStateResult, settingsResult] = [
+      await client.person.findFirst({
+        select: personSelect,
+        where: {
+          ...scopedTo({
+            clerkOrgId: parsed.data.clerkOrgId,
+            organisationId: parsed.data.organisationId,
+          }),
+          archived_at: null,
+          id: parsed.data.personId,
+        },
+      }),
+      await resolvePersonForUser(
+        parsed.data.clerkOrgId,
+        parsed.data.createdByUserId,
+        client
+      ),
+      await getXeroConnectionStateForScope(parsed.data, client),
+      await getSettings(
+        {
           clerkOrgId: parsed.data.clerkOrgId,
           organisationId: parsed.data.organisationId,
-        }),
-      ]);
+        },
+        client
+      ),
+    ];
     if (!(xeroStateResult.ok || isLocalOnlyType(parsed.data.recordType))) {
       return {
         error: {
@@ -486,11 +546,15 @@ export async function createRecord(
       };
     }
     if (
-      !canActOnPerson({
-        actingOrgRole: input.actingOrgRole,
-        actingPersonId: actingPerson?.id ?? null,
-        targetPerson,
-      })
+      !(await canActOnPerson(
+        {
+          actingOrgRole: input.actingOrgRole,
+          actingPersonId: actingPerson?.id ?? null,
+          clerkOrgId: input.clerkOrgId,
+          targetPerson,
+        },
+        client
+      ))
     ) {
       return notAuthorised();
     }
@@ -509,243 +573,258 @@ export async function createRecord(
       stableSourceKey: id,
       startsAt: parsed.data.startsAt,
     });
-    const record = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        const created = await tx.availabilityRecord.create({
-          data: {
-            all_day: parsed.data.allDay,
-            approval_status: routing.approvalStatus,
-            approved_at:
-              routing.approvalStatus === "approved" ? new Date() : null,
-            clerk_org_id: parsed.data.clerkOrgId,
-            contactability: parsed.data.contactabilityStatus,
-            created_by_user_id: parsed.data.createdByUserId,
-            derived_sequence: 0,
-            derived_uid_key: derivedUidKey,
-            ends_at: parsed.data.endsAt,
-            id,
-            notes_internal: emptyToNull(parsed.data.notesInternal),
-            organisation_id: parsed.data.organisationId,
-            person_id: parsed.data.personId,
-            privacy_mode: privacyMode,
-            record_type: parsed.data.recordType,
-            source_type: routing.sourceType,
-            starts_at: parsed.data.startsAt,
-            title: getAvailabilityRecordLabel(parsed.data.recordType),
-            updated_by_user_id: parsed.data.createdByUserId,
+    const record = await (async (tx: TenantDb) => {
+      const created = await tx.availabilityRecord.create({
+        data: {
+          all_day: parsed.data.allDay,
+          approval_status: routing.approvalStatus,
+          approved_at:
+            routing.approvalStatus === "approved" ? new Date() : null,
+          clerk_org_id: parsed.data.clerkOrgId,
+          contactability: parsed.data.contactabilityStatus,
+          created_by_user_id: parsed.data.createdByUserId,
+          derived_sequence: 0,
+          derived_uid_key: derivedUidKey,
+          ends_at: parsed.data.endsAt,
+          id,
+          notes_internal: emptyToNull(parsed.data.notesInternal),
+          organisation_id: parsed.data.organisationId,
+          person_id: parsed.data.personId,
+          privacy_mode: privacyMode,
+          record_type: parsed.data.recordType,
+          source_type: routing.sourceType,
+          starts_at: parsed.data.startsAt,
+          title: getAvailabilityRecordLabel(parsed.data.recordType),
+          updated_by_user_id: parsed.data.createdByUserId,
+        },
+        include: recordInclude,
+      });
+      await tx.auditEvent.create({
+        data: {
+          action: "availability_records.created",
+          actor_user_id: parsed.data.createdByUserId,
+          clerk_org_id: parsed.data.clerkOrgId,
+          organisation_id: parsed.data.organisationId,
+          payload: {
+            approvalStatus: routing.approvalStatus,
+            recordType: parsed.data.recordType,
+            sourceType: routing.sourceType,
+            xeroConnectionState,
           },
-          include: recordInclude,
-        });
-        await tx.auditEvent.create({
-          data: {
-            action: "availability_records.created",
-            actor_user_id: parsed.data.createdByUserId,
-            clerk_org_id: parsed.data.clerkOrgId,
-            organisation_id: parsed.data.organisationId,
-            payload: {
-              approvalStatus: routing.approvalStatus,
-              recordType: parsed.data.recordType,
-              sourceType: routing.sourceType,
-              xeroConnectionState,
-            },
-            resource_id: id,
-            resource_type: "availability_record",
-          },
-        });
-        return created;
-      }
-    );
-    await materialisePlanPublication({
-      availabilityRecordId: record.id,
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
+          resource_id: id,
+          resource_type: "availability_record",
+        },
+      });
+      return created;
+    })(client);
+    afterTenantCommit(client, async () => {
+      await materialisePlanPublication({
+        availabilityRecordId: record.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      });
     });
     return {
       ok: true,
       value: toPlanRecord(record, deriveActions(record, hasXero)),
     };
-  } catch {
-    return unknownError();
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 export async function updateRecord(
-  input: z.infer<typeof UpdateRecordSchema> & RoleScopedInput
+  input: z.infer<typeof UpdateRecordSchema> & RoleScopedInput,
+  db: TenantDb
 ): Promise<Result<PlanRecord, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = UpdateRecordSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+
   try {
-    const [existing, actingPerson, xeroStateResult] = await Promise.all([
-      loadScopedRecord(
-        parsed.data.clerkOrgId,
-        parsed.data.organisationId,
-        parsed.data.recordId
-      ),
-      resolvePersonForUser(
-        parsed.data.clerkOrgId,
-        parsed.data.organisationId,
-        parsed.data.actingUserId
-      ),
-      getXeroConnectionStateForScope(parsed.data),
-    ]);
-    if (
-      !(
-        xeroStateResult.ok ||
-        isLocalOnlyEdit(existing, parsed.data.patch.recordType)
-      )
-    ) {
-      return {
-        error: {
-          code: "unknown_error",
-          message:
-            "We cannot reach Xero right now. Try again later or contact support.",
-        },
-        ok: false,
-      };
-    }
-    const xeroConnectionState = xeroStateResult.ok
-      ? xeroStateResult.value.state
-      : "unavailable";
-    const hasXero = xeroConnectionState !== "not_connected";
-    if (!existing) {
-      return recordNotFound();
-    }
-    if (
-      await hasUnresolvedSubmitOperation({
-        availabilityRecordId: existing.id,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      })
-    ) {
-      return { error: unresolvedSubmitError(), ok: false };
-    }
-    if (
-      !canActOnPerson({
-        actingOrgRole: input.actingOrgRole,
-        actingPersonId: actingPerson?.id ?? null,
-        targetPerson: existing.person,
-      })
-    ) {
-      return notAuthorised();
-    }
-    const editable = canEdit(existing, hasXero);
-    if (!editable.ok) {
-      return editable;
-    }
-    const { patch } = parsed.data;
-    const nextStartsAt = patch.startsAt ?? existing.starts_at;
-    const nextEndsAt = patch.endsAt ?? existing.ends_at;
-    if (nextEndsAt < nextStartsAt) {
-      return {
-        error: {
-          code: "validation_error",
-          message: "End date must be after start date",
-        },
-        ok: false,
-      };
-    }
-    const nextRecordType = patch.recordType ?? existing.record_type;
-    const routing =
-      patch.recordType &&
-      categoryChanged(existing.record_type, patch.recordType)
-        ? routeRecord(patch.recordType, hasXero)
-        : {
-            approvalStatus: existing.approval_status,
-            sourceType: existing.source_type,
-          };
-    const materialChange = hasMaterialChange(existing, patch, routing);
-    const derivedUidKey = deriveAvailabilityUidKey({
-      clerkOrgId: parsed.data.clerkOrgId,
-      endsAt: nextEndsAt,
-      organisationId: parsed.data.organisationId,
-      personId: existing.person_id,
-      recordType: nextRecordType,
-      sourceType: routing.sourceType,
-      stableSourceKey: existing.id,
-      startsAt: nextStartsAt,
-    });
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
-      const updated = await tx.availabilityRecord.updateMany({
-        data: {
-          ...(patch.allDay !== undefined && { all_day: patch.allDay }),
-          ...(patch.contactabilityStatus && {
-            contactability: patch.contactabilityStatus,
-          }),
-          ...(patch.endsAt && { ends_at: patch.endsAt }),
-          ...(patch.notesInternal !== undefined && {
-            notes_internal: emptyToNull(patch.notesInternal ?? undefined),
-          }),
-          ...(patch.privacyMode && { privacy_mode: patch.privacyMode }),
-          ...(patch.startsAt && { starts_at: patch.startsAt }),
-          approval_status: routing.approvalStatus,
-          approved_at:
-            routing.approvalStatus === "approved" &&
-            existing.approval_status !== "approved"
-              ? new Date()
-              : existing.approved_at,
-          derived_sequence: materialChange
-            ? { increment: 1 }
-            : existing.derived_sequence,
-          derived_uid_key: derivedUidKey,
-          record_type: nextRecordType,
-          source_type: routing.sourceType,
-          title: getAvailabilityRecordLabel(nextRecordType),
-          updated_by_user_id: parsed.data.actingUserId,
-        },
-        where: {
-          ...scopedTo({
+    const run = async (client: TenantDb): ReturnType<typeof updateRecord> => {
+      const [existing, actingPerson, xeroStateResult] = [
+        await loadScopedRecord(
+          parsed.data.clerkOrgId,
+          parsed.data.organisationId,
+          parsed.data.recordId,
+          client
+        ),
+        await resolvePersonForUser(
+          parsed.data.clerkOrgId,
+          parsed.data.actingUserId,
+          client
+        ),
+        await getXeroConnectionStateForScope(parsed.data, client),
+      ];
+      if (
+        !canPrepareRecordEdit(
+          xeroStateResult,
+          existing,
+          parsed.data.patch.recordType
+        )
+      ) {
+        return {
+          error: {
+            code: "unknown_error",
+            message:
+              "We cannot reach Xero right now. Try again later or contact support.",
+          },
+          ok: false,
+        };
+      }
+      const xeroConnectionState = xeroStateResult.ok
+        ? xeroStateResult.value.state
+        : "unavailable";
+      const hasXero = xeroConnectionState !== "not_connected";
+      if (!existing) {
+        return recordNotFound();
+      }
+      if (
+        await hasUnresolvedSubmitOperation(
+          {
+            availabilityRecordId: existing.id,
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
-          }),
-          archived_at: existing.archived_at,
-          derived_sequence: existing.derived_sequence,
-          id: parsed.data.recordId,
-          ...unclaimedOrExpiredXeroWriteWhere(),
-          ...noUnresolvedSubmitOperationWhere(),
-        },
-      });
-      if (updated.count !== 1) {
-        throw new ActiveXeroWriteConflictError();
-      }
-      await tx.auditEvent.create({
-        data: {
-          action: "availability_records.updated",
-          actor_user_id: parsed.data.actingUserId,
-          clerk_org_id: parsed.data.clerkOrgId,
-          organisation_id: parsed.data.organisationId,
-          payload: {
-            materialChange,
-            nextApprovalStatus: routing.approvalStatus,
-            nextRecordType,
-            nextSourceType: routing.sourceType,
-            previousApprovalStatus: existing.approval_status,
-            previousRecordType: existing.record_type,
-            previousSourceType: existing.source_type,
           },
-          resource_id: parsed.data.recordId,
-          resource_type: "availability_record",
-        },
+          client
+        )
+      ) {
+        return { error: unresolvedSubmitError(), ok: false };
+      }
+      if (
+        !(await canActOnPerson(
+          {
+            actingOrgRole: input.actingOrgRole,
+            actingPersonId: actingPerson?.id ?? null,
+            clerkOrgId: input.clerkOrgId,
+            targetPerson: existing.person,
+          },
+          client
+        ))
+      ) {
+        return notAuthorised();
+      }
+      const editable = canEdit(existing, hasXero);
+      if (!editable.ok) {
+        return editable;
+      }
+      const { patch } = parsed.data;
+      const nextStartsAt = patch.startsAt ?? existing.starts_at;
+      const nextEndsAt = patch.endsAt ?? existing.ends_at;
+      if (nextEndsAt < nextStartsAt) {
+        return {
+          error: {
+            code: "validation_error",
+            message: "End date must be after start date",
+          },
+          ok: false,
+        };
+      }
+      const nextRecordType = patch.recordType ?? existing.record_type;
+      const routing = editedRecordRouting(existing, patch.recordType, hasXero);
+      const materialChange = hasMaterialChange(existing, patch, routing);
+      const derivedUidKey = deriveAvailabilityUidKey({
+        clerkOrgId: parsed.data.clerkOrgId,
+        endsAt: nextEndsAt,
+        organisationId: parsed.data.organisationId,
+        personId: existing.person_id,
+        recordType: nextRecordType,
+        sourceType: routing.sourceType,
+        stableSourceKey: existing.id,
+        startsAt: nextStartsAt,
       });
-    });
-    const updated = await loadScopedRecord(
-      parsed.data.clerkOrgId,
-      parsed.data.organisationId,
-      parsed.data.recordId
-    );
-    if (!updated) {
-      return recordNotFound();
-    }
-    await materialisePlanPublication({
-      availabilityRecordId: updated.id,
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
-    return {
-      ok: true,
-      value: toPlanRecord(updated, deriveActions(updated, hasXero)),
+      await (async (tx: TenantDb) => {
+        const updated = await tx.availabilityRecord.updateMany({
+          data: {
+            ...(patch.allDay !== undefined && { all_day: patch.allDay }),
+            ...(patch.contactabilityStatus && {
+              contactability: patch.contactabilityStatus,
+            }),
+            ...(patch.endsAt && { ends_at: patch.endsAt }),
+            ...(patch.notesInternal !== undefined && {
+              notes_internal: emptyToNull(patch.notesInternal ?? undefined),
+            }),
+            ...(patch.privacyMode && { privacy_mode: patch.privacyMode }),
+            ...(patch.startsAt && { starts_at: patch.startsAt }),
+            approval_status: routing.approvalStatus,
+            approved_at:
+              routing.approvalStatus === "approved" &&
+              existing.approval_status !== "approved"
+                ? new Date()
+                : existing.approved_at,
+            derived_sequence: materialChange
+              ? { increment: 1 }
+              : existing.derived_sequence,
+            derived_uid_key: derivedUidKey,
+            record_type: nextRecordType,
+            source_type: routing.sourceType,
+            title: getAvailabilityRecordLabel(nextRecordType),
+            updated_by_user_id: parsed.data.actingUserId,
+          },
+          where: {
+            ...scopedTo({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            }),
+            archived_at: existing.archived_at,
+            derived_sequence: existing.derived_sequence,
+            id: parsed.data.recordId,
+            ...unclaimedOrExpiredXeroWriteWhere(),
+            ...noUnresolvedSubmitOperationWhere(),
+          },
+        });
+        if (updated.count !== 1) {
+          throw new ActiveXeroWriteConflictError();
+        }
+        await tx.auditEvent.create({
+          data: {
+            action: "availability_records.updated",
+            actor_user_id: parsed.data.actingUserId,
+            clerk_org_id: parsed.data.clerkOrgId,
+            organisation_id: parsed.data.organisationId,
+            payload: {
+              materialChange,
+              nextApprovalStatus: routing.approvalStatus,
+              nextRecordType,
+              nextSourceType: routing.sourceType,
+              previousApprovalStatus: existing.approval_status,
+              previousRecordType: existing.record_type,
+              previousSourceType: existing.source_type,
+            },
+            resource_id: parsed.data.recordId,
+            resource_type: "availability_record",
+          },
+        });
+      })(client);
+      const updated = await loadScopedRecord(
+        parsed.data.clerkOrgId,
+        parsed.data.organisationId,
+        parsed.data.recordId,
+        client
+      );
+      if (!updated) {
+        return recordNotFound();
+      }
+      afterTenantCommit(client, async () => {
+        await materialisePlanPublication({
+          availabilityRecordId: updated.id,
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        });
+      });
+      return {
+        ok: true,
+        value: toPlanRecord(updated, deriveActions(updated, hasXero)),
+      };
     };
+    return await (async () => {
+      assertTenantDb(db, input.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
       return {
@@ -756,64 +835,82 @@ export async function updateRecord(
         ok: false,
       };
     }
-    return unknownError();
+    throw error;
   }
 }
 export async function deleteDraftRecord(
-  input: z.infer<typeof RecordActionSchema> & RoleScopedInput
+  input: z.infer<typeof RecordActionSchema> & RoleScopedInput,
+  db: TenantDb
 ): Promise<Result<void, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+
   try {
-    const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
-    if (!existing.ok) {
-      return existing;
-    }
-    if (
-      await hasUnresolvedSubmitOperation({
-        availabilityRecordId: existing.value.id,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      })
-    ) {
-      return { error: unresolvedSubmitError(), ok: false };
-    }
-    if (
-      existing.value.source_type !== "team_calendar_leave" ||
-      existing.value.approval_status !== "draft"
-    ) {
-      return {
-        error: {
-          code: "invalid_state_for_delete",
-          message: "Only draft leave records can be deleted",
-        },
-        ok: false,
-      };
-    }
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
-      const deleted = await tx.availabilityRecord.deleteMany({
-        where: {
-          ...scopedTo({
+    const run = async (
+      client: TenantDb
+    ): ReturnType<typeof deleteDraftRecord> => {
+      const existing = await loadAndAuthorise(
+        parsed.data,
+        input.actingOrgRole,
+        client
+      );
+      if (!existing.ok) {
+        return existing;
+      }
+      if (
+        await hasUnresolvedSubmitOperation(
+          {
+            availabilityRecordId: existing.value.id,
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
-          }),
-          approval_status: existing.value.approval_status,
-          derived_sequence: existing.value.derived_sequence,
-          id: parsed.data.recordId,
-          ...unclaimedOrExpiredXeroWriteWhere(),
-          ...noUnresolvedSubmitOperationWhere(),
-        },
-      });
-      if (deleted.count !== 1) {
-        throw new ActiveXeroWriteConflictError();
+          },
+          client
+        )
+      ) {
+        return { error: unresolvedSubmitError(), ok: false };
       }
-      await tx.auditEvent.create({
-        data: auditData(parsed.data, "availability_records.draft_deleted"),
-      });
-    });
-    return { ok: true, value: undefined };
+      if (
+        existing.value.source_type !== "team_calendar_leave" ||
+        existing.value.approval_status !== "draft"
+      ) {
+        return {
+          error: {
+            code: "invalid_state_for_delete",
+            message: "Only draft leave records can be deleted",
+          },
+          ok: false,
+        };
+      }
+      await (async (tx: TenantDb) => {
+        const deleted = await tx.availabilityRecord.deleteMany({
+          where: {
+            ...scopedTo({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            }),
+            approval_status: existing.value.approval_status,
+            derived_sequence: existing.value.derived_sequence,
+            id: parsed.data.recordId,
+            ...unclaimedOrExpiredXeroWriteWhere(),
+            ...noUnresolvedSubmitOperationWhere(),
+          },
+        });
+        if (deleted.count !== 1) {
+          throw new ActiveXeroWriteConflictError();
+        }
+        await tx.auditEvent.create({
+          data: auditData(parsed.data, "availability_records.draft_deleted"),
+        });
+      })(client);
+      return { ok: true, value: undefined };
+    };
+    return await (async () => {
+      assertTenantDb(db, input.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
       return {
@@ -825,87 +922,105 @@ export async function deleteDraftRecord(
         ok: false,
       };
     }
-    return unknownError();
+    throw error;
   }
 }
 export async function archiveRecord(
-  input: z.infer<typeof RecordActionSchema> & RoleScopedInput
+  input: z.infer<typeof RecordActionSchema> & RoleScopedInput,
+  db: TenantDb
 ): Promise<Result<void, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+
   try {
-    const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
-    if (!existing.ok) {
-      return existing;
-    }
-    if (
-      await hasUnresolvedSubmitOperation({
-        availabilityRecordId: existing.value.id,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      })
-    ) {
-      return { error: unresolvedSubmitError(), ok: false };
-    }
-    if (
-      existing.value.source_type === "xero_leave" ||
-      existing.value.source_type === "xero"
-    ) {
-      return {
-        error: {
-          code: "invalid_state_for_archive",
-          message: "Xero-synced records cannot be archived here",
-        },
-        ok: false,
-      };
-    }
-    if (
-      !["approved", "declined", "withdrawn"].includes(
-        existing.value.approval_status
-      )
-    ) {
-      return {
-        error: {
-          code: "invalid_state_for_archive",
-          message: "This record cannot be archived in its current state",
-        },
-        ok: false,
-      };
-    }
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
-      const archived = await tx.availabilityRecord.updateMany({
-        data: {
-          archived_at: new Date(),
-          publish_status: "archived",
-          updated_by_user_id: parsed.data.actingUserId,
-        },
-        where: {
-          ...scopedTo({
+    const run = async (client: TenantDb): ReturnType<typeof archiveRecord> => {
+      const existing = await loadAndAuthorise(
+        parsed.data,
+        input.actingOrgRole,
+        client
+      );
+      if (!existing.ok) {
+        return existing;
+      }
+      if (
+        await hasUnresolvedSubmitOperation(
+          {
+            availabilityRecordId: existing.value.id,
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
-          }),
-          approval_status: existing.value.approval_status,
-          derived_sequence: existing.value.derived_sequence,
-          id: parsed.data.recordId,
-          ...unclaimedOrExpiredXeroWriteWhere(),
-          ...noUnresolvedSubmitOperationWhere(),
-        },
-      });
-      if (archived.count !== 1) {
-        throw new ActiveXeroWriteConflictError();
+          },
+          client
+        )
+      ) {
+        return { error: unresolvedSubmitError(), ok: false };
       }
-      await tx.auditEvent.create({
-        data: auditData(parsed.data, "availability_records.archived"),
+      if (
+        existing.value.source_type === "xero_leave" ||
+        existing.value.source_type === "xero"
+      ) {
+        return {
+          error: {
+            code: "invalid_state_for_archive",
+            message: "Xero-synced records cannot be archived here",
+          },
+          ok: false,
+        };
+      }
+      if (
+        !["approved", "declined", "withdrawn"].includes(
+          existing.value.approval_status
+        )
+      ) {
+        return {
+          error: {
+            code: "invalid_state_for_archive",
+            message: "This record cannot be archived in its current state",
+          },
+          ok: false,
+        };
+      }
+      await (async (tx: TenantDb) => {
+        const archived = await tx.availabilityRecord.updateMany({
+          data: {
+            archived_at: new Date(),
+            publish_status: "archived",
+            updated_by_user_id: parsed.data.actingUserId,
+          },
+          where: {
+            ...scopedTo({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            }),
+            approval_status: existing.value.approval_status,
+            derived_sequence: existing.value.derived_sequence,
+            id: parsed.data.recordId,
+            ...unclaimedOrExpiredXeroWriteWhere(),
+            ...noUnresolvedSubmitOperationWhere(),
+          },
+        });
+        if (archived.count !== 1) {
+          throw new ActiveXeroWriteConflictError();
+        }
+        await tx.auditEvent.create({
+          data: auditData(parsed.data, "availability_records.archived"),
+        });
+      })(client);
+      afterTenantCommit(client, async () => {
+        await materialisePlanPublication({
+          availabilityRecordId: parsed.data.recordId,
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        });
       });
-    });
-    await materialisePlanPublication({
-      availabilityRecordId: parsed.data.recordId,
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
-    return { ok: true, value: undefined };
+      return { ok: true, value: undefined };
+    };
+    return await (async () => {
+      assertTenantDb(db, input.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
       return {
@@ -917,64 +1032,79 @@ export async function archiveRecord(
         ok: false,
       };
     }
-    return unknownError();
+    throw error;
   }
 }
 export async function restoreRecord(
-  input: z.infer<typeof RecordActionSchema> & RoleScopedInput
+  input: z.infer<typeof RecordActionSchema> & RoleScopedInput,
+  db: TenantDb
 ): Promise<Result<void, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+
   try {
-    const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
-    if (!existing.ok) {
-      return existing;
-    }
-    if (
-      existing.value.source_type !== "manual" ||
-      !existing.value.archived_at
-    ) {
-      return {
-        error: {
-          code: "invalid_state_for_archive",
-          message: "Only archived manual records can be restored",
-        },
-        ok: false,
-      };
-    }
-    await tenantTransaction(input.clerkOrgId, async (tx) => {
-      const restored = await tx.availabilityRecord.updateMany({
-        data: {
-          archived_at: null,
-          publish_status: "eligible",
-          updated_by_user_id: parsed.data.actingUserId,
-        },
-        where: {
-          ...scopedTo({
-            clerkOrgId: parsed.data.clerkOrgId,
-            organisationId: parsed.data.organisationId,
-          }),
-          derived_sequence: existing.value.derived_sequence,
-          id: parsed.data.recordId,
-          ...unclaimedOrExpiredXeroWriteWhere(),
-          ...noUnresolvedSubmitOperationWhere(),
-        },
-      });
-      if (restored.count !== 1) {
-        throw new ActiveXeroWriteConflictError();
+    const run = async (client: TenantDb): ReturnType<typeof restoreRecord> => {
+      const existing = await loadAndAuthorise(
+        parsed.data,
+        input.actingOrgRole,
+        client
+      );
+      if (!existing.ok) {
+        return existing;
       }
-      await tx.auditEvent.create({
-        data: auditData(parsed.data, "availability_records.restored"),
+      if (
+        existing.value.source_type !== "manual" ||
+        !existing.value.archived_at
+      ) {
+        return {
+          error: {
+            code: "invalid_state_for_archive",
+            message: "Only archived manual records can be restored",
+          },
+          ok: false,
+        };
+      }
+      await (async (tx: TenantDb) => {
+        const restored = await tx.availabilityRecord.updateMany({
+          data: {
+            archived_at: null,
+            publish_status: "eligible",
+            updated_by_user_id: parsed.data.actingUserId,
+          },
+          where: {
+            ...scopedTo({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            }),
+            derived_sequence: existing.value.derived_sequence,
+            id: parsed.data.recordId,
+            ...unclaimedOrExpiredXeroWriteWhere(),
+            ...noUnresolvedSubmitOperationWhere(),
+          },
+        });
+        if (restored.count !== 1) {
+          throw new ActiveXeroWriteConflictError();
+        }
+        await tx.auditEvent.create({
+          data: auditData(parsed.data, "availability_records.restored"),
+        });
+      })(client);
+      afterTenantCommit(client, async () => {
+        await materialisePlanPublication({
+          availabilityRecordId: parsed.data.recordId,
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        });
       });
-    });
-    await materialisePlanPublication({
-      availabilityRecordId: parsed.data.recordId,
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
-    return { ok: true, value: undefined };
+      return { ok: true, value: undefined };
+    };
+    return await (async () => {
+      assertTenantDb(db, input.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof ActiveXeroWriteConflictError) {
       return {
@@ -986,7 +1116,7 @@ export async function restoreRecord(
         ok: false,
       };
     }
-    return unknownError();
+    throw error;
   }
 }
 const personSelect = {
@@ -1011,130 +1141,148 @@ const recordInclude = {
 } satisfies Prisma.AvailabilityRecordInclude;
 type ScopedRecord = NonNullable<Awaited<ReturnType<typeof loadScopedRecord>>>;
 type SelectedPerson = ScopedRecord["person"];
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Page scope, filters, window and cursor must form one identical count/page predicate.
-async function listRecordsPageForScope(input: {
-  allHistory?: boolean;
-  authorisedPersonIds: null | string[];
-  clerkOrgId: string;
-  cursor?: string | null;
-  filters: PlanFilters;
-  organisationId: string;
-  pageSize?: number;
-}): Promise<Result<PlanListPage, PlanServiceError>> {
-  const requested = input.filters.personId;
-  let personIds = requested;
-  if (input.authorisedPersonIds !== null) {
-    personIds = requested
-      ? requested.filter((id) => input.authorisedPersonIds?.includes(id))
-      : input.authorisedPersonIds;
+const visiblePlanPeople = (
+  requested: string[] | undefined,
+  authorised: string[] | null
+): string[] | undefined => {
+  if (authorised === null) {
+    return requested;
   }
-  const now = new Date();
-  const from = new Date(now);
-  from.setUTCDate(from.getUTCDate() - 90);
-  const to = new Date(now);
-  to.setUTCDate(to.getUTCDate() + 365);
-  const window = input.allHistory
-    ? {
-        from: input.filters.dateRange?.from ?? null,
-        to: input.filters.dateRange?.to ?? null,
-      }
-    : {
-        from: input.filters.dateRange?.from ?? from,
-        to: input.filters.dateRange?.to ?? to,
+  return requested
+    ? requested.filter((id) => authorised.includes(id))
+    : authorised;
+};
+async function listRecordsPageForScope(
+  input: {
+    allHistory?: boolean;
+    authorisedPersonIds: null | string[];
+    clerkOrgId: string;
+    cursor?: string | null;
+    filters: PlanFilters;
+    organisationId: string;
+    pageSize?: number;
+  },
+  db: TenantDb
+): Promise<Result<PlanListPage, PlanServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const personIds = visiblePlanPeople(
+      input.filters.personId,
+      input.authorisedPersonIds
+    );
+    const now = new Date();
+    const from = new Date(now);
+    from.setUTCDate(from.getUTCDate() - 90);
+    const to = new Date(now);
+    to.setUTCDate(to.getUTCDate() + 365);
+    const window = input.allHistory
+      ? {
+          from: input.filters.dateRange?.from ?? null,
+          to: input.filters.dateRange?.to ?? null,
+        }
+      : {
+          from: input.filters.dateRange?.from ?? from,
+          to: input.filters.dateRange?.to ?? to,
+        };
+    if (personIds?.length === 0) {
+      return {
+        ok: true,
+        value: { items: [], nextCursor: null, totalCount: 0, window },
       };
-  if (personIds?.length === 0) {
+    }
+    const where: Prisma.AvailabilityRecordWhereInput = {
+      ...scopedTo(input),
+      ...planSourceFilter(input),
+      ...(input.filters.includeArchived ? {} : { archived_at: null }),
+      ...(input.filters.approvalStatus?.length
+        ? { approval_status: { in: input.filters.approvalStatus } }
+        : {}),
+      ...(personIds?.length ? { person_id: { in: personIds } } : {}),
+      ...planRecordTypeFilter(input.filters),
+      ...(window.from ? { ends_at: { gte: window.from } } : {}),
+      ...(window.to ? { starts_at: { lte: window.to } } : {}),
+    };
+    const cursor = decodePlanCursor(input.cursor ?? null);
+    const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
+    const [rows, totalCount, xeroStateResult] = [
+      await client.availabilityRecord.findMany({
+        include: recordInclude,
+        orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
+        take: pageSize + 1,
+        where: cursor
+          ? {
+              AND: [
+                where,
+                {
+                  OR: [
+                    { starts_at: { gt: cursor.startsAt } },
+                    {
+                      created_at: { gt: cursor.createdAt },
+                      starts_at: cursor.startsAt,
+                    },
+                    {
+                      created_at: cursor.createdAt,
+                      id: { gt: cursor.id },
+                      starts_at: cursor.startsAt,
+                    },
+                  ],
+                },
+              ],
+            }
+          : where,
+      }),
+      await client.availabilityRecord.count({ where }),
+      await getXeroConnectionStateForScope(
+        {
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        },
+        client
+      ),
+    ];
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
+    const hasXero = connectionActionGate(xeroConnectionState);
+    const page = rows.slice(0, pageSize);
+    const balances = page.length
+      ? await client.leaveBalance.findMany({
+          orderBy: { updated_at: "desc" },
+          where: {
+            ...scopedTo(input),
+            person_id: { in: [...new Set(page.map((r) => r.person_id))] },
+            record_type: { in: [...new Set(page.map((r) => r.record_type))] },
+          },
+        })
+      : [];
+    const byPair = new Map<string, (typeof balances)[number]>();
+    for (const balance of balances) {
+      const key = `${balance.person_id}:${balance.record_type}`;
+      if (!byPair.has(key)) {
+        byPair.set(key, balance);
+      }
+    }
+    const items = page.map((record) => ({
+      ...toPlanRecord(record, deriveActions(record, hasXero)),
+      balanceChip: balanceChipFromRow(
+        record,
+        byPair.get(`${record.person_id}:${record.record_type}`)
+      ),
+    }));
     return {
       ok: true,
-      value: { items: [], nextCursor: null, totalCount: 0, window },
+      value: {
+        items,
+        nextCursor:
+          rows.length > pageSize ? encodePlanCursor(page.at(-1)) : null,
+        totalCount,
+        window,
+      },
     };
   }
-  const where: Prisma.AvailabilityRecordWhereInput = {
-    ...scopedTo(input),
-    ...planSourceFilter(input),
-    ...(input.filters.includeArchived ? {} : { archived_at: null }),
-    ...(input.filters.approvalStatus?.length
-      ? { approval_status: { in: input.filters.approvalStatus } }
-      : {}),
-    ...(personIds?.length ? { person_id: { in: personIds } } : {}),
-    ...(input.filters.recordType?.length
-      ? { record_type: { in: [...input.filters.recordType] } }
-      : recordTypeCategoryFilter(input.filters.recordTypeCategory)),
-    ...(window.from ? { ends_at: { gte: window.from } } : {}),
-    ...(window.to ? { starts_at: { lte: window.to } } : {}),
-  };
-  const cursor = decodePlanCursor(input.cursor ?? null);
-  const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
-  const [rows, totalCount, xeroStateResult] = await Promise.all([
-    tenantDatabase(input.clerkOrgId).availabilityRecord.findMany({
-      include: recordInclude,
-      orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
-      take: pageSize + 1,
-      where: cursor
-        ? {
-            AND: [
-              where,
-              {
-                OR: [
-                  { starts_at: { gt: cursor.startsAt } },
-                  {
-                    created_at: { gt: cursor.createdAt },
-                    starts_at: cursor.startsAt,
-                  },
-                  {
-                    created_at: cursor.createdAt,
-                    id: { gt: cursor.id },
-                    starts_at: cursor.startsAt,
-                  },
-                ],
-              },
-            ],
-          }
-        : where,
-    }),
-    tenantDatabase(input.clerkOrgId).availabilityRecord.count({ where }),
-    getXeroConnectionStateForScope({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    }),
-  ]);
-  const xeroConnectionState = xeroStateResult.ok
-    ? xeroStateResult.value.state
-    : "unavailable";
-  const hasXero = connectionActionGate(xeroConnectionState);
-  const page = rows.slice(0, pageSize);
-  const balances = page.length
-    ? await tenantDatabase(input.clerkOrgId).leaveBalance.findMany({
-        orderBy: { updated_at: "desc" },
-        where: {
-          ...scopedTo(input),
-          person_id: { in: [...new Set(page.map((r) => r.person_id))] },
-          record_type: { in: [...new Set(page.map((r) => r.record_type))] },
-        },
-      })
-    : [];
-  const byPair = new Map<string, (typeof balances)[number]>();
-  for (const balance of balances) {
-    const key = `${balance.person_id}:${balance.record_type}`;
-    if (!byPair.has(key)) {
-      byPair.set(key, balance);
-    }
-  }
-  const items = page.map((record) => ({
-    ...toPlanRecord(record, deriveActions(record, hasXero)),
-    balanceChip: balanceChipFromRow(
-      record,
-      byPair.get(`${record.person_id}:${record.record_type}`)
-    ),
-  }));
-  return {
-    ok: true,
-    value: {
-      items,
-      nextCursor: rows.length > pageSize ? encodePlanCursor(page.at(-1)) : null,
-      totalCount,
-      window,
-    },
-  };
 }
 function balanceChipFromRow(
   record: ScopedRecord,
@@ -1207,183 +1355,222 @@ function decodePlanCursor(value: string | null): {
     return null;
   }
 }
-async function listRecordsForScope({
-  authorisedPersonIds,
-  clerkOrgId,
-  filters,
-  organisationId,
-}: {
-  authorisedPersonIds: null | string[];
-  clerkOrgId: string;
-  filters: PlanFilters;
-  organisationId: string;
-}): Promise<Result<RecordListItem[], PlanServiceError>> {
-  const requestedPersonIds = filters.personId;
-  let personIds = requestedPersonIds;
-  if (authorisedPersonIds !== null) {
-    personIds = requestedPersonIds
-      ? requestedPersonIds.filter((personId) =>
-          authorisedPersonIds.includes(personId)
-        )
-      : authorisedPersonIds;
-  }
-  if (personIds?.length === 0) {
-    return { ok: true, value: [] };
-  }
-  const xeroStateResult = await getXeroConnectionStateForScope({
+async function listRecordsForScope(
+  {
+    authorisedPersonIds,
     clerkOrgId,
+    filters,
     organisationId,
-  });
-  const xeroConnectionState = xeroStateResult.ok
-    ? xeroStateResult.value.state
-    : "unavailable";
-  const hasXero = connectionActionGate(xeroConnectionState);
-  const records = await tenantDatabase(clerkOrgId).availabilityRecord.findMany({
-    orderBy: [{ starts_at: "asc" }, { created_at: "asc" }],
-    select: { id: true },
-    where: {
-      ...scopedTo({ clerkOrgId, organisationId }),
-      ...planSourceFilter({ clerkOrgId, filters, organisationId }),
-      ...(filters.includeArchived ? {} : { archived_at: null }),
-      ...(filters.approvalStatus?.length
-        ? { approval_status: { in: filters.approvalStatus } }
-        : {}),
-      ...(personIds?.length ? { person_id: { in: personIds } } : {}),
-      ...(filters.recordType?.length
-        ? { record_type: { in: [...filters.recordType] } }
-        : recordTypeCategoryFilter(filters.recordTypeCategory)),
-      ...(filters.dateRange?.from
-        ? { ends_at: { gte: filters.dateRange.from } }
-        : {}),
-      ...(filters.dateRange?.to
-        ? { starts_at: { lte: filters.dateRange.to } }
-        : {}),
-    },
-  });
-  const loadedRecords = await Promise.all(
-    records.map((record) =>
-      loadScopedRecord(clerkOrgId, organisationId, record.id)
-    )
-  );
-  const items = await Promise.all(
-    loadedRecords
-      .filter((record): record is ScopedRecord => record !== null)
-      .map((record) => toRecordListItem(record, hasXero))
-  );
-  return { ok: true, value: items };
+  }: {
+    authorisedPersonIds: null | string[];
+    clerkOrgId: string;
+    filters: PlanFilters;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<Result<RecordListItem[], PlanServiceError>> {
+  assertTenantDb(db, clerkOrgId);
+  {
+    assertTenantDb(db, clerkOrgId);
+    const client = db;
+
+    const requestedPersonIds = filters.personId;
+    let personIds = requestedPersonIds;
+    if (authorisedPersonIds !== null) {
+      personIds = requestedPersonIds
+        ? requestedPersonIds.filter((personId) =>
+            authorisedPersonIds.includes(personId)
+          )
+        : authorisedPersonIds;
+    }
+    if (personIds?.length === 0) {
+      return { ok: true, value: [] };
+    }
+    const xeroStateResult = await getXeroConnectionStateForScope(
+      {
+        clerkOrgId,
+        organisationId,
+      },
+      client
+    );
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
+    const hasXero = connectionActionGate(xeroConnectionState);
+    const records = await client.availabilityRecord.findMany({
+      orderBy: [{ starts_at: "asc" }, { created_at: "asc" }],
+      select: { id: true },
+      where: {
+        ...scopedTo({ clerkOrgId, organisationId }),
+        ...planSourceFilter({ clerkOrgId, filters, organisationId }),
+        ...planListFilterWhere(filters),
+        ...(personIds?.length ? { person_id: { in: personIds } } : {}),
+      },
+    });
+    const items: RecordListItem[] = [];
+    for (const record of records) {
+      const loaded = await loadScopedRecord(
+        clerkOrgId,
+        organisationId,
+        record.id,
+        client
+      );
+      if (loaded) {
+        items.push(await toRecordListItem(loaded, hasXero, client));
+      }
+    }
+    return { ok: true, value: items };
+  }
 }
 async function toRecordListItem(
   record: ScopedRecord,
-  hasXero: boolean | null
+  hasXero: boolean | null,
+  db: TenantDb
 ): Promise<RecordListItem> {
-  return {
-    ...toPlanRecord(record, deriveActions(record, hasXero)),
-    balanceChip: await balanceChipForRecord(record),
-  };
+  assertTenantDb(db, record.clerk_org_id);
+  {
+    assertTenantDb(db, record.clerk_org_id);
+    const client = db;
+    return await {
+      ...toPlanRecord(record, deriveActions(record, hasXero)),
+      balanceChip: await balanceChipForRecord(record, client),
+    };
+  }
 }
 async function balanceChipForRecord(
-  record: ScopedRecord
+  record: ScopedRecord,
+  db: TenantDb
 ): Promise<BalanceChip | null> {
-  if (isLocalOnlyType(record.record_type)) {
-    return null;
-  }
-  if (!isXeroLeaveType(record.record_type)) {
+  assertTenantDb(db, record.clerk_org_id);
+  {
+    assertTenantDb(db, record.clerk_org_id);
+    const client = db;
+
+    if (isLocalOnlyType(record.record_type)) {
+      return null;
+    }
+    if (!isXeroLeaveType(record.record_type)) {
+      return {
+        balanceAvailable: null,
+        balanceUnavailableReason: "not_xero_leave",
+        currencyCode: null,
+        leaveBalanceUpdatedAt: null,
+        unit: null,
+      };
+    }
+    const balance = await client.leaveBalance.findFirst({
+      orderBy: { updated_at: "desc" },
+      select: {
+        balance: true,
+        balance_unit: true,
+        currency_code: true,
+        updated_at: true,
+      },
+      where: {
+        ...scopedTo({
+          clerkOrgId: record.clerk_org_id,
+          organisationId: record.organisation_id,
+        }),
+        person_id: record.person_id,
+        record_type: record.record_type,
+      },
+    });
+    if (!balance) {
+      return {
+        balanceAvailable: null,
+        balanceUnavailableReason: "not_synced",
+        currencyCode: null,
+        leaveBalanceUpdatedAt: null,
+        unit: null,
+      };
+    }
     return {
-      balanceAvailable: null,
-      balanceUnavailableReason: "not_xero_leave",
-      currencyCode: null,
-      leaveBalanceUpdatedAt: null,
-      unit: null,
-    };
-  }
-  const balance = await tenantDatabase(
-    record.clerk_org_id
-  ).leaveBalance.findFirst({
-    orderBy: { updated_at: "desc" },
-    select: {
-      balance: true,
-      balance_unit: true,
-      currency_code: true,
-      updated_at: true,
-    },
-    where: {
-      ...scopedTo({
-        clerkOrgId: record.clerk_org_id,
-        organisationId: record.organisation_id,
-      }),
-      person_id: record.person_id,
-      record_type: record.record_type,
-    },
-  });
-  if (!balance) {
-    return {
-      balanceAvailable: null,
+      balanceAvailable: Number(balance.balance),
       balanceUnavailableReason: "not_synced",
-      currencyCode: null,
-      leaveBalanceUpdatedAt: null,
-      unit: null,
+      currencyCode: balance.currency_code,
+      leaveBalanceUpdatedAt: balance.updated_at,
+      unit: balance.balance_unit,
     };
   }
-  return {
-    balanceAvailable: Number(balance.balance),
-    balanceUnavailableReason: "not_synced",
-    currencyCode: balance.currency_code,
-    leaveBalanceUpdatedAt: balance.updated_at,
-    unit: balance.balance_unit,
-  };
 }
-function loadScopedRecord(
+async function loadScopedRecord(
   clerkOrgId: string,
   organisationId: string,
-  recordId: string
+  recordId: string,
+  db: TenantDb
 ) {
-  return tenantDatabase(clerkOrgId).availabilityRecord.findFirst({
-    include: recordInclude,
-    where: {
-      ...scopedTo({ clerkOrgId, organisationId }),
-      id: recordId,
-    },
-  });
+  assertTenantDb(db, clerkOrgId);
+  {
+    assertTenantDb(db, clerkOrgId);
+    const client = db;
+    return await client.availabilityRecord.findFirst({
+      include: recordInclude,
+      where: {
+        ...scopedTo({ clerkOrgId, organisationId }),
+        id: recordId,
+      },
+    });
+  }
 }
 async function loadAndAuthorise(
   input: z.infer<typeof RecordActionSchema>,
-  actingOrgRole: string | null | undefined
+  actingOrgRole: string | null | undefined,
+  db: TenantDb
 ): Promise<Result<ScopedRecord, PlanServiceError>> {
-  const [record, actingPerson] = await Promise.all([
-    loadScopedRecord(input.clerkOrgId, input.organisationId, input.recordId),
-    resolvePersonForUser(
-      input.clerkOrgId,
-      input.organisationId,
-      input.actingUserId
-    ),
-  ]);
-  if (!record) {
-    return recordNotFound();
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const [record, actingPerson] = [
+      await loadScopedRecord(
+        input.clerkOrgId,
+        input.organisationId,
+        input.recordId,
+        client
+      ),
+      await resolvePersonForUser(input.clerkOrgId, input.actingUserId, client),
+    ];
+    if (!record) {
+      return recordNotFound();
+    }
+    if (
+      !(await canActOnPerson(
+        {
+          actingOrgRole,
+          actingPersonId: actingPerson?.id ?? null,
+          clerkOrgId: input.clerkOrgId,
+          targetPerson: record.person,
+        },
+        client
+      ))
+    ) {
+      return notAuthorised();
+    }
+    return { ok: true, value: record };
   }
-  if (
-    !canActOnPerson({
-      actingOrgRole,
-      actingPersonId: actingPerson?.id ?? null,
-      targetPerson: record.person,
-    })
-  ) {
-    return notAuthorised();
-  }
-  return { ok: true, value: record };
 }
-function resolvePersonForUser(
+async function resolvePersonForUser(
   clerkOrgId: string,
-  organisationId: string,
-  userId: string
+  userId: string,
+  db: TenantDb
 ) {
-  return tenantDatabase(clerkOrgId).person.findFirst({
-    select: personSelect,
-    where: {
-      ...scopedTo({ clerkOrgId, organisationId }),
-      archived_at: null,
-      clerk_user_id: userId,
-    },
-  });
+  assertTenantDb(db, clerkOrgId);
+  {
+    assertTenantDb(db, clerkOrgId);
+    const client = db;
+
+    const companies = await resolveAccountCompanies(clerkOrgId, client);
+    return client.person.findFirst({
+      select: personSelect,
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        clerk_user_id: userId,
+        organisation_id: { in: companies.map((company) => company.id) },
+      },
+    });
+  }
 }
 function toPlanRecord(
   record: ScopedRecord,
@@ -1537,12 +1724,17 @@ function routeRecord(
   }
   return { approvalStatus: "approved", sourceType: "team_calendar_leave" };
 }
-async function materialisePlanPublication(input: {
+export async function materialisePlanPublication(input: {
   availabilityRecordId: string;
   clerkOrgId: string;
   organisationId: string;
 }): Promise<void> {
-  const result = await materialiseAvailabilityPublication(input);
+  assertNoTenantTransaction("materialisePlanPublication");
+  const result = await withTenantResult(
+    input.clerkOrgId,
+    (db) => materialiseAvailabilityPublication(input, db),
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
   if (!result.ok) {
     // Best-effort: the record is already persisted. Log the failed feed
     // projection rather than failing the write; it is corrected on the next
@@ -1553,6 +1745,7 @@ async function materialisePlanPublication(input: {
       error: result.error.message,
       organisationId: input.organisationId,
     });
+    throw new Error(result.error.message);
   }
 }
 function hasMaterialChange(
@@ -1612,6 +1805,13 @@ function planSourceFilter(input: {
       : {}),
   };
 }
+function planRecordTypeFilter(
+  filters: PlanFilters
+): Prisma.AvailabilityRecordWhereInput {
+  return filters.recordType?.length
+    ? { record_type: { in: [...filters.recordType] } }
+    : recordTypeCategoryFilter(filters.recordTypeCategory);
+}
 function recordTypeCategoryFilter(
   category: PlanFilters["recordTypeCategory"]
 ): {
@@ -1638,21 +1838,34 @@ function parseFilters(filters: unknown): Result<PlanFilters, PlanServiceError> {
   }
   return { ok: true, value: parsed.data };
 }
-function canActOnPerson({
-  actingOrgRole,
-  actingPersonId,
-  targetPerson,
-}: {
-  actingOrgRole?: string | null;
-  actingPersonId: string | null;
-  targetPerson: SelectedPerson;
-}): boolean {
-  return (
+async function canActOnPerson(
+  {
+    clerkOrgId,
+    actingOrgRole,
+    actingPersonId,
+    targetPerson,
+  }: {
+    clerkOrgId: string;
+    actingOrgRole?: string | null;
+    actingPersonId: string | null;
+    targetPerson: SelectedPerson;
+  },
+  db: TenantDb
+): Promise<boolean> {
+  assertTenantDb(db, clerkOrgId);
+  if (
     isAdminOrOwner(actingOrgRole) ||
     targetPerson.id === actingPersonId ||
-    (Boolean(actingPersonId) &&
-      targetPerson.manager_person_id === actingPersonId)
-  );
+    (actingPersonId && targetPerson.manager_person_id === actingPersonId)
+  ) {
+    return true;
+  }
+  if (actingOrgRole !== "org:manager" || !actingPersonId) {
+    return false;
+  }
+  return (
+    await managerScopePersonIds({ actingPersonId, clerkOrgId }, db)
+  ).includes(targetPerson.id);
 }
 function isAdminOrOwner(role?: string | null): boolean {
   return role === "org:admin" || role === "org:owner";
@@ -1695,15 +1908,7 @@ function validationError(error: z.ZodError): Result<never, PlanServiceError> {
     ok: false,
   };
 }
-function unknownError(): Result<never, PlanServiceError> {
-  return {
-    error: {
-      code: "unknown_error",
-      message: "Something went wrong while managing this record",
-    },
-    ok: false,
-  };
-}
+
 function emptyToNull(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -1745,4 +1950,45 @@ function approvedPlanActions(
     return ["view", "withdraw", "archive"];
   }
   return hasXero ? ["view", "archive"] : ["edit", "archive"];
+}
+
+function planListFilterWhere(
+  filters: PlanFilters
+): Prisma.AvailabilityRecordWhereInput {
+  return {
+    ...(filters.includeArchived ? {} : { archived_at: null }),
+    ...(filters.approvalStatus?.length
+      ? { approval_status: { in: filters.approvalStatus } }
+      : {}),
+    ...(filters.recordType?.length
+      ? { record_type: { in: [...filters.recordType] } }
+      : recordTypeCategoryFilter(filters.recordTypeCategory)),
+    ...(filters.dateRange?.from
+      ? { ends_at: { gte: filters.dateRange.from } }
+      : {}),
+    ...(filters.dateRange?.to
+      ? { starts_at: { lte: filters.dateRange.to } }
+      : {}),
+  };
+}
+
+function canPrepareRecordEdit(
+  state: Awaited<ReturnType<typeof getXeroConnectionStateForScope>>,
+  existing: Parameters<typeof isLocalOnlyEdit>[0],
+  recordType: Parameters<typeof isLocalOnlyEdit>[1]
+) {
+  return state.ok || isLocalOnlyEdit(existing, recordType);
+}
+function editedRecordRouting(
+  existing: ScopedRecord,
+  recordType: Parameters<typeof routeRecord>[0] | undefined,
+  hasXero: boolean
+) {
+  if (recordType && categoryChanged(existing.record_type, recordType)) {
+    return routeRecord(recordType, hasXero);
+  }
+  return {
+    approvalStatus: existing.approval_status,
+    sourceType: existing.source_type,
+  };
 }

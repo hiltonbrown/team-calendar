@@ -1,7 +1,9 @@
-import { tenantDatabase } from "@repo/database";
+import { requireOrg } from "@repo/auth/helpers";
+import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { SettingsSectionHeader } from "../../../components/settings-section-header";
 import { toXeroPersonMatchView, xeroPersonMatchSelect } from "./_match-view";
 import { MatchesClient } from "./matches-client";
@@ -22,20 +24,30 @@ export default async function XeroMatchesPage({
   await requirePageRole("org:admin");
 
   const { org: orgParam } = await searchParams;
-  const { clerkOrgId, organisationId } =
-    await requireActiveOrgPageContext(orgParam);
+  // Clerk supplied the authenticated account identifier.
+  const accountId = (await requireOrg()) as ClerkOrgId;
+  const { organisationId, matches } = await withTenantDb(
+    accountId,
+    async (db) => {
+      const { clerkOrgId, organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(accountId, orgParam, db);
 
-  const rawMatches = await tenantDatabase(clerkOrgId).xeroPersonMatch.findMany({
-    orderBy: [{ created_at: "asc" }, { id: "asc" }],
-    select: xeroPersonMatchSelect,
-    where: {
-      clerk_org_id: clerkOrgId,
-      organisation_id: organisationId,
-      status: "pending",
+      const rawMatches = await db.xeroPersonMatch.findMany({
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
+        select: xeroPersonMatchSelect,
+        where: {
+          clerk_org_id: clerkOrgId,
+          organisation_id: scopedOrganisationId,
+          status: "pending",
+        },
+      });
+
+      const preparedMatches = rawMatches.map(toXeroPersonMatchView);
+
+      return { matches: preparedMatches, organisationId: scopedOrganisationId };
     },
-  });
-
-  const matches = rawMatches.map(toXeroPersonMatchView);
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
 
   return (
     <div className="space-y-6">

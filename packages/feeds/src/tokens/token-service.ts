@@ -9,11 +9,11 @@ import {
 } from "node:crypto";
 import type { Result } from "@repo/core";
 import {
+  afterTenantCommit,
+  assertTenantDb,
   resolveAccountCompanies,
-  tenantDatabase,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
-import type { Prisma } from "@repo/database/generated/client";
 import { z } from "zod";
 import { invalidateFeedCache } from "../cache/feed-cache";
 import { isFeedOwner } from "../scope/feed-ownership";
@@ -147,9 +147,10 @@ export function verifySignedFeedToken(input: {
 }
 
 export async function createInitialTokenWithClient(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: InitialTokenInput
 ): Promise<Result<TokenDisclosure, TokenServiceError>> {
+  assertTenantDb(tx, input.clerkOrgId);
   const feed = await tx.feed.findFirst({
     select: { id: true, organisation_id: true },
     where: scopedFeed(input),
@@ -210,17 +211,19 @@ export async function createInitialTokenWithClient(
 }
 
 export async function issueToken(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<TokenDisclosure, TokenServiceError>> {
   const parsed = RotateTokenInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  assertTenantDb(db, parsed.data.clerkOrgId);
   if (!isAdminOrOwner(parsed.data.actingRole)) {
     return notAuthorised();
   }
-  try {
-    return await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+  const run = async (tenantDb4: TenantDb): ReturnType<typeof issueToken> =>
+    await (async (tx: TenantDb) => {
       await lockFeedForTokenChange(tx, parsed.data);
       const feed = await tx.feed.findFirst({
         select: { id: true, organisation_id: true },
@@ -256,14 +259,18 @@ export async function issueToken(
         tokenId: token.id,
       });
       return { ok: true, value: { hint, plaintext, tokenId: token.id } };
-    });
-  } catch {
-    return unknownError("Failed to create feed token.");
-  }
+    })(tenantDb4);
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
+class FeedTokenRotationConflict extends Error {}
+
 export async function rotateToken(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<
   Result<TokenDisclosure & { previousTokenId: string }, TokenServiceError>
 > {
@@ -271,143 +278,152 @@ export async function rotateToken(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const isAdmin = isAdminOrOwner(parsed.data.actingRole);
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb2: TenantDb): ReturnType<typeof rotateToken> => {
+    const isAdmin = isAdminOrOwner(parsed.data.actingRole);
 
-  try {
-    const result = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        await lockFeedForTokenChange(tx, parsed.data);
-        const feed = await tx.feed.findFirst({
-          select: {
-            created_by_user_id: true,
-            id: true,
-            organisation_id: true,
-            scopes: { select: { scope_type: true } },
-          },
-          where: {
-            ...scopedFeed(parsed.data),
-            archived_at: null,
-            status: { in: ["active", "paused"] },
-          },
-        });
-        if (!feed) {
-          return feedNotFound();
-        }
-        // Owners of a personal or team feed may rotate its URL themselves.
-        if (
-          !(
-            isAdmin ||
-            isFeedOwner(
-              {
-                createdByUserId: feed.created_by_user_id,
-                scopes: feed.scopes.map((scope) => ({
-                  scopeType: scope.scope_type,
-                })),
-              },
-              parsed.data.actingUserId
-            )
-          )
-        ) {
-          return notAuthorised();
-        }
-
-        const activeTokens = await tx.feedToken.findMany({
-          orderBy: { created_at: "desc" },
-          select: { id: true },
-          where: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            feed_id: parsed.data.feedId,
-            ...(parsed.data.organisationId === null
-              ? { organisation_id: null }
-              : {
-                  OR: [
-                    { organisation_id: parsed.data.organisationId },
-                    { organisation_id: null },
-                  ],
-                }),
-            status: "active",
-          },
-        });
-        const [previousToken] = activeTokens;
-        if (!previousToken) {
-          return {
-            error: {
-              code: "token_not_found",
-              message: "This feed has no active token to rotate.",
-            },
-            ok: false,
-          } satisfies Result<never, TokenServiceError>;
-        }
-
-        await tx.feedToken.updateMany({
-          data: { revoked_at: new Date(), status: "revoked" },
-          where: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            feed_id: parsed.data.feedId,
-            ...(parsed.data.organisationId === null
-              ? { organisation_id: null }
-              : {
-                  OR: [
-                    { organisation_id: parsed.data.organisationId },
-                    { organisation_id: null },
-                  ],
-                }),
-            status: "active",
-          },
-        });
-
-        const tokenId = randomUUID();
-        const tokenHash = hashFeedToken(generateFeedTokenSecret());
-        const plaintext = createSignedFeedToken({ tokenHash, tokenId });
-        const hint = plaintext.slice(-4);
-        const token = await insertActiveToken(tx, {
-          clerkOrgId: parsed.data.clerkOrgId,
-          feedId: parsed.data.feedId,
-          hint,
-          organisationId: feed.organisation_id,
-          rotatedFromTokenId: previousToken.id,
-          tokenHash,
-          tokenId,
-        });
-        if (!token) {
-          return activeTokenConflict();
-        }
-
-        await auditToken(tx, parsed.data, "feeds.token_rotated", token.id, {
-          actingUserId: parsed.data.actingUserId,
-          feedId: parsed.data.feedId,
-          newHint: hint,
-          newTokenId: token.id,
-          previousTokenId: previousToken.id,
-        });
-
-        return {
-          ok: true,
-          value: {
-            hint,
-            plaintext,
-            previousTokenId: previousToken.id,
-            tokenId: token.id,
-          },
-        } satisfies Result<
-          TokenDisclosure & { previousTokenId: string },
-          TokenServiceError
-        >;
+    const result = await (async (tx: TenantDb) => {
+      await lockFeedForTokenChange(tx, parsed.data);
+      const feed = await tx.feed.findFirst({
+        select: {
+          created_by_user_id: true,
+          id: true,
+          organisation_id: true,
+          scopes: { select: { scope_type: true } },
+        },
+        where: {
+          ...scopedFeed(parsed.data),
+          archived_at: null,
+          status: { in: ["active", "paused"] },
+        },
+      });
+      if (!feed) {
+        return feedNotFound();
       }
-    );
+      // Owners of a personal or team feed may rotate its URL themselves.
+      if (
+        !(
+          isAdmin ||
+          isFeedOwner(
+            {
+              createdByUserId: feed.created_by_user_id,
+              scopes: feed.scopes.map((scope) => ({
+                scopeType: scope.scope_type,
+              })),
+            },
+            parsed.data.actingUserId
+          )
+        )
+      ) {
+        return notAuthorised();
+      }
+
+      const activeTokens = await tx.feedToken.findMany({
+        orderBy: { created_at: "desc" },
+        select: { id: true },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          feed_id: parsed.data.feedId,
+          ...(parsed.data.organisationId === null
+            ? { organisation_id: null }
+            : {
+                OR: [
+                  { organisation_id: parsed.data.organisationId },
+                  { organisation_id: null },
+                ],
+              }),
+          status: "active",
+        },
+      });
+      const [previousToken] = activeTokens;
+      if (!previousToken) {
+        return {
+          error: {
+            code: "token_not_found",
+            message: "This feed has no active token to rotate.",
+          },
+          ok: false,
+        } satisfies Result<never, TokenServiceError>;
+      }
+
+      await tx.feedToken.updateMany({
+        data: { revoked_at: new Date(), status: "revoked" },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          feed_id: parsed.data.feedId,
+          ...(parsed.data.organisationId === null
+            ? { organisation_id: null }
+            : {
+                OR: [
+                  { organisation_id: parsed.data.organisationId },
+                  { organisation_id: null },
+                ],
+              }),
+          status: "active",
+        },
+      });
+
+      const tokenId = randomUUID();
+      const tokenHash = hashFeedToken(generateFeedTokenSecret());
+      const plaintext = createSignedFeedToken({ tokenHash, tokenId });
+      const hint = plaintext.slice(-4);
+      const token = await insertActiveToken(tx, {
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: parsed.data.feedId,
+        hint,
+        organisationId: feed.organisation_id,
+        rotatedFromTokenId: previousToken.id,
+        tokenHash,
+        tokenId,
+      });
+      if (!token) {
+        // Roll back revocations as well as the unsuccessful replacement.
+        throw new FeedTokenRotationConflict();
+      }
+
+      await auditToken(tx, parsed.data, "feeds.token_rotated", token.id, {
+        actingUserId: parsed.data.actingUserId,
+        feedId: parsed.data.feedId,
+        newHint: hint,
+        newTokenId: token.id,
+        previousTokenId: previousToken.id,
+      });
+
+      return {
+        ok: true,
+        value: {
+          hint,
+          plaintext,
+          previousTokenId: previousToken.id,
+          tokenId: token.id,
+        },
+      } satisfies Result<
+        TokenDisclosure & { previousTokenId: string },
+        TokenServiceError
+      >;
+    })(tenantDb2);
 
     if (result.ok) {
-      await invalidateFeedCache({ feedId: parsed.data.feedId });
+      scheduleFeedInvalidation(tenantDb2, { feedId: parsed.data.feedId });
     }
     return result;
-  } catch {
-    return unknownError("Failed to rotate feed token.");
+  };
+  try {
+    return await (async () => {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      return await run(db);
+    })();
+  } catch (error) {
+    if (error instanceof FeedTokenRotationConflict) {
+      // The owning withTenantResult rolls back the revocations before returning this Result.
+      return activeTokenConflict();
+    }
+    throw error;
   }
 }
 
 async function lockFeedForTokenChange(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: InitialTokenInput
 ): Promise<void> {
   // Lifecycle writes also lock this row, so archive cannot finish before a delayed issuance.
@@ -421,7 +437,7 @@ async function lockFeedForTokenChange(
 }
 
 async function insertActiveToken(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: {
     clerkOrgId: string;
     feedId: string;
@@ -475,78 +491,85 @@ function activeTokenConflict(): Result<never, TokenServiceError> {
 }
 
 export async function revokeToken(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<{ feedId: string; tokenId: string }, TokenServiceError>> {
   const parsed = RevokeTokenInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb3: TenantDb): ReturnType<typeof revokeToken> => {
+    if (!isAdminOrOwner(parsed.data.actingRole)) {
+      return notAuthorised();
+    }
 
-  try {
-    const result = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        const token = await tx.feedToken.findFirst({
-          select: { feed_id: true, id: true, status: true, token_hint: true },
-          where: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            id: parsed.data.tokenId,
-            ...(parsed.data.organisationId === null
-              ? { organisation_id: null }
-              : {
-                  OR: [
-                    { organisation_id: parsed.data.organisationId },
-                    { organisation_id: null },
-                  ],
-                }),
-          },
-        });
-        if (!token) {
-          return tokenNotFound();
-        }
-
-        if (token.status !== "revoked") {
-          await tx.feedToken.update({
-            data: { revoked_at: new Date(), status: "revoked" },
-            where: { id: token.id },
-          });
-        }
-
-        await auditToken(tx, parsed.data, "feeds.token_revoked", token.id, {
-          actingUserId: parsed.data.actingUserId,
-          feedId: token.feed_id,
-          hint: token.token_hint,
-          tokenId: token.id,
-        });
-
-        return {
-          ok: true,
-          value: { feedId: token.feed_id, tokenId: token.id },
-        } satisfies Result<
-          { feedId: string; tokenId: string },
-          TokenServiceError
-        >;
+    const result = await (async (tx: TenantDb) => {
+      const token = await tx.feedToken.findFirst({
+        select: { feed_id: true, id: true, status: true, token_hint: true },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          id: parsed.data.tokenId,
+          ...(parsed.data.organisationId === null
+            ? { organisation_id: null }
+            : {
+                OR: [
+                  { organisation_id: parsed.data.organisationId },
+                  { organisation_id: null },
+                ],
+              }),
+        },
+      });
+      if (!token) {
+        return tokenNotFound();
       }
-    );
+
+      if (token.status !== "revoked") {
+        await tx.feedToken.update({
+          data: { revoked_at: new Date(), status: "revoked" },
+          where: { id: token.id },
+        });
+      }
+
+      await auditToken(tx, parsed.data, "feeds.token_revoked", token.id, {
+        actingUserId: parsed.data.actingUserId,
+        feedId: token.feed_id,
+        hint: token.token_hint,
+        tokenId: token.id,
+      });
+
+      return {
+        ok: true,
+        value: { feedId: token.feed_id, tokenId: token.id },
+      } satisfies Result<
+        { feedId: string; tokenId: string },
+        TokenServiceError
+      >;
+    })(tenantDb3);
 
     if (result.ok) {
-      await invalidateFeedCache({ feedId: result.value.feedId });
+      scheduleFeedInvalidation(tenantDb3, { feedId: result.value.feedId });
     }
     return result;
-  } catch {
-    return unknownError("Failed to revoke feed token.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
-export async function revokeAllFeedTokens(input: {
-  clerkOrgId: string;
-  organisationId: string | null;
-}): Promise<Result<{ revokedCount: number }, TokenServiceError>> {
-  try {
-    const result = await tenantDatabase(input.clerkOrgId).feedToken.updateMany({
+export async function revokeAllFeedTokens(
+  input: {
+    clerkOrgId: string;
+    organisationId: string | null;
+  },
+  db: TenantDb
+): Promise<Result<{ revokedCount: number }, TokenServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const run = async (
+    tenantDb: TenantDb
+  ): ReturnType<typeof revokeAllFeedTokens> => {
+    const result = await tenantDb.feedToken.updateMany({
       data: { revoked_at: new Date(), status: "revoked" },
       where: {
         clerk_org_id: input.clerkOrgId,
@@ -554,20 +577,22 @@ export async function revokeAllFeedTokens(input: {
         status: "active",
       },
     });
-    const feeds = await tenantDatabase(input.clerkOrgId).feed.findMany({
+    const feeds = await tenantDb.feed.findMany({
       select: { id: true },
       where: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
       },
     });
-    await Promise.all(
-      feeds.map((feed) => invalidateFeedCache({ feedId: feed.id }))
-    );
+    for (const feed of feeds) {
+      scheduleFeedInvalidation(tenantDb, { feedId: feed.id });
+    }
     return { ok: true, value: { revokedCount: result.count } };
-  } catch {
-    return unknownError("Failed to revoke feed tokens.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 function feedNotFound(): Result<never, TokenServiceError> {
@@ -585,7 +610,7 @@ function tokenNotFound(): Result<never, TokenServiceError> {
 }
 
 async function auditToken(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: {
     actingUserId: string;
     clerkOrgId: string;
@@ -643,6 +668,14 @@ function validationError(error: z.ZodError): Result<never, TokenServiceError> {
   };
 }
 
-function unknownError(message: string): Result<never, TokenServiceError> {
-  return { error: { code: "unknown_error", message }, ok: false };
+function scheduleFeedInvalidation(
+  db: TenantDb,
+  input: Parameters<typeof invalidateFeedCache>[0]
+): void {
+  afterTenantCommit(db, async () => {
+    const outcome = await invalidateFeedCache(input);
+    if (!outcome.ok) {
+      throw new Error(outcome.error.message);
+    }
+  });
 }

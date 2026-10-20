@@ -26,7 +26,10 @@ vi.mock("@repo/billing", () => ({
   resolvePlanKey: mocks.resolvePlanKey,
   retrieveStripeSubscription: mocks.retrieveStripeSubscription,
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/tenant-db")
+  >("../../../../../packages/database/src/tenant-db")),
   getFirstActiveOrganisationIdForClerkOrg:
     mocks.getFirstActiveOrganisationIdForClerkOrg,
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
@@ -145,7 +148,8 @@ describe("Stripe payments webhook", () => {
         status: "active",
         stripeCustomerId: "cus_1",
         stripeSubscriptionId: "sub_1",
-      })
+      }),
+      expect.any(Object)
     );
     expect(mocks.inngestSend).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -459,7 +463,8 @@ describe("Stripe payments webhook", () => {
     expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
       expect.objectContaining({
         stripeEventCreatedAt: new Date(eventCreatedSeconds * 1000),
-      })
+      }),
+      expect.any(Object)
     );
   });
 
@@ -546,7 +551,8 @@ describe("Stripe payments webhook", () => {
         authoritativeTie: true,
         cancelAtPeriodEnd: true,
         status: "canceled",
-      })
+      }),
+      expect.any(Object)
     );
     expect(mocks.recordStripeEvent).toHaveBeenCalledTimes(1);
     expect(mocks.recordStripeEventFailure).not.toHaveBeenCalled();
@@ -587,7 +593,8 @@ describe("Stripe payments webhook", () => {
         planKey: "basic",
         status: "active",
         stripeEventCreatedAt: new Date(newerCreatedSeconds * 1000),
-      })
+      }),
+      expect.any(Object)
     );
   });
 
@@ -606,7 +613,8 @@ describe("Stripe payments webhook", () => {
     expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
       expect.objectContaining({
         stripeEventCreatedAt: new Date(olderCreatedSeconds * 1000),
-      })
+      }),
+      expect.any(Object)
     );
   });
 
@@ -760,7 +768,8 @@ describe("Stripe payments webhook", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({ clerkOrgId: "org_verified" })
+      expect.objectContaining({ clerkOrgId: "org_verified" }),
+      expect.any(Object)
     );
   });
 
@@ -974,3 +983,13 @@ describe("Stripe payments webhook", () => {
     );
   });
 });
+
+vi.mock("../../../../../packages/database/src/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+      }),
+  },
+}));
