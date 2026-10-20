@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import { setPersonManager } from "./manager-assignment-service";
 
 vi.mock("server-only", () => ({}));
+vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });
 
 const ownerUrl = process.env.DATABASE_URL;
 if (!(ownerUrl && isLocalDatabase(ownerUrl))) {

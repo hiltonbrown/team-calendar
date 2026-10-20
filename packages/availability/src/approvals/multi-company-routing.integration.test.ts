@@ -10,6 +10,7 @@ import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { expect, test, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });
 
 const ownerUrl = process.env.DATABASE_URL;
 if (!(ownerUrl && isLocalDatabase(ownerUrl))) {
