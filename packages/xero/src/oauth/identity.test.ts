@@ -53,6 +53,8 @@ describe("Xero access token identity", () => {
   it.each([
     { iss: "https://other.example" },
     { aud: "wrong" },
+    { aud: "https://evil.example/?https://identity.xero.com/resources" },
+    { aud: ["https://identity.xero.com/resources.evil.example"] },
     { client_id: "wrong" },
     { xero_userid: undefined },
     { xero_userid: " " },
@@ -62,6 +64,12 @@ describe("Xero access token identity", () => {
     expect(
       (await verifyXeroAccessTokenIdentity(await token(overrides), deps())).ok
     ).toBe(false);
+  });
+  it("accepts an audience array containing the exact Xero audience", async () => {
+    const signed = await token({
+      aud: ["https://other.example", XERO_IDENTITY_AUDIENCE],
+    });
+    expect((await verifyXeroAccessTokenIdentity(signed, deps())).ok).toBe(true);
   });
   it("distinguishes an explicitly supplied empty scope claim from an omitted claim", async () => {
     expect(
