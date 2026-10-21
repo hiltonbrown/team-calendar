@@ -11,14 +11,8 @@ const remoteJwks = createRemoteJWKSet(
   new URL("https://identity.xero.com/.well-known/openid-configuration/jwks"),
   { cooldownDuration: 30_000, timeoutDuration: 5000 }
 );
+// jwtVerify enforces the exact audience, so it is not re-checked here.
 const claimsSchema = z.object({
-  aud: z
-    .union([z.string(), z.array(z.string())])
-    .refine((aud) =>
-      typeof aud === "string"
-        ? aud === XERO_IDENTITY_AUDIENCE
-        : aud.includes(XERO_IDENTITY_AUDIENCE)
-    ),
   authentication_event_id: z.string().min(1).optional(),
   client_id: z.string().min(1),
   exp: z.number().int().nonnegative(),

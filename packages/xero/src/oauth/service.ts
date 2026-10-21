@@ -1,7 +1,6 @@
 import { withTenantResult } from "@repo/database";
 import "server-only";
 import {
-  createHash,
   createHmac,
   hkdfSync,
   randomBytes,
@@ -43,6 +42,7 @@ import {
   type XeroAccessTokenIdentity,
 } from "./identity";
 import { hasXeroCapability, XERO_SCOPES } from "./scopes";
+import { hashOAuthSessionToken } from "./session-token-hash";
 import { callbackUrl, exchangeToken } from "./token";
 
 const XERO_AUTHORISE_URL = "https://login.xero.com/identity/connect/authorize";
@@ -661,7 +661,7 @@ export async function buildXeroOAuthStartUrl(input: {
       clerk_org_id: input.clerkOrgId,
       created_by_user_id: input.userId ?? null,
       expires_at: new Date(Date.now() + STATE_MAX_AGE_MS),
-      nonce_hash: createHash("sha256").update(nonce).digest("hex"),
+      nonce_hash: hashOAuthSessionToken(nonce),
       organisation_id: input.organisationId ?? null,
       requested_scopes: XERO_SCOPES.split(" "),
       return_to: input.returnTo ?? DEFAULT_XERO_RETURN_TO,
@@ -681,7 +681,7 @@ export async function buildXeroOAuthStartUrl(input: {
     secret
   );
   await systemDatabase.xeroOAuthSession.updateMany({
-    data: { state_hash: createHash("sha256").update(state).digest("hex") },
+    data: { state_hash: hashOAuthSessionToken(state) },
     where: {
       clerk_org_id: input.clerkOrgId,
       id: session.id,
@@ -875,9 +875,9 @@ export async function completeXeroOAuth(input: {
     where: {
       ...scope,
       expires_at: { gt: new Date() },
-      nonce_hash: createHash("sha256").update(input.nonce).digest("hex"),
+      nonce_hash: hashOAuthSessionToken(input.nonce),
       return_to: signed.returnTo,
-      state_hash: createHash("sha256").update(input.state).digest("hex"),
+      state_hash: hashOAuthSessionToken(input.state),
       status: "pending",
     },
   });
@@ -1034,9 +1034,9 @@ export async function cancelXeroOAuth(input: {
       created_by_user_id: signed.userId,
       expires_at: { gt: new Date() },
       id: signed.sessionId,
-      nonce_hash: createHash("sha256").update(input.nonce).digest("hex"),
+      nonce_hash: hashOAuthSessionToken(input.nonce),
       organisation_id: signed.organisationId,
-      state_hash: createHash("sha256").update(input.state).digest("hex"),
+      state_hash: hashOAuthSessionToken(input.state),
       status: "pending",
     },
   });
