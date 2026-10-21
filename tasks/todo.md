@@ -1,5 +1,13 @@
 # Current work
 
+## Code scanning alerts (plan `docs/superpowers/plans/2026-10-21-code-scanning-alerts.md`)
+
+- [x] Task 1: remove redundant `aud` refine in identity.ts with audience regression tests (alert #30).
+- [x] Task 2: consolidate six OAuth session token hashes into `hashOAuthSessionToken`; run all four gates.
+- [ ] Task 3: after owner confirmation, dismiss remaining false-positive password-hash alerts and confirm zero open.
+
+Review: lint PASS (1,325 files), typecheck PASS (19 tasks), unit PASS (18 tasks). Integration NOT VERIFIED locally: the live-test guard rejects the non-local DATABASE_URL and was not bypassed; the PR CI integration job is the gate. A fresh whole-branch review found no Critical or Important findings.
+
 ## Stage 7 execution resumed (21 October 2026)
 
 - [x] Fix and verify the duplicate acting-person warning in both approvals entry points.
