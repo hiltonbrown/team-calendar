@@ -164,6 +164,21 @@ Keep one-off task evidence in that task's review, not here.
   paused database or Neon checks or begin a gated stage without authorisation.
 
 - When the user supplies a database through environment variables, use that target via the guarded integration runner and owned fixtures. Do not substitute a disposable local database without an explicit request; inspect existing environment and runner configuration first.
+- Do not insist on an isolated Neon branch or API key when the user directs
+  verification against the configured database. Record that instruction against
+  the plan and retain the existing database and fixture guards.
+- Treat the owner's authorisation to change the development database schema as
+  persistent authority. Resolve pending migrations and runtime-role setup rather
+  than repeatedly reporting them as prerequisites needing new permission.
+- Do not substitute an intermediate database result or a status report for an
+  authorised verification stage. Complete available configuration and checks,
+  investigate fixture setup, and request only the specific external access that
+  is actually unavailable. When the owner specifies migrations and verification
+  first, finish that deliverable before seeking later provider or monitoring
+  access.
+- Execute an explicitly requested development database reset against the
+  resolved configured target, then reapply and verify migrations. Do not replace
+  that instruction with a preserve-data migration path or a new approval gate.
 
 - When told not to block, a host permission denial ends only the denied action.
   Record it with the exact operator command in `plans/README.md` in the same

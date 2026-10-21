@@ -131,8 +131,8 @@ claimed complete.
 - [x] Remove the company manager visibility column from the schema, regenerate
   Prisma and generate the one-statement drop migration offline.
 - [x] Finish local lint, typecheck and affected unit verification using full runs plus corrected targeted batches.
-- [ ] Apply the migration and run restricted-role/settings integration checks
-  when database verification resumes.
+- [ ] Finish the restricted-role/settings integration suites; migrations and
+  read-only role/policy verification were completed on 21 October below.
 
 Local Stage 6 evidence: lint passes 1,318 files and typecheck passes all 19
 tasks. Full package runs plus corrected targeted files cover availability 717,
@@ -204,6 +204,144 @@ The credential-free Neon provisioning request was aborted before a result
 returned; creation is not confirmed. No blind provisioning retry, migration
 or deployment was performed. Network readiness is unknown and no Neon secret
 binding is configured in the current managed-environment report.
+
+### Stage 7 review, 21 October 2026
+
+Release remains blocked. Current remote evidence supersedes the earlier
+deployment and local-environment access findings above.
+
+- PASS: Vercel authentication and project identity checks. The feature-branch
+  app preview is [READY](https://teamcalendar-bunuguuqw-hiltonb.vercel.app)
+  (`dpl_Gnyy71diDS1NCNHNadLFsoaiqcU8`); the API preview is
+  [READY](https://teamcalendar-dc53hdt7e-hiltonb.vercel.app)
+  (`dpl_HmZR8sSjRh5kgiWeLARyoTLLZcw2`). Both reference current implementation
+  commit `c2a3a60120e6ee4a1c446b17325a678e3d97bcb9`.
+- NOT VERIFIED, Steps 0 and 1: isolated Neon branch, restricted runtime role,
+  two-company/four-role acceptance, provider routing and approvals, and Neon
+  measurements. Local env files exist, but contain the shared owner connection
+  and no `DATABASE_APP_URL` or Neon API credential. The Neon configuration
+  directory is empty and no Neon provisioning tool is callable. Remote app/API
+  database metadata still names the same store for Development, Preview and
+  Production, with no feature-branch database override. No migration or fixture
+  write was attempted against that shared target.
+- NOT VERIFIED, Step 2: a full preview sync cycle and Sentry observation.
+  Sentry credentials are unavailable; remote Preview metadata has no Sentry
+  configuration. Preview Xero connect remains disabled by the existing contract,
+  and demo-only grant access has not been established.
+- FAIL, preflight diagnostic for Step 3: both app and API entry points exit 1
+  using freshly pulled Preview environments with feature-branch overrides.
+  The commands were `bun --no-env-file packages/next-config/bin/preflight.ts app`
+  and the equivalent `api` command, with only the downloaded Preview variables
+  supplied. This executes the preflight entry point directly because the
+  `bun run preflight` script starts another Bun process that can load local env
+  files. Metadata confirms Preview lacks `DATABASE_APP_URL`, launch mode,
+  app/web/API URLs, Sentry settings, Xero redirect URI and tier.
+  API also lacks the Clerk webhook secret, sender and early-access application
+  configuration. Downloaded Xero client and some other secret values are empty
+  despite being configured remotely; these are download limitations, not proof
+  that the secrets are absent. Preflight stopped before the database role check.
+  Encryption provenance is unresolved: metadata scopes its key to Production,
+  while both Preview downloads contain a non-empty key. Do not infer isolated
+  demo-grant access from that discrepancy.
+- NOT VERIFIED, exact deployed-environment preflight: Vercel rejected an env
+  pull by deployment ID with `Deployment is in READY state, expected INITIALIZING`.
+  The diagnostic above uses current branch Preview settings, not a claimed
+  snapshot of the deployed environment.
+
+Operator correction: use the database already configured in `.env.local`.
+An isolated branch and `NEON_API_KEY` are not required for this execution.
+This direction supersedes the earlier branch-provisioning blockers and the
+plan's fresh-branch measurement setup. Inspect the configured database's roles
+and migration status, retain the protected runner and owned-fixture requirements
+for integration tests, and complete the remaining configuration, acceptance,
+measurement and monitoring checks on that target. Existing preflight failures
+and unexecuted checks remain as recorded above.
+
+Following that correction, a read-only connection to the configured database
+succeeded: database `neondb`, role `neondb_owner`, transaction read-only `on`.
+The role catalogue contains no `team_calendar_app` role; the connected owner has
+`BYPASSRLS`. The migration inventory returned no rows, so migration deployment
+state is not established. No data, roles or schema were changed. The next
+database work is to establish schema/migration state and provision the required
+restricted runtime access on this target, rather than create another branch.
+
+Development database remediation is authorised by the owner:
+
+- [x] Reconcile migration history and apply the repository's pending migrations
+  to the existing configured development database without a reset.
+- [x] Provision restricted `team_calendar_app` login and `DATABASE_APP_URL`.
+- [x] Verify migrated schema, role restrictions and fail-closed tenant access.
+- [x] Record results and resume the remaining Stage 7 checks.
+
+### Stage 7 development database result
+
+- Subsequent explicit owner instruction: reset the development database.
+  Executed `prisma migrate reset --force` against the configured direct Neon
+  connection. PASS: reset succeeded and all 41 migrations actually executed from
+  the initial migration, superseding the earlier baseline-only history.
+  Post-reset verification PASS: all application tables empty; all migration SQL
+  checksums match; Prisma schema diff reports no differences; all 29 tenant
+  tables have RLS policies and grants; the restricted login remains safe and
+  usable; transaction context clears after commit and rollback. Existing-account
+  visibility is not claimed on the empty database. Existing application data was
+  deleted. No pre-reset backup was created by this operation; recovery was not
+  verified. No seed or provider/browser acceptance was run.
+- Migration-first verification at the owner's request: PASS. Fresh
+  `prisma migrate status` reports up to date; `prisma migrate diff
+  --from-config-datasource --to-schema prisma/schema.prisma --exit-code` exits 0
+  with no differences. All 41 successfully applied SQL checksums match the
+  repository. Fresh read-only role/policy/isolation checks pass on all 29 tenant
+  tables, including no-context denial and commit/rollback context cleanup.
+  Migration deployment and catalogue/schema verification are complete. This
+  result does not claim the full integration suites or later provider/browser
+  acceptance ran.
+- PASS: Prisma found no difference between the existing schema and historical
+  commit `9dcfeee`. Restored tracking for its 28 baseline migrations using
+  `prisma migrate resolve --applied`, then applied all 13 pending migrations.
+  No database reset was performed. `prisma migrate status` now reports all
+  41 migrations present and the database up to date.
+- Fixed the observed Neon deployment failure in the handwritten RLS migration:
+  `ALTER ROLE ... NOSUPERUSER` failed with PostgreSQL `42501` because it requires
+  a superuser. The migration now rejects elevated role attributes explicitly
+  without attempting to alter superuser-only attributes. Marked the failed
+  attempt rolled back and successfully redeployed the corrected migration.
+- PASS: enabled the `team_calendar_app` login and configured its unique generated
+  credential in the four Git-ignored local env files (root, app, API and
+  database). No credential values were printed. Also configured sensitive
+  `DATABASE_APP_URL` variables for app/API Preview, scoped only to
+  `feat/tenant-request-transactions`. These remote variables require a new
+  deployment to take effect; existing previews were not redeployed.
+- PASS: read-only catalogue and access checks confirm RLS, tenant policies and
+  grants on all 29 tenant tables, safe reference-table grants, no access to
+  system tables, no elevated runtime-role memberships or table ownership,
+  no-context denial, correct existing-account reads, absent-account denial and
+  context cleanup after commit and rollback. These checks wrote no tenant data;
+  they are not a passing restricted-role integration-suite claim.
+- NOT VERIFIED, Steps 0 to 2: required live multi-company acceptance, Vercel/Neon
+  measurements and a complete sync cycle observed in Sentry. Actual development
+  inventory is one company, zero multi-company accounts, zero active people,
+  zero active Xero connections and zero approved records. The plan's two-demo-
+  company/four-role scenario cannot be exercised from that inventory. Sentry
+  access remains unconfigured. No synthetic provider or performance evidence
+  was substituted.
+- Step 3 remains FAIL for the previously inspected Preview configuration; the
+  restricted database variable is now configured, but the other recorded
+  configuration failures remain unresolved. Step 4 is complete: results and
+  limits are recorded here. Stage 7 remains incomplete and release is not
+  approved. Continuing live acceptance requires the actual demo-company grants,
+  staff/role access and monitoring configuration. No Neon branch or API key is
+  required.
+
+After the owner's correction about stopping prematurely, configured Preview-only
+feature-branch launch mode (`early_access`) and the verified app/API branch-alias
+URLs plus the existing public web URL on both Vercel projects. These settings,
+like the new database variable, await redeployment. A fresh aggregate query
+confirmed zero stored canonical Xero grants and zero Xero connections, including
+inactive connections; no reusable consent was overlooked. Checked all seven
+local env files and local Sentry config locations: no Sentry credentials or
+project settings were found. Requested the locations of existing demo-company
+grants and Sentry access while continuing the available configuration work.
+Neither live acceptance nor Sentry observation is complete.
 
 ## Xero multi-company accounts (plan `docs/superpowers/plans/2026-10-10-xero-multi-company.md`)
 

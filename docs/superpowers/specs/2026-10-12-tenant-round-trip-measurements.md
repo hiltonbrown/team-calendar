@@ -1,7 +1,7 @@
 # Tenant round-trip measurements
 
 Date: 12 October 2026
-Status: Stage 7 access inspected on 14 October 2026; database and Neon measurements NOT VERIFIED.
+Status: Stage 7 access rechecked on 21 October 2026; database and Neon measurements NOT VERIFIED.
 Plan: [Multi-company leave outcomes and request transactions](../plans/2026-10-12-tenant-transaction-per-request.md), Tasks 0.1 and 0.2.
 
 ## Evidence available
@@ -28,9 +28,21 @@ Each scope logs `tenant_query_timing` through `@repo/observability/log`, with `o
 | Each Task 2.3 loader: parallel versus one-transaction wall time | NOT VERIFIED | Pending Stage 7 |
 | PrismaNeon concurrent-query correctness and serialisation | NOT VERIFIED | Pending Stage 7 |
 
-The Stage 7 access inspection found readable app and API projects through the Vercel connector. Their latest previews both contain the plan-document commit `d0de937bd7a5a88cce18b4b5f3f2d3a48e2b7098`, not the implementation. No Neon credentials are configured in the managed environment or local preview environment files. A fresh isolated Neon branch and implementation previews are still required. Local PostgreSQL cannot establish production-region latency, pool capacity or PrismaNeon concurrency behaviour.
+The 21 October Stage 7 inspection confirms that the feature-branch app and API previews are READY at implementation commit `c2a3a60120e6ee4a1c446b17325a678e3d97bcb9`. Their project database bindings still reference the same store across Development, Preview and Production, with no feature-branch database override or `DATABASE_APP_URL`. Local files contain a shared owner connection, but no Neon API credential; the local Neon configuration directory is empty. Isolated branch provisioning remains unavailable. Both preflight entry points fail with current branch Preview variables, before the restricted-role catalogue check. No Neon measurement or provider acceptance was executed. See [Stage 7 review](../../../tasks/todo.md#stage-7-review-21-october-2026) for deployment identities, command details and remaining dependencies. Local PostgreSQL cannot establish production-region latency, pool capacity or PrismaNeon concurrency behaviour.
 
 ## Reproduction and decision
+
+The owner subsequently directed Stage 7 to use the database configured in
+`.env.local`; an isolated branch and Neon API key are not prerequisites. On
+21 October all 41 migrations were recorded and the restricted runtime role was
+provisioned on that database. Read-only checks passed for all 29 tenant-table
+policies/grants, runtime-role restrictions, scoped reads, no-context denial and
+transaction-context cleanup. Feature-branch app/API Preview database variables
+are configured for subsequent deployments. This supersedes the branch and
+runtime-role setup findings above, but supplies no Vercel-region latency,
+PrismaNeon performance, provider or four-role acceptance evidence. Those
+measurement values remain NOT VERIFIED. The actual database has one company,
+zero active staff and zero active Xero connections.
 
 On a host with access to the existing local test database, run from the repository root:
 
