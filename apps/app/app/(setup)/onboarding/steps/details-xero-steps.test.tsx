@@ -34,7 +34,8 @@ class ResizeObserverMock {
 globalThis.ResizeObserver = ResizeObserverMock;
 
 const { DetailsStep } = await import("./details-step");
-const { XeroStep, xeroReturnMessage } = await import("./xero-step");
+const { XeroStep } = await import("./xero-step");
+const { xeroReturnMessage } = await import("./xero-return-message");
 const organisationId = "00000000-0000-4000-8000-000000000001";
 
 describe("DetailsStep", () => {

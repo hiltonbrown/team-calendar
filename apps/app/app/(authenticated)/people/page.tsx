@@ -133,9 +133,9 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
           ? await db.xeroConnection.findFirst({
               select: { id: true },
               where: {
-                archived_at: null,
                 clerk_org_id: clerkOrgId,
                 organisation_id: scopedOrganisationId,
+                released_at: null,
               },
             })
           : null;

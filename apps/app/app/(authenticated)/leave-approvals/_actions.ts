@@ -31,6 +31,7 @@ import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { resolveApprovalActingPerson } from "./acting-person";
 
 const RecordActionSchema = z.object({
   recordId: z.string().uuid(),
@@ -380,16 +381,12 @@ async function loadRecordActionContext(
   if (!record) {
     return notAuthorised();
   }
-  const person = await db.person.findFirst({
-    orderBy: [{ created_at: "asc" }, { id: "asc" }],
-    select: { id: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: actor.clerkOrgId,
-      clerk_user_id: actor.actingUserId,
-      organisation_id: { in: companyIds },
-    },
-  });
+  const person = await resolveApprovalActingPerson(
+    actor.clerkOrgId,
+    actor.actingUserId,
+    companyIds,
+    db
+  );
   if (actor.role === "manager") {
     if (!person) {
       return notAuthorised();

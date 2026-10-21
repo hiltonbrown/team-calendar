@@ -2,9 +2,9 @@ import type { Result, XeroMutationIdentity } from "@repo/core";
 import { log } from "@repo/observability/log";
 import { keys } from "../../keys";
 import { emitXeroMetric } from "../metrics";
-import type {
+import {
   resolveXeroAccess,
-  XeroAccessError,
+  type XeroAccessError,
 } from "../oauth/authorisation";
 import type { XeroAccessContext } from "../write/types";
 import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
@@ -350,9 +350,7 @@ async function resolveDispatchAccess(
   }
   let access: Awaited<ReturnType<typeof resolveXeroAccess>>;
   try {
-    const resolve =
-      resolveAccess ??
-      (await import("../oauth/authorisation.js")).resolveXeroAccess;
+    const resolve = resolveAccess ?? resolveXeroAccess;
     access = await resolve({
       capability: context.capability,
       clerkOrgId: context.clerk_org_id,

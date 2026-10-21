@@ -19,7 +19,8 @@ import { DetailsStep } from "./steps/details-step";
 import { FinishStep } from "./steps/finish-step";
 import { InviteStep } from "./steps/invite-step";
 import { PeopleStep } from "./steps/people-step";
-import { XeroStep, xeroReturnMessage } from "./steps/xero-step";
+import { xeroReturnMessage } from "./steps/xero-return-message";
+import { XeroStep } from "./steps/xero-step";
 
 export const metadata: Metadata = {
   description: "Set up Team Calendar for your organisation.",

@@ -176,6 +176,14 @@ Keep one-off task evidence in that task's review, not here.
   is actually unavailable. When the owner specifies migrations and verification
   first, finish that deliverable before seeking later provider or monitoring
   access.
+- When authorised execution resumes, work through the unchecked outcomes without
+  another permission hand-off. Finish independent measurements and source fixes
+  while checking specific provider or monitoring access in parallel. Never treat
+  an external-access gap as a reason to stop unrelated authorised work.
+- Distinguish a repository's production preflight configuration from provider
+  eligibility or purchasing requirements. A missing `XERO_APP_TIER` value does
+  not establish that demo verification requires a paid subscription or upgrade;
+  report the exact configuration rule without inventing a commercial blocker.
 - Execute an explicitly requested development database reset against the
   resolved configured target, then reapply and verify migrations. Do not replace
   that instruction with a preserve-data migration path or a new approval gate.

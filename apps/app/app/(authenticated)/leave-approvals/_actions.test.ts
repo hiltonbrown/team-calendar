@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   database: {
     availabilityRecord: { findFirst: vi.fn() },
     person: {
-      findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
   },
   decline: vi.fn(),
@@ -143,7 +143,7 @@ describe("leave approval server actions", () => {
       ok: true,
       value: { clerkOrgId, organisationId },
     });
-    mocks.database.person.findFirst.mockResolvedValue({ id: "person_789" });
+    mocks.database.person.findMany.mockResolvedValue([{ id: "person_789" }]);
     mocks.approve.mockResolvedValue({
       ok: true,
       value: {
@@ -278,9 +278,10 @@ describe("leave approval server actions", () => {
     });
     it("scopes database queries to clerk_org_id and organisation_id", async () => {
       await approveAction({ recordId });
-      expect(mocks.database.person.findFirst).toHaveBeenCalledWith({
+      expect(mocks.database.person.findMany).toHaveBeenCalledWith({
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: { id: true },
+        take: 2,
         where: {
           archived_at: null,
           clerk_org_id: clerkOrgId,

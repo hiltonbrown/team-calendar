@@ -1,5 +1,27 @@
 # Current work
 
+## Stage 7 execution resumed (21 October 2026)
+
+- [x] Fix and verify the duplicate acting-person warning in both approvals entry points.
+- [x] Measure configured Neon adapter concurrency and host round trips, including bounded read-only access patterns.
+- [ ] Measure populated Vercel loaders and jobs, with named fan-out comparisons and the endpoint frontend connection limit.
+- [ ] Apply only measured fan-out decisions, with equivalence coverage where a split is justified.
+- [ ] Rerun branch Preview app/API preflight and resolve configuration from existing verified values.
+- [ ] Complete available multi-company acceptance and sync observation; record actual external-access gaps precisely.
+- [ ] Run affected and required gates, reconcile plan evidence, and record the final review.
+
+Execution boundary: use the authorised configured development database. Do not create a new branch, request a Neon API key, repeat the reset or expand the release scope. Existing database and fixture guards remain in force. Earlier source gates and database-reset evidence remain valid unless a relevant change invalidates them.
+
+### Resumed execution review
+
+The duplicate-person regression failed with no warning before the fix. Both approval entry points now share a bounded, tenant-scoped lookup, selecting the earliest match and warning on duplicates without blocking approval. Fresh lint PASS (1,321 files), typecheck PASS (19 tasks), full unit suite PASS (18 tasks, including 991 app tests). Independent scoped review found no Critical or Important findings. A frozen-lockfile install restored the missing local database-to-observability workspace link; no lockfile or dependency metadata changed. Logs: `/tmp/tc-stage7-resume-EIauFj/{typecheck,unit}.log`.
+
+Actual restricted-role PrismaNeon concurrency and commit/rollback context cleanup PASS. Twenty warm host-to-Neon samples: RTT p50 21.06 ms, p95 25.22 ms. Pool maximum 10; PostgreSQL maximum connections 112; these do not establish the PgBouncer frontend limit. Read-only comparison and driver traces are in the measurements document. No application rows were written by these diagnostics. The current database has one company, no active staff, no grants/connections and no approved records. Named-loader and populated Vercel measurements remain NOT VERIFIED; the fan-out register stays empty.
+
+Fresh branch Preview preflight: app FAIL and API FAIL. Added only the existing root local KV URL/token to app Preview on `feat/tenant-request-transactions`, with sensitive values passed privately and exact branch/target metadata read back. No deployment triggered. Both projects lack Preview Sentry DSN/org/project/auth token and Xero callback/tier. API additionally lacks Clerk webhook secret, Resend sender, early-access recipient and HMAC secret. Sensitive downloaded database/Xero/KV blanks are redaction, not absence. The catalogue phase was not reached. Preview downloads remain private, mode 0600, in the existing session scratch directory.
+
+Fresh integration verification of the warning change remains NOT VERIFIED; no protected fixture run was started and no guard was bypassed. The last complete CI integration PASS is at `5c9cb42`, before the warning change. The earlier database reset, migration checks and Neon RLS verification remain complete. Four-role/two-company provider acceptance and a full sync-cycle Sentry observation still require the actual connected demo companies and monitoring access. The plan is not complete.
+
 ## Tenant transactions per request (plan `docs/superpowers/plans/2026-10-12-tenant-transaction-per-request.md`)
 
 - [x] Reconcile Stage 0 with the source spec and preserve the explicit Gate 0 decision.
@@ -7,33 +29,34 @@
 - [x] Implement opt-in driver timing, scoped summaries and unit coverage; align dependency metadata.
 - [x] Fix omitted BEGIN counts, queued-pool request attribution, logger-failure semantics and environment-test typing.
 - [x] Obtain independent Stage 0 review and reproduce/fix its Important finding with a RED/GREEN regression.
-- [ ] Verify real database counts and concurrency on the existing local PostgreSQL service.
+- [x] Verify real database counts and concurrency on restricted CI PostgreSQL (six statement-count tests at `5c9cb42`).
 - [ ] Record Neon preview latency, critical-path statement counts, fan-out comparisons and pool limits.
 - [x] Obtain explicit owner confirmation at Gate 0: proceed with Stage 1 despite the verification gaps.
 - [x] Implement Stage 1 core API and legacy-helper detector with RED/GREEN unit tests.
 - [x] Add Stage 1 restricted-role isolation, pooled cleanup and statement-count assertions.
-- [ ] Verify Stage 1 database-backed assertions on an accessible restricted-role database.
+- [x] Verify Stage 1 database-backed assertions on restricted CI PostgreSQL (16 RLS tests), plus configured-Neon catalogue/context checks.
 - [ ] Stage 2: verify phased guards, split dispatch phases and measured fan-out boundary.
-- [ ] Stage 3.1: verify shared query-helper expansion (source drafted).
-- [ ] Stage 3.2: verify notification helpers and post-commit effects (source drafted).
-- [ ] Stage 3.3: reconcile and verify feed expansion and post-commit cache effects (source drafted).
-- [ ] Stage 4.1: reconcile and verify account manager visibility (source drafted).
-- [ ] Stage 4.2: reconcile and verify cross-company manager assignment (source drafted).
-- [ ] Stage 4.3: reconcile and verify account-wide calendar/feed scope and entry points (source drafted).
-- [ ] Stage 4.4: reconcile and verify account-wide dashboard (source drafted).
-- [ ] Stage 4.5: reconcile and verify account-wide People entry points (source drafted).
-- [ ] Stage 4.6: reconcile and verify the combined approval queue (source drafted).
-- [ ] Stage 4.7: reconcile and verify person/record-derived leave routing (source drafted).
-- [ ] Stage 5.1: reconcile and verify reference-data conversion (source drafted).
-- [ ] Stage 5.2: reconcile and verify manual records, analytics and onboarding conversion (source drafted).
-- [ ] Stage 5.3: reconcile and verify settings/account-wide notifications (Option 1 approved; source drafted).
-- [ ] Stage 5.4: reconcile and verify sync/integrations conversion (source drafted; local corrected tests pass, preview gates pending).
-- [ ] Stage 5.5: reconcile and verify webhooks/support conversion (source drafted).
-- [ ] Stage 5.6: reconcile and verify database-only job phases (source drafted).
-- [ ] Stage 5.7: reconcile and verify Xero job persistence phases (source drafted).
-- [ ] Finish deferred verification for Stages 2 to 5, then gated Stages 6 and 7.
+- [x] Stage 3.1: shared query-helper conversion and CI verification.
+- [x] Stage 3.2: notification helpers and post-commit effects, with CI verification.
+- [x] Stage 3.3: feed conversion and post-commit cache effects, with CI verification.
+- [x] Stage 4.1: account manager visibility implementation and CI verification.
+- [x] Stage 4.2: cross-company manager assignment implementation and CI verification.
+- [x] Stage 4.3: account-wide calendar/feed scope and entry points, with CI verification.
+- [x] Stage 4.4: account-wide dashboard implementation and CI verification.
+- [x] Stage 4.5: account-wide People entry points and CI verification.
+- [x] Stage 4.6: combined approval queue and CI verification; omitted warning subsequently fixed and unit-verified above.
+- [x] Stage 4.7: person/record-derived leave routing, verified with fake providers in CI.
+- [x] Stage 5.1: reference-data conversion and CI verification.
+- [x] Stage 5.2: manual records, analytics and onboarding conversion, with CI verification.
+- [x] Stage 5.3: settings/account-wide notifications conversion and CI verification.
+- [x] Stage 5.4: sync/integrations conversion and CI verification, not live provider acceptance.
+- [x] Stage 5.5: webhooks/support conversion and CI verification.
+- [x] Stage 5.6: database-only job phases and CI verification.
+- [x] Stage 5.7: Xero job persistence phases and CI verification, using fake providers.
+- [x] Stage 6: required clients, legacy helper removal, documentation and applied column-drop migration.
+- [ ] Complete measured Stage 2 fan-out decisions and Stage 7 live verification/release gates.
 
-### Review
+### Historical review (superseded by the results above and later dated sections)
 
 Stage 0 preparation and Stage 1 core API are implemented. Stage 2 dispatch
 preparation entry points now thread TenantDb; most production entry points and
@@ -1206,3 +1229,82 @@ Final verification on disposable local PostgreSQL 16 with a restricted applicati
 Security review fixes: removed-company custom feeds and tokens are archived/revoked with active-company projection checks; selection compares pre-inventory connection and ownership state under lock, including same-account and cross-account Remove races; runtime-role preflight rejects inherited ownership/elevated membership; confirmed Disconnect then Remove reuses locked audit proof; Starter preset picker does not count an extra company. Each finding has regression coverage.
 
 No live Xero calls were made. Authenticated browser walkthroughs, live multi-file Xero and Neon preview RLS/latency remain NOT VERIFIED. Deployment requires provisioning the restricted role and `DATABASE_APP_URL`, applying both migrations and passing the app/API role preflight, as documented in `SECURITY.md` and `AGENTS.md`.
+
+## 2026-10-21 Onboarding runtime boundary fix
+
+- [x] Trace the reported server/client error and inspect existing test coverage.
+- [x] Reproduce the boundary failure in the page regression test.
+- [x] Move callback message selection out of the client component module.
+- [x] Verify onboarding tests and required gates; record runtime verification limits.
+
+Stopping condition: fix the onboarding boundary failure, retain callback behaviour and report evidence for the timestamp errors without unrelated changes.
+
+### Review
+
+- Moved `xeroReturnMessage` unchanged into `steps/xero-return-message.ts`, outside the client component boundary. The server page passes the selected message as a serialisable prop.
+- Removed the page test's callable client-helper mock. RED: two page tests failed at the original helper call. GREEN: all 49 onboarding tests passed, including expired, cancelled and unknown callback codes.
+- PASS: Prisma generation, `bun run check` (1,322 files), `bun run typecheck` (19 tasks) and `git diff --check`.
+- Integration NOT VERIFIED: `bun run test:integration` stopped at `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No guard bypass or live fixture run was attempted.
+- Authenticated browser onboarding and absence of the timestamp errors remain NOT VERIFIED. React's documented profiler bug can produce negative measures for errored or aborted Server Components (https://github.com/react/react/issues/37561); the installed development client has the affected error path. This fix removes the confirmed onboarding render exception, without suppressing profiler errors or changing dependencies.
+
+- PASS: `bun run test`, all 18 tasks. Existing unrelated workspace changes were preserved.
+
+## 2026-10-21 Calendar loading repair
+
+- [x] Trace the calendar error boundary to the logged Prisma validation failure.
+- [x] Reproduce rejection of the invalid Xero connection query in a regression test.
+- [x] Correct the lookup using the current connection lifecycle and preserve tenant/company scoping.
+- [x] Verify calendar tests and required checks; record evidence and limits.
+
+Stopping condition: repair the demonstrated invalid calendar query without changing calendar filters, schema or unrelated work.
+
+### Review
+
+- Root cause confirmed in `.next/dev/logs/next-development.log`: Prisma rejected `db.xeroConnection.findFirst` because `archived_at` is not a connection field.
+- Replaced that predicate with `released_at: null`, consistent with the canonical connection queries; retained `clerk_org_id` and `organisation_id`. No schema, filter or UI changes.
+- RED: the new page regression failed on the emitted `archived_at` predicate. GREEN: 14 calendar test files, 69 tests passed.
+- PASS: `bun run check` (1,322 files), `bun run typecheck` (19 tasks), `git diff --check`.
+- Integration NOT VERIFIED: reused this session's unchanged prerequisite failure, `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No database guard bypass or provider operation.
+- Authenticated browser reload remains NOT VERIFIED.
+
+- PASS: `bun run test`, 18 successful tasks (app: 157 files, 994 tests).
+
+## 2026-10-21 People loading repair
+
+- [x] Trace the People page failure to its logged invalid connection archive predicate.
+- [x] Add a failing regression for the connection lookup and company selection.
+- [x] Use the current connection release predicate while retaining tenant/company scoping.
+- [x] Verify People tests and required checks; record runtime limits.
+
+Stopping condition: repair the demonstrated People page query failure, without changing directory behaviour or unrelated work.
+
+### Review
+
+- The People page log confirms Prisma rejected the connection query's `archived_at` predicate. Replaced it with `released_at: null`, consistent with canonical connection queries and the preceding calendar repair. Tenant and company predicates remain intact.
+- Added page regression coverage for the emitted query, no connection, multiple companies and rejecting a foreign company before connection access. RED: the supported-query regression failed on the old predicate. GREEN: 37 People tests across five files passed.
+- PASS: `bun run check` (1,323 files), `bun run typecheck` (19 tasks), `git diff --check`.
+- Integration NOT VERIFIED: reused this session's unchanged guard failure, `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No guard bypass or provider calls.
+- Authenticated browser reload remains NOT VERIFIED.
+
+- PASS: `bun run test`, 18 successful tasks (app: 158 files, 998 tests).
+
+## 2026-10-21 Xero people-sync repair
+
+- [x] Confirm dispatch/execution and inspect failed run summaries with tenant-scoped read-only queries.
+- [x] Isolate the pre-dispatch failure and reproduce the affected production path.
+- [x] Apply the smallest source fix and add regression coverage.
+- [x] Verify relevant suites and required checks, separating local checks from live sync proof.
+
+Stopping condition: repair the demonstrated people-sync failure without bypassing database/provider test guards or expanding into unrelated sync changes.
+
+### Review
+
+- Read-only, restricted-role queries scoped by both tenancy keys confirmed failed people runs fetched/upserted zero records with `retry_later`; the AU connection is active and unpaused. No credentials were printed or database rows changed.
+- Confirmed the compiled API transport contained a `MODULE_NOT_FOUND` stub for `../oauth/authorisation.js`. Executing the compiled credential resolver in isolation reproduced the pre-dispatch failure with fake inputs and no network.
+- Replaced the dynamic missing-file import with a static canonical resolver import, retaining dispatch-time credential lookup, tenant binding checks and injected resolver support. Added default-resolver coverage; two existing pure-mapping test files now mock the server-only marker pulled in by that import.
+- Fresh Turbopack compilation resolves the real authorisation module. Read-only `/api/inngest` introspection returned HTTP 200. The fresh compiled resolver passed a fake-credential execution without network calls.
+- Focused checks: 94 transport/read tests and 24 people-sync/access/initial-import job tests passed before the final import adjustment; the final full unit gate covers those paths.
+- PASS: typecheck (19 tasks), lint and `git diff --check`.
+- Integration and full live people-import completion remain NOT VERIFIED. Reused this session's unchanged remote-database integration guard failure; no live sync was dispatched, no provider call was made and no database guard was bypassed.
+
+- PASS: final `bun run test`, 18 successful tasks including all 730 Xero tests.

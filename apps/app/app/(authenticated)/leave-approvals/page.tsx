@@ -19,6 +19,7 @@ import {
 } from "@/lib/auth/require-page-role";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
+import { resolveApprovalActingPerson } from "./acting-person";
 import { LeaveApprovalsClient } from "./leave-approvals-client";
 
 export const metadata = {
@@ -105,16 +106,12 @@ const LeaveApprovalsPage = async ({
     clerkOrgId,
     async (db) => {
       const companies = await resolveAccountCompanies(clerkOrgId, db);
-      const actingPerson = await db.person.findFirst({
-        orderBy: [{ created_at: "asc" }, { id: "asc" }],
-        select: { id: true },
-        where: {
-          archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: user.id,
-          organisation_id: { in: companies.map((company) => company.id) },
-        },
-      });
+      const actingPerson = await resolveApprovalActingPerson(
+        clerkOrgId,
+        user.id,
+        companies.map((company) => company.id),
+        db
+      );
       if (role === "manager" && !actingPerson) {
         return null;
       }

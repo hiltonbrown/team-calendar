@@ -94,9 +94,9 @@ async function loadCalendarResources(
         tenant_name: true,
       },
       where: {
-        archived_at: null,
         clerk_org_id: clerkOrgId,
         organisation_id: organisationId,
+        released_at: null,
       },
     }),
   ];

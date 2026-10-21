@@ -1,59 +1,90 @@
 # Tenant round-trip measurements
 
-Date: 12 October 2026
-Status: Stage 7 access rechecked on 21 October 2026; database and Neon measurements NOT VERIFIED.
-Plan: [Multi-company leave outcomes and request transactions](../plans/2026-10-12-tenant-transaction-per-request.md), Tasks 0.1 and 0.2.
+Updated: 21 October 2026
+Status: PrismaNeon correctness and developer-host diagnostics PASS; representative Vercel page and job measurements NOT VERIFIED.
+Plan: [Multi-company leave outcomes and request transactions](../plans/2026-10-12-tenant-transaction-per-request.md), Tasks 0.1, 0.2 and Stage 7.
 
-## Evidence available
+## Verified prerequisites
 
-The statement recorder observes real `pg.Pool` client calls through `PrismaPg`, including transaction control statements. After Stage 6 removed the per-query helpers, the integration suite exercises the production request-scoped tenant core. It asserts one plain statement, four statements for one tenant query, and six statements for three queries sharing a transaction. It also checks correct results and tenant context, one connection and sequential execution when the transaction receives three concurrent queries. These PrismaPg assertions do not establish PrismaNeon behaviour.
+The owner directed use of the database configured in `.env.local`. Neither a new Neon branch nor a Neon API key is required. The authorised development reset applied all 41 migrations from scratch. Catalogue checks verified the restricted `team_calendar_app` login, 29 tenant-table RLS policies/grants, no elevated membership or ownership, and transaction-context cleanup. Feature-branch app/API Preview database variables are configured. Implementation CI passed at `5c9cb42`, including the PrismaPg statement-count and RLS integration suites ([CI run](https://github.com/hiltonbrown/team-calendar/actions/runs/39534951518)).
 
-These are assertions to verify, not measurements from this run. All four database tests are currently blocked by sandbox `connect EPERM` on the existing local PostgreSQL service at localhost:5432. No disposable or external database was created. The options spec's earlier local figures are historical evidence only.
+Read-only inventory at 03:22 UTC found one company, no multi-company accounts, zero active people, zero stored Xero grants, zero Xero connections and zero approved records. This supersedes earlier missing-role and branch-provisioning notes; it is not a populated acceptance fixture.
 
-The opt-in timing uses driver calls rather than Prisma query events, because Prisma's query events omit the adapter's `BEGIN`. It is disabled unless `TENANT_QUERY_TIMING=1`. Label a loader or one Inngest step with the exported `withTenantQueryTiming(operation, fn)` helper. The flag alone does not add measurement scopes to existing entry points. The measurement scope holds counters only, never a database client.
+## Actual PrismaNeon diagnostics
 
-Each scope logs `tenant_query_timing` through `@repo/observability/log`, with `operation`, `statement_count`, `database_duration_ms` and `wall_time_ms`. Duration is summed across driver calls, including failures; wall time measures the complete labelled operation, so parallel database duration can exceed wall time. Operation labels must be fixed descriptive names, never user data. SQL text, parameters, URLs and account IDs are excluded. Logging failures cannot change the operation's result or error.
+Executed on 21 October 2026, final sample at 03:20:10 UTC, from the developer host to the configured pooled Neon endpoint in `ap-southeast-2`, using `DATABASE_APP_URL` as `team_calendar_app`. Driver: `@neondatabase/serverless` 1.1.0; adapter: `@prisma/adapter-neon` 7.10.0. These are not Vercel-region results. All operations were reads or transaction-local context changes; there were zero application-data writes.
 
-## Measurements still required
+| Diagnostic | Result |
+|---|---|
+| Initial connection plus first `SELECT 1` | 170.27 ms, one observation, not a guaranteed cold start |
+| Warm `SELECT 1`, 20 samples | p50 21.06 ms, p95 25.22 ms; one driver statement per sample |
+| Effective adapter pool maximum | 10, inspected on the actual underlying pool |
+| PostgreSQL `max_connections` | 112 |
+| Runtime role `rolconnlimit` | -1, no role-specific limit |
+| PgBouncer frontend connection limit | NOT VERIFIED; neither value above establishes it |
+| Concurrent-query correctness | PASS: three different queries returned 11, 22 and 33 with the expected tenant context, one PostgreSQL backend and one driver connection |
+| Context after commit and rollback | PASS: missing/empty context; no-context company read returned zero |
 
-| Measurement | Before | After |
-|---|---|---|
-| Vercel region and Neon preview branch identity | NOT VERIFIED | Pending Stage 7 |
-| Restricted `team_calendar_app` role | NOT VERIFIED | Pending Stage 7 |
-| Vercel to Neon round-trip time | NOT VERIFIED | Pending Stage 7 |
-| Calendar, People, approvals, sync, Dashboard and settings statement counts | NOT VERIFIED | Pending Stage 7 |
-| Each database-bearing Inngest step's statement count and wall time | NOT VERIFIED | Pending Stage 7 |
-| Page p50 and p95 latency | NOT VERIFIED | Pending Stage 7 |
-| Effective PrismaNeon pool size and pooled endpoint connection limit | NOT VERIFIED | Pending Stage 7 |
-| Each Task 2.3 loader: parallel versus one-transaction wall time | NOT VERIFIED | Pending Stage 7 |
-| PrismaNeon concurrent-query correctness and serialisation | NOT VERIFIED | Pending Stage 7 |
+The concurrency assertion used `Promise.all` inside one PrismaNeon interactive transaction. Each probe included `pg_sleep(0.02)` and checked its result/context/backend. The recorder observed six driver statements, sent sequentially:
 
-The 21 October Stage 7 inspection confirms that the feature-branch app and API previews are READY at implementation commit `c2a3a60120e6ee4a1c446b17325a678e3d97bcb9`. Their project database bindings still reference the same store across Development, Preview and Production, with no feature-branch database override or `DATABASE_APP_URL`. Local files contain a shared owner connection, but no Neon API credential; the local Neon configuration directory is empty. Isolated branch provisioning remains unavailable. Both preflight entry points fail with current branch Preview variables, before the restricted-role catalogue check. No Neon measurement or provider acceptance was executed. See [Stage 7 review](../../../tasks/todo.md#stage-7-review-21-october-2026) for deployment identities, command details and remaining dependencies. Local PostgreSQL cannot establish production-region latency, pool capacity or PrismaNeon concurrency behaviour.
+| Driver call | Start ms | Completion ms |
+|---|---:|---:|
+| BEGIN | 0.00 | 21.12 |
+| transaction-local `set_config` | 23.36 | 44.63 |
+| alpha | 46.54 | 85.05 |
+| beta | 85.27 | 124.86 |
+| gamma | 125.19 | 164.11 |
+| COMMIT | 165.45 | 185.49 |
 
-## Reproduction and decision
+This closes Task 0.2 Step 4 for the installed PrismaNeon/driver versions and configured endpoint. No concurrency errors were observed, so there is no evidence-based requirement to remove every service-level `Promise.all` for driver compatibility.
 
-The owner subsequently directed Stage 7 to use the database configured in
-`.env.local`; an isolated branch and Neon API key are not prerequisites. On
-21 October all 41 migrations were recorded and the restricted runtime role was
-provisioned on that database. Read-only checks passed for all 29 tenant-table
-policies/grants, runtime-role restrictions, scoped reads, no-context denial and
-transaction-context cleanup. Feature-branch app/API Preview database variables
-are configured for subsequent deployments. This supersedes the branch and
-runtime-role setup findings above, but supplies no Vercel-region latency,
-PrismaNeon performance, provider or four-role acceptance evidence. Those
-measurement values remain NOT VERIFIED. The actual database has one company,
-zero active staff and zero active Xero connections.
+## Bounded access-pattern comparison
 
-On a host with access to the existing local test database, run from the repository root:
+Each sample read scoped organisation, person and availability-record counts for an absent account; each returned three zeros. After warming three pool connections, each pattern ran 20 times. Counts include BEGIN, context and COMMIT. These are diagnostic model queries, not named production loaders or historical deployed page measurements.
+
+| Pattern | Statements | p50 ms | p95 ms |
+|---|---:|---:|---:|
+| Three awaited queries, one transaction | 6 | 142.47 | 151.84 |
+| Three `Promise.all` queries, one transaction | 6 | 145.89 | 153.48 |
+| Three independent transactions, parallel | 12 | 97.87 | 132.89 |
+| Three independent transactions, serial (historical per-query emulation) | 12 | 355.92 | 466.68 |
+
+Parallel branches used twice as many statements and up to three connections. Their lower wall time in this bounded diagnostic does not establish a safe or beneficial split for any Task 2.3 production loader. The historical emulation is not a before measurement of the old application.
+
+The decision rule is `overhead = 3 × round-trip time × tenant queries on the critical path`, compared with `0.10 × page p95`. Using the diagnostic warm median only gives `3 × 21.06 = 63.18 ms` of estimated per-query transaction overhead. Three serial per-query wrappers estimate 189.54 ms total control overhead; one wrapper estimates 63.18 ms. This is a model, not a measured page saving. Actual Vercel RTT, page p95 and each loader's critical-path queries are still missing, so the required page decision cannot be made from these figures.
+
+Keep `TENANT_FAN_OUT_ENTRY_POINTS` empty until the named, representative loader comparisons justify individual entries. Do not split or register production loaders based on the generic three-count comparison. Gate 0 remains the owner's approval to proceed without the original performance evidence, not performance proof.
+
+## Remaining measurements
+
+| Required evidence | Status |
+|---|---|
+| Vercel execution region and Vercel-to-Neon RTT | NOT VERIFIED |
+| Calendar, People, approvals, sync, Dashboard and settings loader statement counts and page p50/p95 | NOT VERIFIED |
+| Each database-bearing Inngest step's statement count and wall time | NOT VERIFIED |
+| Each named Task 2.3 loader, parallel versus one transaction, including result equivalence | NOT VERIFIED |
+| Historical populated application before/after figures | NOT VERIFIED; bounded emulation above is not a replacement |
+| Actual pooled-endpoint frontend connection limit | NOT VERIFIED |
+
+A direct operational import probe for approval and sync services failed before any database calls: under Bun's `react-server` condition, a transitive React client dependency attempted unavailable `React.createContext`. One normal-Bun attempt, stubbing only the `server-only` build marker in this server-side process, also stopped on a transitive Server Component import restriction. No data, auth or provider results were mocked, and no database test guard or `NODE_ENV` classification was changed. These import failures do not indicate a database or deployed application failure. Named loader measurements remain unexecuted and belong in the running application, with an authenticated, populated account. Absent-account early returns cannot establish representative acceptance or query costs.
+
+The opt-in instrumentation counts actual driver calls, including BEGIN, rather than Prisma query events. Wrap each named loader or job step in `withTenantQueryTiming(operation, fn)` with `TENANT_QUERY_TIMING=1`; the flag alone adds no scopes. Logs contain only fixed operation labels, statement counts, summed driver duration and wall time, never SQL, parameters, URLs, secrets or account IDs. Parallel summed database duration can exceed wall time. Remove temporary measurement wrappers after collecting the required samples.
+
+## Reproduction
+
+The executed read-only operational diagnostic is retained locally, without credentials:
+
+```sh
+bun --no-env-file /tmp/teamcalendar-stage7-20261021-NuLvbo/neon-measurements.ts
+node /tmp/teamcalendar-stage7-20261021-NuLvbo/inspect-database.mjs --acceptance
+```
+
+The diagnostic reads the ignored root `.env.local`, uses the existing restricted runtime URL, and records driver start/completion times. The scripts are session-local evidence, not committed release tooling. It directly uses the production PrismaNeon adapter, not a test runner or a fabricated live-test manifest.
+
+For the existing localhost-only PrismaPg integration suite:
 
 ```sh
 ALLOW_LOCAL_DATABASE_TESTS=1 bunx vitest run --config packages/database/vitest.config.mts packages/database/tenant-statement-counts.integration.test.ts
 ```
 
-Supply `DATABASE_APP_URL` (preferred) or a local `DATABASE_URL`. This suite makes read-only queries and uses the existing live-test connection guard. A remote URL is not authorised by `ALLOW_LOCAL_DATABASE_TESTS`.
-
-On an authorised Neon preview deployment in the production Vercel region, enable timing, wrap the named request loaders and Inngest steps, record representative samples, and remove the temporary wrappers after measurement. Repeat the concurrent-query assertion with PrismaNeon. Compare each registered fan-out loader with a temporary uncommitted serial transaction patch. Record pool configuration and the endpoint's actual connection limit rather than assuming defaults.
-
-The decision rule is `overhead = 3 × round-trip time × tenant queries on the critical path`, compared with `0.10 × page p95`. A statement total across parallel branches is not the critical-path query count. The required inputs are unknown, so this document cannot recommend proceeding with the refactor on measured performance grounds.
-
-Gate 0 was approved by the owner, who explicitly chose to proceed with Stage 1 despite the missing Neon measurements and blocked database integration. The measurements remain NOT VERIFIED; approval does not establish measured performance or live isolation evidence.
+`ALLOW_LOCAL_DATABASE_TESTS` does not authorise a remote integration test. Existing live-test and fixture guards remain unchanged.

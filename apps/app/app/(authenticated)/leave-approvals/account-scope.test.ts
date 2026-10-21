@@ -5,10 +5,12 @@ const state = vi.hoisted(() => ({
   approve: vi.fn(),
   auth: vi.fn(),
   open: false,
+  people: vi.fn(),
   records: vi.fn(),
   role: "org:admin",
   send: vi.fn(),
   transaction: vi.fn(),
+  warn: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database/tenant-client", () => ({
@@ -57,7 +59,7 @@ vi.mock("@repo/analytics/server", () => ({ analytics: null }));
 vi.mock("@repo/analytics/activation-events", () => ({
   createActivationEvent: vi.fn(),
 }));
-vi.mock("@repo/observability/log", () => ({ log: { warn: vi.fn() } }));
+vi.mock("@repo/observability/log", () => ({ log: { warn: state.warn } }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { TenantPhaseError, withTenantDb } from "@repo/database";
@@ -75,6 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.open = false;
   state.role = "org:admin";
+  state.people.mockResolvedValue([{ id: actorId }]);
   state.auth.mockImplementation(async () => {
     if (state.open) {
       throw new Error("Auth called inside SQL scope");
@@ -92,7 +95,10 @@ beforeEach(() => {
         $executeRaw: vi.fn(),
         $queryRaw: vi.fn(async () => []),
         availabilityRecord: { findFirst: state.records },
-        person: { findFirst: async () => ({ id: actorId }) },
+        person: {
+          findFirst: async () => ({ id: actorId }),
+          findMany: state.people,
+        },
         xeroConnection: {
           findMany: async () =>
             companies.map((company) => ({ organisation_id: company.id })),
@@ -143,6 +149,47 @@ test("missing/foreign record stops before any provider write", async () => {
   state.records.mockResolvedValue(null);
   expect((await approveAction({ recordId })).ok).toBe(false);
   expect(state.approve).not.toHaveBeenCalled();
+});
+test("duplicate acting people warn and keep the earliest match without blocking approval", async () => {
+  state.people.mockResolvedValue([{ id: actorId }, { id: reportId }]);
+  expect((await approveAction({ recordId })).ok).toBe(true);
+  expect(state.approve.mock.calls[0]?.[0]).toMatchObject({
+    actingPersonId: actorId,
+  });
+  expect(state.warn).toHaveBeenCalledWith(
+    "Multiple person records match the approval actor",
+    { clerkOrgId: "account-A", selectedPersonId: actorId }
+  );
+  expect(state.people).toHaveBeenCalledWith({
+    orderBy: [{ created_at: "asc" }, { id: "asc" }],
+    select: { id: true },
+    take: 2,
+    where: {
+      archived_at: null,
+      clerk_org_id: "account-A",
+      clerk_user_id: "user-1",
+      organisation_id: { in: companies.map((company) => company.id) },
+    },
+  });
+});
+test("a single acting person does not produce a duplicate warning", async () => {
+  expect((await approveAction({ recordId })).ok).toBe(true);
+  expect(state.warn).not.toHaveBeenCalled();
+});
+test("an admin without a person can approve without a duplicate warning", async () => {
+  state.people.mockResolvedValue([]);
+  expect((await approveAction({ recordId })).ok).toBe(true);
+  expect(state.approve.mock.calls[0]?.[0]).toMatchObject({
+    actingPersonId: null,
+  });
+  expect(state.warn).not.toHaveBeenCalled();
+});
+test("a manager without a person cannot approve", async () => {
+  state.role = "org:manager";
+  state.people.mockResolvedValue([]);
+  expect((await approveAction({ recordId })).ok).toBe(false);
+  expect(state.approve).not.toHaveBeenCalled();
+  expect(state.warn).not.toHaveBeenCalled();
 });
 test("one failed company dispatch does not prevent the third company from queuing", async () => {
   state.send.mockImplementation(async (input) => {

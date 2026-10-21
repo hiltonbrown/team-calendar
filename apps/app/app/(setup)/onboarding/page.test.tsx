@@ -112,10 +112,6 @@ vi.mock("./steps/xero-step", () => ({
       Xero step {String(props.connected)} {props.returnMessage}
     </div>
   ),
-  xeroReturnMessage: (input: {
-    cancelled: boolean;
-    errorCode: string | null;
-  }) => (input.errorCode ? `error:${input.errorCode}` : null),
 }));
 vi.mock("./steps/people-step", () => ({
   PeopleStep: () => <div>People step</div>,
@@ -151,7 +147,9 @@ function snapshot(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function renderPage(params: Record<string, string> = {}) {
+async function renderPage(
+  params: Record<string, string | string[] | undefined> = {}
+) {
   render(await Page({ searchParams: Promise.resolve(params) }));
 }
 
@@ -243,11 +241,35 @@ describe("OnboardingPage", () => {
     expect(screen.getByText("Xero step false")).toBeTruthy();
   });
 
-  it("passes the Xero return code to the Xero step", async () => {
+  it("renders callback errors without invoking a client export on the server", async () => {
     mocks.loadWizardSnapshot.mockResolvedValue(snapshot({ step: "xero" }));
     await renderPage({ xero_error: "expired" });
-    expect(screen.getByText("Xero step false error:expired")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Xero step false The Xero sign-in took too long or was interrupted. Try connecting again."
+      )
+    ).toBeTruthy();
   });
+
+  it.each([
+    {
+      message:
+        "You cancelled the Xero connection. Connect again, or set up without Xero.",
+      params: { xero: "cancelled" },
+    },
+    {
+      message:
+        "Xero could not be connected. Try again, or set up without Xero for now.",
+      params: { xero_error: "<script>" },
+    },
+  ])(
+    "renders a safe Xero return message for $params",
+    async ({ params, message }) => {
+      mocks.loadWizardSnapshot.mockResolvedValue(snapshot({ step: "xero" }));
+      await renderPage(params);
+      expect(screen.getByText(`Xero step false ${message}`)).toBeTruthy();
+    }
+  );
 
   it("shows a load error instead of a broken step", async () => {
     mocks.loadWizardSnapshot.mockResolvedValue({

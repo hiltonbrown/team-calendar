@@ -24,6 +24,22 @@
 
 ---
 
+## Reconciled status (21 October 2026)
+
+Checked items record completed implementation or verified final outcomes. Suggested
+task commit titles were consolidated into `50b9080` and subsequent corrective
+commits; a checked commit item does not imply that exact title exists. Intermediate
+optional-client bridges and the migration-time detector were removed as planned
+in Stage 6; they are not work to recreate. Historical RED-only checkpoints without
+independently established execution are retained as non-checkbox instructions.
+
+- All four required gates PASS at `5c9cb42`: [CI evidence](https://github.com/hiltonbrown/team-calendar/actions/runs/39534951518). The run includes 16 RLS tests, six statement-count tests and the multi-company routing integration test, using local PostgreSQL and fake provider calls.
+- The configured development database was reset and all 41 migrations executed from scratch. Schema/checksum verification and RLS/grants on 29 tenant tables PASS. See [database results](../../../tasks/todo.md#stage-7-development-database-result).
+- Stages 1, 3, 4, 5 and 6 are implemented. Task 4.6's duplicate-person warning now uses a shared bounded lookup in the page and actions, preserves earliest-created selection and has RED/GREEN regression coverage. Fresh lint, typecheck (19 tasks) and unit tests (18 tasks) PASS; scoped independent review found no Critical or Important findings. These uncommitted changes have not had a fresh integration run; the linked CI result applies to `5c9cb42`.
+- Task 0.2 Step 4 now PASSes against actual PrismaNeon, including concurrent-query correctness, sequential driver statements and commit/rollback context cleanup. Host-to-Neon diagnostics are recorded in the [measurements document](../specs/2026-10-12-tenant-round-trip-measurements.md), not represented as Vercel-region page measurements. Remaining Task 0.2 measurements, measured fan-out decisions (Task 2.3), and Stage 7 Steps 0 to 3 remain open.
+- Fresh branch Preview app/API preflights FAIL. Existing local KV settings were added to app Preview for this feature branch only and metadata readback confirms the scope. Missing Sentry, Xero callback/tier and API delivery/webhook configuration remain; sensitive downloaded blanks are not absence evidence. No deployment was triggered by the configuration fix.
+- App and API previews are READY at `5c9cb42`. This establishes deployment, not live acceptance or a completed sync-cycle observation. Stage 7 Step 4 is complete; the plan is not complete.
+
 ## 1. Findings
 
 ### Outcome requirements (confirmed with the owner, 12 October 2026)
@@ -195,11 +211,11 @@ Mismatch rule: a `TenantDb` for account A used with `clerkOrgId` B throws (the s
 - Create: `packages/database/src/test-fixtures/statement-recorder.ts`
 - Create: `packages/database/tenant-statement-counts.integration.test.ts`
 
-- [ ] **Step 1:** Write `createRecordingTenantClient()`: a `pg.Pool` whose `connect` hook wraps each client's `query` to push the SQL text to an array, passed to `PrismaPg`, then wrapped exactly like `referenceDatabase`. Verify with one plain query that the adapter routes through `client.query`; if it does not, fall back to `log_statement=all` parsing as the spec did and record that in the test header.
-- [ ] **Step 2:** Write assertions that pin today's baseline (they pass against `main` and exist to make later changes visible): one `tenantDatabase` query sends 4 statements (`BEGIN`, `set_config`, query, `COMMIT`); three queries in one `tenantTransaction` send 6.
-- [ ] **Step 3:** Add a concurrency-safety assertion: `Promise.all` of three different queries inside one `tenantTransaction` returns correct results with no transaction error, and the recorder shows them sent one after another on the one connection. Stage 4 relies on this for loaders that are not on the fan-out register.
-- [ ] **Step 4:** Run `bunx vitest run packages/database/tenant-statement-counts.integration.test.ts` with `ALLOW_LOCAL_DATABASE_TESTS=1`. Expected: PASS.
-- [ ] **Step 5:** Commit `test: record tenant statement counts per access pattern`.
+- [x] **Step 1:** Write `createRecordingTenantClient()`: a `pg.Pool` whose `connect` hook wraps each client's `query` to push the SQL text to an array, passed to `PrismaPg`, then wrapped exactly like `referenceDatabase`. Verify with one plain query that the adapter routes through `client.query`; if it does not, fall back to `log_statement=all` parsing as the spec did and record that in the test header.
+- [x] **Step 2:** Write assertions that pin today's baseline (they pass against `main` and exist to make later changes visible): one `tenantDatabase` query sends 4 statements (`BEGIN`, `set_config`, query, `COMMIT`); three queries in one `tenantTransaction` send 6.
+- [x] **Step 3:** Add a concurrency-safety assertion: `Promise.all` of three different queries inside one `tenantTransaction` returns correct results with no transaction error, and the recorder shows them sent one after another on the one connection. Stage 4 relies on this for loaders that are not on the fan-out register.
+- [x] **Step 4:** Run `bunx vitest run packages/database/tenant-statement-counts.integration.test.ts` with `ALLOW_LOCAL_DATABASE_TESTS=1`. Expected: PASS.
+- [x] **Step 5:** Commit `test: record tenant statement counts per access pattern`.
 
 ### Task 0.2: Neon preview measurements
 
@@ -207,14 +223,16 @@ Mismatch rule: a `TenantDb` for account A used with `clerkOrgId` B throws (the s
 - Modify: `packages/database/src/standalone-client.ts` (opt-in query timing behind `TENANT_QUERY_TIMING=1`, logged through `@repo/observability`, off by default)
 - Create: `docs/superpowers/specs/2026-10-12-tenant-round-trip-measurements.md`
 
-- [ ] **Step 1:** Add the opt-in timing (count of tenant statements per request and per Inngest step, total database wall time). Unit test that it is inert when the flag is absent.
-- [ ] **Step 2:** On a Neon preview branch with `DATABASE_APP_URL` as `team_calendar_app` and the production Vercel region, record: Vercel to Neon round-trip time; tenant statements per request for calendar, people, approvals, sync, dashboard and settings pages; tenant statements per Inngest step; p50 and p95 latency for those pages; effective `PrismaNeon` pool size and Neon pooled-endpoint connection limit.
+- [x] **Step 1:** Add the opt-in timing (count of tenant statements per request and per Inngest step, total database wall time). Unit test that it is inert when the flag is absent.
+- [ ] **Step 2:** On the configured Neon database (the owner's existing-target instruction supersedes branch creation), with `DATABASE_APP_URL` as `team_calendar_app` and the production Vercel region, record: Vercel to Neon round-trip time; tenant statements per request for calendar, people, approvals, sync, dashboard and settings pages; tenant statements per Inngest step; p50 and p95 latency for those pages; effective `PrismaNeon` pool size and Neon pooled-endpoint connection limit.
 - [ ] **Step 3:** For each Task 2.3 fan-out loader, record wall time with branches parallel (today) and with all branches in one transaction (temporary local patch, not committed).
-- [ ] **Step 4:** Repeat the Task 0.1 Step 3 concurrency assertion against Neon through `PrismaNeon` (the integration test covers `PrismaPg` only). Record the result; if `PrismaNeon` errors on concurrent queries in one interactive transaction, every `Promise.all` inside a service must be removed in Stage 3 rather than left to serialise, and Gate 0 must note it.
+- [x] **Step 4:** Repeat the Task 0.1 Step 3 concurrency assertion against Neon through `PrismaNeon` (the integration test covers `PrismaPg` only). Actual restricted-role diagnostic PASS on 21 October: correct distinct results/context on one backend, six sequential driver statements, context cleanup after commit and rollback. See the measurements document. No concurrent-query error requires removing `Promise.all`.
 - [ ] **Step 5:** Write the measurements document with the spec's decision rule applied: overhead = 3 × round trip × tenant queries on the critical path, compared with 10% of p95.
 - [ ] **Step 6:** Commit `docs: record tenant round-trip measurements on Neon preview`.
 
 ### Gate 0 (owner decision)
+
+- [x] Owner explicitly approved proceeding to Stage 1 despite missing Neon measurements; this does not establish performance or live acceptance evidence.
 
 Present the measurements document. Proceed to Stage 1 only on explicit confirmation. The gate decides the tenant transaction refactor only: if the owner stops it here, Stage 4 still runs every O step to deliver the three outcomes and skips the E and P steps. New code in O steps (for example the Task 4.2 service) then uses the existing `tenantDatabase` and `tenantTransaction` helpers instead of `TenantDb`. If no core page exceeds the 10% threshold, the spec recommends stopping at Option A; the owner decides whether Option B still proceeds for consistency.
 
@@ -230,7 +248,7 @@ Present the measurements document. Proceed to Stage 1 only on explicit confirmat
 - Modify: `packages/database/index.ts` (export the API and error classes)
 - Modify: `packages/database/src/tenant-client.ts` (move `TENANT_READ_TRANSACTION_OPTIONS` to `tenant-db.ts` and re-export; keep `tenantDatabase` / `tenantTransaction` working)
 
-- [ ] **Step 1: Write failing unit tests** (mocked `referenceDatabase.$transaction`):
+- [x] **Step 1: Write failing unit tests** (mocked `referenceDatabase.$transaction`):
   - `withTenantDb` sets context once, passes the transaction client, returns `fn`'s value.
   - Calling `withTenantDb` inside `withTenantDb` throws `TenantNestingError`.
   - `assertTenantDb` passes for the owning account, throws `TenantMismatchError` for another account and for an unregistered client.
@@ -240,10 +258,10 @@ Present the measurements document. Proceed to Stage 1 only on explicit confirmat
   - `withTenantReads` runs branches concurrently in separate transactions and returns keyed results.
   - `inTenant` reuses a supplied `db` (no new transaction) and opens one when `db` is absent.
   - Blank `clerkOrgId` throws (existing `assertTenant` behaviour).
-- [ ] **Step 2:** Run `bunx vitest run packages/database/src/tenant-db.test.ts`. Expected: FAIL (module missing).
-- [ ] **Step 3:** Implement per section 2. Errors are named classes so callers and tests can match them.
-- [ ] **Step 4:** Run the test again. Expected: PASS.
-- [ ] **Step 5:** Commit `feat(database): add withTenantDb request-scoped tenant transactions`.
+- [x] **Step 2:** Run `bunx vitest run packages/database/src/tenant-db.test.ts`. Expected: FAIL (module missing).
+- [x] **Step 3:** Implement per section 2. Errors are named classes so callers and tests can match them.
+- [x] **Step 4:** Run the test again. Expected: PASS.
+- [x] **Step 5:** Commit `feat(database): add withTenantDb request-scoped tenant transactions`.
 
 ### Task 1.2: Restricted-role integration tests
 
@@ -251,24 +269,24 @@ Present the measurements document. Proceed to Stage 1 only on explicit confirmat
 - Modify: `packages/database/row-level-security.integration.test.ts`
 - Modify: `packages/database/tenant-statement-counts.integration.test.ts`
 
-- [ ] **Step 1:** Add tests against the restricted role:
+- [x] **Step 1:** Add tests against the restricted role:
   - `withTenantDb(A)` never returns B rows, with 20 concurrent `withTenantDb(A)` and `withTenantDb(B)` calls interleaved.
   - A query with no context is denied (existing test retained).
   - After `withTenantDb` commits or rolls back, a query on the same pooled connection sees no `app.clerk_org_id` (`current_setting('app.clerk_org_id', true)` is empty).
   - `assertTenantDb(dbA, B)` throws before any statement is sent.
   - Statement count: three queries in one `withTenantDb` send 6 statements (`n + 3`).
-- [ ] **Step 2:** Run `bun run test:integration --filter @repo/database`. Expected: PASS.
-- [ ] **Step 3:** Commit `test(database): prove withTenantDb isolation, cleanup and statement counts`.
+- [x] **Step 2:** Run `bun run test:integration --filter @repo/database`. Expected: PASS.
+- [x] **Step 3:** Commit `test(database): prove withTenantDb isolation, cleanup and statement counts`.
 
 ### Task 1.3: Migration-time detector in `tenantDatabase`
 
 **Files:**
 - Modify: `packages/database/src/tenant-client.ts`, `packages/database/src/tenant-client.test.ts`
 
-- [ ] **Step 1:** Failing test: calling `tenantDatabase(x)` while a `withTenantDb` scope is active throws `TenantNestingError` when `NODE_ENV === "test"` and logs a structured warning (`tenant_db_unthreaded`, with a stack frame) otherwise. Same for `tenantTransaction`.
-- [ ] **Step 2:** Implement using an exported `isTenantScopeActive()` from `tenant-db.ts`.
-- [ ] **Step 3:** Run `bun run test`. Expected: PASS (no entry point opens a scope yet).
-- [ ] **Step 4:** Commit `feat(database): detect unthreaded tenant access inside a request transaction`.
+- [x] **Step 1:** Failing test: calling `tenantDatabase(x)` while a `withTenantDb` scope is active throws `TenantNestingError` when `NODE_ENV === "test"` and logs a structured warning (`tenant_db_unthreaded`, with a stack frame) otherwise. Same for `tenantTransaction`.
+- [x] **Step 2:** Implement using an exported `isTenantScopeActive()` from `tenant-db.ts`.
+- [x] **Step 3:** Run `bun run test`. Expected: PASS (no entry point opens a scope yet).
+- [x] **Step 4:** Commit `feat(database): detect unthreaded tenant access inside a request transaction`.
 
 ---
 
@@ -282,23 +300,26 @@ Present the measurements document. Proceed to Stage 1 only on explicit confirmat
 
 Registration is per export because four modules mix phased and converted functions: `approval-service.ts` (reads converted, Xero writes phased), `submit-recovery-service.ts` (`listSubmitRecoveryCandidates` converted, the rest phased), `render-feed.ts` (C4) and `submit-service.ts` (phased writes beside the pure `submitRequestFingerprint`). Inngest handlers (C2) export `inngest.createFunction` values, not async functions, so a guard on the handler export can never fire; for C2 register the named persistence and step-body functions the handlers call, extracting an anonymous step body into a named function where needed.
 
-- [ ] **Step 1:** Failing boundary test: for every registered export, the first statement is `assertNoTenantTransaction(` and the signature has no `TenantDb` parameter (source scan, same technique as `SYSTEM_IMPORT_ALLOWLIST`; first-statement position is checked because it is unambiguous to scan). Unregistered exports in the same module are unaffected. Every registered `{ path, exports }` must resolve to an existing exported function, so a rename fails the test instead of silently dropping the guard.
-- [ ] **Step 2:** Populate the register from the C1 to C6 rows in section 1, including the C2 step-body functions and the C4 exports `renderFeedForToken` and `cachedEtagForToken`.
-- [ ] **Step 3:** Add `assertNoTenantTransaction("<function>")` as the first line of each phased export.
-- [ ] **Step 4:** Run `bunx vitest run packages/database/src/boundary.test.ts` and `bun run test`. Expected: PASS.
-- [ ] **Step 5:** Commit `refactor: register phased tenant flows and guard them against request transactions`.
+- [x] **Step 1:** Failing boundary test: for every registered export, the first statement is `assertNoTenantTransaction(` and the signature has no `TenantDb` parameter (source scan, same technique as `SYSTEM_IMPORT_ALLOWLIST`; first-statement position is checked because it is unambiguous to scan). Unregistered exports in the same module are unaffected. Every registered `{ path, exports }` must resolve to an existing exported function, so a rename fails the test instead of silently dropping the guard.
+- [x] **Step 2:** Populate the register from the C1 to C6 rows in section 1, including the C2 step-body functions and the C4 exports `renderFeedForToken` and `cachedEtagForToken`.
+- [x] **Step 3:** Add `assertNoTenantTransaction("<function>")` as the first line of each phased export.
+- [x] **Step 4:** Run `bunx vitest run packages/database/src/boundary.test.ts` and `bun run test`. Expected: PASS.
+- [x] **Step 5:** Commit `refactor: register phased tenant flows and guard them against request transactions`.
 
 ### Task 2.2: Failure-persisting services
 
 **Files:**
 - Modify: `packages/database/src/tenant-phased-modules.ts`
 
-- [ ] **Step 1:** Search every non-phased service for writes followed by an `ok: false` return (status transitions to failure states, failure audit events, attempt counters). Add each to the register with reason "persists state on failure", or restructure so the failure write happens in its own phase.
-- [ ] **Step 2:** Inventory result-bearing side effects: every Inngest send or notification dispatch whose failure reaches the caller as a `Result` error (for example `dispatch_failed`). Starting points, verified on `main`: `dispatchXeroSyncInternal` behind `dispatchApprovalReconciliation` and `dispatchXeroLeaveSync` (`approval-service.ts:781` to `888`), and the `dispatch_failed` paths in `sync-monitor-service.ts` (declared at line 27); then check `feeds/_actions.ts`, `submit-side-effects.ts`, `submit-service.ts` and `balance-refresh.ts`. For each, split the function so the database part takes `db` and the send is a separate function called by the entry point after `withTenantDb` returns. Record the list in this task's commit message.
-- [ ] **Step 3:** Add a unit test per affected function proving the failure state is still persisted, and a test per split send proving a failed send still returns its error `Result` to the caller.
-- [ ] **Step 4:** Commit `refactor: phase failure-persisting services and split result-bearing sends`.
+- [x] **Step 1:** Search every non-phased service for writes followed by an `ok: false` return (status transitions to failure states, failure audit events, attempt counters). Add each to the register with reason "persists state on failure", or restructure so the failure write happens in its own phase.
+- [x] **Step 2:** Inventory result-bearing side effects: every Inngest send or notification dispatch whose failure reaches the caller as a `Result` error (for example `dispatch_failed`). Starting points, verified on `main`: `dispatchXeroSyncInternal` behind `dispatchApprovalReconciliation` and `dispatchXeroLeaveSync` (`approval-service.ts:781` to `888`), and the `dispatch_failed` paths in `sync-monitor-service.ts` (declared at line 27); then check `feeds/_actions.ts`, `submit-side-effects.ts`, `submit-service.ts` and `balance-refresh.ts`. For each, split the function so the database part takes `db` and the send is a separate function called by the entry point after `withTenantDb` returns. Record the list in this task's commit message.
+- [x] **Step 3:** Add a unit test per affected function proving the failure state is still persisted, and a test per split send proving a failed send still returns its error `Result` to the caller.
+- [x] **Step 4:** Commit `refactor: phase failure-persisting services and split result-bearing sends`.
 
 ### Task 2.3: Fan-out register
+
+The candidate list, empty approval register and boundary test are implemented.
+Measurement-dependent selection, splitting and approval remain open below.
 
 **Files:**
 - Create: `packages/database/src/tenant-fan-out.ts` (documented list of entry-point loaders allowed to use `withTenantReads`)
@@ -308,8 +329,8 @@ Fan-out can only happen at an entry point. A service that receives a `db` is alr
 - [ ] **Step 1:** Identify the services that fan out today, to confirm against Stage 0 numbers: `getApprovalSummaryCounts` (`approval-service.ts:510`; four counts in `Promise.all` at line 538), sync monitor summaries (`sync-monitor-service.ts`), dashboard summaries (`dashboard-service.ts`), plan summaries (`plan-service.ts`), `current-status.ts`, `feed-scope.ts`, `feed-service.ts`, `getFeedOversightCounts`, and the per-account loop in `recountUsage` (`recount-usage.ts`). Keep a service on the list only where Stage 0 shows parallel is faster; the rest keep `Promise.all` on their `db` and run serially.
 - [ ] **Step 2:** For each retained service, split it into single-purpose functions that each take `db` (for example `countPendingApprovals(input, db)`), and keep a thin composing function with no `db` parameter that the entry point calls. Unit test that each part returns the same values as the original function.
 - [ ] **Step 3:** Register the entry-point loaders that call the composing functions through `withTenantReads`: initially `leave-approvals/page.tsx`, `dashboard-body.tsx`, `sync` page loaders, `settings/general/page.tsx`, `settings/billing/page.tsx`, the feeds pages, and the `recount-usage` step.
-- [ ] **Step 4:** Boundary test: `withTenantReads(` appears only in registered entry-point modules, never under `packages/*/src` other than `packages/jobs/src/handlers`.
-- [ ] **Step 5:** Run `bun run test`. Expected: PASS.
+- [x] **Step 4:** Boundary test: `withTenantReads(` appears only in registered entry-point modules, never under `packages/*/src` other than `packages/jobs/src/handlers`.
+- [x] **Step 5:** Run `bun run test`. Expected: PASS.
 - [ ] **Step 6:** Commit `refactor: move tenant fan-out to entry points`.
 
 ---
@@ -322,12 +343,12 @@ Rule for every task in this stage: add `db?: TenantDb` as the **last** parameter
 
 Each task follows the same steps:
 
-- [ ] **Step 0 (precondition):** For every function in the task, confirm it has no `Promise.all` over tenant queries that Task 2.3 did not already split, no external call (Xero, Clerk, Stripe, Resend, KV read, Inngest send) between database queries, and no loop that catches a per-item failure and continues (hazard 6). Restructure or register any function that fails before converting it; do not convert first and fix afterwards.
-- [ ] **Step 1:** Add or extend the co-located test so it calls the function both without `db` (opens its own transaction) and with a `db` from a test `withTenantDb` (reuses it, asserted by spying that `$transaction` is not called again). Add a mismatch test where a `db` for another account throws `TenantMismatchError`.
-- [ ] **Step 2:** Run the file's tests. Expected: FAIL.
-- [ ] **Step 3:** Convert.
-- [ ] **Step 4:** Run the file's tests, then `bun run typecheck` and `bun run test`. Expected: PASS.
-- [ ] **Step 5:** Commit `refactor(<package>): thread TenantDb through <area>`.
+- [x] **Step 0 (precondition):** For every function in the task, confirm it has no `Promise.all` over tenant queries that Task 2.3 did not already split, no external call (Xero, Clerk, Stripe, Resend, KV read, Inngest send) between database queries, and no loop that catches a per-item failure and continues (hazard 6). Restructure or register any function that fails before converting it; do not convert first and fix afterwards.
+- [x] **Step 1:** Add or extend the co-located test so it calls the function both without `db` (opens its own transaction) and with a `db` from a test `withTenantDb` (reuses it, asserted by spying that `$transaction` is not called again). Add a mismatch test where a `db` for another account throws `TenantMismatchError`.
+- **Step 2 (historical RED checkpoint):** Run the file's tests; expect FAIL. Original RED execution is not independently established by this reconciliation; current GREEN verification is complete.
+- [x] **Step 3:** Convert.
+- [x] **Step 4:** Run the file's tests, then `bun run typecheck` and `bun run test`. Expected: PASS.
+- [x] **Step 5:** Commit `refactor(<package>): thread TenantDb through <area>`.
 
 | Task | Files (call sites) |
 |---|---|
@@ -364,12 +385,12 @@ Outcomes served: 1 (visibility rules for managers) and 3 (managers approve direc
 - Modify (signature only): every `managerScopePersonIds` caller listed above
 - Later contract migration (Task 6.4): drop `organisation_settings.manager_visibility_scope` once nothing reads it
 
-- [ ] **O1:** Failing tests: `managerScopePersonIds({ actingPersonId, clerkOrgId })` (no `organisationId`) returns direct reports in every company of the account, honours the account-level setting (`direct_reports_only` versus transitive `all_team_leave`), and never returns people from another account. A search test confirms no code outside `account-settings.ts` reads `managerVisibilityScope` from company settings. Migration test: an account whose companies disagree is backfilled to `direct_reports_only`; an account whose companies all use `all_team_leave` keeps it.
-- [ ] **O2:** Implement the model, migration, query helper and the new manager-scope contract. Reports are matched by `manager_person_id` across all of the account's people, not one company's.
-- [ ] **O3:** Move the setting in the settings UI from per-company to account level; per-company settings that apply to individual requests (decline reason, declined visibility, notifications, privacy default) stay per company.
-- [ ] **O4:** Update every caller to the new signature. Out-of-office and leave reports keep their existing company filter; only their manager scope widens.
-- [ ] **E/P:** Convert `account-settings.ts`, `manager-scope.ts`, `organisation-settings-service.ts` and the leave-approval settings entry points.
-- [ ] **Commit:** `feat(availability): account-level manager visibility across companies`.
+- [x] **O1:** Failing tests: `managerScopePersonIds({ actingPersonId, clerkOrgId })` (no `organisationId`) returns direct reports in every company of the account, honours the account-level setting (`direct_reports_only` versus transitive `all_team_leave`), and never returns people from another account. A search test confirms no code outside `account-settings.ts` reads `managerVisibilityScope` from company settings. Migration test: an account whose companies disagree is backfilled to `direct_reports_only`; an account whose companies all use `all_team_leave` keeps it.
+- [x] **O2:** Implement the model, migration, query helper and the new manager-scope contract. Reports are matched by `manager_person_id` across all of the account's people, not one company's.
+- [x] **O3:** Move the setting in the settings UI from per-company to account level; per-company settings that apply to individual requests (decline reason, declined visibility, notifications, privacy default) stay per company.
+- [x] **O4:** Update every caller to the new signature. Out-of-office and leave reports keep their existing company filter; only their manager scope widens.
+- [x] **E/P:** Convert `account-settings.ts`, `manager-scope.ts`, `organisation-settings-service.ts` and the leave-approval settings entry points.
+- [x] **Commit:** `feat(availability): account-level manager visibility across companies`.
 
 ### Task 4.2: Assign a person's manager from any company
 
@@ -380,12 +401,12 @@ Outcome served: 3. **Today:** nothing in the product writes `people.manager_pers
 - Modify: `apps/app/app/(authenticated)/people/_actions.ts` (new `setPersonManagerAction`), `people/[personId]/page.tsx` and `people/@modal/(.)[personId]/page.tsx` (manager picker on the profile)
 - Modify: `packages/database/row-level-security.integration.test.ts`
 
-- [ ] **O1:** Failing tests: owner and admin can set or clear any person's manager to any non-archived person in the same account, in any company; managers and viewers get `not_authorised`; a person cannot manage themselves; a cycle (A manages B, B manages A, including longer chains) is rejected; each change writes an audit event; a manager from another account is rejected by RLS and by the service.
-- [ ] **O2:** Implement the service and action (both tenancy keys, `Result` errors, audit event).
-- [ ] **O3:** Add the picker to the profile, listing people from every company with their company name, following `DESIGN.md`.
-- [ ] **O4:** Confirm Xero people reconciliation still preserves a manually assigned manager (the copy at line 505 only fills an empty value) and add a test for it.
-- [ ] **E/P:** Born converted: the new service takes `db: TenantDb`; the action opens `withTenantResult`.
-- [ ] **Commit:** `feat(people): owners and admins assign managers across companies`.
+- [x] **O1:** Failing tests: owner and admin can set or clear any person's manager to any non-archived person in the same account, in any company; managers and viewers get `not_authorised`; a person cannot manage themselves; a cycle (A manages B, B manages A, including longer chains) is rejected; each change writes an audit event; a manager from another account is rejected by RLS and by the service.
+- [x] **O2:** Implement the service and action (both tenancy keys, `Result` errors, audit event).
+- [x] **O3:** Add the picker to the profile, listing people from every company with their company name, following `DESIGN.md`.
+- [x] **O4:** Confirm Xero people reconciliation still preserves a manually assigned manager (the copy at line 505 only fills an empty value) and add a test for it.
+- [x] **E/P:** Born converted: the new service takes `db: TenantDb`; the action opens `withTenantResult`.
+- [x] **Commit:** `feat(people): owners and admins assign managers across companies`.
 
 ### Task 4.3: Calendar and feeds show every company to every role
 
@@ -395,11 +416,11 @@ Outcome served: 1. **Today:** the calendar is account-wide (`getCalendarRange` u
 - Modify: `packages/availability/src/calendar/calendar-service.ts` and test; `packages/feeds/src/scope/feed-scope.ts` and test
 - Modify: `apps/app/app/(authenticated)/calendar/page.tsx`; feed entry points (`feeds/page.tsx`, `feeds/[feedId]/page.tsx`, `feeds/@modal/(.)[feedId]/page.tsx`, `feeds/new/page.tsx`, `feeds/@modal/(.)new/page.tsx`, `feeds/_actions.ts`, `apps/api/app/api/feeds/route.ts`, `feeds/[feedId]/route.ts`, `feeds/[feedId]/rotate-token/route.ts`)
 
-- [ ] **O1:** Failing tests, with an account holding companies A and B: an owner, admin, manager and viewer employed in A each see B's approved leave on the calendar with the filter on "all"; private and masked records from B show to peers exactly as private and masked records from A do; a manager in A whose report is in B sees that report's leave with manager visibility, not peer masking; the default account feed and a `manager_team` feed for that manager include B's records.
-- [ ] **O2:** Fix whatever the tests show, expected at least in `relationshipToOwner` and the `manager_team` scope, by using the Task 4.1 account-wide manager scope.
-- [ ] **E:** Convert `calendar-service.ts` (feeds were converted in Task 3.3).
-- [ ] **P:** Convert the calendar page and feed entry points with `TENANT_READ_TRANSACTION_OPTIONS`; `ical/[token]/route.ts` stays phased (C4).
-- [ ] **Commit:** `feat(calendar): show every company's leave to every role`.
+- [x] **O1:** Failing tests, with an account holding companies A and B: an owner, admin, manager and viewer employed in A each see B's approved leave on the calendar with the filter on "all"; private and masked records from B show to peers exactly as private and masked records from A do; a manager in A whose report is in B sees that report's leave with manager visibility, not peer masking; the default account feed and a `manager_team` feed for that manager include B's records.
+- [x] **O2:** Fix whatever the tests show, expected at least in `relationshipToOwner` and the `manager_team` scope, by using the Task 4.1 account-wide manager scope.
+- [x] **E:** Convert `calendar-service.ts` (feeds were converted in Task 3.3).
+- [x] **P:** Convert the calendar page and feed entry points with `TENANT_READ_TRANSACTION_OPTIONS`; `ical/[token]/route.ts` stays phased (C4).
+- [x] **Commit:** `feat(calendar): show every company's leave to every role`.
 
 ### Task 4.4: Dashboard defaults to all companies
 
@@ -407,10 +428,10 @@ Outcome served: 1. **Today:** `dashboard-body.tsx` and `dashboard-service.ts` sc
 
 **Files:** `packages/availability/src/dashboard/dashboard-service.ts` and test; `apps/app/app/(authenticated)/dashboard-body.tsx`, `(authenticated)/page.tsx`
 
-- [ ] **O1:** Failing tests: with no company selected, who is away, the timeline and coverage include every company; selecting a company narrows them; the direct-report count and approval-queue widget use the Task 4.1 cross-company scope; privacy rules apply as in Task 4.3.
-- [ ] **O2:** Implement, reusing the calendar's company selection (`selectCalendarCompanies` and its filter control) rather than a new mechanism; company-specific settings are read per record's company.
-- [ ] **E/P:** Convert `dashboard-service.ts` (split fan-out per Task 2.3) and the dashboard entry points.
-- [ ] **Commit:** `feat(dashboard): default to all companies with a company filter`.
+- [x] **O1:** Failing tests: with no company selected, who is away, the timeline and coverage include every company; selecting a company narrows them; the direct-report count and approval-queue widget use the Task 4.1 cross-company scope; privacy rules apply as in Task 4.3.
+- [x] **O2:** Implement, reusing the calendar's company selection (`selectCalendarCompanies` and its filter control) rather than a new mechanism; company-specific settings are read per record's company.
+- [x] **E/P:** Convert `dashboard-service.ts` (split fan-out per Task 2.3) and the dashboard entry points.
+- [x] **Commit:** `feat(dashboard): default to all companies with a company filter`.
 
 ### Task 4.5: People directory defaults to all companies, role rules unchanged
 
@@ -418,11 +439,11 @@ Outcome served: 1. **Today:** `people/page.tsx` uses `requireActiveOrgPageContex
 
 **Files:** `packages/availability/src/people/people-service.ts`, `current-status.ts` and tests; `apps/app/app/(authenticated)/people/page.tsx`, `people/[personId]/page.tsx`, `people/@modal/(.)[personId]/page.tsx`, `people/_actions.ts` (Clerk calls phased, C6), `people/new/page.tsx`, `people/new/_actions.ts`, `lib/server/create-manual-person.ts`, `lib/server/load-onboarding-people.ts`
 
-- [ ] **O1:** Failing tests: owner and admin list every person in every company by default, each labelled with company; a company filter narrows the list; viewers still see only themselves; managers see their Task 4.1 scope across companies; `canAccessPerson` follows the same rules across companies.
-- [ ] **O2:** Implement with the same company selection as Task 4.4.
-- [ ] **E:** Convert `people-service.ts`, `current-user-service.ts`, `current-status.ts`, `manual-balance-service.ts`, `alternative-contact-service.ts`, `balance-refresh.ts` (result-bearing sync dispatch per Task 2.2).
-- [ ] **P:** Convert the people entry points listed above.
-- [ ] **Commit:** `feat(people): default to all companies with a company filter`.
+- [x] **O1:** Failing tests: owner and admin list every person in every company by default, each labelled with company; a company filter narrows the list; viewers still see only themselves; managers see their Task 4.1 scope across companies; `canAccessPerson` follows the same rules across companies.
+- [x] **O2:** Implement with the same company selection as Task 4.4.
+- [x] **E:** Convert `people-service.ts`, `current-user-service.ts`, `current-status.ts`, `manual-balance-service.ts`, `alternative-contact-service.ts`, `balance-refresh.ts` (result-bearing sync dispatch per Task 2.2).
+- [x] **P:** Convert the people entry points listed above.
+- [x] **Commit:** `feat(people): default to all companies with a company filter`.
 
 ### Task 4.6: One combined approval queue
 
@@ -430,14 +451,15 @@ Outcome served: 3. **Today:** `leave-approvals/page.tsx` resolves one company wi
 
 **Files:** `packages/availability/src/approvals/approval-service.ts` and test; `apps/app/app/(authenticated)/leave-approvals/page.tsx`, `_actions.ts` and their components
 
-- [ ] **O1:** Failing tests, with companies A and B: owner and admin see pending requests from A and B in one list, each item labelled with its company; there is no company filter; a manager employed in A sees requests from direct reports in A and B (per the account setting) and nothing else; summary counts span both companies; declined requests appear or not according to each record's company setting; a decline requires a reason when the record's company requires one; approving or declining a B request as an A-employed manager or any admin calls Xero through B's connection.
-- [ ] **O2:** Make `organisationId` absent from list, detail and summary inputs (account-wide); add the company id and name to `ApprovalListItem`; resolve the acting person by `clerk_user_id` across the account (one company per staff member is assumed, not enforced; see section 13).
-- [ ] **O3:** Approve, decline, retry and request-more-info actions take `recordId` only. The server loads the record within the account, derives `organisationId` from it, authorises against the Task 4.1 scope, then calls the existing phased C1 services with that company. A client cannot route a decision to another company.
-- [ ] **O4:** Update the page and components: drop the company switcher from Leave approvals, show the company label on each item, keep the existing status, person, type and date filters.
-- [ ] **O5:** 'Sync Xero leave' (admins, `leave-approvals-client.tsx:247`; `ReconciliationActionSchema`, `_actions.ts:36`) takes no company: it dispatches a leave sync for every company with an active connection. Each dispatch is result-bearing (Task 2.2), so the action collects one `Result` per company and the page shows which companies queued and which failed; one failure never prevents the others. Test with three companies where one dispatch fails.
-- [ ] **E:** Convert the non-Xero exports (`listForApprover`, `getApprovalDetail`, the split parts of `getApprovalSummaryCounts`, `requestMoreInfo`, the database parts of `dispatchApprovalReconciliation` and `dispatchXeroLeaveSync`); Xero write exports stay phased (C1).
-- [ ] **P:** Convert `leave-approvals/page.tsx` and the read paths in `_actions.ts`; decision actions call the phased services with no surrounding transaction.
-- [ ] **Commit:** `feat(approvals): one queue across every company`.
+- [x] **O1:** Failing tests, with companies A and B: owner and admin see pending requests from A and B in one list, each item labelled with its company; there is no company filter; a manager employed in A sees requests from direct reports in A and B (per the account setting) and nothing else; summary counts span both companies; declined requests appear or not according to each record's company setting; a decline requires a reason when the record's company requires one; approving or declining a B request as an A-employed manager or any admin calls Xero through B's connection.
+- [x] **O2:** Make `organisationId` absent from list, detail and summary inputs (account-wide); add the company id and name to `ApprovalListItem`; resolve the acting person by `clerk_user_id` across the account (one company per staff member is assumed, not enforced; see section 13).
+- [x] **O2a (review omission):** Detect multiple Person matches for the acting Clerk user and log the warning required by section 13. Both page and actions use the shared tenant-scoped `findMany` lookup with `take: 2`, deterministic earliest-created selection and a duplicate warning. Regression observed the missing warning before the fix; affected tests and the full unit suite PASS afterwards. Admins without a Person remain allowed; managers without a Person remain denied.
+- [x] **O3:** Approve, decline, retry and request-more-info actions take `recordId` only. The server loads the record within the account, derives `organisationId` from it, authorises against the Task 4.1 scope, then calls the existing phased C1 services with that company. A client cannot route a decision to another company.
+- [x] **O4:** Update the page and components: drop the company switcher from Leave approvals, show the company label on each item, keep the existing status, person, type and date filters.
+- [x] **O5:** 'Sync Xero leave' (admins, `leave-approvals-client.tsx:247`; `ReconciliationActionSchema`, `_actions.ts:36`) takes no company: it dispatches a leave sync for every company with an active connection. Each dispatch is result-bearing (Task 2.2), so the action collects one `Result` per company and the page shows which companies queued and which failed; one failure never prevents the others. Test with three companies where one dispatch fails.
+- [x] **E:** Convert the non-Xero exports (`listForApprover`, `getApprovalDetail`, the split parts of `getApprovalSummaryCounts`, `requestMoreInfo`, the database parts of `dispatchApprovalReconciliation` and `dispatchXeroLeaveSync`); Xero write exports stay phased (C1).
+- [x] **P:** Convert `leave-approvals/page.tsx` and the read paths in `_actions.ts`; decision actions call the phased services with no surrounding transaction.
+- [x] **Commit:** `feat(approvals): one queue across every company`.
 
 ### Task 4.7: Leave requests route to the requester's company
 
@@ -445,27 +467,29 @@ Outcome served: 2. **Expected today, not yet proved:** submit, approve, decline 
 
 **Files:** `packages/availability/src/plans/plan-service.ts`, `submit-service.ts`, `submit-side-effects.ts`, `submit-recovery-service.ts`, `write-operation.ts`, `xero-write-claim.ts` and tests; `apps/app/app/(authenticated)/plans/_actions.ts`, `plans/record-form-data.ts`; `packages/database/plan-sync-multi-company.integration.test.ts` (extend)
 
-- [ ] **O1:** Failing integration test with companies A and B, each with a fake Xero connection: a staff member employed in B creates and submits leave, and an admin and a cross-company manager approve it; every Xero call and `OutboundOperation` uses B's connection and tenant, never A's. A request whose client-supplied `organisationId` disagrees with the record's company is rejected and makes no Xero call.
-- [ ] **O2:** Fix whatever the test shows. At minimum, derive the company from the person or record on the server rather than trusting the client value.
-- [ ] **O3:** Confirm the manager notification on submission reaches a manager employed in another company. Notification rules stay as they are; if the current lookup filters the manager by the record's company, fix the lookup, not the rule.
-- [ ] **E:** Convert `plan-service.ts`, `listSubmitRecoveryCandidates`, `xero-write-claim.ts` and the database parts of `submit-side-effects.ts` (its notification and sync dispatches follow the Task 2.2 split); Xero write exports stay phased (C1).
-- [ ] **P:** Convert `plans/page.tsx`, `plans/new/page.tsx`, `plans/[planId]/edit/page.tsx`, `plans/@modal/(.)new/page.tsx`, `plans/@modal/(.)[planId]/edit/page.tsx`, `plans/record-form-data.ts` and the read paths in `plans/_actions.ts`; submit and withdraw call phased services directly.
-- [ ] **Commit:** `test(plans): prove leave routes to the requester's company`.
+- [x] **O1:** Failing integration test with companies A and B, each with a fake Xero connection: a staff member employed in B creates and submits leave, and an admin and a cross-company manager approve it; every Xero call and `OutboundOperation` uses B's connection and tenant, never A's. A request whose client-supplied `organisationId` disagrees with the record's company is rejected and makes no Xero call.
+- [x] **O2:** Fix whatever the test shows. At minimum, derive the company from the person or record on the server rather than trusting the client value.
+- [x] **O3:** Confirm the manager notification on submission reaches a manager employed in another company. Notification rules stay as they are; if the current lookup filters the manager by the record's company, fix the lookup, not the rule.
+- [x] **E:** Convert `plan-service.ts`, `listSubmitRecoveryCandidates`, `xero-write-claim.ts` and the database parts of `submit-side-effects.ts` (its notification and sync dispatches follow the Task 2.2 split); Xero write exports stay phased (C1).
+- [x] **P:** Convert `plans/page.tsx`, `plans/new/page.tsx`, `plans/[planId]/edit/page.tsx`, `plans/@modal/(.)new/page.tsx`, `plans/@modal/(.)[planId]/edit/page.tsx`, `plans/record-form-data.ts` and the read paths in `plans/_actions.ts`; submit and withdraw call phased services directly.
+- [x] **Commit:** `test(plans): prove leave routes to the requester's company`.
 
 ### Shared expand steps (E)
 
 Used by every E step in Stages 4 and 5. Add `db?: TenantDb` as the last parameter (rename existing `client?: Prisma.TransactionClient`), wrap the function body in one `inTenant(clerkOrgId, db, async (db) => ...)`, pass `db` to converted callees, and move fire-and-forget effects into `afterTenantCommit`; result-bearing sends stay outside (Task 2.2).
 
-- [ ] **E0 (precondition):** confirm no unsplit `Promise.all` over tenant queries (Task 2.3), no external call (Xero, Clerk, Stripe, Resend, KV read, Inngest send) between queries, and no catch-and-continue loop (hazard 6). Restructure or register first.
-- [ ] **E1:** extend the co-located test to call the function without `db` (opens its own transaction) and with a test `withTenantDb` `db` (reuses it; `$transaction` not called again), plus a cross-account mismatch that throws `TenantMismatchError`.
-- [ ] **E2:** run the tests; expect FAIL. **E3:** convert. **E4:** run the file's tests, `bun run typecheck` and `bun run test`; expect PASS.
+- [x] **E0 (precondition):** confirm no unsplit `Promise.all` over tenant queries (Task 2.3), no external call (Xero, Clerk, Stripe, Resend, KV read, Inngest send) between queries, and no catch-and-continue loop (hazard 6). Restructure or register first.
+- [x] **E1:** extend the co-located test to call the function without `db` (opens its own transaction) and with a test `withTenantDb` `db` (reuses it; `$transaction` not called again), plus a cross-account mismatch that throws `TenantMismatchError`.
+- **E2 (historical RED checkpoint):** Run the tests; expect FAIL. Original RED execution is not independently established by this reconciliation.
+- [x] **E3:** Convert.
+- [x] **E4:** Run the file's tests, `bun run typecheck` and `bun run test`; expect PASS.
 
 ### Shared entry-point steps (P)
 
-- [ ] **P1:** test that the entry point opens exactly one `withTenantDb` (or `withTenantResult` for actions returning `Result`), passes `db` to every service, and leaves no partial writes on an injected failure. Pages return plain data and close the transaction before rendering. Entry points that reach `getCalendarRange`, `previewFeed` or `projectFeedEvents` assert `TENANT_READ_TRANSACTION_OPTIONS`.
-- [ ] **P2:** run; expect FAIL.
-- [ ] **P3:** convert: authenticate (`requireOrg`, `requireRole`) before opening; resolve the full data set inside the transaction; call phased flows (C1, C5, C6) outside it; call result-bearing sends (Task 2.2) after `withTenantDb` returns and return their `Result`; use `TENANT_READ_TRANSACTION_OPTIONS` (30 s) when reaching `getCalendarRange`, `previewFeed` or `projectFeedEvents`, otherwise the 15 s default; use `withTenantReads` only in registered fan-out loaders, at the top level of the entry point.
-- [ ] **P4:** run the slice's tests, `bun run test` and the relevant integration suites; expect PASS with no `TenantNestingError` from the detector.
+- [x] **P1:** test that the entry point opens exactly one `withTenantDb` (or `withTenantResult` for actions returning `Result`), passes `db` to every service, and leaves no partial writes on an injected failure. Pages return plain data and close the transaction before rendering. Entry points that reach `getCalendarRange`, `previewFeed` or `projectFeedEvents` assert `TENANT_READ_TRANSACTION_OPTIONS`.
+- **P2 (historical RED checkpoint):** Run; expect FAIL. Original RED execution is not independently established by this reconciliation; current GREEN verification is complete.
+- [x] **P3:** convert: authenticate (`requireOrg`, `requireRole`) before opening; resolve the full data set inside the transaction; call phased flows (C1, C5, C6) outside it; call result-bearing sends (Task 2.2) after `withTenantDb` returns and return their `Result`; use `TENANT_READ_TRANSACTION_OPTIONS` (30 s) when reaching `getCalendarRange`, `previewFeed` or `projectFeedEvents`, otherwise the 15 s default; use `withTenantReads` only in registered fan-out loaders, at the top level of the entry point.
+- [x] **P4:** run the slice's tests, `bun run test` and the relevant integration suites; expect PASS with no `TenantNestingError` from the detector.
 
 ---
 
@@ -490,10 +514,10 @@ Commit each row as `refactor(<package>): one tenant transaction per <area> reque
 
 ### Task 6.1: Make `db` required
 
-- [ ] **Step 1:** Remove `?` from every `db?: TenantDb` parameter and replace each `inTenant(clerkOrgId, db, fn)` with `assertTenantDb(db, clerkOrgId)` followed by the body.
-- [ ] **Step 2:** `bun run typecheck`. Every remaining caller without `db` is a missed entry point; fix it with the P steps in the Stage 4 or Stage 5 task that owns it.
-- [ ] **Step 3:** Run all four gates. Expected: PASS.
-- [ ] **Step 4:** Commit `refactor: require TenantDb on all tenant services`.
+- [x] **Step 1:** Remove `?` from every `db?: TenantDb` parameter and replace each `inTenant(clerkOrgId, db, fn)` with `assertTenantDb(db, clerkOrgId)` followed by the body.
+- [x] **Step 2:** `bun run typecheck`. Every remaining caller without `db` is a missed entry point; fix it with the P steps in the Stage 4 or Stage 5 task that owns it.
+- [x] **Step 3:** Run all four gates. Expected: PASS.
+- [x] **Step 4:** Commit `refactor: require TenantDb on all tenant services`.
 
 ### Task 6.2: Delete the per-query model
 
@@ -502,10 +526,10 @@ Commit each row as `refactor(<package>): one tenant transaction per <area> reque
 - Modify: `packages/database/src/tenant-db.ts` (delete `inTenant`)
 - Modify: `packages/database/index.ts`, `packages/database/src/boundary.test.ts`
 
-- [ ] **Step 1:** Boundary test: `tenantDatabase(`, `tenantTransaction(` and `referenceDatabase` do not appear in production code outside `packages/database/src`; `withTenantDb(` appears only in entry-point modules, phased modules and `tenant-db.ts`. Entry-point modules are defined by path pattern, so the test needs no hand-maintained list: `apps/*/app/**/_actions.ts`, `apps/*/app/**/actions.ts`, `apps/*/app/actions/**`, `apps/*/app/**/route.ts`, `apps/*/app/**/page.tsx`, `apps/*/app/**/layout.tsx`, `apps/*/app/**/*-data.ts` and `form-data.ts` loaders, `apps/*/app/**/dashboard-body.tsx`, `apps/*/lib/server/**`, `apps/api/lib/**` and `packages/jobs/src/handlers/**`. A new entry-point file outside these patterns fails the test until the pattern list is extended deliberately.
-- [ ] **Step 2:** Delete and fix test fixtures that used the old helpers.
-- [ ] **Step 3:** Run all four gates. Expected: PASS.
-- [ ] **Step 4:** Commit `refactor(database): remove per-query tenant transactions`.
+- [x] **Step 1:** Boundary test: `tenantDatabase(`, `tenantTransaction(` and `referenceDatabase` do not appear in production code outside `packages/database/src`; `withTenantDb(` appears only in entry-point modules, phased modules and `tenant-db.ts`. Entry-point modules are defined by path pattern, so the test needs no hand-maintained list: `apps/*/app/**/_actions.ts`, `apps/*/app/**/actions.ts`, `apps/*/app/actions/**`, `apps/*/app/**/route.ts`, `apps/*/app/**/page.tsx`, `apps/*/app/**/layout.tsx`, `apps/*/app/**/*-data.ts` and `form-data.ts` loaders, `apps/*/app/**/dashboard-body.tsx`, `apps/*/lib/server/**`, `apps/api/lib/**` and `packages/jobs/src/handlers/**`. A new entry-point file outside these patterns fails the test until the pattern list is extended deliberately.
+- [x] **Step 2:** Delete and fix test fixtures that used the old helpers.
+- [x] **Step 3:** Run all four gates. Expected: PASS.
+- [x] **Step 4:** Commit `refactor(database): remove per-query tenant transactions`.
 
 ### Task 6.3: Documentation
 
@@ -513,15 +537,15 @@ Commit each row as `refactor(<package>): one tenant transaction per <area> reque
 - Modify: `AGENTS.md` (section "Database runtime roles and RLS" and "Query scoping pattern"), `SECURITY.md`, `PRODUCT.md` (tenancy section, roles, approvals and settings), `ScreenCatalogue.md` (Leave approvals, People, Dashboard, People profile)
 - Modify: `docs/superpowers/specs/2026-10-11-tenant-database-round-trips-options.md` (status: decided, Option B with carve-outs, link to this plan)
 
-- [ ] **Step 1:** Replace the two-helper guidance with: entry points open `withTenantDb` / `withTenantResult`; services take `db: TenantDb` last and call `assertTenantDb`; side effects use `afterTenantCommit`; phased flows are registered and call `assertNoTenantTransaction`; external HTTP never runs inside a tenant transaction. Update the `listPeople` example.
-- [ ] **Step 1a:** Describe the multi-company behaviour as built: every role sees every company's approved leave subject to privacy rules; Dashboard and People default to all companies with a company filter; owners and admins approve from one combined queue; managers approve direct reports in any company; owners and admins assign managers from any company on the People profile; manager visibility is an account-level setting; per-request settings (decline reason, declined visibility, notifications, privacy default) stay per company.
-- [ ] **Step 2:** Commit `docs: describe multi-company approvals and request-scoped tenant transactions`.
+- [x] **Step 1:** Replace the two-helper guidance with: entry points open `withTenantDb` / `withTenantResult`; services take `db: TenantDb` last and call `assertTenantDb`; side effects use `afterTenantCommit`; phased flows are registered and call `assertNoTenantTransaction`; external HTTP never runs inside a tenant transaction. Update the `listPeople` example.
+- [x] **Step 1a:** Describe the multi-company behaviour as built: every role sees every company's approved leave subject to privacy rules; Dashboard and People default to all companies with a company filter; owners and admins approve from one combined queue; managers approve direct reports in any company; owners and admins assign managers from any company on the People profile; manager visibility is an account-level setting; per-request settings (decline reason, declined visibility, notifications, privacy default) stay per company.
+- [x] **Step 2:** Commit `docs: describe multi-company approvals and request-scoped tenant transactions`.
 
 ### Task 6.4: Drop the per-company manager visibility column
 
-- [ ] **Step 1:** Confirm with a search that nothing reads `organisation_settings.manager_visibility_scope` (Task 4.1 moved every reader to `account_settings`).
-- [ ] **Step 2:** Edit `schema.prisma`, generate the migration that drops the column, and run `bun run migrate` locally plus the RLS and settings integration suites. Expected: PASS.
-- [ ] **Step 3:** Commit `refactor(database): drop per-company manager visibility`.
+- [x] **Step 1:** Confirm with a search that nothing reads `organisation_settings.manager_visibility_scope` (Task 4.1 moved every reader to `account_settings`).
+- [x] **Step 2:** Edit `schema.prisma`, generate and apply the column-drop migration. All migrations subsequently executed from scratch through the owner's requested development reset; schema/checksum checks passed, and RLS/settings integration suites passed in CI.
+- [x] **Step 3:** Commit `refactor(database): drop per-company manager visibility`.
 
 ---
 
@@ -531,7 +555,7 @@ Commit each row as `refactor(<package>): one tenant transaction per <area> reque
 - [ ] **Step 1:** Re-run the Task 0.2 measurements on the Neon database configured in `.env.local` and append before and after figures to the measurements document. The owner's subsequent instruction supersedes the fresh isolated branch setup; no Neon API key is required to use the configured database. Retain the existing database and fixture guards.
 - [ ] **Step 2:** Confirm no `tenant_db_unthreaded` warnings and no transaction timeout errors in Sentry on the preview deployment over a full sync cycle.
 - [ ] **Step 3:** Run `bun run preflight app` and `bun run preflight api` against the preview.
-- [ ] **Step 4:** Record results and any verification gaps in `tasks/todo.md` (review section), per `AGENTS.md`.
+- [x] **Step 4:** Record results and any verification gaps in `tasks/todo.md` (review section), per `AGENTS.md`.
 
 ---
 

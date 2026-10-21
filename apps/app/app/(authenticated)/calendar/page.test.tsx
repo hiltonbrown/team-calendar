@@ -178,6 +178,24 @@ describe("CalendarPage", () => {
       expect.any(Object)
     );
   });
+  it("loads connection health with the supported tenant and company filters", async () => {
+    render(await Page({ searchParams: Promise.resolve({}) }));
+    expect(mocks.xeroTenantFindFirst).toHaveBeenCalledWith({
+      select: {
+        last_leave_records_sync_at: true,
+        last_sync_error_message: true,
+        leave_records_stale_since: true,
+        sync_paused_at: true,
+        tenant_name: true,
+      },
+      where: {
+        clerk_org_id: "org_1",
+        organisation_id: "00000000-0000-4000-8000-000000000001",
+        released_at: null,
+      },
+    });
+    expect(screen.getByRole("region", { name: "Calendar" })).toBeDefined();
+  });
   it("renders the disconnected Xero banner", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
     expect(screen.getByText(XERO_NOT_CONNECTED_COPY)).toBeDefined();
