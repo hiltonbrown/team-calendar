@@ -1,4 +1,7 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
+import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import {
   listAllTypes,
   listForUser,
@@ -10,7 +13,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { NotificationsClient } from "./notifications-client";
@@ -47,8 +50,6 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(orgParam);
   const user = await currentUser();
   if (!user) {
     redirect("/");
@@ -68,24 +69,57 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
     unreadOnly: filters.unreadOnly,
   };
 
-  const [notificationsResult, preferencesResult] = await Promise.all([
-    listForUser({
-      clerkOrgId,
-      filters: notificationFilters,
-      organisationId,
-      pagination: { cursor: filters.cursor, pageSize: 25 },
-      userId: user.id,
-    }),
-    listPreferences({
-      clerkOrgId,
-      organisationId,
-      userId: user.id,
-    }),
-  ]);
+  // Clerk supplied the authenticated account identifier.
+  const accountId = (await requireOrg()) as ClerkOrgId;
+  const {
+    organisationId,
+    orgQueryValue,
+    preferenceCompanyName,
+    notificationsResult,
+    preferencesResult,
+  } = await withTenantDb(
+    accountId,
+    async (db) => {
+      const {
+        clerkOrgId,
+        organisationId: scopedOrganisationId,
+        orgQueryValue: preparedOrgQueryValue,
+      } = await resolveActiveOrgPageContext(accountId, orgParam, db);
+      const company = await db.organisation.findFirst({
+        select: { name: true },
+        where: { clerk_org_id: clerkOrgId, id: scopedOrganisationId },
+      });
+      const preparedNotificationsResult = await listForUser(
+        {
+          clerkOrgId,
+          filters: notificationFilters,
+          pagination: { cursor: filters.cursor, pageSize: 25 },
+          userId: user.id,
+        },
+        db
+      );
+      const preparedPreferencesResult = await listPreferences(
+        { clerkOrgId, organisationId: scopedOrganisationId, userId: user.id },
+        db
+      );
+      return {
+        notificationsResult: preparedNotificationsResult,
+        organisationId: scopedOrganisationId,
+        orgQueryValue: preparedOrgQueryValue,
+        preferenceCompanyName: company?.name ?? "Selected company",
+        preferencesResult: preparedPreferencesResult,
+      };
+    },
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
 
   return (
     <>
-      <Header organisationId={organisationId} page="Notifications" />
+      <Header
+        organisationId={organisationId}
+        page="Notifications"
+        showCompanySelector={filters.tab === "preferences"}
+      />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         {notificationsResult.ok && preferencesResult.ok ? (
           <NotificationsClient
@@ -99,6 +133,15 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
               type: filters.type,
               unreadOnly: filters.unreadOnly,
             }}
+            key={JSON.stringify([
+              organisationId,
+              filters,
+              notificationsResult.value.unreadCount,
+              notificationsResult.value.notifications.map((item) => [
+                item.id,
+                item.readAt?.toISOString() ?? null,
+              ]),
+            ])}
             nextCursor={notificationsResult.value.nextCursor}
             notifications={notificationsResult.value.notifications.map(
               (item) => ({
@@ -110,6 +153,7 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
             notificationTypes={listAllTypes()}
             organisationId={organisationId}
             orgQueryValue={orgQueryValue}
+            preferenceCompanyName={preferenceCompanyName}
             preferences={preferencesResult.value}
             unreadCount={notificationsResult.value.unreadCount}
           />

@@ -2,7 +2,8 @@
 import { requireRole } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import {
   completeXeroTenantSelection,
@@ -48,6 +49,7 @@ export async function completeTenantSelectionAction(input: {
 }): Promise<
   Result<{ redirectTo: string; outcomes: SelectionOutcome[] }, ActionError>
 > {
+  assertNoTenantTransaction("completeTenantSelectionAction");
   const [admin, owner] = await Promise.all([
     requireRole("org:admin"),
     requireRole("org:owner"),
@@ -73,14 +75,16 @@ export async function completeTenantSelectionAction(input: {
   ) {
     return notAuthorised();
   }
-  const session = await tenantDatabase(orgId).xeroOAuthSession.findFirst({
-    select: { organisation_id: true },
-    where: {
-      clerk_org_id: orgId,
-      created_by_user_id: user.id,
-      id: parsed.data.sessionId,
-    },
-  });
+  const session = await withTenantDb(orgId, (db) =>
+    db.xeroOAuthSession.findFirst({
+      select: { organisation_id: true },
+      where: {
+        clerk_org_id: orgId,
+        created_by_user_id: user.id,
+        id: parsed.data.sessionId,
+      },
+    })
+  );
   if (!session) {
     return {
       error: {
@@ -184,27 +188,30 @@ async function recordSelectedConnection(
   outcome: Extract<XeroTenantSelectionOutcome, { ok: true }>
 ): Promise<void> {
   try {
-    await tenantDatabase(orgId).auditEvent.create({
-      data: {
-        action:
-          outcome.action === "reconnected"
-            ? "xero.connection_reconnected"
-            : "xero.connection_connected",
-        actor_display:
-          [user.firstName, user.lastName].filter(Boolean).join(" ") || user.id,
-        actor_user_id: user.id,
-        clerk_org_id: orgId,
-        entity_id: outcome.connectionId,
-        entity_type: "xero_connection",
-        metadata: {
-          connectionId: outcome.connectionId,
-          organisationId: outcome.organisationId,
+    await withTenantDb(orgId, (db) =>
+      db.auditEvent.create({
+        data: {
+          action:
+            outcome.action === "reconnected"
+              ? "xero.connection_reconnected"
+              : "xero.connection_connected",
+          actor_display:
+            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+            user.id,
+          actor_user_id: user.id,
+          clerk_org_id: orgId,
+          entity_id: outcome.connectionId,
+          entity_type: "xero_connection",
+          metadata: {
+            connectionId: outcome.connectionId,
+            organisationId: outcome.organisationId,
+          },
+          organisation_id: outcome.organisationId,
+          resource_id: outcome.connectionId,
+          resource_type: "xero_connection",
         },
-        organisation_id: outcome.organisationId,
-        resource_id: outcome.connectionId,
-        resource_type: "xero_connection",
-      },
-    });
+      })
+    );
   } catch {
     /* Canonical connection audit is committed. */
   }

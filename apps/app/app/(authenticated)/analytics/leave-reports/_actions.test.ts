@@ -21,9 +21,26 @@ vi.mock("@repo/availability", () => ({
   listLeaveReportRecordsForDrilldown: mocks.listLeaveReportRecordsForDrilldown,
   resolveDateRange: mocks.resolveDateRange,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => mocks.database),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
@@ -37,7 +54,7 @@ const userId = "user_456";
 describe("analytics leave-reports server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
@@ -80,7 +97,7 @@ describe("analytics leave-reports server actions", () => {
     });
 
     it("rejects non-manager/admin/owner roles", async () => {
-      mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:viewer" });
 
       const result = await exportLeaveReportsCsvAction({
         organisationId,
@@ -139,7 +156,8 @@ describe("analytics leave-reports server actions", () => {
           clerkOrgId,
           organisationId,
           role: "admin",
-        })
+        }),
+        expect.any(Object)
       );
     });
 
@@ -215,7 +233,8 @@ describe("analytics leave-reports server actions", () => {
     });
 
     it("formats resolved boundaries in the organisation timezone", async () => {
-      mocks.database.organisation.findFirst.mockResolvedValueOnce({
+      mocks.database.organisation.findFirst.mockResolvedValue({
+        id: organisationId,
         timezone: "Australia/Sydney",
       });
       mocks.resolveDateRange.mockReturnValueOnce({

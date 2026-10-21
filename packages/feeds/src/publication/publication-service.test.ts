@@ -1,4 +1,5 @@
-import { Prisma } from "@repo/database/generated/client";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -28,6 +29,7 @@ const mocks = vi.hoisted(() => {
       first_name: "Jane",
       last_name: "Smith",
     },
+    person_id: "40000000-0000-4000-8000-000000000001",
     privacy_mode: "named",
     publication: null as typeof publication | null,
     record_type: "annual_leave",
@@ -69,7 +71,15 @@ const mocks = vi.hoisted(() => {
         return record.publication;
       }
     ),
-    availabilityPublicationFindUnique: vi.fn(() => ({ ...publication })),
+    availabilityPublicationCreateMany: vi.fn(
+      async (args: { data: Record<string, unknown> }) => {
+        await mocks.availabilityPublicationCreate(args);
+        return { count: 1 };
+      }
+    ),
+    availabilityPublicationFindUnique: vi.fn(
+      () => record.publication ?? { ...publication }
+    ),
     availabilityPublicationUpdate: vi.fn(
       ({ data }: { data: Record<string, unknown> }) => {
         if (!record.publication) {
@@ -125,20 +135,44 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     availabilityPublication: {
-      create: mocks.availabilityPublicationCreate,
+      createMany: mocks.availabilityPublicationCreateMany,
       findFirst: mocks.availabilityPublicationFindUnique,
       update: mocks.availabilityPublicationUpdate,
     },
     availabilityRecord: {
       findFirst: mocks.availabilityRecordFindFirst,
     },
+    feed: { findMany: vi.fn(async () => []) },
+    person: { findMany: vi.fn(async () => []) },
+    team: { findMany: vi.fn(async () => []) },
   };
+  tenantTestState.client = client;
   return {
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )),
   };
 });
 
@@ -159,7 +193,9 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("creates publication rows with the stable UID, sequence zero, and starts_at/ends_at", async () => {
-    const result = await materialiseAvailabilityPublication(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -182,11 +218,15 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("keeps the UID stable and increments sequence on a prompt-scope edit", async () => {
-    const first = await materialiseAvailabilityPublication(input);
+    const first = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
     expect(first.ok && first.value.publishedSequence).toBe(0);
 
     mocks.record.title = "Client site";
-    const second = await materialiseAvailabilityPublication(input);
+    const second = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(second).toMatchObject({
       ok: true,
@@ -199,12 +239,16 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("does not increment sequence or update publishedDescription when only notes_internal changes", async () => {
-    const first = await materialiseAvailabilityPublication(input);
+    const first = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
     expect(first.ok && first.value.publishedSequence).toBe(0);
     expect(first.ok && first.value.publishedDescription).toBeNull();
 
     mocks.record.notes_internal = "Updated note";
-    const second = await materialiseAvailabilityPublication(input);
+    const second = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(second).toMatchObject({
       ok: true,
@@ -218,11 +262,15 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("increments sequence when only the all-day flag changes", async () => {
-    const first = await materialiseAvailabilityPublication(input);
+    const first = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
     expect(first.ok && first.value.publishedSequence).toBe(0);
 
     mocks.record.all_day = false;
-    const second = await materialiseAvailabilityPublication(input);
+    const second = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(second).toMatchObject({
       ok: true,
@@ -234,11 +282,15 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("increments sequence when only the start date changes", async () => {
-    const first = await materialiseAvailabilityPublication(input);
+    const first = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
     expect(first.ok && first.value.publishedSequence).toBe(0);
 
     mocks.record.starts_at = new Date("2026-05-02T09:00:00.000Z");
-    const second = await materialiseAvailabilityPublication(input);
+    const second = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(second).toMatchObject({
       ok: true,
@@ -259,11 +311,15 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("increments sequence when only the end date changes", async () => {
-    const first = await materialiseAvailabilityPublication(input);
+    const first = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
     expect(first.ok && first.value.publishedSequence).toBe(0);
 
     mocks.record.ends_at = new Date("2026-05-02T17:00:00.000Z");
-    const second = await materialiseAvailabilityPublication(input);
+    const second = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(second).toMatchObject({
       ok: true,
@@ -284,10 +340,14 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("skips the write and keeps the sequence when nothing materially changed", async () => {
-    const first = await materialiseAvailabilityPublication(input);
+    const first = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
     expect(first.ok && first.value.publishedSequence).toBe(0);
 
-    const second = await materialiseAvailabilityPublication(input);
+    const second = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(second).toMatchObject({
       ok: true,
@@ -300,14 +360,11 @@ describe("materialiseAvailabilityPublication", () => {
   });
 
   it("recovers from a concurrent create conflict by reloading the winning row", async () => {
-    mocks.availabilityPublicationCreate.mockImplementationOnce(() => {
-      throw new Prisma.PrismaClientKnownRequestError("Unique constraint", {
-        clientVersion: "test",
-        code: "P2002",
-      });
-    });
+    mocks.availabilityPublicationCreateMany.mockResolvedValueOnce({ count: 0 });
 
-    const result = await materialiseAvailabilityPublication(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      materialiseAvailabilityPublication(input, db)
+    );
 
     expect(result).toMatchObject({
       ok: true,

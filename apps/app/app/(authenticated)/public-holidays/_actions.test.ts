@@ -1,3 +1,60 @@
+const tenantPoolMocks = vi.hoisted(() => ({
+  organisationFindFirst: vi.fn((query: { where: { id?: string } }) =>
+    Promise.resolve(
+      query.where.id === "00000000-0000-4000-8000-000000000001"
+        ? {
+            country_code: "AU",
+            id: "00000000-0000-4000-8000-000000000001",
+            name: "Company A",
+            timezone: "Australia/Brisbane",
+          }
+        : null
+    )
+  ),
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (client: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: tenantPoolMocks.organisationFindFirst,
+          findMany: vi.fn(() =>
+            Promise.resolve([
+              {
+                country_code: "AU",
+                id: "00000000-0000-4000-8000-000000000001",
+                name: "Company A",
+                timezone: "Australia/Brisbane",
+              },
+            ])
+          ),
+        },
+        person: {
+          findFirst: vi.fn(() =>
+            Promise.resolve({
+              id: "person-1",
+              organisation_id: "00000000-0000-4000-8000-000000000001",
+            })
+          ),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/account-companies")
+  >("../../../../../packages/database/src/queries/account-companies")),
+
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/organisations")
+  >("../../../../../packages/database/src/queries/organisations")),
+}));
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +71,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: () => Promise.resolve("org_123"),
   requireRole: mocks.requireRole,
 }));
 vi.mock("@repo/auth/server", () => ({
@@ -112,7 +170,8 @@ describe("public-holidays server actions", () => {
       await hideHolidayAction({ holidayKey, organisationId });
 
       expect(mocks.hidePublicHoliday).toHaveBeenCalledWith(
-        expect.objectContaining({ actingRole: "owner" })
+        expect.objectContaining({ actingRole: "owner" }),
+        expect.any(Object)
       );
     });
 
@@ -139,14 +198,17 @@ describe("public-holidays server actions", () => {
             "Christmas Day hidden. Locations with their own working-day setting keep it.",
         },
       });
-      expect(mocks.hidePublicHoliday).toHaveBeenCalledWith({
-        actingRole: "admin",
-        actingUserId: userId,
-        clerkOrgId,
-        holidayKey,
-        locationId: null,
-        organisationId,
-      });
+      expect(mocks.hidePublicHoliday).toHaveBeenCalledWith(
+        {
+          actingRole: "admin",
+          actingUserId: userId,
+          clerkOrgId,
+          holidayKey,
+          locationId: null,
+          organisationId,
+        },
+        expect.any(Object)
+      );
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/public-holidays");
     });
   });
@@ -175,7 +237,8 @@ describe("public-holidays server actions", () => {
           organisationId,
           regionCode: "QLD",
           userId,
-        })
+        }),
+        expect.any(Object)
       );
     });
 
@@ -212,7 +275,8 @@ describe("public-holidays server actions", () => {
       expect(mocks.deleteCustomHoliday).toHaveBeenCalledWith(
         clerkOrgId,
         organisationId,
-        holidayId
+        holidayId,
+        expect.any(Object)
       );
     });
   });
@@ -230,7 +294,8 @@ describe("public-holidays server actions", () => {
         value: { message: "Royal Queensland Show restored for Brisbane." },
       });
       expect(mocks.restorePublicHoliday).toHaveBeenCalledWith(
-        expect.objectContaining({ holidayKey, locationId })
+        expect.objectContaining({ holidayKey, locationId }),
+        expect.any(Object)
       );
     });
 
@@ -263,7 +328,8 @@ describe("public-holidays server actions", () => {
         value: { message: "Royal Queensland Show switched on for Brisbane." },
       });
       expect(mocks.setLocalHolidayEnabled).toHaveBeenCalledWith(
-        expect.objectContaining({ enabled: true, holidayKey, locationId })
+        expect.objectContaining({ enabled: true, holidayKey, locationId }),
+        expect.any(Object)
       );
     });
   });

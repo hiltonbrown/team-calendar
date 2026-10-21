@@ -2,6 +2,8 @@
 import type { PlanKey } from "@repo/core";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 
@@ -82,19 +84,39 @@ describe("billing queries integration", () => {
     const originalEventTime = new Date("2026-08-20T12:00:00.000Z");
     const olderEventTime = new Date("2026-08-19T12:00:00.000Z");
 
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdA,
-      currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.premium,
-      status: "active",
-      stripeCustomerId: "cus_066_1",
-      stripeEventCreatedAt: originalEventTime,
-      stripeSubscriptionId: "sub_066_1",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdA,
+        currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.premium,
+        status: "active",
+        stripeCustomerId: "cus_066_1",
+        stripeEventCreatedAt: originalEventTime,
+        stripeSubscriptionId: "sub_066_1",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdA,
+            currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.premium,
+            status: "active",
+            stripeCustomerId: "cus_066_1",
+            stripeEventCreatedAt: originalEventTime,
+            stripeSubscriptionId: "sub_066_1",
+          },
+          db
+        )
+    );
 
-    const initial = await getSubscriptionForOrg(testClerkOrgIdA);
+    const initial = await withTestTenantDb(
+      tenantTestAccount(testClerkOrgIdA),
+      (db) => getSubscriptionForOrg(testClerkOrgIdA, db)
+    );
     expect(initial).toMatchObject({
       cancel_at_period_end: false,
       clerk_org_id: testClerkOrgIdA,
@@ -115,19 +137,39 @@ describe("billing queries integration", () => {
     expect(directRows[0]?.stripe_subscription_id).toBe("sub_066_1");
 
     // Replay an older event (e.g. out-of-order webhook that would downgrade to basic)
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: true,
-      clerkOrgId: testClerkOrgIdA,
-      currentPeriodEnd: new Date("2026-09-19T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.basic,
-      status: "past_due",
-      stripeCustomerId: "cus_066_older",
-      stripeEventCreatedAt: olderEventTime,
-      stripeSubscriptionId: "sub_066_older",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: true,
+        clerkOrgId: testClerkOrgIdA,
+        currentPeriodEnd: new Date("2026-09-19T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.basic,
+        status: "past_due",
+        stripeCustomerId: "cus_066_older",
+        stripeEventCreatedAt: olderEventTime,
+        stripeSubscriptionId: "sub_066_older",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: true,
+            clerkOrgId: testClerkOrgIdA,
+            currentPeriodEnd: new Date("2026-09-19T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.basic,
+            status: "past_due",
+            stripeCustomerId: "cus_066_older",
+            stripeEventCreatedAt: olderEventTime,
+            stripeSubscriptionId: "sub_066_older",
+          },
+          db
+        )
+    );
 
-    const afterReplay = await getSubscriptionForOrg(testClerkOrgIdA);
+    const afterReplay = await withTestTenantDb(
+      tenantTestAccount(testClerkOrgIdA),
+      (db) => getSubscriptionForOrg(testClerkOrgIdA, db)
+    );
     expect(afterReplay).toMatchObject({
       cancel_at_period_end: false,
       clerk_org_id: testClerkOrgIdA,
@@ -142,31 +184,68 @@ describe("billing queries integration", () => {
     const originalEventTime = new Date("2026-08-20T12:00:00.000Z");
     const newerEventTime = new Date("2026-08-21T12:00:00.000Z");
 
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdA,
-      currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.basic,
-      status: "active",
-      stripeCustomerId: "cus_066_1",
-      stripeEventCreatedAt: originalEventTime,
-      stripeSubscriptionId: "sub_066_1",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdA,
+        currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.basic,
+        status: "active",
+        stripeCustomerId: "cus_066_1",
+        stripeEventCreatedAt: originalEventTime,
+        stripeSubscriptionId: "sub_066_1",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdA,
+            currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.basic,
+            status: "active",
+            stripeCustomerId: "cus_066_1",
+            stripeEventCreatedAt: originalEventTime,
+            stripeSubscriptionId: "sub_066_1",
+          },
+          db
+        )
+    );
 
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdA,
-      currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.enterprise,
-      status: "active",
-      stripeCustomerId: "cus_066_1",
-      stripeEventCreatedAt: newerEventTime,
-      stripeSubscriptionId: "sub_066_enterprise",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdA,
+        currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.enterprise,
+        status: "active",
+        stripeCustomerId: "cus_066_1",
+        stripeEventCreatedAt: newerEventTime,
+        stripeSubscriptionId: "sub_066_enterprise",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdA,
+            currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.enterprise,
+            status: "active",
+            stripeCustomerId: "cus_066_1",
+            stripeEventCreatedAt: newerEventTime,
+            stripeSubscriptionId: "sub_066_enterprise",
+          },
+          db
+        )
+    );
 
-    const updated = await getSubscriptionForOrg(testClerkOrgIdA);
+    const updated = await withTestTenantDb(
+      tenantTestAccount(testClerkOrgIdA),
+      (db) => getSubscriptionForOrg(testClerkOrgIdA, db)
+    );
     expect(updated).toMatchObject({
       clerk_org_id: testClerkOrgIdA,
       plan_key: planKeys.enterprise,
@@ -177,19 +256,39 @@ describe("billing queries integration", () => {
 
   test("null stripe_event_created_at on either side updates correctly (IS NULL fallback branches)", async () => {
     // 1. Initial row with null stripe_event_created_at
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdB,
-      currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.basic,
-      status: "active",
-      stripeCustomerId: "cus_066_null_1",
-      stripeEventCreatedAt: null,
-      stripeSubscriptionId: "sub_066_null_1",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdB,
+        currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.basic,
+        status: "active",
+        stripeCustomerId: "cus_066_null_1",
+        stripeEventCreatedAt: null,
+        stripeSubscriptionId: "sub_066_null_1",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdB,
+            currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.basic,
+            status: "active",
+            stripeCustomerId: "cus_066_null_1",
+            stripeEventCreatedAt: null,
+            stripeSubscriptionId: "sub_066_null_1",
+          },
+          db
+        )
+    );
 
-    const initial = await getSubscriptionForOrg(testClerkOrgIdB);
+    const initial = await withTestTenantDb(
+      tenantTestAccount(testClerkOrgIdB),
+      (db) => getSubscriptionForOrg(testClerkOrgIdB, db)
+    );
     expect(initial).toMatchObject({
       plan_key: planKeys.basic,
       stripe_subscription_id: "sub_066_null_1",
@@ -197,38 +296,78 @@ describe("billing queries integration", () => {
 
     // 2. Incoming event with non-null timestamp updates row where existing timestamp IS NULL
     const datedEventTime = new Date("2026-08-20T12:00:00.000Z");
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdB,
-      currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.premium,
-      status: "active",
-      stripeCustomerId: "cus_066_null_1",
-      stripeEventCreatedAt: datedEventTime,
-      stripeSubscriptionId: "sub_066_dated",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdB,
+        currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.premium,
+        status: "active",
+        stripeCustomerId: "cus_066_null_1",
+        stripeEventCreatedAt: datedEventTime,
+        stripeSubscriptionId: "sub_066_dated",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdB,
+            currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.premium,
+            status: "active",
+            stripeCustomerId: "cus_066_null_1",
+            stripeEventCreatedAt: datedEventTime,
+            stripeSubscriptionId: "sub_066_dated",
+          },
+          db
+        )
+    );
 
-    const afterDated = await getSubscriptionForOrg(testClerkOrgIdB);
+    const afterDated = await withTestTenantDb(
+      tenantTestAccount(testClerkOrgIdB),
+      (db) => getSubscriptionForOrg(testClerkOrgIdB, db)
+    );
     expect(afterDated).toMatchObject({
       plan_key: planKeys.premium,
       stripe_subscription_id: "sub_066_dated",
     });
 
     // 3. Incoming event with null timestamp updates row where incoming timestamp IS NULL
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: true,
-      clerkOrgId: testClerkOrgIdB,
-      currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.enterprise,
-      status: "active",
-      stripeCustomerId: "cus_066_null_1",
-      stripeEventCreatedAt: null,
-      stripeSubscriptionId: "sub_066_null_fallback",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: true,
+        clerkOrgId: testClerkOrgIdB,
+        currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.enterprise,
+        status: "active",
+        stripeCustomerId: "cus_066_null_1",
+        stripeEventCreatedAt: null,
+        stripeSubscriptionId: "sub_066_null_fallback",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: true,
+            clerkOrgId: testClerkOrgIdB,
+            currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.enterprise,
+            status: "active",
+            stripeCustomerId: "cus_066_null_1",
+            stripeEventCreatedAt: null,
+            stripeSubscriptionId: "sub_066_null_fallback",
+          },
+          db
+        )
+    );
 
-    const afterNullFallback = await getSubscriptionForOrg(testClerkOrgIdB);
+    const afterNullFallback = await withTestTenantDb(
+      tenantTestAccount(testClerkOrgIdB),
+      (db) => getSubscriptionForOrg(testClerkOrgIdB, db)
+    );
     expect(afterNullFallback).toMatchObject({
       cancel_at_period_end: true,
       plan_key: planKeys.enterprise,
@@ -268,29 +407,63 @@ describe("billing queries integration", () => {
   });
 
   test("getSubscriptionForStripeCustomer resolves subscription by stripe customer id across organisations", async () => {
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdA,
-      currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.basic,
-      status: "active",
-      stripeCustomerId: "cus_test_org_a",
-      stripeEventCreatedAt: new Date("2026-08-20T12:00:00.000Z"),
-      stripeSubscriptionId: "sub_test_org_a",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdA,
+        currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.basic,
+        status: "active",
+        stripeCustomerId: "cus_test_org_a",
+        stripeEventCreatedAt: new Date("2026-08-20T12:00:00.000Z"),
+        stripeSubscriptionId: "sub_test_org_a",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdA,
+            currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.basic,
+            status: "active",
+            stripeCustomerId: "cus_test_org_a",
+            stripeEventCreatedAt: new Date("2026-08-20T12:00:00.000Z"),
+            stripeSubscriptionId: "sub_test_org_a",
+          },
+          db
+        )
+    );
 
-    await upsertSubscriptionFromWebhook({
-      cancelAtPeriodEnd: false,
-      clerkOrgId: testClerkOrgIdB,
-      currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
-      endedAt: null,
-      planKey: planKeys.premium,
-      status: "active",
-      stripeCustomerId: "cus_test_org_b",
-      stripeEventCreatedAt: new Date("2026-08-20T12:00:00.000Z"),
-      stripeSubscriptionId: "sub_test_org_b",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        cancelAtPeriodEnd: false,
+        clerkOrgId: testClerkOrgIdB,
+        currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+        endedAt: null,
+        planKey: planKeys.premium,
+        status: "active",
+        stripeCustomerId: "cus_test_org_b",
+        stripeEventCreatedAt: new Date("2026-08-20T12:00:00.000Z"),
+        stripeSubscriptionId: "sub_test_org_b",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            cancelAtPeriodEnd: false,
+            clerkOrgId: testClerkOrgIdB,
+            currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
+            endedAt: null,
+            planKey: planKeys.premium,
+            status: "active",
+            stripeCustomerId: "cus_test_org_b",
+            stripeEventCreatedAt: new Date("2026-08-20T12:00:00.000Z"),
+            stripeSubscriptionId: "sub_test_org_b",
+          },
+          db
+        )
+    );
 
     const subA = await getSubscriptionForStripeCustomer("cus_test_org_a");
     expect(subA).toMatchObject({

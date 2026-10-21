@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  companyLookup: vi.fn(),
   currentUser: vi.fn(),
   getActiveOrgContext: vi.fn(),
   getUnreadCount: vi.fn(),
@@ -17,6 +18,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
+}));
+vi.mock("@repo/database", () => ({
+  afterTenantCommit: (_db: unknown, effect: () => Promise<void>) => effect(),
+  withTenantResult: async (
+    _account: string,
+    run: (db: unknown) => Promise<unknown>
+  ) => run({ organisation: { findFirst: mocks.companyLookup } }),
 }));
 vi.mock("@repo/notifications", () => ({
   getUnreadCount: mocks.getUnreadCount,
@@ -48,7 +56,9 @@ describe("notification actions", () => {
     mocks.auth.mockResolvedValue({
       has: async () => true,
       isAuthenticated: true,
+      orgId: "org_1",
     });
+    mocks.companyLookup.mockResolvedValue({ id: organisationId });
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
@@ -72,7 +82,6 @@ describe("notification actions", () => {
   it("validates markAsRead input", async () => {
     const result = await markAsReadAction({
       notificationId: "nope",
-      organisationId,
     });
 
     expect(result.ok).toBe(false);
@@ -81,20 +90,18 @@ describe("notification actions", () => {
   it("marks one notification read and revalidates notifications", async () => {
     const result = await markAsReadAction({
       notificationId: "00000000-0000-4000-8000-000000000099",
-      organisationId,
     });
 
     expect(result.ok).toBe(true);
     expect(mocks.markAsRead).toHaveBeenCalledWith(
-      expect.objectContaining({ organisationId, userId: "user_1" })
+      expect.objectContaining({ clerkOrgId: "org_1", userId: "user_1" }),
+      expect.any(Object)
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/notifications");
   });
 
   it("marks all read and updates preferences through services", async () => {
-    await expect(
-      markAllAsReadAction({ organisationId })
-    ).resolves.toMatchObject({
+    await expect(markAllAsReadAction()).resolves.toMatchObject({
       ok: true,
     });
     await expect(

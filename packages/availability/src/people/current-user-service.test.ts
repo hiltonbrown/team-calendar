@@ -1,4 +1,8 @@
-import { Prisma } from "@repo/database/generated/client";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -6,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   organisationCreate: vi.fn(),
   organisationFindFirst: vi.fn(),
   organisationUpdate: vi.fn(),
-  personCreate: vi.fn(),
+  personCreateMany: vi.fn(),
   personFindFirst: vi.fn(),
   personFindMany: vi.fn(),
   personUpdate: vi.fn(),
@@ -16,23 +20,44 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({ withinLimit: mocks.withinLimit }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+  lockPlanLimitMutations: vi.fn(async () => undefined),
+  resolveAccountCompanies: async () => [
+    {
+      country_code: "AU",
+      id: organisationId,
+      name: "Acme Org",
+      timezone: "Australia/Brisbane",
+    },
+  ],
+
   scopedQuery: (inputClerkOrgId: string, inputOrganisationId: string) => ({
     clerk_org_id: inputClerkOrgId,
     organisation_id: inputOrganisationId,
   }),
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       organisation: {
         create: mocks.organisationCreate,
         findFirst: mocks.organisationFindFirst,
         update: mocks.organisationUpdate,
       },
       person: {
-        create: mocks.personCreate,
+        createMany: mocks.personCreateMany,
         findFirst: mocks.personFindFirst,
         findMany: mocks.personFindMany,
         update: mocks.personUpdate,
@@ -40,32 +65,9 @@ vi.mock("@repo/database", () => ({
       xeroPersonMatch: {
         findFirst: mocks.xeroPersonMatchFindFirst,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        organisation: {
-          create: mocks.organisationCreate,
-          findFirst: mocks.organisationFindFirst,
-          update: mocks.organisationUpdate,
-        },
-        person: {
-          create: mocks.personCreate,
-          findFirst: mocks.personFindFirst,
-          findMany: mocks.personFindMany,
-          update: mocks.personUpdate,
-        },
-        xeroPersonMatch: {
-          findFirst: mocks.xeroPersonMatchFindFirst,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("@repo/feeds", () => ({
   ensureDefaultCalendarFeed: mocks.ensureDefaultCalendarFeed,
 }));
@@ -89,6 +91,8 @@ const organisation = {
 };
 
 const person = {
+  archived_at: null,
+  clerk_org_id: clerkOrgId,
   clerk_user_id: null,
   display_name: "Case Person",
   email: "case.person@example.com",
@@ -97,6 +101,7 @@ const person = {
   job_title: "Engineer",
   last_name: "Person",
   location: { name: "Brisbane" },
+  organisation_id: organisationId,
   team: { name: "Platform" },
 };
 
@@ -118,17 +123,29 @@ describe("current-user-service organisation provisioning", () => {
   it("creates an organisation once and provisions its defaults", async () => {
     mocks.organisationFindFirst.mockResolvedValue(null);
 
-    const result = await ensureOrganisationForClerk({
-      clerkOrgId,
-      countryCode: "AU",
-      name: "Current user test",
-    });
+    const result = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId,
+        countryCode: "AU",
+        name: "Current user test",
+      }),
+      (db) =>
+        ensureOrganisationForClerk(
+          {
+            clerkOrgId,
+            countryCode: "AU",
+            name: "Current user test",
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ clerkOrgId, organisationId });
     expect(mocks.withinLimit).toHaveBeenCalledWith(
       clerkOrgId,
       "00000000-0000-4000-8000-000000000000",
-      "payroll_entities"
+      "payroll_entities",
+      expect.any(Object)
     );
     expect(mocks.organisationCreate).toHaveBeenCalledWith({
       data: {
@@ -142,25 +159,41 @@ describe("current-user-service organisation provisioning", () => {
         working_hours_per_day: 7.6,
       },
     });
-    expect(mocks.ensureDefaultCalendarFeed).toHaveBeenCalledWith({
-      clerkOrgId,
-      organisationId,
-    });
+    expect(mocks.ensureDefaultCalendarFeed).toHaveBeenCalledWith(
+      { clerkOrgId, organisationId },
+      expect.any(Object)
+    );
   });
 
   it("updates the oldest active organisation idempotently", async () => {
     mocks.organisationFindFirst.mockResolvedValue(organisation);
 
-    const result = await ensureOrganisationForClerk({
-      clerkOrgId,
-      countryCode: "NZ",
-      fiscalYearStart: 4,
-      locale: "en-NZ",
-      name: "Updated organisation",
-      reportingUnit: "days",
-      timezone: "Pacific/Auckland",
-      workingHoursPerDay: 8,
-    });
+    const result = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId,
+        countryCode: "NZ",
+        fiscalYearStart: 4,
+        locale: "en-NZ",
+        name: "Updated organisation",
+        reportingUnit: "days",
+        timezone: "Pacific/Auckland",
+        workingHoursPerDay: 8,
+      }),
+      (db) =>
+        ensureOrganisationForClerk(
+          {
+            clerkOrgId,
+            countryCode: "NZ",
+            fiscalYearStart: 4,
+            locale: "en-NZ",
+            name: "Updated organisation",
+            reportingUnit: "days",
+            timezone: "Pacific/Auckland",
+            workingHoursPerDay: 8,
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ clerkOrgId, organisationId });
     expect(mocks.organisationFindFirst).toHaveBeenCalledWith({
@@ -191,11 +224,22 @@ describe("current-user-service organisation provisioning", () => {
     });
 
     await expect(
-      ensureOrganisationForClerk({
-        clerkOrgId,
-        countryCode: "AU",
-        name: "Blocked organisation",
-      })
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId,
+          countryCode: "AU",
+          name: "Blocked organisation",
+        }),
+        (db) =>
+          ensureOrganisationForClerk(
+            {
+              clerkOrgId,
+              countryCode: "AU",
+              name: "Blocked organisation",
+            },
+            db
+          )
+      )
     ).rejects.toThrow("Unable to verify billing limits. Please try again.");
     expect(mocks.organisationCreate).not.toHaveBeenCalled();
     expect(mocks.ensureDefaultCalendarFeed).not.toHaveBeenCalled();
@@ -209,11 +253,22 @@ describe("current-user-service organisation provisioning", () => {
     });
 
     await expect(
-      ensureOrganisationForClerk({
-        clerkOrgId,
-        countryCode: "AU",
-        name: "Blocked organisation",
-      })
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId,
+          countryCode: "AU",
+          name: "Blocked organisation",
+        }),
+        (db) =>
+          ensureOrganisationForClerk(
+            {
+              clerkOrgId,
+              countryCode: "AU",
+              name: "Blocked organisation",
+            },
+            db
+          )
+      )
     ).rejects.toThrow(
       "Your current plan has reached its payroll entity limit."
     );
@@ -235,19 +290,41 @@ describe("current-user-service organisation provisioning", () => {
       });
 
     await expect(
-      ensureOrganisationForClerk({
-        clerkOrgId,
-        countryCode: "AU",
-        name: "Current user test",
-      })
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId,
+          countryCode: "AU",
+          name: "Current user test",
+        }),
+        (db) =>
+          ensureOrganisationForClerk(
+            {
+              clerkOrgId,
+              countryCode: "AU",
+              name: "Current user test",
+            },
+            db
+          )
+      )
     ).rejects.toThrow("Feed unavailable");
 
     await expect(
-      ensureOrganisationForClerk({
-        clerkOrgId,
-        countryCode: "AU",
-        name: "Current user test",
-      })
+      withTestTenantDb(
+        tenantTestAccount({
+          clerkOrgId,
+          countryCode: "AU",
+          name: "Current user test",
+        }),
+        (db) =>
+          ensureOrganisationForClerk(
+            {
+              clerkOrgId,
+              countryCode: "AU",
+              name: "Current user test",
+            },
+            db
+          )
+      )
     ).resolves.toEqual({ clerkOrgId, organisationId });
     expect(mocks.organisationCreate).toHaveBeenCalledTimes(1);
     expect(mocks.organisationUpdate).toHaveBeenCalledTimes(1);
@@ -258,14 +335,21 @@ describe("current-user-service organisation provisioning", () => {
 describe("current-user-service person provisioning", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.personFindFirst.mockResolvedValue(null);
-    mocks.personFindMany.mockResolvedValue([]);
+    mocks.personFindFirst.mockReset().mockResolvedValue(null);
+    mocks.personFindMany.mockReset().mockResolvedValue([]);
     mocks.xeroPersonMatchFindFirst.mockResolvedValue(null);
-    mocks.personCreate.mockResolvedValue({
-      ...person,
-      clerk_user_id: "user_new",
-      id: "c2000000-0000-4000-8000-000000000009",
-    });
+    mocks.personCreateMany
+      .mockReset()
+      .mockImplementation(
+        async ({ data }: { data: Record<string, unknown> }) => {
+          mocks.personFindFirst.mockResolvedValue({
+            ...person,
+            ...data,
+            id: "c2000000-0000-4000-8000-000000000009",
+          });
+          return await { count: 1 };
+        }
+      );
     mocks.personUpdate.mockResolvedValue({
       ...person,
       clerk_user_id: "user_case",
@@ -283,10 +367,16 @@ describe("current-user-service person provisioning", () => {
       clerk_user_id: "user_existing",
     });
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_existing",
-      email: "different@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_existing",
+          email: "different@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -299,11 +389,12 @@ describe("current-user-service person provisioning", () => {
     });
     expect(mocks.personFindFirst).toHaveBeenCalledWith({
       include: { location: true, team: true },
+      orderBy: [{ created_at: "asc" }, { id: "asc" }],
       where: {
         archived_at: null,
         clerk_org_id: clerkOrgId,
         clerk_user_id: "user_existing",
-        organisation_id: organisationId,
+        organisation_id: { in: [organisationId] },
       },
     });
     expect(mocks.personFindMany).not.toHaveBeenCalled();
@@ -313,12 +404,18 @@ describe("current-user-service person provisioning", () => {
   it("links one unclaimed person by case-insensitive email within the tenant", async () => {
     mocks.personFindMany.mockResolvedValue([person]);
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      avatarUrl: " https://img.example.com/avatar.png ",
-      clerkUserId: "user_case",
-      displayName: " Case Updated ",
-      email: " CASE.PERSON@EXAMPLE.COM ",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          avatarUrl: " https://img.example.com/avatar.png ",
+          clerkUserId: "user_case",
+          displayName: " Case Updated ",
+          email: " CASE.PERSON@EXAMPLE.COM ",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -332,7 +429,7 @@ describe("current-user-service person provisioning", () => {
         clerk_org_id: clerkOrgId,
         clerk_user_id: null,
         email: { equals: "case.person@example.com", mode: "insensitive" },
-        organisation_id: organisationId,
+        organisation_id: { in: [organisationId] },
       },
     });
     expect(mocks.personUpdate).toHaveBeenCalledWith({
@@ -353,10 +450,16 @@ describe("current-user-service person provisioning", () => {
       { ...person, id: "c2000000-0000-4000-8000-000000000002" },
     ]);
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_duplicate",
-      email: "case.person@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_duplicate",
+          email: "case.person@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toEqual({
       error: {
@@ -367,26 +470,33 @@ describe("current-user-service person provisioning", () => {
       ok: false,
     });
     expect(mocks.personUpdate).not.toHaveBeenCalled();
-    expect(mocks.personCreate).not.toHaveBeenCalled();
+    expect(mocks.personCreateMany).not.toHaveBeenCalled();
     expect(mocks.withinLimit).not.toHaveBeenCalled();
   });
 
   it("creates a tenant-scoped fallback person at the final available seat", async () => {
-    const result = await ensureCurrentUserPerson(tenant, {
-      avatarUrl: "https://img.example.com/new.png",
-      clerkUserId: "user_new",
-      displayName: "New Person",
-      email: "NEW.PERSON@EXAMPLE.COM",
-      jobTitle: "Designer",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          avatarUrl: "https://img.example.com/new.png",
+          clerkUserId: "user_new",
+          displayName: "New Person",
+          email: "NEW.PERSON@EXAMPLE.COM",
+          jobTitle: "Designer",
+        },
+        db
+      )
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.withinLimit).toHaveBeenCalledWith(
       clerkOrgId,
       organisationId,
-      "seats"
+      "seats",
+      expect.any(Object)
     );
-    expect(mocks.personCreate).toHaveBeenCalledWith({
+    expect(mocks.personCreateMany).toHaveBeenCalledWith({
       data: {
         avatar_url: "https://img.example.com/new.png",
         clerk_org_id: clerkOrgId,
@@ -400,19 +510,25 @@ describe("current-user-service person provisioning", () => {
         organisation_id: organisationId,
         source_system: "MANUAL",
       },
-      include: { location: true, team: true },
+      skipDuplicates: true,
     });
   });
 
   it("uses an internal email when Clerk does not provide one", async () => {
-    await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_new",
-      firstName: "New",
-      lastName: "Person",
-    });
+    await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_new",
+          firstName: "New",
+          lastName: "Person",
+        },
+        db
+      )
+    );
 
     expect(mocks.personFindMany).not.toHaveBeenCalled();
-    expect(mocks.personCreate).toHaveBeenCalledWith(
+    expect(mocks.personCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ email: "user_new@internal" }),
       })
@@ -425,10 +541,16 @@ describe("current-user-service person provisioning", () => {
       value: { allowed: false, current: 9, limit: 9 },
     });
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_blocked",
-      email: "blocked@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_blocked",
+          email: "blocked@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toEqual({
       error: {
@@ -437,7 +559,7 @@ describe("current-user-service person provisioning", () => {
       },
       ok: false,
     });
-    expect(mocks.personCreate).not.toHaveBeenCalled();
+    expect(mocks.personCreateMany).not.toHaveBeenCalled();
   });
 
   it("propagates authoritative seat-check errors without creating a person", async () => {
@@ -446,19 +568,25 @@ describe("current-user-service person provisioning", () => {
       ok: false,
     });
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_error",
-      email: "error@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_error",
+          email: "error@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toEqual({
       error: { code: "internal", message: "Failed to check billing limits." },
       ok: false,
     });
-    expect(mocks.personCreate).not.toHaveBeenCalled();
+    expect(mocks.personCreateMany).not.toHaveBeenCalled();
   });
 
-  it("recovers the winner when concurrent fallback creation hits the unique constraint", async () => {
+  it("reuses the winner when concurrent fallback insertion skips a duplicate", async () => {
     const concurrentlyCreated = {
       ...person,
       clerk_user_id: "user_race",
@@ -467,17 +595,18 @@ describe("current-user-service person provisioning", () => {
     mocks.personFindFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(concurrentlyCreated);
-    mocks.personCreate.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint", {
-        clientVersion: "test",
-        code: "P2002",
-      })
-    );
+    mocks.personCreateMany.mockResolvedValue({ count: 0 });
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_race",
-      email: "race@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_race",
+          email: "race@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -494,23 +623,24 @@ describe("current-user-service person provisioning", () => {
     });
   });
 
-  it("returns an internal error when a unique conflict has no scoped winner", async () => {
-    mocks.personCreate.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint", {
-        clientVersion: "test",
-        code: "P2002",
-      })
-    );
+  it("returns a conflict when a skipped insert has no scoped winner", async () => {
+    mocks.personCreateMany.mockResolvedValue({ count: 0 });
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_missing_winner",
-      email: "missing-winner@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_missing_winner",
+          email: "missing-winner@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toEqual({
       error: {
-        code: "internal",
-        message: "Failed to ensure the current user has a person profile.",
+        code: "conflict",
+        message: "The person could not be linked. Review the people directory.",
       },
       ok: false,
     });
@@ -518,20 +648,20 @@ describe("current-user-service person provisioning", () => {
   });
 
   it("returns an internal error when persistence fails without a recoverable winner", async () => {
-    mocks.personCreate.mockRejectedValue(new Error("Database unavailable"));
+    mocks.personCreateMany.mockRejectedValue(new Error("Database unavailable"));
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_failure",
-      email: "failure@example.com",
-    });
+    const result = withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_failure",
+          email: "failure@example.com",
+        },
+        db
+      )
+    );
 
-    expect(result).toEqual({
-      error: {
-        code: "internal",
-        message: "Failed to ensure the current user has a person profile.",
-      },
-      ok: false,
-    });
+    await expect(result).rejects.toThrow("Database unavailable");
     expect(mocks.personUpdate).not.toHaveBeenCalled();
     expect(mocks.organisationUpdate).not.toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: otherOrganisationId } })
@@ -557,16 +687,22 @@ describe("current-user-service person provisioning", () => {
       clerk_user_id: "user_absorbed",
     });
 
-    const result = await ensureCurrentUserPerson(tenant, {
-      clerkUserId: "user_absorbed",
-      email: "absorbed@example.com",
-    });
+    const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
+      ensureCurrentUserPerson(
+        tenant,
+        {
+          clerkUserId: "user_absorbed",
+          email: "absorbed@example.com",
+        },
+        db
+      )
+    );
 
     expect(result).toMatchObject({
       ok: true,
       value: { id: xeroTargetPerson.id },
     });
-    expect(mocks.personCreate).not.toHaveBeenCalled();
+    expect(mocks.personCreateMany).not.toHaveBeenCalled();
     expect(mocks.personUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ clerk_user_id: "user_absorbed" }),

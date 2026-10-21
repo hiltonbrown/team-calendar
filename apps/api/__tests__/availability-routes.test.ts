@@ -267,7 +267,8 @@ describe("Availability Collection Route (POST)", () => {
     // Tenant isolation verification: getOrganisationById called with authenticated clerkOrgId
     expect(getOrganisationById).toHaveBeenCalledWith(
       "org_clerk_123",
-      validPostPayload.organisationId
+      validPostPayload.organisationId,
+      expect.any(Object)
     );
     expect(createManualAvailability).toHaveBeenCalledWith(
       {
@@ -278,7 +279,8 @@ describe("Availability Collection Route (POST)", () => {
         personId: validPostPayload.personId,
         recordType: validPostPayload.recordType,
       }),
-      { orgRole: "org:viewer", userId: "user_123" }
+      { orgRole: "org:viewer", userId: "user_123" },
+      expect.any(Object)
     );
   });
   it("returns 403 when createManualAvailability returns not_authorised", async () => {
@@ -583,7 +585,8 @@ describe("Availability Single Record Route (PATCH)", () => {
       },
       "33333333-3333-4333-a333-333333333333",
       { title: "Changed" },
-      { orgRole: "org:viewer", userId: "user_123" }
+      { orgRole: "org:viewer", userId: "user_123" },
+      expect.any(Object)
     );
   });
   it.each([
@@ -890,7 +893,8 @@ describe("Availability Single Record Route (DELETE)", () => {
     expect(getAvailabilityRecordById).toHaveBeenCalledWith(
       "org_clerk_123",
       "22222222-2222-4222-a222-222222222222",
-      "33333333-3333-4333-a333-333333333333"
+      "33333333-3333-4333-a333-333333333333",
+      expect.any(Object)
     );
     expect(archiveManualAvailability).toHaveBeenCalledWith(
       {
@@ -898,7 +902,8 @@ describe("Availability Single Record Route (DELETE)", () => {
         organisationId: "22222222-2222-4222-a222-222222222222",
       },
       "33333333-3333-4333-a333-333333333333",
-      { orgRole: "org:viewer", userId: "user_123" }
+      { orgRole: "org:viewer", userId: "user_123" },
+      expect.any(Object)
     );
   });
   it("returns 403 when archiveManualAvailability returns not_authorised", async () => {
@@ -943,3 +948,18 @@ describe("Availability Single Record Route (DELETE)", () => {
     expect(response.status).toBe(403);
   });
 });
+
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));

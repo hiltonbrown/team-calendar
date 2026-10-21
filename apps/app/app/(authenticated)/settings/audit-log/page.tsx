@@ -1,12 +1,15 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   type AuditEventDetail,
   getAuditEventDetail,
   listAuditLogEvents,
 } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { AuditLogClient } from "./audit-log-client";
 
 export const metadata: Metadata = {
@@ -27,7 +30,7 @@ const AuditLogPage = async ({ searchParams }: AuditLogPageProps) => {
     searchParams,
   ]);
   const org = firstValue(params.org);
-  const { clerkOrgId, organisationId } = await requireActiveOrgPageContext(org);
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
   const role = orgRole === "org:owner" ? "owner" : "admin";
 
   if (!user) {
@@ -42,44 +45,65 @@ const AuditLogPage = async ({ searchParams }: AuditLogPageProps) => {
   };
   const cursor = firstValue(params.cursor);
 
-  const listResult = await listAuditLogEvents({
-    actingRole: role,
-    actingUserId: user.id,
+  const { listResult, details, organisationId } = await withTenantDb(
     clerkOrgId,
-    filters,
-    organisationId,
-    pagination: { cursor, pageSize: 50 },
-  });
+    async (db) => {
+      const { organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+      const preparedListResult = await listAuditLogEvents(
+        {
+          actingRole: role,
+          actingUserId: user.id,
+          clerkOrgId,
+          filters,
+          organisationId: scopedOrganisationId,
+          pagination: { cursor, pageSize: 50 },
+        },
+        db
+      );
 
-  if (!listResult.ok) {
-    throw new Error(listResult.error.message);
-  }
+      if (!preparedListResult.ok) {
+        throw new Error(preparedListResult.error.message);
+      }
 
-  const detailIds = listResult.value.events
-    .filter((event) => event.hasBeforeAfter)
-    .slice(0, 10)
-    .map((event) => event.id);
-  const detailResults = await Promise.all(
-    detailIds.map((eventId) =>
-      getAuditEventDetail({
-        actingRole: role,
-        actingUserId: user.id,
-        clerkOrgId,
-        eventId,
-        organisationId,
-      })
-    )
-  );
-  const details = new Map<string, AuditEventDetail>();
-  for (const result of detailResults) {
-    if (result.ok) {
-      details.set(result.value.id, result.value);
+      const detailIds = preparedListResult.value.events
+        .filter((event) => event.hasBeforeAfter)
+        .slice(0, 10)
+        .map((event) => event.id);
+      const detailResults: Awaited<ReturnType<typeof getAuditEventDetail>>[] =
+        [];
+      for (const eventId of detailIds) {
+        detailResults.push(
+          await getAuditEventDetail(
+            {
+              actingRole: role,
+              actingUserId: user.id,
+              clerkOrgId,
+              eventId,
+              organisationId: scopedOrganisationId,
+            },
+            db
+          )
+        );
+      }
+      const preparedDetails = new Map<string, AuditEventDetail>();
+      for (const result of detailResults) {
+        if (result.ok) {
+          preparedDetails.set(result.value.id, result.value);
+        }
+      }
+
+      return {
+        details: Object.fromEntries(preparedDetails),
+        listResult: preparedListResult,
+        organisationId: scopedOrganisationId,
+      };
     }
-  }
+  );
 
   return (
     <AuditLogClient
-      details={Object.fromEntries(details)}
+      details={details}
       events={listResult.value.events}
       filters={{
         actionPrefix: filters.actionPrefix ?? "",

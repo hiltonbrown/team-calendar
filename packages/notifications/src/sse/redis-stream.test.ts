@@ -11,6 +11,8 @@ const sampleEvent: NotificationSseEvent = {
     category: "leave_lifecycle",
     createdAt: "2026-08-28T00:00:00.000Z",
     notificationId: "notif-123",
+    organisationId: "company-A",
+    organisationName: "Company A",
     title: "Approved",
     type: "leave_approved",
     unreadCount: 1,

@@ -105,7 +105,8 @@ describe("support GitHub issue route", () => {
 
     expect(mocks.getOrganisationById).toHaveBeenCalledWith(
       "org_clerk_123",
-      "00000000-0000-4000-8000-000000000001"
+      "00000000-0000-4000-8000-000000000001",
+      expect.any(Object)
     );
     expect(mocks.createSupportGitHubIssue).toHaveBeenCalledWith({
       clerk_org_id: "org_clerk_123",
@@ -123,18 +124,21 @@ describe("support GitHub issue route", () => {
       },
       user_id: "user_123",
     });
-    expect(mocks.persistSupportSubmissionAudit).toHaveBeenCalledWith({
-      category: "support",
-      clerkOrgId: "org_clerk_123",
-      issueNumber: 123,
-      issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
-      labelAssignmentSucceeded: true,
-      labelsAttempted: ["support", "priority:normal"],
-      organisationId: "00000000-0000-4000-8000-000000000001",
-      status: "created",
-      subject: "Missing leave entry",
-      userId: "user_123",
-    });
+    expect(mocks.persistSupportSubmissionAudit).toHaveBeenCalledWith(
+      {
+        category: "support",
+        clerkOrgId: "org_clerk_123",
+        issueNumber: 123,
+        issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
+        labelAssignmentSucceeded: true,
+        labelsAttempted: ["support", "priority:normal"],
+        organisationId: "00000000-0000-4000-8000-000000000001",
+        status: "created",
+        subject: "Missing leave entry",
+        userId: "user_123",
+      },
+      expect.any(Object)
+    );
   });
 
   it("returns a validation error for invalid payloads", async () => {
@@ -460,10 +464,49 @@ describe("support GitHub issue route", () => {
       "Failed to persist support submission audit event",
       {
         clerkOrgId: "org_clerk_123",
+        error: {
+          code: "internal",
+          message: "Failed to persist the support audit event.",
+        },
         issueNumber: 123,
         organisationId: "00000000-0000-4000-8000-000000000001",
         userId: "user_123",
       }
     );
   });
+
+  it("returns success when the audit write throws after the GitHub issue is created", async () => {
+    const failure = new Error("connection reset");
+    mocks.persistSupportSubmissionAudit.mockRejectedValue(failure);
+
+    const response = await POST(
+      new Request("http://api.test/api/support/github-issue", {
+        body: JSON.stringify({
+          category: "support",
+          message: "The calendar is missing one leave entry.",
+          page_url:
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001",
+          priority: "normal",
+          subject: "Missing leave entry",
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.logError).toHaveBeenCalledWith(
+      "Failed to persist support submission audit event",
+      expect.objectContaining({ error: failure, issueNumber: 123 })
+    );
+  });
 });
+
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

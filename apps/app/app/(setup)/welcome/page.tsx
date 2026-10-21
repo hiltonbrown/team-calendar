@@ -1,5 +1,8 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import { getPersonProfile, loadWelcomeEligibility } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
+import { type TenantDb, withTenantDb } from "@repo/database";
 import { Button } from "@repo/design-system/components/ui/button";
 import { listFeeds, normaliseRole } from "@repo/feeds";
 import type { Metadata } from "next";
@@ -11,7 +14,7 @@ import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { recommendFeed } from "@/lib/feeds/recommend-feed";
 import { formatLeaveBalance } from "@/lib/format-leave-balance";
 import { withOrg } from "@/lib/navigation/org-url";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { StepHeading } from "../onboarding/steps/step-heading";
 import { CalendarStep } from "./steps/calendar-step";
 import { SkipToDashboard } from "./steps/welcome-controls";
@@ -47,58 +50,75 @@ const WelcomePage = async ({ searchParams }: WelcomePageProps) => {
   if (!(user && orgRole)) {
     redirect("/");
   }
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(first(params.org));
-  const homeHref = withOrg("/", orgQueryValue);
-  const eligibility = await loadWelcomeEligibility({
-    actingRole: orgRole,
-    clerkOrgId,
-    organisationId,
-    userId: user.id,
-  });
-  if (
-    !(
-      eligibility.ok &&
-      eligibility.value.eligible &&
-      eligibility.value.personId
-    )
-  ) {
-    redirect(homeHref);
-  }
-  const { personId } = eligibility.value;
   const step: StepId =
     STEPS.find((item) => item.id === first(params.step))?.id ?? "identity";
   const index = STEPS.findIndex((item) => item.id === step);
   const next = STEPS[index + 1];
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const { organisationId, orgQueryValue, homeHref, profile, calendar } =
+    await withTenantDb(clerkOrgId, async (db) => {
+      const {
+        organisationId: scopedOrganisationId,
+        orgQueryValue: preparedOrgQueryValue,
+      } = await resolveActiveOrgPageContext(clerkOrgId, first(params.org), db);
+      const preparedHomeHref = withOrg("/", preparedOrgQueryValue);
+      const eligibility = await loadWelcomeEligibility(
+        {
+          actingRole: orgRole,
+          clerkOrgId,
+          organisationId: scopedOrganisationId,
+          userId: user.id,
+        },
+        db
+      );
+      if (
+        !(
+          eligibility.ok &&
+          eligibility.value.eligible &&
+          eligibility.value.personId
+        )
+      ) {
+        redirect(preparedHomeHref);
+      }
+      const { personId } = eligibility.value;
+      const preparedProfile =
+        step === "calendar"
+          ? null
+          : await getPersonProfile(
+              {
+                actingPersonId: personId,
+                actingUserId: user.id,
+                clerkOrgId,
+                organisationId: scopedOrganisationId,
+                personId,
+                role: peopleRole(orgRole),
+              },
+              db
+            );
+      const preparedCalendar =
+        step === "calendar"
+          ? await calendarData(
+              {
+                clerkOrgId,
+                homeHref: preparedHomeHref,
+                organisationId: scopedOrganisationId,
+                orgRole,
+                userId: user.id,
+              },
+              db
+            )
+          : null;
+      return {
+        calendar: preparedCalendar,
+        homeHref: preparedHomeHref,
+        organisationId: scopedOrganisationId,
+        orgQueryValue: preparedOrgQueryValue,
+        profile: preparedProfile,
+      };
+    });
   const stepHref = (id: StepId) =>
     withOrg(`/welcome?step=${id}`, orgQueryValue);
-
-  let content: React.ReactNode;
-  if (step === "calendar") {
-    content = await calendarContent({
-      clerkOrgId,
-      homeHref,
-      organisationId,
-      orgRole,
-      userId: user.id,
-    });
-  } else {
-    const profile = await getPersonProfile({
-      actingPersonId: personId,
-      actingUserId: user.id,
-      clerkOrgId,
-      organisationId,
-      personId,
-      role: peopleRole(orgRole),
-    });
-    if (!profile.ok) {
-      content = <FetchErrorState entityName="your profile" />;
-    } else if (step === "identity") {
-      content = <IdentityContent profile={profile.value} />;
-    } else {
-      content = <BalancesContent profile={profile.value} />;
-    }
-  }
+  const content = welcomeStepContent(calendar, profile, step);
 
   return (
     <SetupColumn>
@@ -206,20 +226,26 @@ function BalancesContent({ profile }: { profile: Profile }) {
   );
 }
 
-async function calendarContent(input: {
-  clerkOrgId: string;
-  homeHref: string;
-  organisationId: string;
-  orgRole: string;
-  userId: string;
-}) {
-  const feeds = await listFeeds({
-    actingRole: normaliseRole(input.orgRole),
-    actingUserId: input.userId,
-    clerkOrgId: input.clerkOrgId,
-    filters: { status: ["active"] },
-    organisationId: input.organisationId,
-  });
+async function calendarData(
+  input: {
+    clerkOrgId: string;
+    homeHref: string;
+    organisationId: string;
+    orgRole: string;
+    userId: string;
+  },
+  db: TenantDb
+) {
+  const feeds = await listFeeds(
+    {
+      actingRole: normaliseRole(input.orgRole),
+      actingUserId: input.userId,
+      clerkOrgId: input.clerkOrgId,
+      filters: { status: ["active"] },
+      organisationId: input.organisationId,
+    },
+    db
+  );
   const { recommended } = recommendFeed(feeds.ok ? feeds.value : []);
   const toFeed = (feed: typeof recommended) =>
     feed?.subscribeUrl
@@ -229,14 +255,30 @@ async function calendarContent(input: {
     recommended?.isOwnedByActor && recommended.kind === "personal"
       ? toFeed(recommended)
       : null;
-  return (
-    <CalendarStep
-      fallbackFeed={personal ? null : toFeed(recommended)}
-      homeHref={input.homeHref}
-      organisationId={input.organisationId}
-      personalFeed={personal}
-    />
-  );
+  return {
+    fallbackFeed: personal ? null : toFeed(recommended),
+    homeHref: input.homeHref,
+    organisationId: input.organisationId,
+    personalFeed: personal,
+  };
 }
 
 export default WelcomePage;
+
+function welcomeStepContent(
+  calendar: Parameters<typeof CalendarStep>[0] | null,
+  profile: Awaited<ReturnType<typeof getPersonProfile>> | null,
+  step: StepId
+) {
+  if (calendar) {
+    return <CalendarStep {...calendar} />;
+  }
+  if (!profile?.ok) {
+    return <FetchErrorState entityName="your profile" />;
+  }
+  return step === "identity" ? (
+    <IdentityContent profile={profile.value} />
+  ) : (
+    <BalancesContent profile={profile.value} />
+  );
+}

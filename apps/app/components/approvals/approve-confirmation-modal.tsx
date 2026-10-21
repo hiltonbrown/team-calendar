@@ -24,8 +24,9 @@ export interface ApprovalModalRecord {
   employeeName: string;
   endsAt: string | Date;
   id: string;
-  organisationId: string;
+  organisationName: string;
   recordType: string;
+  requireDeclineReason: boolean;
   startsAt: string | Date;
 }
 
@@ -49,7 +50,6 @@ export function ApproveConfirmationModal({
     try {
       const action = retry ? retryApprovalAction : approveAction;
       const result = await action({
-        organisationId: record.organisationId,
         recordId: record.id,
       });
       if (!result.ok) {
@@ -74,7 +74,6 @@ export function ApproveConfirmationModal({
     setIsPending(true);
     try {
       const result = await revertApprovalAttemptAction({
-        organisationId: record.organisationId,
         recordId: record.id,
       });
       if (!result.ok) {

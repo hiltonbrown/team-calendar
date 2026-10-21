@@ -1,4 +1,5 @@
 import { Prisma } from "@repo/database/generated/client";
+import { referenceDatabase } from "@repo/database/tenant-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   personFindMany: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -82,12 +84,20 @@ const databaseMock = {
     updateMany: mocks.xeroSyncCursorUpdateMany,
   },
 };
-vi.mock("@repo/database", () => {
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: vi.fn((run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase })
+    ),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: databaseMock,
     scopedTo: mocks.scopedTo,
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -97,13 +107,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  );
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/feeds", () => ({
   feedIdsForPeople: mocks.feedIdsForPeople,
@@ -366,7 +381,10 @@ describe("leave records stale archival", () => {
         upserted: 0,
       });
     }
-    expect(mocks.databaseTransaction).toHaveBeenCalled();
+    expect(referenceDatabase.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ maxWait: 10_000, timeout: 30_000 })
+    );
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -467,7 +485,10 @@ describe("leave records stale archival", () => {
     });
     const result = await syncXeroLeaveRecords(input());
     expect(result.ok).toBe(true);
-    expect(mocks.databaseTransaction).toHaveBeenCalled();
+    expect(referenceDatabase.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ maxWait: 10_000, timeout: 30_000 })
+    );
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         distinct: ["person_id"],
@@ -566,20 +587,27 @@ describe("leave records stale archival", () => {
       });
     }
     // Single transaction for stale archival
-    expect(mocks.databaseTransaction).toHaveBeenCalled();
+    expect(referenceDatabase.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ maxWait: 10_000, timeout: 30_000 })
+    );
     // Publication materialisation is called ONCE for the applied record, ZERO times for stale records
     expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledTimes(1);
     expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledWith(
       expect.objectContaining({
         availabilityRecordId: "80000000-0000-4000-8000-000000000001",
-      })
+      }),
+      expect.any(Object)
     );
     // Canonical feed resolution called with person IDs
-    expect(mocks.feedIdsForPeople).toHaveBeenCalledWith({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: expect.arrayContaining([PERSON_ID, PERSON_ID_2]),
-    });
+    expect(mocks.feedIdsForPeople).toHaveBeenCalledWith(
+      {
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: expect.arrayContaining([PERSON_ID, PERSON_ID_2]),
+      },
+      expect.any(Object)
+    );
     // Feeds deduplicated before enqueue
     expect(mocks.inngestSend).toHaveBeenCalledTimes(1);
     expect(mocks.inngestSend).toHaveBeenCalledWith([
@@ -720,11 +748,14 @@ describe("leave records stale archival", () => {
     );
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledTimes(3);
     expect(mocks.availabilityRecordCreate).toHaveBeenCalledTimes(1);
-    expect(mocks.feedIdsForPeople).toHaveBeenCalledWith({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_ID_2, PERSON_ID_3],
-    });
+    expect(mocks.feedIdsForPeople).toHaveBeenCalledWith(
+      {
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [PERSON_ID_2, PERSON_ID_3],
+      },
+      expect.any(Object)
+    );
     expect(mocks.inngestSend).toHaveBeenCalledTimes(1);
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
@@ -1815,7 +1846,10 @@ describe("regional leave sync (NZ/UK)", () => {
     });
     const result = await syncXeroLeaveRecords(input());
     expect(result.ok).toBe(true);
-    expect(mocks.databaseTransaction).toHaveBeenCalled();
+    expect(referenceDatabase.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ maxWait: 10_000, timeout: 30_000 })
+    );
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

@@ -5,7 +5,8 @@ import {
   type OrganisationId,
   type Result,
 } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { lockPlanLimitMutations, withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { noemailFallbackDomain } from "@repo/seo/branding";
 import { z } from "zod";
@@ -144,6 +145,7 @@ export async function fetchAllClerkMemberships(
   clerkOrganizations: ClerkOrganizationsApi,
   organizationId: string
 ): Promise<ClerkMembershipResource[]> {
+  assertNoTenantTransaction("fetchAllClerkMemberships");
   const memberships: ClerkMembershipResource[] = [];
   const limit = 100;
   let offset = 0;
@@ -169,6 +171,7 @@ export async function fetchAllClerkPendingInvitations(
   clerkOrganizations: ClerkOrganizationsApi,
   organizationId: string
 ): Promise<ClerkInvitationResource[]> {
+  assertNoTenantTransaction("fetchAllClerkPendingInvitations");
   const invitations: ClerkInvitationResource[] = [];
   const limit = 100;
   let offset = 0;
@@ -453,8 +456,8 @@ async function evaluateAllPeopleAndClerkAccess(params: {
   const { clerkOrgId, clerkOrganizations, organisationId } = params;
 
   try {
-    const [people, memberships, pendingInvitations] = await Promise.all([
-      tenantDatabase(clerkOrgId).person.findMany({
+    const people = await withTenantDb(clerkOrgId, (db) =>
+      db.person.findMany({
         orderBy: [{ first_name: "asc" }, { last_name: "asc" }, { id: "asc" }],
         select: {
           archived_at: true,
@@ -471,7 +474,9 @@ async function evaluateAllPeopleAndClerkAccess(params: {
           clerk_org_id: clerkOrgId,
           organisation_id: organisationId,
         },
-      }),
+      })
+    );
+    const [memberships, pendingInvitations] = await Promise.all([
       fetchAllClerkMemberships(clerkOrganizations, clerkOrgId),
       fetchAllClerkPendingInvitations(clerkOrganizations, clerkOrgId),
     ]);
@@ -510,12 +515,13 @@ export async function loadClerkAccessReview(params: {
   clerkOrganizations: ClerkOrganizationsApi;
   organisationId: OrganisationId;
 }): Promise<Result<ClerkAccessReviewResult, ClerkAccessServiceError>> {
+  assertNoTenantTransaction("loadClerkAccessReview");
   const evaluatedResult = await evaluateAllPeopleAndClerkAccess(params);
   if (!evaluatedResult.ok) {
     return evaluatedResult;
   }
 
-  const evaluated = evaluatedResult.value;
+  const { value: evaluated } = evaluatedResult;
   const candidates = evaluated.map((e) => e.candidateView);
 
   let linkableCount = 0;
@@ -570,6 +576,7 @@ export async function reconcileClerkAccessLinks(params: {
     ClerkAccessServiceError
   >
 > {
+  assertNoTenantTransaction("reconcileClerkAccessLinks");
   const { clerkOrgId, organisationId } = params;
   const evaluatedResult = await evaluateAllPeopleAndClerkAccess(params);
   if (!evaluatedResult.ok) {
@@ -583,16 +590,25 @@ export async function reconcileClerkAccessLinks(params: {
   const linkedPersonIds: string[] = [];
 
   for (const item of linkable) {
-    if (item.clerkUserIdToLink) {
-      await tenantDatabase(clerkOrgId).person.update({
-        data: { clerk_user_id: item.clerkUserIdToLink },
-        where: {
-          clerk_org_id: clerkOrgId,
-          id: item.person.id,
-          organisation_id: organisationId,
-        },
+    const { email } = item.person;
+    if (item.clerkUserIdToLink && email) {
+      const linked = await withTenantDb(clerkOrgId, async (db) => {
+        await lockPlanLimitMutations(clerkOrgId, db);
+        return db.person.updateMany({
+          data: { clerk_user_id: item.clerkUserIdToLink },
+          where: {
+            archived_at: null,
+            clerk_org_id: clerkOrgId,
+            clerk_user_id: null,
+            email,
+            id: item.person.id,
+            organisation_id: organisationId,
+          },
+        });
       });
-      linkedPersonIds.push(item.person.id);
+      if (linked.count === 1) {
+        linkedPersonIds.push(item.person.id);
+      }
     }
   }
 
@@ -672,6 +688,7 @@ export async function inviteClerkAccessCandidates(params: {
   inviterUserId: string;
   organisationId: OrganisationId;
 }): Promise<Result<ClerkInvitationDispatchResult, ClerkAccessServiceError>> {
+  assertNoTenantTransaction("inviteClerkAccessCandidates");
   const {
     candidatePersonIds,
     clerkOrgId,
@@ -701,7 +718,7 @@ export async function inviteClerkAccessCandidates(params: {
     return evaluatedResult;
   }
 
-  const evaluated = evaluatedResult.value;
+  const { value: evaluated } = evaluatedResult;
   const invitableCandidates = evaluated.filter(
     (e) =>
       e.candidateView.state === "invitable" &&
@@ -716,7 +733,7 @@ export async function inviteClerkAccessCandidates(params: {
     (e) => e.candidateView.state === "conflict"
   ).length;
 
-  const totalCandidateCount = evaluated.length;
+  const { length: totalCandidateCount } = evaluated;
 
   // 3. Chunk invitable candidates into batches of <= 10 (max 50 batches / 50 requests per hour budget)
   const BATCH_SIZE = 10;

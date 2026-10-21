@@ -1,8 +1,10 @@
 import { auth, currentUser, requireOrg } from "@repo/auth/helpers";
 import { createManualAvailability } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { listPeopleForOrganisation } from "@repo/database/queries/people";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 
@@ -20,6 +22,7 @@ const CreateAvailabilitySchema = z.object({
   workingLocation: z.string().max(200).optional().nullable(),
 });
 export async function POST(request: Request): Promise<Response> {
+  assertNoTenantTransaction("POST");
   try {
     // Get authenticated user and organisation
     let clerkOrgId: string;
@@ -75,67 +78,83 @@ export async function POST(request: Request): Promise<Response> {
     // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId is validated by Zod UUID schema
     const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
     const scopedOrgId = data.organisationId as OrganisationId;
-    // Validate organisation exists and is in scope
-    const orgResult = await getOrganisationById(scopedClerkOrgId, scopedOrgId);
-    if (!orgResult.ok) {
-      return Response.json(
-        { error: orgResult.error, ok: false },
-        { status: orgResult.error.code === "not_found" ? 404 : 500 }
-      );
-    }
-    // Validate person exists in organisation
-    const peopleResult = await listPeopleForOrganisation(
-      scopedClerkOrgId,
-      scopedOrgId
-    );
-    if (!peopleResult.ok) {
-      return Response.json(
-        { error: peopleResult.error, ok: false },
-        { status: 500 }
-      );
-    }
-    const personExists = peopleResult.value.some((p) => p.id === data.personId);
-    if (!personExists) {
-      return Response.json(
-        {
-          error: { code: "not_found", message: "Person not found" },
-          ok: false,
-        },
-        { status: 404 }
-      );
-    }
     const authResult = await auth();
-    // Call availability service to create record
-    const createResult = await (() =>
-      createManualAvailability(
-        {
-          clerkOrgId: scopedClerkOrgId,
-          organisationId: scopedOrgId,
-        },
-        {
-          allDay: data.allDay,
-          contactability: data.contactability,
-          endsAt: new Date(data.endsAt),
-          notesInternal: data.notesInternal,
-          personId: data.personId,
-          preferredContactMethod: data.preferredContactMethod,
-          recordType: data.recordType,
-          startsAt: new Date(data.startsAt),
-          title: data.title,
-          workingLocation: data.workingLocation,
-        },
-        { orgRole: authResult.orgRole, userId: user.id }
-      ))();
-    if (!createResult.ok) {
-      return Response.json(
-        { error: createResult.error, ok: false },
-        { status: statusForCreateError(createResult.error.code) }
-      );
-    }
-    return Response.json(
-      { ok: true, value: createResult.value },
-      { status: 201 }
+    const prepared = await withTenantResult(
+      scopedClerkOrgId,
+      async (db): Promise<Result<HttpDescriptor, HttpDescriptor>> => {
+        // Validate organisation exists and is in scope
+        const orgResult = await getOrganisationById(
+          scopedClerkOrgId,
+          scopedOrgId,
+          db
+        );
+        if (!orgResult.ok) {
+          return httpDescriptor(
+            { error: orgResult.error, ok: false },
+            { status: orgResult.error.code === "not_found" ? 404 : 500 }
+          );
+        }
+        // Validate person exists in organisation
+        const peopleResult = await listPeopleForOrganisation(
+          scopedClerkOrgId,
+          scopedOrgId,
+          undefined,
+          db
+        );
+        if (!peopleResult.ok) {
+          return httpDescriptor(
+            { error: peopleResult.error, ok: false },
+            { status: 500 }
+          );
+        }
+        const personExists = peopleResult.value.some(
+          (p) => p.id === data.personId
+        );
+        if (!personExists) {
+          return httpDescriptor(
+            {
+              error: { code: "not_found", message: "Person not found" },
+              ok: false,
+            },
+            { status: 404 }
+          );
+        }
+        // Call availability service to create record
+        const createResult = await (() =>
+          createManualAvailability(
+            {
+              clerkOrgId: scopedClerkOrgId,
+              organisationId: scopedOrgId,
+            },
+            {
+              allDay: data.allDay,
+              contactability: data.contactability,
+              endsAt: new Date(data.endsAt),
+              notesInternal: data.notesInternal,
+              personId: data.personId,
+              preferredContactMethod: data.preferredContactMethod,
+              recordType: data.recordType,
+              startsAt: new Date(data.startsAt),
+              title: data.title,
+              workingLocation: data.workingLocation,
+            },
+            { orgRole: authResult.orgRole, userId: user.id },
+            db
+          ))();
+        if (!createResult.ok) {
+          return httpDescriptor(
+            { error: createResult.error, ok: false },
+            { status: statusForCreateError(createResult.error.code) }
+          );
+        }
+        return httpDescriptor(
+          { ok: true, value: createResult.value },
+          { status: 201 }
+        );
+      }
     );
+    const descriptor = prepared.ok ? prepared.value : prepared.error;
+    return Response.json(descriptor.body, { status: descriptor.status });
   } catch (error) {
     log.error("Error creating availability record", { error });
     return Response.json(
@@ -164,4 +183,18 @@ function statusForCreateError(code: string): number {
     return 403;
   }
   return 500;
+}
+
+interface HttpDescriptor {
+  body: unknown;
+  status: number;
+}
+function httpDescriptor(
+  body: unknown,
+  init?: { status: number }
+): Result<HttpDescriptor, HttpDescriptor> {
+  const descriptor = { body, status: init?.status ?? 200 };
+  return descriptor.status >= 400
+    ? { error: descriptor, ok: false }
+    : { ok: true, value: descriptor };
 }

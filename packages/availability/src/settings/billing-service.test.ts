@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -6,8 +8,18 @@ const mocks = vi.hoisted(() => ({
   getSubscriptionForOrg: vi.fn(),
 }));
 
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));
+
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
   getAuthoritativeUsageCount: mocks.getAuthoritativeUsageCount,
   getPlanDefinition: (key: string) => ({
     name: `${key.charAt(0).toUpperCase()}${key.slice(1)}`,
@@ -47,7 +59,10 @@ describe("billing-service", () => {
   });
 
   it("returns plan, authoritative usage, and over-limit state", async () => {
-    const result = await getBillingSummary(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => getBillingSummary(baseInput, db)
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -86,17 +101,27 @@ describe("billing-service", () => {
       },
     ]);
     expect(mocks.getAuthoritativeUsageCount.mock.calls).toEqual([
-      ["org_1", "payroll_entities"],
-      ["org_1", "seats"],
-      ["org_1", "feeds"],
+      ["org_1", "payroll_entities", expect.any(Object)],
+      ["org_1", "seats", expect.any(Object)],
+      ["org_1", "feeds", expect.any(Object)],
     ]);
   });
 
   it("allows admins", async () => {
-    const result = await getBillingSummary({
-      ...baseInput,
-      actingRole: "admin",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingRole: "admin",
+      }),
+      (db) =>
+        getBillingSummary(
+          {
+            ...baseInput,
+            actingRole: "admin",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -105,10 +130,20 @@ describe("billing-service", () => {
   });
 
   it("rejects roles below admin", async () => {
-    const result = await getBillingSummary({
-      ...baseInput,
-      actingRole: "viewer",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingRole: "viewer",
+      }),
+      (db) =>
+        getBillingSummary(
+          {
+            ...baseInput,
+            actingRole: "viewer",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
@@ -124,7 +159,10 @@ describe("billing-service", () => {
       seats: 10,
     });
 
-    const result = await getBillingSummary(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => getBillingSummary(baseInput, db)
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -143,7 +181,10 @@ describe("billing-service", () => {
         Promise.resolve({ feeds: 5, payroll_entities: 1, seats: 10 }[limitType])
     );
 
-    const result = await getBillingSummary(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => getBillingSummary(baseInput, db)
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -159,7 +200,10 @@ describe("billing-service", () => {
         )
     );
 
-    const result = await getBillingSummary(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => getBillingSummary(baseInput, db)
+    );
 
     expect(result).toMatchObject({ ok: true, value: { isOverLimit: false } });
   });

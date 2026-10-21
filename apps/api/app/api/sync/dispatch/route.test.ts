@@ -4,13 +4,16 @@ const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   dispatchManualSync: vi.fn(),
   getXeroConnectionState: vi.fn(),
+  prepareManualSync: vi.fn(),
   reconcileXeroApprovalState: vi.fn(),
+  recordManualSyncDispatch: vi.fn(),
   requireOrg: vi.fn(),
   requireRole: vi.fn(),
   syncRunFindFirst: vi.fn(),
   syncXeroLeaveBalances: vi.fn(),
   syncXeroLeaveRecords: vi.fn(),
   syncXeroPeople: vi.fn(),
+  transactionOpen: false,
   xeroTenantFindFirst: vi.fn(),
 }));
 vi.mock("@repo/auth/helpers", () => ({
@@ -19,17 +22,41 @@ vi.mock("@repo/auth/helpers", () => ({
   requireRole: mocks.requireRole,
 }));
 vi.mock("@repo/availability", () => ({
-  dispatchManualSync: mocks.dispatchManualSync,
+  prepareManualSync: mocks.prepareManualSync,
+  recordManualSyncDispatch: mocks.recordManualSyncDispatch,
+  sendPreparedManualSync: vi.fn((prepared: { input: unknown }) => {
+    if (mocks.transactionOpen) {
+      throw new Error("Send ran before commit");
+    }
+    return mocks.dispatchManualSync(prepared.input);
+  }),
 }));
 vi.mock("@repo/database/queries/xero-connection-state", () => ({
   getXeroConnectionState: mocks.getXeroConnectionState,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return {
     syncRun: { findFirst: mocks.syncRunFindFirst },
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-  })),
-}));
+  };
+}
 vi.mock("@repo/jobs", () => ({
   reconcileXeroApprovalState: mocks.reconcileXeroApprovalState,
   syncXeroLeaveBalances: mocks.syncXeroLeaveBalances,
@@ -65,6 +92,16 @@ function successfulInlineResult() {
 describe("manual sync dispatch route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.prepareManualSync.mockImplementation(
+      async (requestInput: unknown) => ({
+        ok: true,
+        value: { input: requestInput, kind: "send" },
+      })
+    );
+    mocks.recordManualSyncDispatch.mockResolvedValue({
+      ok: true,
+      value: undefined,
+    });
     mocks.getXeroConnectionState.mockResolvedValue({
       ok: true,
       value: { state: "connected" },

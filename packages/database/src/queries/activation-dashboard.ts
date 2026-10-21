@@ -1,4 +1,4 @@
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { getUnresolvedStripeEventsForOrg } from "./billing";
 
 interface ActivationDashboardRow {
@@ -28,13 +28,18 @@ export interface ActivationDashboardSummary {
   };
 }
 
-export async function getActivationDashboardSummary(input: {
-  clerkOrgId: string;
-  organisationId: string;
-}): Promise<ActivationDashboardSummary> {
-  const rows = await tenantDatabase(input.clerkOrgId).$queryRaw<
-    ActivationDashboardRow[]
-  >`
+export async function getActivationDashboardSummary(
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<ActivationDashboardSummary> {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const tenantDb = db;
+
+    const rows = await tenantDb.$queryRaw<ActivationDashboardRow[]>`
     SELECT
       EXISTS (SELECT 1 FROM xero_connections WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${input.organisationId} AND status = 'active') AS xero_connected,
       (SELECT COUNT(DISTINCT run_type) = 3 FROM sync_runs WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${input.organisationId} AND status = 'succeeded' AND run_type IN ('people', 'leave_records', 'leave_balances')) AS initial_sync_completed,
@@ -45,25 +50,26 @@ export async function getActivationDashboardSummary(input: {
       (SELECT COUNT(*) FROM availability_records WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${input.organisationId} AND approval_status = 'xero_sync_failed')::bigint AS xero_write_failures,
       0::bigint AS stripe_delivery_failures
   `;
-  const [row] = rows;
-  if (!row) {
-    throw new Error("Activation dashboard aggregation returned no row");
+    const [row] = rows;
+    if (!row) {
+      throw new Error("Activation dashboard aggregation returned no row");
+    }
+    return {
+      failures: {
+        stripeDeliveries: (
+          await getUnresolvedStripeEventsForOrg(input.clerkOrgId)
+        ).length,
+        syncRecords: Number(row.sync_failures),
+        xeroWrites: Number(row.xero_write_failures),
+      },
+      milestones: {
+        feedAccessed: row.feed_accessed,
+        firstLeaveApproved: row.first_leave_approved,
+        firstLeaveSubmitted: row.first_leave_submitted,
+        initialSyncCompleted: row.initial_sync_completed,
+        organisationProvisioned: true,
+        xeroConnected: row.xero_connected,
+      },
+    };
   }
-  return {
-    failures: {
-      stripeDeliveries: (
-        await getUnresolvedStripeEventsForOrg(input.clerkOrgId)
-      ).length,
-      syncRecords: Number(row.sync_failures),
-      xeroWrites: Number(row.xero_write_failures),
-    },
-    milestones: {
-      feedAccessed: row.feed_accessed,
-      firstLeaveApproved: row.first_leave_approved,
-      firstLeaveSubmitted: row.first_leave_submitted,
-      initialSyncCompleted: row.initial_sync_completed,
-      organisationProvisioned: true,
-      xeroConnected: row.xero_connected,
-    },
-  };
 }

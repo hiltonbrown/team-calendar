@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
+import { assertNoTenantTransaction, withTenantDb } from "@repo/database";
 import { ensureXeroInitialSyncRequested } from "@repo/database/queries/xero-sync-cursors";
 import { z } from "zod";
 import { inngest } from "./client";
@@ -232,6 +233,7 @@ export async function dispatchInitialXeroSync(
     }
   >
 > {
+  assertNoTenantTransaction("dispatchInitialXeroSync");
   const parsed = InitialXeroSyncEventSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -244,7 +246,9 @@ export async function dispatchInitialXeroSync(
     };
   }
   try {
-    const requestedAt = await ensureXeroInitialSyncRequested(parsed.data);
+    const requestedAt = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+      ensureXeroInitialSyncRequested(parsed.data, db)
+    );
     if (
       !requestedAt ||
       (parsed.data.requestedAt && parsed.data.requestedAt !== requestedAt)

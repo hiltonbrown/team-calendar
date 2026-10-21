@@ -2,7 +2,12 @@
 import { requireRole } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
-import { tenantDatabase, tenantTransaction } from "@repo/database";
+import {
+  afterTenantCommit,
+  withTenantDb,
+  withTenantResult,
+} from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
@@ -12,7 +17,6 @@ import {
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ConnectSchema = z.object({
   organisationId: z.string().uuid().optional(),
@@ -59,6 +63,7 @@ export async function connectXeroAction(input: {
     redirectUrl: string;
   }>
 > {
+  assertNoTenantTransaction("connectXeroAction");
   if (!(await canManageXero())) {
     return notAuthorised();
   }
@@ -76,11 +81,8 @@ export async function connectXeroAction(input: {
   const baseUrl = env.NEXT_PUBLIC_API_URL ?? env.NEXT_PUBLIC_APP_URL;
   const redirectUrl = new URL("/api/xero/oauth/start", baseUrl);
   redirectUrl.searchParams.set("clerkOrgId", context.value.clerkOrgId);
-  if (context.value.organisationId) {
-    redirectUrl.searchParams.set(
-      "organisationId",
-      context.value.organisationId
-    );
+  if (parsed.data.organisationId) {
+    redirectUrl.searchParams.set("organisationId", parsed.data.organisationId);
   }
   redirectUrl.searchParams.set("returnTo", parsed.data.returnTo);
   redirectUrl.searchParams.set("userId", context.value.actingUserId);
@@ -97,6 +99,7 @@ export async function disconnectXeroAction(input: {
     result: XeroDisconnectResult;
   }>
 > {
+  assertNoTenantTransaction("disconnectXeroAction");
   if (!(await canManageXero())) {
     return notAuthorised();
   }
@@ -104,36 +107,43 @@ export async function disconnectXeroAction(input: {
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveAdminContext(parsed.data.organisationId);
+  const context = await resolveAdminIdentity(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-  const organisation = await tenantDatabase(
-    context.value.clerkOrgId
-  ).organisation.findFirst({
-    select: { name: true },
-    where: {
-      clerk_org_id: context.value.clerkOrgId,
-      id: context.value.organisationId,
-    },
-  });
-  if (!organisation || organisation.name !== parsed.data.confirmationText) {
-    return validationError("Type the organisation name to confirm disconnect.");
-  }
-  const connection = await tenantDatabase(
-    context.value.clerkOrgId
-  ).xeroConnection.findFirst({
-    select: { id: true },
-    where: {
-      clerk_org_id: context.value.clerkOrgId,
-      id: parsed.data.connectionId,
-      organisation_id: context.value.organisationId,
-    },
-  });
-  if (!connection) {
-    return validationError(
-      "Xero connection was not found in this organisation."
-    );
+  const prepared = await withTenantResult(
+    context.value.clerkOrgId,
+    async (client): Promise<ActionResult<void>> => {
+      const organisation = await client.organisation.findFirst({
+        select: { name: true },
+        where: {
+          clerk_org_id: context.value.clerkOrgId,
+          id: context.value.organisationId,
+        },
+      });
+      if (!organisation || organisation.name !== parsed.data.confirmationText) {
+        return validationError(
+          "Type the organisation name to confirm disconnect."
+        );
+      }
+      const connection = await client.xeroConnection.findFirst({
+        select: { id: true },
+        where: {
+          clerk_org_id: context.value.clerkOrgId,
+          id: parsed.data.connectionId,
+          organisation_id: context.value.organisationId,
+        },
+      });
+      if (!connection) {
+        return validationError(
+          "Xero connection was not found in this organisation."
+        );
+      }
+      return { ok: true, value: undefined };
+    }
+  );
+  if (!prepared.ok) {
+    return prepared;
   }
   return await (async () => {
     const result = await disconnectXeroOAuthConnection({
@@ -164,6 +174,7 @@ export async function pauseTenantSyncAction(input: {
     paused: true;
   }>
 > {
+  assertNoTenantTransaction("pauseTenantSyncAction");
   return await updateTenantPauseState(input, true);
 }
 export async function resumeTenantSyncAction(input: {
@@ -174,6 +185,7 @@ export async function resumeTenantSyncAction(input: {
     resumed: true;
   }>
 > {
+  assertNoTenantTransaction("resumeTenantSyncAction");
   const result = await updateTenantPauseState(input, false);
   if (!result.ok) {
     return result;
@@ -198,48 +210,59 @@ async function updateTenantPauseState(
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveAdminContext(parsed.data.organisationId);
+  const context = await resolveAdminIdentity(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-  return await (async () => {
-    const updated = await tenantTransaction(
-      context.value.clerkOrgId,
-      async (tx) => {
-        const result = await tx.xeroConnection.updateMany({
-          data: { sync_paused_at: paused ? new Date() : null },
-          where: {
-            clerk_org_id: context.value.clerkOrgId,
-            id: parsed.data.connectionId,
-            organisation_id: context.value.organisationId,
-          },
-        });
-        if (result.count === 0) {
-          return false;
-        }
-        await tx.auditEvent.create({
-          data: {
-            ...auditBase(context.value),
-            action: paused
-              ? "xero.tenant_sync_paused"
-              : "xero.tenant_sync_resumed",
-            entity_id: parsed.data.connectionId,
-            entity_type: "xero_tenant",
-            metadata: {},
-            resource_id: parsed.data.connectionId,
-            resource_type: "xero_tenant",
-          },
-        });
-        return true;
+  return withTenantResult(
+    context.value.clerkOrgId,
+    async (db): Promise<ActionResult<{ paused: true }>> => {
+      const company = await db.organisation.findFirst({
+        select: { id: true },
+        where: {
+          clerk_org_id: context.value.clerkOrgId,
+          id: context.value.organisationId,
+        },
+      });
+      if (!company) {
+        return notAuthorised();
       }
-    );
-    if (!updated) {
-      return validationError("Xero tenant was not found in this organisation.");
+      const updated = await db.xeroConnection.updateMany({
+        data: { sync_paused_at: paused ? new Date() : null },
+        where: {
+          clerk_org_id: context.value.clerkOrgId,
+          id: parsed.data.connectionId,
+          organisation_id: context.value.organisationId,
+        },
+      });
+      if (updated.count !== 1) {
+        return validationError(
+          "Xero tenant was not found in this organisation."
+        );
+      }
+      await db.auditEvent.create({
+        data: {
+          ...auditBase(context.value),
+          action: paused
+            ? "xero.tenant_sync_paused"
+            : "xero.tenant_sync_resumed",
+          entity_id: parsed.data.connectionId,
+          entity_type: "xero_tenant",
+          metadata: {},
+          resource_id: parsed.data.connectionId,
+          resource_type: "xero_tenant",
+        },
+      });
+      afterTenantCommit(db, () => {
+        revalidate();
+
+        return Promise.resolve();
+      });
+      return { ok: true, value: { paused: true } };
     }
-    revalidate();
-    return { ok: true, value: { paused: true } };
-  })();
+  );
 }
+
 async function canManageXero(): Promise<boolean> {
   const [admin, owner] = await Promise.all([
     requireRole("org:admin"),
@@ -271,6 +294,7 @@ export async function removeCompanyAction(input: {
   connectionId: string;
   confirmationText: string;
 }): Promise<ActionResult<{ removed: true }>> {
+  assertNoTenantTransaction("removeCompanyAction");
   if (!(await requireRole("org:owner"))) {
     return notAuthorised();
   }
@@ -278,20 +302,20 @@ export async function removeCompanyAction(input: {
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveAdminContext(parsed.data.organisationId, true);
+  const context = await resolveAdminIdentity(parsed.data.organisationId, true);
   if (!context.ok) {
     return context;
   }
-  const company = await tenantDatabase(
-    context.value.clerkOrgId
-  ).organisation.findFirst({
-    select: { name: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: context.value.clerkOrgId,
-      id: context.value.organisationId,
-    },
-  });
+  const company = await withTenantDb(context.value.clerkOrgId, (db) =>
+    db.organisation.findFirst({
+      select: { name: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: context.value.clerkOrgId,
+        id: context.value.organisationId,
+      },
+    })
+  );
   if (!company || company.name !== parsed.data.confirmationText) {
     return validationError("Type the company name to confirm removal.");
   }
@@ -313,7 +337,7 @@ export async function removeCompanyAction(input: {
   revalidatePath("/people");
   return { ok: true, value: { removed: true } };
 }
-async function resolveAdminContext(
+async function resolveAdminIdentity(
   organisationId: string,
   ownerOnly = false
 ): Promise<
@@ -326,17 +350,16 @@ async function resolveAdminContext(
     userAgent: null | string;
   }>
 > {
-  const [{ orgRole }, user, context, requestHeaders] = await Promise.all([
+  const [{ orgId, orgRole }, user, requestHeaders] = await Promise.all([
     auth(),
     currentUser(),
-    getActiveOrgContext(organisationId),
     headers(),
   ]);
   if (
     !(
       (orgRole === "org:owner" || (!ownerOnly && orgRole === "org:admin")) &&
       user &&
-      context.ok
+      orgId
     )
   ) {
     return notAuthorised();
@@ -349,13 +372,30 @@ async function resolveAdminContext(
         [user.firstName, user.lastName].filter(Boolean).join(" ") ||
         user.emailAddresses[0]?.emailAddress ||
         "Unknown user",
-      clerkOrgId: context.value.clerkOrgId,
+      clerkOrgId: orgId,
       ipAddress: requestHeaders.get("x-forwarded-for"),
-      organisationId: context.value.organisationId,
+      organisationId,
       userAgent: requestHeaders.get("user-agent"),
     },
   };
 }
+async function resolveAdminContext(
+  organisationId: string,
+  ownerOnly = false
+): ReturnType<typeof resolveAdminIdentity> {
+  const identity = await resolveAdminIdentity(organisationId, ownerOnly);
+  if (!identity.ok) {
+    return identity;
+  }
+  const company = await withTenantDb(identity.value.clerkOrgId, (db) =>
+    db.organisation.findFirst({
+      select: { id: true },
+      where: { clerk_org_id: identity.value.clerkOrgId, id: organisationId },
+    })
+  );
+  return company ? identity : notAuthorised();
+}
+
 function auditBase(input: {
   actingUserId: string;
   actorDisplay: string;

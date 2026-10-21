@@ -2,6 +2,8 @@
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Prisma } from "./generated/client";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
@@ -73,20 +75,30 @@ describe("authoritative billing usage", () => {
         ),
       ],
     });
-    await expect(getAuthoritativeUsageCount(clerkOrgId, "seats")).resolves.toBe(
-      1
-    );
-    await expect(getAuthoritativeUsageCount(clerkOrgId, "feeds")).resolves.toBe(
-      1
-    );
     await expect(
-      getAuthoritativeUsageCount(clerkOrgId, "payroll_entities")
+      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
+        getAuthoritativeUsageCount(clerkOrgId, "seats", db)
+      )
     ).resolves.toBe(1);
     await expect(
-      getAuthoritativeUsageCount(clerkOrgId, "organisations")
+      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
+        getAuthoritativeUsageCount(clerkOrgId, "feeds", db)
+      )
     ).resolves.toBe(1);
     await expect(
-      getAuthoritativeUsageCount(clerkOrgId, "connections")
+      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
+        getAuthoritativeUsageCount(clerkOrgId, "payroll_entities", db)
+      )
+    ).resolves.toBe(1);
+    await expect(
+      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
+        getAuthoritativeUsageCount(clerkOrgId, "organisations", db)
+      )
+    ).resolves.toBe(1);
+    await expect(
+      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
+        getAuthoritativeUsageCount(clerkOrgId, "connections", db)
+      )
     ).resolves.toBe(1);
   });
 });

@@ -6,9 +6,12 @@ import {
   createManualAvailability,
   updateManualAvailability,
 } from "@repo/availability";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { afterTenantCommit, withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ManualAvailabilityActionSchema = z.object({
   allDay: z.boolean().default(true),
@@ -42,6 +45,7 @@ export type AvailabilityActionResult =
 export async function createManualAvailabilityAction(
   input: ManualAvailabilityActionInput
 ): Promise<AvailabilityActionResult> {
+  assertNoTenantTransaction("createManualAvailabilityAction");
   const parsed = ManualAvailabilityActionSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -50,39 +54,55 @@ export async function createManualAvailabilityAction(
     };
   }
 
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false };
-  }
-
-  const authResult = await auth();
-  if (authResult.orgId !== contextResult.value.clerkOrgId) {
+  const [authResult, user] = await Promise.all([auth(), currentUser()]);
+  if (!(authResult.orgId && user)) {
     return { error: "Not authenticated", ok: false };
   }
+  const clerkOrgId = authResult.orgId as ClerkOrgId;
+  try {
+    const prepared = await withTenantResult(
+      clerkOrgId,
+      async (db): Promise<Result<{ id?: string }, string>> => {
+        const company = await getOrganisationById(
+          clerkOrgId,
+          parsed.data.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await createManualAvailability(
+          { clerkOrgId, organisationId: company.value.id as OrganisationId },
+          toServiceInput(parsed.data),
+          { orgRole: authResult.orgRole, userId: user.id },
+          db
+        );
 
-  const user = await currentUser();
-  if (!user) {
-    return { error: "Not authenticated", ok: false };
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+
+        afterTenantCommit(db, () => {
+          revalidateAvailabilityPaths();
+
+          return Promise.resolve();
+        });
+        return { ok: true, value: { id: result.value.id } };
+      }
+    );
+    return prepared.ok
+      ? { ok: true, ...prepared.value }
+      : { error: prepared.error, ok: false };
+  } catch {
+    return { error: "Failed to save availability record.", ok: false };
   }
-
-  const result = await createManualAvailability(
-    contextResult.value,
-    toServiceInput(parsed.data),
-    { orgRole: authResult.orgRole, userId: user.id }
-  );
-
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
-  }
-
-  revalidateAvailabilityPaths();
-  return { id: result.value.id, ok: true };
 }
 
 export async function updateManualAvailabilityAction(
   recordId: string,
   input: ManualAvailabilityActionInput
 ): Promise<AvailabilityActionResult> {
+  assertNoTenantTransaction("updateManualAvailabilityAction");
   const recordParsed = z.string().uuid().safeParse(recordId);
   if (!recordParsed.success) {
     return { error: "Invalid availability record", ok: false };
@@ -96,71 +116,102 @@ export async function updateManualAvailabilityAction(
     };
   }
 
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false };
-  }
-
-  const authResult = await auth();
-  if (authResult.orgId !== contextResult.value.clerkOrgId) {
+  const [authResult, user] = await Promise.all([auth(), currentUser()]);
+  if (!(authResult.orgId && user)) {
     return { error: "Not authenticated", ok: false };
   }
+  const clerkOrgId = authResult.orgId as ClerkOrgId;
+  try {
+    const prepared = await withTenantResult(
+      clerkOrgId,
+      async (db): Promise<Result<{ id?: string }, string>> => {
+        const company = await getOrganisationById(
+          clerkOrgId,
+          parsed.data.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await updateManualAvailability(
+          { clerkOrgId, organisationId: company.value.id as OrganisationId },
+          recordParsed.data,
+          toServiceInput(parsed.data),
+          { orgRole: authResult.orgRole, userId: user.id },
+          db
+        );
 
-  const user = await currentUser();
-  if (!user) {
-    return { error: "Not authenticated", ok: false };
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+
+        afterTenantCommit(db, () => {
+          revalidateAvailabilityPaths();
+
+          return Promise.resolve();
+        });
+        return { ok: true, value: { id: result.value.id } };
+      }
+    );
+    return prepared.ok
+      ? { ok: true, ...prepared.value }
+      : { error: prepared.error, ok: false };
+  } catch {
+    return { error: "Failed to save availability record.", ok: false };
   }
-
-  const result = await updateManualAvailability(
-    contextResult.value,
-    recordParsed.data,
-    toServiceInput(parsed.data),
-    { orgRole: authResult.orgRole, userId: user.id }
-  );
-
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
-  }
-
-  revalidateAvailabilityPaths();
-  return { id: result.value.id, ok: true };
 }
 
 export async function archiveManualAvailabilityAction(
   input: z.infer<typeof RecordActionSchema>
 ): Promise<AvailabilityActionResult> {
+  assertNoTenantTransaction("archiveManualAvailabilityAction");
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return { error: "Invalid availability record", ok: false };
   }
 
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false };
-  }
-
-  const authResult = await auth();
-  if (authResult.orgId !== contextResult.value.clerkOrgId) {
+  const [authResult, user] = await Promise.all([auth(), currentUser()]);
+  if (!(authResult.orgId && user)) {
     return { error: "Not authenticated", ok: false };
   }
+  const clerkOrgId = authResult.orgId as ClerkOrgId;
+  try {
+    const prepared = await withTenantResult(
+      clerkOrgId,
+      async (db): Promise<Result<{ id?: string }, string>> => {
+        const company = await getOrganisationById(
+          clerkOrgId,
+          parsed.data.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await archiveManualAvailability(
+          { clerkOrgId, organisationId: company.value.id as OrganisationId },
+          parsed.data.recordId,
+          { orgRole: authResult.orgRole, userId: user.id },
+          db
+        );
 
-  const user = await currentUser();
-  if (!user) {
-    return { error: "Not authenticated", ok: false };
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+
+        afterTenantCommit(db, () => {
+          revalidateAvailabilityPaths();
+
+          return Promise.resolve();
+        });
+        return { ok: true, value: {} };
+      }
+    );
+    return prepared.ok
+      ? { ok: true, ...prepared.value }
+      : { error: prepared.error, ok: false };
+  } catch {
+    return { error: "Failed to save availability record.", ok: false };
   }
-
-  const result = await archiveManualAvailability(
-    contextResult.value,
-    parsed.data.recordId,
-    { orgRole: authResult.orgRole, userId: user.id }
-  );
-
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
-  }
-
-  revalidateAvailabilityPaths();
-  return { ok: true };
 }
 
 function toServiceInput(input: ManualAvailabilityActionInput) {

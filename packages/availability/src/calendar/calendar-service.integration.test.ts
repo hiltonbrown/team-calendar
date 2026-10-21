@@ -1,4 +1,6 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -27,7 +29,7 @@ const companies = [
     name: "Other account",
   },
 ];
-const { systemDatabase, tenantTransaction } = await import("@repo/database");
+const { systemDatabase, withTenantDb } = await import("@repo/database");
 const { getCalendarRange } = await import("./calendar-service");
 const clerkOrgIds = [accountA.clerkOrgId, accountB.clerkOrgId];
 const input = {
@@ -95,7 +97,9 @@ beforeAll(async () => {
 afterAll(clean);
 describe("account-wide calendar isolation", () => {
   it("keeps identical provider IDs separate and transforms private leave before returning it", async () => {
-    const result = await getCalendarRange(input);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      getCalendarRange(input, db)
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -126,23 +130,43 @@ describe("account-wide calendar isolation", () => {
   });
   it("filters to an owned company and rejects crafted other-account company IDs", async () => {
     const [, ownCompany] = companies;
-    const result = await getCalendarRange({
-      ...input,
-      companyIds: [ownCompany.id],
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        companyIds: [ownCompany.id],
+      }),
+      (db) =>
+        getCalendarRange(
+          {
+            ...input,
+            companyIds: [ownCompany.id],
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       ok: true,
       value: { people: [{ companyId: ownCompany.id }] },
     });
     expect(
-      await getCalendarRange({
-        ...input,
-        companyIds: [accountB.organisationId],
-      })
+      await withTestTenantResult(
+        tenantTestAccount({
+          ...input,
+          companyIds: [accountB.organisationId],
+        }),
+        (db) =>
+          getCalendarRange(
+            {
+              ...input,
+              companyIds: [accountB.organisationId],
+            },
+            db
+          )
+      )
     ).toMatchObject({ error: { code: "validation_error" }, ok: false });
   });
   it("enforces RLS when all application filters are removed", async () => {
-    const records = await tenantTransaction(accountA.clerkOrgId, (tx) =>
+    const records = await withTenantDb(accountA.clerkOrgId, (tx) =>
       tx.availabilityRecord.findMany({
         select: { id: true, organisation_id: true },
       })

@@ -11,11 +11,14 @@ import { LeaveApprovalSettingsClient } from "./leave-approval-settings-client";
 
 const mocks = vi.hoisted(() => ({
   restoreLeaveApprovalDefaultsAction: vi.fn(),
+  updateAccountManagerVisibilityAction: vi.fn(),
   updateLeaveApprovalSettingsAction: vi.fn(),
 }));
 
 vi.mock("./_actions", () => ({
   restoreLeaveApprovalDefaultsAction: mocks.restoreLeaveApprovalDefaultsAction,
+  updateAccountManagerVisibilityAction:
+    mocks.updateAccountManagerVisibilityAction,
   updateLeaveApprovalSettingsAction: mocks.updateLeaveApprovalSettingsAction,
 }));
 
@@ -28,7 +31,6 @@ const settings: OrganisationSettings = {
   defaultPrivacyMode: "named",
   feedsIncludePublicHolidaysDefault: false,
   id: "70000000-0000-4000-8000-000000000002",
-  managerVisibilityScope: "direct_reports_only",
   notifyManagersOnStatusChange: true,
   organisationId,
   requireDeclineReason: true,
@@ -42,11 +44,16 @@ describe("LeaveApprovalSettingsClient", () => {
     cleanup();
     mocks.restoreLeaveApprovalDefaultsAction.mockReset();
     mocks.updateLeaveApprovalSettingsAction.mockReset();
+    mocks.updateAccountManagerVisibilityAction.mockReset();
   });
 
   it("gives every auto-save switch an accessible name and exposes the fixed decline policy", () => {
     render(
       <LeaveApprovalSettingsClient
+        accountSettings={{
+          clerkOrgId: settings.clerkOrgId,
+          managerVisibilityScope: "direct_reports_only",
+        }}
         organisationId={organisationId}
         settings={settings}
       />
@@ -93,6 +100,10 @@ describe("LeaveApprovalSettingsClient", () => {
     });
     render(
       <LeaveApprovalSettingsClient
+        accountSettings={{
+          clerkOrgId: settings.clerkOrgId,
+          managerVisibilityScope: "direct_reports_only",
+        }}
         organisationId={organisationId}
         settings={settings}
       />
@@ -107,4 +118,32 @@ describe("LeaveApprovalSettingsClient", () => {
       patch: { showPendingOnCalendar: false },
     });
   });
+});
+
+it("saves manager visibility to the account action without a company id", async () => {
+  mocks.updateAccountManagerVisibilityAction.mockResolvedValue({
+    ok: true,
+    value: { updated: true },
+  });
+  render(
+    <LeaveApprovalSettingsClient
+      accountSettings={{
+        clerkOrgId: settings.clerkOrgId,
+        managerVisibilityScope: "direct_reports_only",
+      }}
+      organisationId={organisationId}
+      settings={settings}
+    />
+  );
+  fireEvent.click(
+    screen.getByRole("radio", {
+      name: "All team leave including indirect reports",
+    })
+  );
+  await waitFor(() =>
+    expect(mocks.updateAccountManagerVisibilityAction).toHaveBeenCalledWith({
+      managerVisibilityScope: "all_team_leave",
+    })
+  );
+  expect(mocks.updateLeaveApprovalSettingsAction).not.toHaveBeenCalled();
 });

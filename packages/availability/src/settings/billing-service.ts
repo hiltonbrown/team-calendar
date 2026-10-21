@@ -2,11 +2,13 @@ import "server-only";
 
 import { type PlanKey, planKeys, type Result } from "@repo/core";
 import {
+  assertTenantDb,
   getAuthoritativeUsageCount,
   getPlanDefinition,
   getPlanLimits,
   getSubscriptionForOrg,
   limitTypes,
+  type TenantDb,
 } from "@repo/database";
 import { z } from "zod";
 
@@ -49,87 +51,94 @@ const SummarySchema = z.object({
 });
 
 export async function getBillingSummary(
-  input: z.input<typeof SummarySchema>
+  input: z.input<typeof SummarySchema>,
+  db: TenantDb
 ): Promise<Result<BillingSummary, BillingServiceError>> {
-  const parsed = SummarySchema.safeParse(input);
-  if (!parsed.success) {
-    return unknownError("Failed to load billing summary.");
-  }
-  if (
-    parsed.data.actingRole !== "owner" &&
-    parsed.data.actingRole !== "admin"
-  ) {
-    return {
-      error: {
-        code: "not_authorised",
-        message: "Billing is managed by the account owner.",
-      },
-      ok: false,
-    };
-  }
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  const summaryResult = await loadBillingSummary(parsed.data);
-  if (!summaryResult.ok) {
-    return summaryResult;
-  }
+    const parsed = SummarySchema.safeParse(input);
+    if (!parsed.success) {
+      return unknownError("Failed to load billing summary.");
+    }
+    if (
+      parsed.data.actingRole !== "owner" &&
+      parsed.data.actingRole !== "admin"
+    ) {
+      return {
+        error: {
+          code: "not_authorised",
+          message: "Billing is managed by the account owner.",
+        },
+        ok: false,
+      };
+    }
 
-  return {
-    ok: true,
-    value: {
-      ...summaryResult.value,
-      hasContactFlow: true,
-      hasUpgradeFlow: true,
-    },
-  };
-}
-
-async function loadBillingSummary(
-  input: z.infer<typeof SummarySchema>
-): Promise<Result<BillingSummaryCore, BillingServiceError>> {
-  try {
-    const [subscription, usage] = await Promise.all([
-      getSubscriptionForOrg(input.clerkOrgId),
-      Promise.all(
-        limitTypes.map(async (limitType) => ({
-          currentValue: await getAuthoritativeUsageCount(
-            input.clerkOrgId,
-            limitType
-          ),
-          limitType,
-        }))
-      ),
-    ]);
-
-    const planKey =
-      planKeys.find((key) => key === subscription?.plan_key) ?? "basic";
-    const planLimits = await getPlanLimits(planKey);
-    const usageItems = usage.map(({ currentValue, limitType }) => ({
-      currentValue,
-      label: labelForMetric(limitType),
-      limit: planLimits[limitType] === -1 ? null : planLimits[limitType],
-      metricKey: limitType,
-      unit: labelForMetric(limitType).toLowerCase(),
-    }));
+    const summaryResult = await loadBillingSummary(parsed.data, client);
+    if (!summaryResult.ok) {
+      return summaryResult;
+    }
 
     return {
       ok: true,
       value: {
-        isOverLimit: usageItems.some(
-          (item) => item.limit !== null && item.currentValue > item.limit
-        ),
-        plan: {
-          currentPeriodEnd: subscription?.current_period_end ?? null,
-          key: planKey,
-          label: labelForPlan(planKey),
-          seatsPurchased: 0,
-          status: subscription?.status ?? "active",
-        },
-        usage: usageItems,
+        ...summaryResult.value,
+        hasContactFlow: true,
+        hasUpgradeFlow: true,
       },
     };
-  } catch {
-    return unknownError("Failed to load billing summary.");
   }
+}
+
+async function loadBillingSummary(
+  input: z.infer<typeof SummarySchema>,
+  db: TenantDb
+): Promise<Result<BillingSummaryCore, BillingServiceError>> {
+  const subscription = await getSubscriptionForOrg(input.clerkOrgId, db);
+  const usage: Array<{
+    currentValue: number;
+    limitType: (typeof limitTypes)[number];
+  }> = [];
+  for (const limitType of limitTypes) {
+    usage.push({
+      currentValue: await getAuthoritativeUsageCount(
+        input.clerkOrgId,
+        limitType,
+        db
+      ),
+      limitType,
+    });
+  }
+
+  const planKey =
+    planKeys.find((key) => key === subscription?.plan_key) ?? "basic";
+  const planLimits = await getPlanLimits(planKey);
+  const usageItems = usage.map(({ currentValue, limitType }) => ({
+    currentValue,
+    label: labelForMetric(limitType),
+    limit: planLimits[limitType] === -1 ? null : planLimits[limitType],
+    metricKey: limitType,
+    unit: labelForMetric(limitType).toLowerCase(),
+  }));
+
+  return {
+    ok: true,
+    value: {
+      isOverLimit: usageItems.some(
+        (item) => item.limit !== null && item.currentValue > item.limit
+      ),
+      plan: {
+        currentPeriodEnd: subscription?.current_period_end ?? null,
+        key: planKey,
+        label: labelForPlan(planKey),
+        seatsPurchased: 0,
+        status: subscription?.status ?? "active",
+      },
+      usage: usageItems,
+    },
+  };
 }
 
 function labelForPlan(value: PlanKey): string {

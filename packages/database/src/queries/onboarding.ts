@@ -1,6 +1,6 @@
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 
 export type OnboardingStep =
   | "details"
@@ -41,32 +41,39 @@ const internal = <T>(message: string): Result<T> => ({
 
 export async function getOnboardingRecord(
   clerkOrgId: string,
-  organisationId: string
+  organisationId: string,
+  db: TenantDb
 ): Promise<Result<OnboardingRecord>> {
-  try {
-    const organisation = await tenantDatabase(
-      clerkOrgId
-    ).organisation.findFirst({
-      select: {
-        onboarding_completed_at: true,
-        onboarding_step: true,
-        xero_setup_skipped_at: true,
-      },
-      where: scope(clerkOrgId, organisationId),
-    });
-    if (!organisation) {
-      return notFound();
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb = db;
+
+    try {
+      const organisation = await tenantDb.organisation.findFirst({
+        select: {
+          onboarding_completed_at: true,
+          onboarding_step: true,
+          xero_setup_skipped_at: true,
+        },
+        where: scope(clerkOrgId, organisationId),
+      });
+      if (!organisation) {
+        return notFound();
+      }
+      return {
+        ok: true,
+        value: {
+          completedAt: organisation.onboarding_completed_at,
+          step: organisation.onboarding_step,
+          xeroSkippedAt: organisation.xero_setup_skipped_at,
+        },
+      };
+    } catch (error) {
+      if (tenantDb) {
+        throw error;
+      }
+      return internal("Failed to load onboarding progress.");
     }
-    return {
-      ok: true,
-      value: {
-        completedAt: organisation.onboarding_completed_at,
-        step: organisation.onboarding_step,
-        xeroSkippedAt: organisation.xero_setup_skipped_at,
-      },
-    };
-  } catch {
-    return internal("Failed to load onboarding progress.");
   }
 }
 
@@ -76,83 +83,129 @@ export async function advanceOnboardingStep(
   clerkOrgId: string,
   organisationId: string,
   from: OnboardingStep,
-  to: OnboardingStep
+  to: OnboardingStep,
+  db: TenantDb
 ): Promise<Result<{ advanced: boolean }>> {
-  try {
-    const updated = await tenantDatabase(clerkOrgId).organisation.updateMany({
-      data: { onboarding_step: to },
-      where: { ...scope(clerkOrgId, organisationId), onboarding_step: from },
-    });
-    return { ok: true, value: { advanced: updated.count > 0 } };
-  } catch {
-    return internal("Failed to save onboarding progress.");
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb2 = db;
+
+    try {
+      const updated = await tenantDb2.organisation.updateMany({
+        data: { onboarding_step: to },
+        where: {
+          ...scope(clerkOrgId, organisationId),
+          onboarding_step: from,
+        },
+      });
+      return { ok: true, value: { advanced: updated.count > 0 } };
+    } catch (error) {
+      if (tenantDb2) {
+        throw error;
+      }
+      return internal("Failed to save onboarding progress.");
+    }
   }
 }
 
 export async function setXeroSetupSkipped(
   clerkOrgId: string,
   organisationId: string,
-  skipped: boolean
+  skipped: boolean,
+  db: TenantDb
 ): Promise<Result<void>> {
-  try {
-    await tenantDatabase(clerkOrgId).organisation.updateMany({
-      data: { xero_setup_skipped_at: skipped ? new Date() : null },
-      where: scope(clerkOrgId, organisationId),
-    });
-    return { ok: true, value: undefined };
-  } catch {
-    return internal("Failed to save the Xero setup choice.");
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb3 = db;
+
+    try {
+      await tenantDb3.organisation.updateMany({
+        data: { xero_setup_skipped_at: skipped ? new Date() : null },
+        where: scope(clerkOrgId, organisationId),
+      });
+      return { ok: true, value: undefined };
+    } catch (error) {
+      if (tenantDb3) {
+        throw error;
+      }
+      return internal("Failed to save the Xero setup choice.");
+    }
   }
 }
 
 export async function completeOnboarding(
   clerkOrgId: string,
-  organisationId: string
+  organisationId: string,
+  db: TenantDb
 ): Promise<Result<{ completedAt: Date }>> {
-  try {
-    await tenantDatabase(clerkOrgId).organisation.updateMany({
-      data: { onboarding_completed_at: new Date(), onboarding_step: "finish" },
-      where: {
-        ...scope(clerkOrgId, organisationId),
-        onboarding_completed_at: null,
-      },
-    });
-    const record = await getOnboardingRecord(clerkOrgId, organisationId);
-    if (!record.ok) {
-      return record;
-    }
-    if (!record.value.completedAt) {
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb4 = db;
+
+    try {
+      await tenantDb4.organisation.updateMany({
+        data: {
+          onboarding_completed_at: new Date(),
+          onboarding_step: "finish",
+        },
+        where: {
+          ...scope(clerkOrgId, organisationId),
+          onboarding_completed_at: null,
+        },
+      });
+      const record = await getOnboardingRecord(
+        clerkOrgId,
+        organisationId,
+        tenantDb4
+      );
+      if (!record.ok) {
+        return record;
+      }
+      if (!record.value.completedAt) {
+        return internal("Failed to complete onboarding.");
+      }
+      return { ok: true, value: { completedAt: record.value.completedAt } };
+    } catch (error) {
+      if (tenantDb4) {
+        throw error;
+      }
       return internal("Failed to complete onboarding.");
     }
-    return { ok: true, value: { completedAt: record.value.completedAt } };
-  } catch {
-    return internal("Failed to complete onboarding.");
   }
 }
 
 export async function getWelcomeState(
   clerkOrgId: string,
   organisationId: string,
-  clerkUserId: string
+  clerkUserId: string,
+  db: TenantDb
 ): Promise<Result<{ completedAt: Date | null; personId: string } | null>> {
-  try {
-    const person = await tenantDatabase(clerkOrgId).person.findFirst({
-      select: { id: true, welcome_completed_at: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: clerkUserId,
-        organisation_id: organisationId,
-      },
-    });
-    return {
-      ok: true,
-      value: person
-        ? { completedAt: person.welcome_completed_at, personId: person.id }
-        : null,
-    };
-  } catch {
-    return internal("Failed to load the welcome state.");
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb5 = db;
+
+    try {
+      const person = await tenantDb5.person.findFirst({
+        select: { id: true, welcome_completed_at: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          clerk_user_id: clerkUserId,
+          organisation_id: organisationId,
+        },
+      });
+      return {
+        ok: true,
+        value: person
+          ? { completedAt: person.welcome_completed_at, personId: person.id }
+          : null,
+      };
+    } catch (error) {
+      if (tenantDb5) {
+        throw error;
+      }
+      return internal("Failed to load the welcome state.");
+    }
   }
 }
 
@@ -160,36 +213,46 @@ export async function completeWelcome(
   clerkOrgId: string,
   organisationId: string,
   personId: string,
-  clerkUserId: string
+  clerkUserId: string,
+  db: TenantDb
 ): Promise<Result<void>> {
-  try {
-    const updated = await tenantDatabase(clerkOrgId).person.updateMany({
-      data: { welcome_completed_at: new Date() },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: clerkUserId,
-        id: personId,
-        organisation_id: organisationId,
-        welcome_completed_at: null,
-      },
-    });
-    if (updated.count > 0) {
-      return { ok: true, value: undefined };
+  {
+    assertTenantDb(db, clerkOrgId);
+    const tenantDb6 = db;
+
+    try {
+      const updated = await tenantDb6.person.updateMany({
+        data: { welcome_completed_at: new Date() },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          clerk_user_id: clerkUserId,
+          id: personId,
+          organisation_id: organisationId,
+          welcome_completed_at: null,
+        },
+      });
+      if (updated.count > 0) {
+        return { ok: true, value: undefined };
+      }
+      const state = await getWelcomeState(
+        clerkOrgId,
+        organisationId,
+        clerkUserId,
+        tenantDb6
+      );
+      if (state.ok && state.value?.personId === personId) {
+        return { ok: true, value: undefined };
+      }
+      return {
+        error: appError("not_found", "Person not found."),
+        ok: false,
+      };
+    } catch (error) {
+      if (tenantDb6) {
+        throw error;
+      }
+      return internal("Failed to save the welcome state.");
     }
-    const state = await getWelcomeState(
-      clerkOrgId,
-      organisationId,
-      clerkUserId
-    );
-    if (state.ok && state.value?.personId === personId) {
-      return { ok: true, value: undefined };
-    }
-    return {
-      error: appError("not_found", "Person not found."),
-      ok: false,
-    };
-  } catch {
-    return internal("Failed to save the welcome state.");
   }
 }

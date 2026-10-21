@@ -2,9 +2,11 @@
 
 import { auth, currentUser } from "@repo/auth/server";
 import { exportAuditLogCsv } from "@repo/availability";
-import type { Result } from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ExportSchema = z.object({
   filters: z
@@ -40,49 +42,69 @@ export async function exportAuditLogCsvAction(input: {
   };
   organisationId: string;
 }): Promise<ActionResult<{ csvContent: string; filename: string }>> {
+  assertNoTenantTransaction("exportAuditLogCsvAction");
   const parsed = ExportSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(parsed.data.organisationId),
-  ]);
-
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   let role: "admin" | "owner" | null = null;
   if (orgRole === "org:owner") {
     role = "owner";
   } else if (orgRole === "org:admin") {
     role = "admin";
   }
-  if (!(role && user && context.ok)) {
+  if (!(orgId && role && user)) {
     return notAuthorised();
   }
 
-  const result = await exportAuditLogCsv({
-    actingRole: role,
-    actingUserId: user.id,
-    clerkOrgId: context.value.clerkOrgId,
-    filters: parsed.data.filters,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
+  const clerkOrgId = orgId as ClerkOrgId;
+  try {
+    return await withTenantResult(
+      clerkOrgId,
+      async (db): ReturnType<typeof exportAuditLogCsvAction> => {
+        const company = await getOrganisationById(
+          clerkOrgId,
+          parsed.data.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return notAuthorised();
+        }
+        const result = await exportAuditLogCsv(
+          {
+            actingRole: role,
+            actingUserId: user.id,
+            clerkOrgId,
+            filters: parsed.data.filters,
+            organisationId: company.value.id,
+          },
+          db
+        );
+        if (!result.ok) {
+          return {
+            error: {
+              code:
+                result.error.code === "not_authorised" ||
+                result.error.code === "validation_error"
+                  ? result.error.code
+                  : "unknown_error",
+              message: result.error.message,
+            },
+            ok: false,
+          };
+        }
+
+        return { ok: true, value: result.value };
+      }
+    );
+  } catch {
     return {
-      error: {
-        code:
-          result.error.code === "not_authorised" ||
-          result.error.code === "validation_error"
-            ? result.error.code
-            : "unknown_error",
-        message: result.error.message,
-      },
+      error: { code: "unknown_error", message: "Failed to export audit log." },
       ok: false,
     };
   }
-
-  return { ok: true, value: result.value };
 }
 
 function notAuthorised(): ActionResult<never> {

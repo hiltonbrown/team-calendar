@@ -398,6 +398,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   Organisation: 'Organisation',
+  AccountSettings: 'AccountSettings',
   OrganisationSettings: 'OrganisationSettings',
   Team: 'Team',
   Location: 'Location',
@@ -444,7 +445,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroAuthorisation" | "xeroConnection" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHoliday" | "publicHolidayPreference" | "feed" | "feedEventPublication" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
+    modelProps: "organisation" | "accountSettings" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroAuthorisation" | "xeroConnection" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHoliday" | "publicHolidayPreference" | "feed" | "feedEventPublication" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -519,6 +520,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrganisationCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrganisationCountAggregateOutputType> | number
+        }
+      }
+    }
+    AccountSettings: {
+      payload: Prisma.$AccountSettingsPayload<ExtArgs>
+      fields: Prisma.AccountSettingsFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AccountSettingsFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AccountSettingsFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>
+        }
+        findFirst: {
+          args: Prisma.AccountSettingsFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AccountSettingsFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>
+        }
+        findMany: {
+          args: Prisma.AccountSettingsFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>[]
+        }
+        create: {
+          args: Prisma.AccountSettingsCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>
+        }
+        createMany: {
+          args: Prisma.AccountSettingsCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AccountSettingsCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>[]
+        }
+        delete: {
+          args: Prisma.AccountSettingsDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>
+        }
+        update: {
+          args: Prisma.AccountSettingsUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>
+        }
+        deleteMany: {
+          args: Prisma.AccountSettingsDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AccountSettingsUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AccountSettingsUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>[]
+        }
+        upsert: {
+          args: Prisma.AccountSettingsUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountSettingsPayload>
+        }
+        aggregate: {
+          args: Prisma.AccountSettingsAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAccountSettings>
+        }
+        groupBy: {
+          args: Prisma.AccountSettingsGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AccountSettingsGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AccountSettingsCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AccountSettingsCountAggregateOutputType> | number
         }
       }
     }
@@ -2878,6 +2953,17 @@ export const OrganisationScalarFieldEnum = {
 export type OrganisationScalarFieldEnum = (typeof OrganisationScalarFieldEnum)[keyof typeof OrganisationScalarFieldEnum]
 
 
+export const AccountSettingsScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  manager_visibility_scope: 'manager_visibility_scope',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AccountSettingsScalarFieldEnum = (typeof AccountSettingsScalarFieldEnum)[keyof typeof AccountSettingsScalarFieldEnum]
+
+
 export const OrganisationSettingsScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
@@ -2885,7 +2971,6 @@ export const OrganisationSettingsScalarFieldEnum = {
   show_pending_on_calendar: 'show_pending_on_calendar',
   show_declined_on_approvals: 'show_declined_on_approvals',
   notify_managers_on_status_change: 'notify_managers_on_status_change',
-  manager_visibility_scope: 'manager_visibility_scope',
   default_leave_request_advance_days: 'default_leave_request_advance_days',
   require_decline_reason: 'require_decline_reason',
   default_privacy_mode: 'default_privacy_mode',
@@ -4352,6 +4437,7 @@ export interface PrismaClientOptionsWithAdapter extends PrismaClientBaseOptions 
 export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaClientOptionsWithAdapter
 export type GlobalOmitConfig = {
   organisation?: Prisma.OrganisationOmit
+  accountSettings?: Prisma.AccountSettingsOmit
   organisationSettings?: Prisma.OrganisationSettingsOmit
   team?: Prisma.TeamOmit
   location?: Prisma.LocationOmit

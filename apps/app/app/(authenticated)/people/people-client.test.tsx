@@ -29,7 +29,9 @@ const mocks = vi.hoisted(() => ({
   >(() => () => undefined),
 }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/people",
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@repo/notifications/components/provider", () => ({
   useNotificationEvents: () => ({ subscribe: mocks.subscribe }),
@@ -56,6 +58,8 @@ const defaultFilters: PeopleFilterInput = PeopleFilterSchema.parse({});
 const samplePerson: PersonListItem = {
   archivedAt: null,
   avatarUrl: null,
+  companyId: organisationId,
+  companyName: "Company A",
   currentStatus: {
     activePublicHoliday: null,
     activeRecord: null,
@@ -98,6 +102,7 @@ describe("PeopleClient", () => {
       render(
         <PeopleClient
           canIncludeArchived={true}
+          companies={[{ id: organisationId, name: "Company A" }]}
           connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}

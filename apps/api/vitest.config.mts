@@ -7,6 +7,15 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        // Subpath exports that map into src/ must resolve before the
+        // directory alias below.
+        find: /^@repo\/database\/(tenant-db|tenant-client|test-fixtures\/tenant-scope|is-local-database)$/,
+        replacement: path.resolve(
+          import.meta.dirname,
+          "../../packages/database/src/$1"
+        ),
+      },
+      {
         find: "@repo",
         replacement: path.resolve(import.meta.dirname, "../../packages"),
       },

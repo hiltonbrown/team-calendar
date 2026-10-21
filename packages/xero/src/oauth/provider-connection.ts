@@ -1,3 +1,4 @@
+import { assertNoTenantTransaction, withTenantResult } from "@repo/database";
 import "server-only";
 import {
   getScopedXeroConnection,
@@ -30,6 +31,7 @@ export async function verifyXeroProviderConnection(
   context: XeroAccessContext,
   definiteTenantAuthFailure = false
 ): Promise<XeroProviderConnectionStatus> {
+  assertNoTenantTransaction("verifyXeroProviderConnection");
   const captured = context.providerConnection;
   if (!captured) {
     return "inconclusive";
@@ -40,7 +42,9 @@ export async function verifyXeroProviderConnection(
       connectionId: context.id,
       organisationId: context.organisation_id,
     };
-    const scoped = await getScopedXeroConnection(scope);
+    const scoped = await withTenantResult(scope.clerkOrgId, (db) =>
+      getScopedXeroConnection(scope, db)
+    );
     if (!scoped.ok) {
       return "connection_changed";
     }

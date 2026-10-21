@@ -3,10 +3,11 @@ import "server-only";
 import { withinLimit } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import {
+  afterTenantCommit,
+  assertTenantDb,
   lockPlanLimitMutations,
   resolveAccountCompanies,
-  tenantDatabase,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
@@ -220,7 +221,7 @@ class RollbackError extends Error {
 }
 
 const assertWithinFeedLimit = async (
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: { clerkOrgId: string; organisationId: string }
 ): Promise<void> => {
   const entitlement = await withinLimit(
@@ -244,15 +245,16 @@ const assertWithinFeedLimit = async (
 };
 
 const enforceFeedLimit = async (
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: { clerkOrgId: string; organisationId: string }
 ): Promise<void> => {
-  await lockPlanLimitMutations(tx, input.clerkOrgId);
+  await lockPlanLimitMutations(input.clerkOrgId, tx);
   await assertWithinFeedLimit(tx, input);
 };
 
 export async function createFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<
   Result<{ feedId: string; token: TokenDisclosure }, FeedServiceError>
 > {
@@ -260,77 +262,83 @@ export async function createFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb2: TenantDb): ReturnType<typeof createFeed> => {
+    if (!isAdminOrOwner(parsed.data.actingRole)) {
+      return notAuthorised();
+    }
 
-  const scopes = await validateScopes(parsed.data);
-  if (!scopes.ok) {
-    return { error: scopes.error, ok: false };
-  }
+    const scopes = await validateScopes(parsed.data, tenantDb2);
+    if (!scopes.ok) {
+      return { error: scopes.error, ok: false };
+    }
 
-  try {
-    const result = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        await enforceFeedLimit(tx, parsed.data);
-        const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
-        const feed = await tx.feed.create({
-          data: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            created_by_user_id: parsed.data.actingUserId,
-            description: emptyToNull(parsed.data.description),
-            includes_public_holidays: parsed.data.includesPublicHolidays,
-            name: parsed.data.name,
-            organisation_id: parsed.data.organisationId,
-            privacy_mode: parsed.data.privacyMode,
-            scopes: {
-              create: createScopeRows({
-                clerkOrgId: parsed.data.clerkOrgId,
-                organisationId: parsed.data.organisationId,
-                scopes: scopes.value,
-              }),
-            },
-            slug,
-            status: "active",
-          },
-          select: { id: true },
-        });
-
-        const token = await createInitialTokenWithClient(tx, {
-          actingUserId: parsed.data.actingUserId,
-          clerkOrgId: parsed.data.clerkOrgId,
-          feedId: feed.id,
-          organisationId: parsed.data.organisationId,
-        });
-        if (!token.ok) {
-          throw new RollbackError(mapTokenError(token.error));
-        }
-
-        await auditFeed(tx, parsed.data, "feeds.created", feed.id, {
-          actingUserId: parsed.data.actingUserId,
-          feedId: feed.id,
+    const result = await (async (tx: TenantDb) => {
+      await enforceFeedLimit(tx, parsed.data);
+      const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
+      const feed = await tx.feed.create({
+        data: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          created_by_user_id: parsed.data.actingUserId,
+          description: emptyToNull(parsed.data.description),
+          includes_public_holidays: parsed.data.includesPublicHolidays,
           name: parsed.data.name,
-          privacyMode: parsed.data.privacyMode,
-          scopeCount: scopes.value.length,
-        });
+          organisation_id: parsed.data.organisationId,
+          privacy_mode: parsed.data.privacyMode,
+          scopes: {
+            create: createScopeRows({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+              scopes: scopes.value,
+            }),
+          },
+          slug,
+          status: "active",
+        },
+        select: { id: true },
+      });
 
-        return { feedId: feed.id, token: token.value };
+      const token = await createInitialTokenWithClient(tx, {
+        actingUserId: parsed.data.actingUserId,
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: feed.id,
+        organisationId: parsed.data.organisationId,
+      });
+      if (!token.ok) {
+        throw new RollbackError(mapTokenError(token.error));
       }
-    );
 
-    await invalidateFeedCache({ feedId: result.feedId });
+      await auditFeed(tx, parsed.data, "feeds.created", feed.id, {
+        actingUserId: parsed.data.actingUserId,
+        feedId: feed.id,
+        name: parsed.data.name,
+        privacyMode: parsed.data.privacyMode,
+        scopeCount: scopes.value.length,
+      });
+
+      return { feedId: feed.id, token: token.value };
+    })(tenantDb2);
+
+    scheduleFeedInvalidation(tenantDb2, { feedId: result.feedId });
     return { ok: true, value: result };
+  };
+  try {
+    return await (async () => {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof RollbackError) {
+      // Result-bearing entry points own withTenantResult and roll back this failure.
       return { error: error.serviceError, ok: false };
     }
-    return unknownError("Failed to create feed.");
+    throw error;
   }
 }
 
 export async function ensureDefaultCalendarFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<
   Result<
     { created: boolean; feedId: string; token?: TokenDisclosure },
@@ -341,138 +349,150 @@ export async function ensureDefaultCalendarFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    tenantDb3: TenantDb
+  ): ReturnType<typeof ensureDefaultCalendarFeed> => {
+    const actingUserId =
+      parsed.data.actingUserId ?? "system:default-calendar-feed";
 
-  const actingUserId =
-    parsed.data.actingUserId ?? "system:default-calendar-feed";
-  try {
-    const result = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        await lockPlanLimitMutations(tx, parsed.data.clerkOrgId);
-        const defaultMarkers = await tx.auditEvent.findMany({
-          select: { resource_id: true },
-          where: {
-            action: "feeds.created",
-            clerk_org_id: parsed.data.clerkOrgId,
-            payload: { equals: true, path: ["defaultFeed"] },
-            resource_type: "feed",
-          },
-        });
-        const defaultFeedIds = defaultMarkers.flatMap((marker) =>
-          marker.resource_id ? [marker.resource_id] : []
-        );
-        const existing = await tx.feed.findFirst({
-          orderBy: { created_at: "asc" },
-          select: { id: true },
-          where: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            id: { in: defaultFeedIds },
-          },
-        });
-        if (existing) {
-          return { created: false, feedId: existing.id };
-        }
+    const result = await (async (tx: TenantDb) => {
+      await lockPlanLimitMutations(parsed.data.clerkOrgId, tx);
+      const defaultMarkers = await tx.auditEvent.findMany({
+        select: { resource_id: true },
+        where: {
+          action: "feeds.created",
+          clerk_org_id: parsed.data.clerkOrgId,
+          payload: { equals: true, path: ["defaultFeed"] },
+          resource_type: "feed",
+        },
+      });
+      const defaultFeedIds = defaultMarkers.flatMap((marker) =>
+        marker.resource_id ? [marker.resource_id] : []
+      );
+      const existing = await tx.feed.findFirst({
+        orderBy: { created_at: "asc" },
+        select: { id: true },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          id: { in: defaultFeedIds },
+        },
+      });
+      if (existing) {
+        return { created: false, feedId: existing.id };
+      }
 
-        await assertWithinFeedLimit(tx, parsed.data);
-        const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
-        const feed = await tx.feed.create({
-          data: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            created_by_user_id: parsed.data.actingUserId ?? null,
-            includes_public_holidays: parsed.data.includesPublicHolidays,
-            name: parsed.data.name,
-            organisation_id: null,
-            privacy_mode: parsed.data.privacyMode,
-            scopes: {
-              create: createScopeRows({
-                clerkOrgId: parsed.data.clerkOrgId,
-                organisationId: null,
-                scopes: [{ scopeType: "org", scopeValue: null }],
-              }),
-            },
-            slug,
-            status: "active",
+      await assertWithinFeedLimit(tx, parsed.data);
+      const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
+      const feed = await tx.feed.create({
+        data: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          created_by_user_id: parsed.data.actingUserId ?? null,
+          includes_public_holidays: parsed.data.includesPublicHolidays,
+          name: parsed.data.name,
+          organisation_id: null,
+          privacy_mode: parsed.data.privacyMode,
+          scopes: {
+            create: createScopeRows({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: null,
+              scopes: [{ scopeType: "org", scopeValue: null }],
+            }),
           },
-          select: { id: true },
-        });
+          slug,
+          status: "active",
+        },
+        select: { id: true },
+      });
 
-        const token = await createInitialTokenWithClient(tx, {
+      const token = await createInitialTokenWithClient(tx, {
+        actingUserId,
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: feed.id,
+        organisationId: null,
+      });
+      if (!token.ok) {
+        throw new RollbackError(mapTokenError(token.error));
+      }
+
+      await auditFeed(
+        tx,
+        {
           actingUserId,
           clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        },
+        "feeds.created",
+        feed.id,
+        {
+          defaultFeed: true,
           feedId: feed.id,
-          organisationId: null,
-        });
-        if (!token.ok) {
-          throw new RollbackError(mapTokenError(token.error));
+          name: parsed.data.name,
+          privacyMode: parsed.data.privacyMode,
+          scopeCount: 1,
         }
+      );
 
-        await auditFeed(
-          tx,
-          {
-            actingUserId,
-            clerkOrgId: parsed.data.clerkOrgId,
-            organisationId: parsed.data.organisationId,
-          },
-          "feeds.created",
-          feed.id,
-          {
-            defaultFeed: true,
-            feedId: feed.id,
-            name: parsed.data.name,
-            privacyMode: parsed.data.privacyMode,
-            scopeCount: 1,
-          }
-        );
-
-        return { created: true, feedId: feed.id, token: token.value };
-      }
-    );
+      return { created: true, feedId: feed.id, token: token.value };
+    })(tenantDb3);
 
     if (result.created) {
-      await invalidateFeedCache({ feedId: result.feedId });
+      scheduleFeedInvalidation(tenantDb3, { feedId: result.feedId });
     }
     return { ok: true, value: result };
+  };
+  try {
+    return await (async () => {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof RollbackError) {
+      // Result-bearing entry points own withTenantResult and roll back this failure.
       return { error: error.serviceError, ok: false };
     }
-    return unknownError("Failed to create default feed.");
+    throw error;
   }
 }
 
 export async function updateFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<FeedDetail, FeedServiceError>> {
   const parsed = UpdateFeedSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const permission = await authoriseFeedChange(parsed.data);
-  if (!permission.ok) {
-    return permission;
-  }
-  if (parsed.data.patch.scopes && !permission.value.isAdmin) {
-    return notAuthorised();
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb4: TenantDb): ReturnType<typeof updateFeed> => {
+    const permission = await authoriseFeedChange(parsed.data, tenantDb4);
+    if (!permission.ok) {
+      return permission;
+    }
+    if (parsed.data.patch.scopes && !permission.value.isAdmin) {
+      return notAuthorised();
+    }
 
-  const scopes = parsed.data.patch.scopes
-    ? await validateScopes({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-        scopes: parsed.data.patch.scopes,
-      })
-    : null;
-  if (scopes && !scopes.ok) {
-    return { error: scopes.error, ok: false };
-  }
+    const scopes = parsed.data.patch.scopes
+      ? await validateScopes(
+          {
+            clerkOrgId: parsed.data.clerkOrgId,
+            organisationId: parsed.data.organisationId,
+            scopes: parsed.data.patch.scopes,
+          },
+          tenantDb4
+        )
+      : null;
+    if (scopes && !scopes.ok) {
+      return { error: scopes.error, ok: false };
+    }
 
-  try {
     const invalidate = Boolean(
       parsed.data.patch.privacyMode ||
         parsed.data.patch.includesPublicHolidays !== undefined ||
         parsed.data.patch.scopes
     );
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       const feed = await loadFeedForUpdate(tx, parsed.data);
       if (!feed.ok) {
         throw new RollbackError(feed.error);
@@ -525,40 +545,49 @@ export async function updateFeed(
         feedId: parsed.data.feedId,
         ...changedFields,
       });
-    });
+    })(tenantDb4);
 
     if (invalidate) {
-      await invalidateFeedCache({ feedId: parsed.data.feedId });
+      scheduleFeedInvalidation(tenantDb4, { feedId: parsed.data.feedId });
     }
-    return await getFeedDetail(parsed.data);
+    return await getFeedDetail(parsed.data, tenantDb4);
+  };
+  try {
+    return await (async () => {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof RollbackError) {
+      // Result-bearing entry points own withTenantResult and roll back this failure.
       return { error: error.serviceError, ok: false };
     }
-    return unknownError("Failed to update feed.");
+    throw error;
   }
 }
 
-export const pauseFeed = (input: unknown) =>
-  transitionFeed(input, "active", "paused", "feeds.paused");
+export const pauseFeed = (input: unknown, db: TenantDb) =>
+  transitionFeed(input, "active", "paused", "feeds.paused", db);
 
-export const resumeFeed = (input: unknown) =>
-  transitionFeed(input, "paused", "active", "feeds.resumed");
+export const resumeFeed = (input: unknown, db: TenantDb) =>
+  transitionFeed(input, "paused", "active", "feeds.resumed", db);
 
 export async function archiveFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<FeedDetail, FeedServiceError>> {
   const parsed = FeedCommandSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const permission = await authoriseFeedChange(parsed.data);
-  if (!permission.ok) {
-    return permission;
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb5: TenantDb): ReturnType<typeof archiveFeed> => {
+    const permission = await authoriseFeedChange(parsed.data, tenantDb5);
+    if (!permission.ok) {
+      return permission;
+    }
 
-  try {
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       const feed = await loadFeedForUpdate(tx, parsed.data);
       if (!feed.ok) {
         throw new RollbackError(feed.error);
@@ -580,32 +609,39 @@ export async function archiveFeed(
         actingUserId: parsed.data.actingUserId,
         feedId: parsed.data.feedId,
       });
-    });
-    await invalidateFeedCache({ feedId: parsed.data.feedId });
-    return await getFeedDetail(parsed.data);
+    })(tenantDb5);
+    scheduleFeedInvalidation(tenantDb5, { feedId: parsed.data.feedId });
+    return await getFeedDetail(parsed.data, tenantDb5);
+  };
+  try {
+    return await (async () => {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof RollbackError) {
+      // Result-bearing entry points own withTenantResult and roll back this failure.
       return { error: error.serviceError, ok: false };
     }
-    return unknownError("Failed to archive feed.");
+    throw error;
   }
 }
 
 export async function restoreFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<FeedDetail, FeedServiceError>> {
   const parsed = FeedCommandSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb6: TenantDb): ReturnType<typeof restoreFeed> => {
+    if (!isAdminOrOwner(parsed.data.actingRole)) {
+      return notAuthorised();
+    }
 
-  try {
-    const existing = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).feed.findFirst({
+    const existing = await tenantDb6.feed.findFirst({
       select: { status: true },
       where: scopedFeed(parsed.data),
     });
@@ -615,7 +651,7 @@ export async function restoreFeed(
     if (existing.status !== "archived") {
       return invalidTransition();
     }
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       await tx.feed.update({
         data: { archived_at: null, status: "paused" },
         where: { id: parsed.data.feedId },
@@ -624,67 +660,51 @@ export async function restoreFeed(
         actingUserId: parsed.data.actingUserId,
         feedId: parsed.data.feedId,
       });
-    });
-    await invalidateFeedCache({ feedId: parsed.data.feedId });
-    return await getFeedDetail(parsed.data);
-  } catch {
-    return unknownError("Failed to restore feed.");
-  }
+    })(tenantDb6);
+    scheduleFeedInvalidation(tenantDb6, { feedId: parsed.data.feedId });
+    return await getFeedDetail(parsed.data, tenantDb6);
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function listFeeds(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<FeedListItem[], FeedServiceError>> {
   const parsed = ListFeedsSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb7: TenantDb): ReturnType<typeof listFeeds> => {
     const role = parsed.data.actingRole;
     const actingPersonId =
       parsed.data.actingPersonId ??
-      (await findActingPersonId({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-        userId: parsed.data.actingUserId,
-      }));
+      (await findActingPersonId(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+          userId: parsed.data.actingUserId,
+        },
+        tenantDb7
+      ));
     const statuses = isAdminOrOwner(role)
       ? parsed.data.filters.status
       : parsed.data.filters.status.filter((status) => status !== "archived");
-    const feeds = await tenantDatabase(parsed.data.clerkOrgId).feed.findMany({
-      cursor: parsed.data.pagination.cursor
-        ? { id: parsed.data.pagination.cursor }
-        : undefined,
-      orderBy: [{ created_at: "desc" }, { id: "asc" }],
-      select: feedListSelect,
-      skip: parsed.data.pagination.cursor ? 1 : 0,
-      take: parsed.data.pagination.pageSize,
-      where: {
-        clerk_org_id: parsed.data.clerkOrgId,
-        name: parsed.data.filters.search
-          ? { contains: parsed.data.filters.search, mode: "insensitive" }
-          : undefined,
-        OR: [
-          { organisation_id: parsed.data.organisationId },
-          { organisation_id: null },
-        ],
-        privacy_mode: parsed.data.filters.privacyMode?.length
-          ? { in: parsed.data.filters.privacyMode }
-          : undefined,
-        scopes: parsed.data.filters.type?.length
-          ? { some: { scope_type: { in: parsed.data.filters.type } } }
-          : undefined,
-        status: { in: statuses },
-      },
-    });
+    const feeds = await findFeedListRows(parsed.data, statuses, tenantDb7);
 
     const scopeData =
       feeds.length > 0
-        ? await loadFeedScopeData({
-            clerkOrgId: parsed.data.clerkOrgId,
-            organisationId: parsed.data.organisationId,
-          })
+        ? await loadFeedScopeData(
+            {
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            },
+            tenantDb7
+          )
         : null;
     if (scopeData && !scopeData.ok) {
       return { error: scopeData.error, ok: false };
@@ -698,24 +718,30 @@ export async function listFeeds(
         scopeType: scope.scope_type,
         scopeValue: scope.scope_value,
       }));
-      const visible = await canViewFeed({
-        actingPersonId,
-        clerkOrgId: parsed.data.clerkOrgId,
-        createdByUserId: feed.created_by_user_id,
-        organisationId: feed.organisation_id,
-        preloaded: preloadedForFeed(feed.organisation_id, preloadedScopeData),
-        role,
-        scopes,
-      });
+      const visible = await canViewFeed(
+        {
+          actingPersonId,
+          clerkOrgId: parsed.data.clerkOrgId,
+          createdByUserId: feed.created_by_user_id,
+          organisationId: feed.organisation_id,
+          preloaded: preloadedForFeed(feed.organisation_id, preloadedScopeData),
+          role,
+          scopes,
+        },
+        tenantDb7
+      );
       if (!(visible.ok && visible.value)) {
         continue;
       }
-      const labels = await resolveScopeRows({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: feed.organisation_id,
-        preloaded: preloadedForFeed(feed.organisation_id, preloadedScopeData),
-        scopes: feed.scopes,
-      });
+      const labels = await resolveScopeRows(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: feed.organisation_id,
+          preloaded: preloadedForFeed(feed.organisation_id, preloadedScopeData),
+          scopes: feed.scopes,
+        },
+        tenantDb7
+      );
       visibleItems.push(
         toFeedListItem({
           actingUserId: parsed.data.actingUserId,
@@ -726,29 +752,35 @@ export async function listFeeds(
       );
     }
     return { ok: true, value: visibleItems };
-  } catch {
-    return unknownError("Failed to list feeds.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function getFeedDetail(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<FeedDetail, FeedServiceError>> {
   const parsed = DetailSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (tenantDb8: TenantDb): ReturnType<typeof getFeedDetail> => {
     const role = parsed.data.actingRole;
     const actingPersonId =
       parsed.data.actingPersonId ??
-      (await findActingPersonId({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-        userId: parsed.data.actingUserId,
-      }));
-    const feed = await tenantDatabase(parsed.data.clerkOrgId).feed.findFirst({
+      (await findActingPersonId(
+        {
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+          userId: parsed.data.actingUserId,
+        },
+        tenantDb8
+      ));
+    const feed = await tenantDb8.feed.findFirst({
       select: feedDetailSelect,
       where: scopedFeed(parsed.data),
     });
@@ -760,14 +792,17 @@ export async function getFeedDetail(
       scopeType: scope.scope_type,
       scopeValue: scope.scope_value,
     }));
-    const visible = await canViewFeed({
-      actingPersonId,
-      clerkOrgId: parsed.data.clerkOrgId,
-      createdByUserId: feed.created_by_user_id,
-      organisationId: feed.organisation_id,
-      role,
-      scopes,
-    });
+    const visible = await canViewFeed(
+      {
+        actingPersonId,
+        clerkOrgId: parsed.data.clerkOrgId,
+        createdByUserId: feed.created_by_user_id,
+        organisationId: feed.organisation_id,
+        role,
+        scopes,
+      },
+      tenantDb8
+    );
     if (!visible.ok) {
       return { error: visible.error, ok: false };
     }
@@ -775,11 +810,14 @@ export async function getFeedDetail(
       return notAuthorised();
     }
 
-    const resolvedScopes = await resolveScopeRows({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: feed.organisation_id,
-      scopes: feed.scopes,
-    });
+    const resolvedScopes = await resolveScopeRows(
+      {
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: feed.organisation_id,
+        scopes: feed.scopes,
+      },
+      tenantDb8
+    );
     if (!resolvedScopes.ok) {
       return { error: resolvedScopes.error, ok: false };
     }
@@ -811,21 +849,27 @@ export async function getFeedDetail(
         updatedAt: feed.updated_at,
       },
     };
-  } catch {
-    return unknownError("Failed to load feed detail.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function getOwnFeedEligibility(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<OwnFeedEligibility, FeedServiceError>> {
   const parsed = OwnFeedEligibilitySchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  try {
-    const value = await tenantTransaction(parsed.data.clerkOrgId, (tx) =>
-      loadOwnFeedState(tx, parsed.data)
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    tenantDb9: TenantDb
+  ): ReturnType<typeof getOwnFeedEligibility> => {
+    const value = await ((tx: TenantDb) => loadOwnFeedState(tx, parsed.data))(
+      tenantDb9
     );
     return {
       ok: true,
@@ -836,175 +880,194 @@ export async function getOwnFeedEligibility(
         teamFeedId: value.teamFeedId,
       },
     };
-  } catch {
-    return unknownError("Failed to load your feed options.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 // Self-service creation for a person's own calendar or their direct reports.
 // Scopes are fixed here rather than accepted from the caller, so a non-admin
 // can never publish anything wider than their own team.
 export async function createOwnFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<{ created: boolean; feedId: string }, FeedServiceError>> {
   const parsed = OwnFeedSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const kind: OwnFeedKind = parsed.data.kind;
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    tenantDb10: TenantDb
+  ): ReturnType<typeof createOwnFeed> => {
+    const kind: OwnFeedKind = parsed.data.kind;
 
-  try {
-    const result = await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (tx) => {
-        // Serialises concurrent self-service requests for the Clerk org, so a
-        // double submit returns the feed the first request created.
-        await lockPlanLimitMutations(tx, parsed.data.clerkOrgId);
-        const state = await loadOwnFeedState(tx, parsed.data);
-        if (!state.person) {
-          throw new RollbackError({
-            code: "validation_error",
-            message:
-              "Your account is not linked to a person yet. Ask an administrator to link it.",
-          });
-        }
-        const existingId =
-          kind === "personal" ? state.personalFeedId : state.teamFeedId;
-        if (existingId) {
-          return { created: false, feedId: existingId };
-        }
-        if (kind === "team" && !state.hasDirectReports) {
-          throw new RollbackError({
-            code: "not_authorised",
-            message: "A team feed needs at least one direct report.",
-          });
-        }
-
-        await assertWithinFeedLimit(tx, parsed.data);
-        const settings = await tx.organisationSettings.findFirst({
-          select: {
-            default_feed_privacy_mode: true,
-            feeds_include_public_holidays_default: true,
-          },
-          where: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            organisation_id: parsed.data.organisationId,
-          },
+    const result = await (async (tx: TenantDb) => {
+      // Serialises concurrent self-service requests for the Clerk org, so a
+      // double submit returns the feed the first request created.
+      await lockPlanLimitMutations(parsed.data.clerkOrgId, tx);
+      const state = await loadOwnFeedState(tx, parsed.data);
+      if (!state.person) {
+        throw new RollbackError({
+          code: "validation_error",
+          message:
+            "Your account is not linked to a person yet. Ask an administrator to link it.",
         });
-        const privacyMode = settings?.default_feed_privacy_mode ?? "named";
-        const name = ownFeedName(kind, state.person.firstName);
-        const slug = await makeUniqueSlug(tx, parsed.data, name);
-        const scopeType = ownFeedScopeType(kind);
-        const feed = await tx.feed.create({
-          data: {
-            clerk_org_id: parsed.data.clerkOrgId,
-            created_by_user_id: parsed.data.actingUserId,
-            includes_public_holidays:
-              settings?.feeds_include_public_holidays_default ?? false,
-            name,
-            organisation_id: null,
-            privacy_mode: privacyMode,
-            scopes: {
-              create: createScopeRows({
-                clerkOrgId: parsed.data.clerkOrgId,
-                organisationId: null,
-                scopes: [{ scopeType, scopeValue: null }],
-              }),
-            },
-            slug,
-            status: "active",
-          },
-          select: { id: true },
-        });
-
-        const token = await createInitialTokenWithClient(tx, {
-          actingUserId: parsed.data.actingUserId,
-          clerkOrgId: parsed.data.clerkOrgId,
-          feedId: feed.id,
-          organisationId: null,
-        });
-        if (!token.ok) {
-          throw new RollbackError(mapTokenError(token.error));
-        }
-
-        await auditFeed(tx, parsed.data, "feeds.created", feed.id, {
-          actingUserId: parsed.data.actingUserId,
-          feedId: feed.id,
-          name,
-          ownFeedKind: kind,
-          privacyMode,
-          scopeCount: 1,
-        });
-        return { created: true, feedId: feed.id };
       }
-    );
+      const existingId =
+        kind === "personal" ? state.personalFeedId : state.teamFeedId;
+      if (existingId) {
+        return { created: false, feedId: existingId };
+      }
+      if (kind === "team" && !state.hasDirectReports) {
+        throw new RollbackError({
+          code: "not_authorised",
+          message: "A team feed needs at least one direct report.",
+        });
+      }
+
+      await assertWithinFeedLimit(tx, parsed.data);
+      const settings = await tx.organisationSettings.findFirst({
+        select: {
+          default_feed_privacy_mode: true,
+          feeds_include_public_holidays_default: true,
+        },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          organisation_id: parsed.data.organisationId,
+        },
+      });
+      const privacyMode = settings?.default_feed_privacy_mode ?? "named";
+      const name = ownFeedName(kind, state.person.firstName);
+      const slug = await makeUniqueSlug(tx, parsed.data, name);
+      const scopeType = ownFeedScopeType(kind);
+      const feed = await tx.feed.create({
+        data: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          created_by_user_id: parsed.data.actingUserId,
+          includes_public_holidays:
+            settings?.feeds_include_public_holidays_default ?? false,
+          name,
+          organisation_id: null,
+          privacy_mode: privacyMode,
+          scopes: {
+            create: createScopeRows({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: null,
+              scopes: [{ scopeType, scopeValue: null }],
+            }),
+          },
+          slug,
+          status: "active",
+        },
+        select: { id: true },
+      });
+
+      const token = await createInitialTokenWithClient(tx, {
+        actingUserId: parsed.data.actingUserId,
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: feed.id,
+        organisationId: null,
+      });
+      if (!token.ok) {
+        throw new RollbackError(mapTokenError(token.error));
+      }
+
+      await auditFeed(tx, parsed.data, "feeds.created", feed.id, {
+        actingUserId: parsed.data.actingUserId,
+        feedId: feed.id,
+        name,
+        ownFeedKind: kind,
+        privacyMode,
+        scopeCount: 1,
+      });
+      return { created: true, feedId: feed.id };
+    })(tenantDb10);
 
     if (result.created) {
-      await invalidateFeedCache({ feedId: result.feedId });
+      scheduleFeedInvalidation(tenantDb10, { feedId: result.feedId });
     }
     return { ok: true, value: result };
+  };
+  try {
+    return await (async () => {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      return await run(db);
+    })();
   } catch (error) {
     if (error instanceof RollbackError) {
+      // Result-bearing entry points own withTenantResult and roll back this failure.
       return { error: error.serviceError, ok: false };
     }
-    return unknownError("Failed to create your feed.");
+    throw error;
   }
 }
 
 export async function getFeedOversightCounts(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<{ personal: number; total: number }, FeedServiceError>> {
   const parsed = FeedCountsSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!isAdminOrOwner(parsed.data.actingRole)) {
-    return notAuthorised();
-  }
-  const where = {
-    archived_at: null,
-    clerk_org_id: parsed.data.clerkOrgId,
-    OR: [
-      { organisation_id: parsed.data.organisationId },
-      { organisation_id: null },
-    ],
-    status: { in: ["active", "paused"] satisfies feed_status[] },
-  };
-  try {
-    const [total, personal] = await Promise.all([
-      tenantDatabase(parsed.data.clerkOrgId).feed.count({ where }),
-      tenantDatabase(parsed.data.clerkOrgId).feed.count({
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    tenantDb: TenantDb
+  ): ReturnType<typeof getFeedOversightCounts> => {
+    if (!isAdminOrOwner(parsed.data.actingRole)) {
+      return notAuthorised();
+    }
+    const where = {
+      archived_at: null,
+      clerk_org_id: parsed.data.clerkOrgId,
+      OR: [
+        { organisation_id: parsed.data.organisationId },
+        { organisation_id: null },
+      ],
+      status: { in: ["active", "paused"] satisfies feed_status[] },
+    };
+
+    const [total, personal] = [
+      await tenantDb.feed.count({ where }),
+      await tenantDb.feed.count({
         where: {
           ...where,
           scopes: { every: { scope_type: "self" }, some: {} },
         },
       }),
-    ]);
+    ];
     return { ok: true, value: { personal, total } };
-  } catch {
-    return unknownError("Failed to count feeds.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 async function transitionFeed(
   input: unknown,
   fromStatus: feed_status,
   toStatus: feed_status,
-  auditAction: string
+  auditAction: string,
+  db: TenantDb
 ): Promise<Result<FeedDetail, FeedServiceError>> {
   const parsed = FeedCommandSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const permission = await authoriseFeedChange(parsed.data);
-  if (!permission.ok) {
-    return permission;
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    tenantDb11: TenantDb
+  ): ReturnType<typeof transitionFeed> => {
+    const permission = await authoriseFeedChange(parsed.data, tenantDb11);
+    if (!permission.ok) {
+      return permission;
+    }
 
-  try {
-    const existing = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).feed.findFirst({
+    const existing = await tenantDb11.feed.findFirst({
       select: { archived_at: true, status: true },
       where: scopedFeed(parsed.data),
     });
@@ -1017,7 +1080,7 @@ async function transitionFeed(
     if (existing.status !== fromStatus) {
       return invalidTransition();
     }
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await (async (tx: TenantDb) => {
       await tx.feed.update({
         data: { status: toStatus },
         where: { id: parsed.data.feedId },
@@ -1026,18 +1089,17 @@ async function transitionFeed(
         actingUserId: parsed.data.actingUserId,
         feedId: parsed.data.feedId,
       });
-    });
-    await invalidateFeedCache({ feedId: parsed.data.feedId });
-    return await getFeedDetail(parsed.data);
-  } catch {
-    return unknownError("Failed to update feed status.");
-  }
+    })(tenantDb11);
+    scheduleFeedInvalidation(tenantDb11, { feedId: parsed.data.feedId });
+    return await getFeedDetail(parsed.data, tenantDb11);
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
-type FeedReadClient = Pick<
-  Prisma.TransactionClient,
-  "feed" | "person" | "organisation"
->;
+type FeedReadClient = TenantDb;
 
 async function loadOwnFeedState(
   client: FeedReadClient,
@@ -1082,10 +1144,10 @@ async function loadOwnFeedState(
         status: { in: ["active", "paused"] },
       },
     });
-  const [personalFeed, teamFeed, directReport] = await Promise.all([
-    ownFeed("self"),
-    ownFeed("manager_team"),
-    person
+  const [personalFeed, teamFeed, directReport] = [
+    await ownFeed("self"),
+    await ownFeed("manager_team"),
+    await (person
       ? client.person.findFirst({
           select: { id: true },
           where: {
@@ -1100,8 +1162,8 @@ async function loadOwnFeedState(
             },
           },
         })
-      : Promise.resolve(null),
-  ]);
+      : Promise.resolve(null)),
+  ];
   return {
     hasDirectReports: Boolean(directReport),
     person: person ? { firstName: person.first_name, id: person.id } : null,
@@ -1120,18 +1182,22 @@ function ownFeedName(kind: OwnFeedKind, firstName: string): string {
 
 // Admins and owners manage every feed; anyone else may change only a
 // personal or team feed they created.
-async function authoriseFeedChange(input: {
-  actingRole: string;
-  actingUserId: string;
-  clerkOrgId: string;
-  feedId: string;
-  organisationId: string;
-}): Promise<Result<{ isAdmin: boolean }, FeedServiceError>> {
+async function authoriseFeedChange(
+  input: {
+    actingRole: string;
+    actingUserId: string;
+    clerkOrgId: string;
+    feedId: string;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<Result<{ isAdmin: boolean }, FeedServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   if (isAdminOrOwner(normaliseRole(input.actingRole))) {
     return { ok: true, value: { isAdmin: true } };
   }
   try {
-    const feed = await tenantDatabase(input.clerkOrgId).feed.findFirst({
+    const feed = await db.feed.findFirst({
       select: {
         created_by_user_id: true,
         scopes: { select: { scope_type: true } },
@@ -1227,7 +1293,7 @@ function lastFetchedAt(tokens: TokenRow[]): Date | null {
 }
 
 async function loadFeedForUpdate(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: { clerkOrgId: string; feedId: string; organisationId: string }
 ): Promise<
   Result<{ id: string; organisationId: string | null }, FeedServiceError>
@@ -1254,7 +1320,7 @@ async function loadFeedForUpdate(
 }
 
 async function makeUniqueSlug(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: { clerkOrgId: string; organisationId: string },
   name: string
 ): Promise<string> {
@@ -1286,7 +1352,7 @@ function slugify(value: string): string {
 }
 
 function auditFeed(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: { actingUserId: string; clerkOrgId: string; organisationId: string },
   action: string,
   feedId: string,
@@ -1501,4 +1567,49 @@ function preloadedForFeed(
   data: FeedScopeData | undefined
 ) {
   return organisationId === null ? undefined : data;
+}
+
+function scheduleFeedInvalidation(
+  db: TenantDb,
+  input: Parameters<typeof invalidateFeedCache>[0]
+): void {
+  afterTenantCommit(db, async () => {
+    const outcome = await invalidateFeedCache(input);
+    if (!outcome.ok) {
+      throw new Error(outcome.error.message);
+    }
+  });
+}
+
+function findFeedListRows(
+  input: z.infer<typeof ListFeedsSchema>,
+  statuses: z.infer<typeof ListFeedsSchema>["filters"]["status"],
+  db: TenantDb
+) {
+  return db.feed.findMany({
+    cursor: input.pagination.cursor
+      ? { id: input.pagination.cursor }
+      : undefined,
+    orderBy: [{ created_at: "desc" }, { id: "asc" }],
+    select: feedListSelect,
+    skip: input.pagination.cursor ? 1 : 0,
+    take: input.pagination.pageSize,
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      name: input.filters.search
+        ? { contains: input.filters.search, mode: "insensitive" }
+        : undefined,
+      OR: [
+        { organisation_id: input.organisationId },
+        { organisation_id: null },
+      ],
+      privacy_mode: input.filters.privacyMode?.length
+        ? { in: input.filters.privacyMode }
+        : undefined,
+      scopes: input.filters.type?.length
+        ? { some: { scope_type: { in: input.filters.type } } }
+        : undefined,
+      status: { in: statuses },
+    },
+  });
 }

@@ -1,5 +1,6 @@
 import type { Result } from "@repo/core";
-import { tenantTransaction } from "@repo/database";
+import type { TenantDb } from "@repo/database";
+import { assertTenantDb } from "@repo/database";
 import {
   listTeamsWithCoverageMinimum,
   setTeamCoverageMinimum,
@@ -50,22 +51,29 @@ const rangeMessage = (teamSize: number) =>
 
 /** Teams with their minimum and active headcount, for owners and admins. */
 export async function listTeamCoverageMinimums(
-  input: z.input<typeof ScopeSchema> & { actingRole: string }
+  input: z.input<typeof ScopeSchema> & { actingRole: string },
+  db: TenantDb
 ): Promise<Result<TeamCoverageMinimumRow[], TeamCoverageMinimumError>> {
-  if (!canManage(input.actingRole)) {
-    return failure(
-      "not_authorised",
-      "Only owners and admins can manage coverage."
-    );
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    if (!canManage(input.actingRole)) {
+      return failure(
+        "not_authorised",
+        "Only owners and admins can manage coverage."
+      );
+    }
+    const parsed = ScopeSchema.safeParse(input);
+    if (!parsed.success) {
+      return failure("validation_error", "Invalid organisation.");
+    }
+    const teams = await listTeamsWithCoverageMinimum(parsed.data, client);
+    return teams.ok
+      ? teams
+      : failure("unknown_error", "Failed to load team coverage.");
   }
-  const parsed = ScopeSchema.safeParse(input);
-  if (!parsed.success) {
-    return failure("validation_error", "Invalid organisation.");
-  }
-  const teams = await listTeamsWithCoverageMinimum(parsed.data);
-  return teams.ok
-    ? teams
-    : failure("unknown_error", "Failed to load team coverage.");
 }
 
 /**
@@ -74,8 +82,10 @@ export async function listTeamCoverageMinimums(
  * The update and its audit event commit together.
  */
 export async function updateTeamCoverageMinimum(
-  input: z.input<typeof UpdateSchema>
+  input: z.input<typeof UpdateSchema>,
+  db: TenantDb
 ): Promise<Result<TeamCoverageMinimumReceipt, TeamCoverageMinimumError>> {
+  assertTenantDb(db, input.clerkOrgId);
   if (!canManage(input.actingRole)) {
     return failure(
       "not_authorised",
@@ -90,8 +100,10 @@ export async function updateTeamCoverageMinimum(
     );
   }
   const value = parsed.data;
-  try {
-    const teams = await listTeamsWithCoverageMinimum(value);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof updateTeamCoverageMinimum> => {
+    const teams = await listTeamsWithCoverageMinimum(value, client);
     if (!teams.ok) {
       return failure("unknown_error", "Failed to update team coverage.");
     }
@@ -110,7 +122,7 @@ export async function updateTeamCoverageMinimum(
       return failure("validation_error", rangeMessage(team.activePeopleCount));
     }
     const { minimum } = value;
-    const result = await tenantTransaction(input.clerkOrgId, async (tx) => {
+    const result = await (async (tx: TenantDb) => {
       const change = await setTeamCoverageMinimum(
         {
           clerkOrgId: value.clerkOrgId,
@@ -140,7 +152,7 @@ export async function updateTeamCoverageMinimum(
         },
       });
       return change;
-    });
+    })(client);
     if (!result.ok) {
       return result.error.code === "not_found"
         ? failure("not_found", "That team was not found.")
@@ -150,7 +162,9 @@ export async function updateTeamCoverageMinimum(
       ok: true,
       value: { minimum, teamName: result.value.teamName },
     };
-  } catch {
-    return failure("unknown_error", "Failed to update team coverage.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }

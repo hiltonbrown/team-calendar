@@ -265,9 +265,9 @@ describe("toTeamTimelineProps", () => {
   });
 
   it.each([
-    ["employee", 1, 1, "Me", null],
-    ["manager", 12, 12, "My team", null],
-    ["manager", 12, 31, "My team", "Showing 12 of 31 people."],
+    ["employee", 1, 1, "All teams", null],
+    ["manager", 12, 12, "All teams", null],
+    ["manager", 12, 31, "All teams", "Showing 12 of 31 people."],
     ["admin", 10, 48, "All teams", "Showing 10 of 48 people away this week."],
     ["admin", 0, 0, "All teams", "No one is away this week."],
   ] as const)(

@@ -1,7 +1,6 @@
 import type { Result, XeroConnectionState } from "@repo/core";
-import type { Prisma } from "../../generated/client";
 import { systemDatabase } from "../system-client";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 
 export type { XeroConnectionState } from "@repo/core";
 export interface XeroConnectionStateResult {
@@ -16,11 +15,11 @@ export interface XeroConnectionStateError {
 }
 export async function getXeroConnectionState(
   input: XeroConnectionStateInput,
-  client: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
-    input.clerkOrgId
-  )
+  db: TenantDb
 ): Promise<Result<XeroConnectionStateResult, XeroConnectionStateError>> {
-  try {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
     const connection = await client.xeroConnection.findFirst({
       select: { status: true, xero_authorisation_id: true },
       where: {
@@ -46,7 +45,5 @@ export async function getXeroConnectionState(
       state = "reauthorisation_required";
     }
     return { ok: true, value: { state } };
-  } catch {
-    return { error: { code: "state_unavailable" }, ok: false };
   }
 }

@@ -19,12 +19,19 @@ import {
   updateRecord,
   withdrawSubmission,
 } from "@repo/availability";
-import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId, Result } from "@repo/core";
+import {
+  afterTenantCommit,
+  assertTenantDb,
+  resolveAccountCompanies,
+  type TenantDb,
+  withTenantDb,
+  withTenantResult,
+} from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
   buildFormDate,
   type PlanRecordActionInput,
@@ -62,7 +69,11 @@ export async function attachSubmitRecoveryCandidateAction(input: {
   recordId: string;
   remoteId: string;
 }): Promise<PlanActionResult<void>> {
-  const context = await resolveRecoveryContext(input.organisationId);
+  assertNoTenantTransaction("attachSubmitRecoveryCandidateAction");
+  const context = await resolveRecoveryContext(
+    input.organisationId,
+    input.recordId
+  );
   if (!context.ok) {
     return context;
   }
@@ -86,7 +97,11 @@ export async function listSubmitRecoveryCandidatesAction(input: {
   organisationId: string;
   recordId: string;
 }) {
-  const context = await resolveRecoveryContext(input.organisationId);
+  assertNoTenantTransaction("listSubmitRecoveryCandidatesAction");
+  const context = await resolveRecoveryContext(
+    input.organisationId,
+    input.recordId
+  );
   if (!context.ok) {
     return context;
   }
@@ -103,7 +118,11 @@ export async function resolveSubmitAsNotCreatedAction(input: {
   reason: string;
   recordId: string;
 }): Promise<PlanActionResult<void>> {
-  const context = await resolveRecoveryContext(input.organisationId);
+  assertNoTenantTransaction("resolveSubmitAsNotCreatedAction");
+  const context = await resolveRecoveryContext(
+    input.organisationId,
+    input.recordId
+  );
   if (!context.ok) {
     return context;
   }
@@ -131,41 +150,82 @@ export async function createRecordAction(input: PlanRecordFormInput): Promise<
     id: string;
   }>
 > {
+  assertNoTenantTransaction("createRecordAction");
   const parsed = PlanRecordFormSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedPlanActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const dates = await resolveFormDates(parsed.data, context.value);
-  if (!dates.ok) {
-    return dates;
+  try {
+    return await withTenantResult(
+      actor.value.clerkOrgId,
+      async (db): ReturnType<typeof createRecordAction> => {
+        const context = await loadPlanActionContext(
+          actor.value,
+          parsed.data,
+          db
+        );
+        if (!context.ok) {
+          return context;
+        }
+        const dates = await resolveFormDates(
+          parsed.data,
+          context.value,
+          undefined,
+          db
+        );
+        if (!dates.ok) {
+          return dates;
+        }
+        return await (async () => {
+          const result = await createRecord(
+            {
+              actingOrgRole: context.value.orgRole,
+              allDay: parsed.data.allDay,
+              clerkOrgId: context.value.clerkOrgId,
+              contactabilityStatus: parsed.data.contactabilityStatus,
+              createdByUserId: context.value.userId,
+              endsAt: dates.value.endsAt,
+              notesInternal: parsed.data.notesInternal,
+              organisationId: context.value.organisationId,
+              personId: parsed.data.personId,
+              privacyMode: parsed.data.privacyMode,
+              recordType: parsed.data.recordType,
+              startsAt: dates.value.startsAt,
+            },
+            db
+          );
+          if (!result.ok) {
+            return result;
+          }
+          afterTenantCommit(db, () => {
+            revalidatePath("/plans");
+
+            return Promise.resolve();
+          });
+          afterTenantCommit(db, () => {
+            revalidatePath("/calendar");
+
+            return Promise.resolve();
+          });
+          afterTenantCommit(db, () => {
+            revalidatePath("/");
+
+            return Promise.resolve();
+          });
+          return { ok: true, value: { id: result.value.id } };
+        })();
+      }
+    );
+  } catch {
+    return {
+      error: { code: "unknown_error", message: "Failed to save leave record." },
+      ok: false,
+    };
   }
-  return await (async () => {
-    const result = await createRecord({
-      actingOrgRole: context.value.orgRole,
-      allDay: parsed.data.allDay,
-      clerkOrgId: context.value.clerkOrgId,
-      contactabilityStatus: parsed.data.contactabilityStatus,
-      createdByUserId: context.value.userId,
-      endsAt: dates.value.endsAt,
-      notesInternal: parsed.data.notesInternal,
-      organisationId: context.value.organisationId,
-      personId: parsed.data.personId,
-      privacyMode: parsed.data.privacyMode,
-      recordType: parsed.data.recordType,
-      startsAt: dates.value.startsAt,
-    });
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/plans");
-    revalidatePath("/calendar");
-    revalidatePath("/");
-    return { ok: true, value: { id: result.value.id } };
-  })();
 }
 export async function updateRecordAction(
   input: UpdatePlanRecordFormInput
@@ -174,46 +234,79 @@ export async function updateRecordAction(
     id: string;
   }>
 > {
+  assertNoTenantTransaction("updateRecordAction");
   const parsed = UpdatePlanRecordFormSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedPlanActor();
+  if (!actor.ok) {
+    return actor;
   }
-  const dates = await resolveFormDates(
-    parsed.data,
-    context.value,
-    parsed.data.recordId
-  );
-  if (!dates.ok) {
-    return dates;
+  try {
+    return await withTenantResult(
+      actor.value.clerkOrgId,
+      async (db): ReturnType<typeof updateRecordAction> => {
+        const context = await loadPlanActionContext(
+          actor.value,
+          parsed.data,
+          db
+        );
+        if (!context.ok) {
+          return context;
+        }
+        const dates = await resolveFormDates(
+          parsed.data,
+          context.value,
+          parsed.data.recordId,
+          db
+        );
+        if (!dates.ok) {
+          return dates;
+        }
+        return await (async () => {
+          const result = await updateRecord(
+            {
+              actingOrgRole: context.value.orgRole,
+              actingUserId: context.value.userId,
+              clerkOrgId: context.value.clerkOrgId,
+              organisationId: context.value.organisationId,
+              patch: {
+                allDay: parsed.data.allDay,
+                contactabilityStatus: parsed.data.contactabilityStatus,
+                endsAt: dates.value.endsAt,
+                notesInternal: parsed.data.notesInternal,
+                privacyMode: parsed.data.privacyMode,
+                recordType: parsed.data.recordType,
+                startsAt: dates.value.startsAt,
+              },
+              recordId: parsed.data.recordId,
+            },
+            db
+          );
+          if (!result.ok) {
+            return result;
+          }
+          afterTenantCommit(db, () => {
+            revalidatePath("/plans");
+
+            return Promise.resolve();
+          });
+          afterTenantCommit(db, () => {
+            revalidatePath("/calendar");
+
+            return Promise.resolve();
+          });
+          return { ok: true, value: { id: result.value.id } };
+        })();
+      }
+    );
+  } catch {
+    return {
+      error: { code: "unknown_error", message: "Failed to save leave record." },
+      ok: false,
+    };
   }
-  return await (async () => {
-    const result = await updateRecord({
-      actingOrgRole: context.value.orgRole,
-      actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      patch: {
-        allDay: parsed.data.allDay,
-        contactabilityStatus: parsed.data.contactabilityStatus,
-        endsAt: dates.value.endsAt,
-        notesInternal: parsed.data.notesInternal,
-        privacyMode: parsed.data.privacyMode,
-        recordType: parsed.data.recordType,
-        startsAt: dates.value.startsAt,
-      },
-      recordId: parsed.data.recordId,
-    });
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/plans");
-    revalidatePath("/calendar");
-    return { ok: true, value: { id: result.value.id } };
-  })();
 }
 async function captureSubmissionActivation(input: {
   clerkOrgId: string;
@@ -223,17 +316,17 @@ async function captureSubmissionActivation(input: {
   if (!input.submittedAt) {
     return;
   }
-  const first = await tenantDatabase(
-    input.clerkOrgId
-  ).availabilityRecord.findFirst({
-    orderBy: { submitted_at: "asc" },
-    select: { submitted_at: true },
-    where: {
-      clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
-      submitted_at: { not: null },
-    },
-  });
+  const first = await withTenantDb(input.clerkOrgId, (db) =>
+    db.availabilityRecord.findFirst({
+      orderBy: { submitted_at: "asc" },
+      select: { submitted_at: true },
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+        submitted_at: { not: null },
+      },
+    })
+  );
   if (!first?.submitted_at) {
     return;
   }
@@ -255,86 +348,179 @@ async function captureSubmissionActivation(input: {
 export async function deleteDraftAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
+  assertNoTenantTransaction("deleteDraftAction");
   const parsed = PlanRecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedPlanActor();
+  if (!actor.ok) {
+    return actor;
   }
-  return await (async () => {
-    const result = await deleteDraftRecord({
-      actingOrgRole: context.value.orgRole,
-      actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      recordId: parsed.data.recordId,
-    });
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/plans");
-    return { ok: true, value: undefined };
-  })();
+  try {
+    return await withTenantResult(
+      actor.value.clerkOrgId,
+      async (db): ReturnType<typeof deleteDraftAction> => {
+        const context = await loadPlanActionContext(
+          actor.value,
+          parsed.data,
+          db
+        );
+        if (!context.ok) {
+          return context;
+        }
+        return await (async () => {
+          const result = await deleteDraftRecord(
+            {
+              actingOrgRole: context.value.orgRole,
+              actingUserId: context.value.userId,
+              clerkOrgId: context.value.clerkOrgId,
+              organisationId: context.value.organisationId,
+              recordId: parsed.data.recordId,
+            },
+            db
+          );
+          if (!result.ok) {
+            return result;
+          }
+          afterTenantCommit(db, () => {
+            revalidatePath("/plans");
+
+            return Promise.resolve();
+          });
+          return { ok: true, value: undefined };
+        })();
+      }
+    );
+  } catch {
+    return {
+      error: { code: "unknown_error", message: "Failed to save leave record." },
+      ok: false,
+    };
+  }
 }
 export async function archiveRecordAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
+  assertNoTenantTransaction("archiveRecordAction");
   const parsed = PlanRecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedPlanActor();
+  if (!actor.ok) {
+    return actor;
   }
-  return await (async () => {
-    const result = await archiveRecord({
-      actingOrgRole: context.value.orgRole,
-      actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      recordId: parsed.data.recordId,
-    });
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/plans");
-    revalidatePath("/calendar");
-    return { ok: true, value: undefined };
-  })();
+  try {
+    return await withTenantResult(
+      actor.value.clerkOrgId,
+      async (db): ReturnType<typeof archiveRecordAction> => {
+        const context = await loadPlanActionContext(
+          actor.value,
+          parsed.data,
+          db
+        );
+        if (!context.ok) {
+          return context;
+        }
+        return await (async () => {
+          const result = await archiveRecord(
+            {
+              actingOrgRole: context.value.orgRole,
+              actingUserId: context.value.userId,
+              clerkOrgId: context.value.clerkOrgId,
+              organisationId: context.value.organisationId,
+              recordId: parsed.data.recordId,
+            },
+            db
+          );
+          if (!result.ok) {
+            return result;
+          }
+          afterTenantCommit(db, () => {
+            revalidatePath("/plans");
+
+            return Promise.resolve();
+          });
+          afterTenantCommit(db, () => {
+            revalidatePath("/calendar");
+
+            return Promise.resolve();
+          });
+          return { ok: true, value: undefined };
+        })();
+      }
+    );
+  } catch {
+    return {
+      error: { code: "unknown_error", message: "Failed to save leave record." },
+      ok: false,
+    };
+  }
 }
 export async function restoreRecordAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
+  assertNoTenantTransaction("restoreRecordAction");
   const parsed = PlanRecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
+  const actor = await authenticatedPlanActor();
+  if (!actor.ok) {
+    return actor;
   }
-  return await (async () => {
-    const result = await restoreRecord({
-      actingOrgRole: context.value.orgRole,
-      actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      recordId: parsed.data.recordId,
-    });
-    if (!result.ok) {
-      return result;
-    }
-    revalidatePath("/plans");
-    revalidatePath("/calendar");
-    return { ok: true, value: undefined };
-  })();
+  try {
+    return await withTenantResult(
+      actor.value.clerkOrgId,
+      async (db): ReturnType<typeof restoreRecordAction> => {
+        const context = await loadPlanActionContext(
+          actor.value,
+          parsed.data,
+          db
+        );
+        if (!context.ok) {
+          return context;
+        }
+        return await (async () => {
+          const result = await restoreRecord(
+            {
+              actingOrgRole: context.value.orgRole,
+              actingUserId: context.value.userId,
+              clerkOrgId: context.value.clerkOrgId,
+              organisationId: context.value.organisationId,
+              recordId: parsed.data.recordId,
+            },
+            db
+          );
+          if (!result.ok) {
+            return result;
+          }
+          afterTenantCommit(db, () => {
+            revalidatePath("/plans");
+
+            return Promise.resolve();
+          });
+          afterTenantCommit(db, () => {
+            revalidatePath("/calendar");
+
+            return Promise.resolve();
+          });
+          return { ok: true, value: undefined };
+        })();
+      }
+    );
+  } catch {
+    return {
+      error: { code: "unknown_error", message: "Failed to save leave record." },
+      ok: false,
+    };
+  }
 }
 export async function submitForApprovalAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
+  assertNoTenantTransaction("submitForApprovalAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -360,6 +546,7 @@ export async function submitForApprovalAction(
 export async function withdrawSubmissionAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
+  assertNoTenantTransaction("withdrawSubmissionAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -391,6 +578,7 @@ export async function withdrawSubmissionAction(
 export async function retrySubmissionAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
+  assertNoTenantTransaction("retrySubmissionAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -416,6 +604,7 @@ export async function retrySubmissionAction(
 export async function revertToDraftAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
+  assertNoTenantTransaction("revertToDraftAction");
   const context = await resolveRecordActionContext(input);
   if (!context.ok) {
     return context;
@@ -435,20 +624,14 @@ interface SubmissionActionValue {
   id: string;
   xeroWriteError: string | null;
 }
-async function resolveActionContext(organisationId: string): Promise<
-  PlanActionResult<{
-    clerkOrgId: string;
-    organisationId: string;
-    orgRole: string | null;
-    userId: string;
-  }>
-> {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(organisationId),
-  ]);
-  if (!(user && canUsePlans(orgRole))) {
+interface PlanActor {
+  clerkOrgId: ClerkOrgId;
+  orgRole: string | null;
+  userId: string;
+}
+async function authenticatedPlanActor(): Promise<PlanActionResult<PlanActor>> {
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  if (!(orgId && user && canUsePlans(orgRole))) {
     return {
       error: {
         code: "not_authorised",
@@ -457,24 +640,72 @@ async function resolveActionContext(organisationId: string): Promise<
       ok: false,
     };
   }
-  if (!context.ok) {
-    return {
-      error: {
-        code: "not_authorised",
-        message: context.error.message,
-      },
-      ok: false,
-    };
-  }
+  // Clerk account is authenticated before SQL preparation.
   return {
     ok: true,
     value: {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
+      clerkOrgId: orgId as ClerkOrgId,
       orgRole: orgRole ?? null,
       userId: user.id,
     },
   };
+}
+async function loadPlanActionContext(
+  actor: PlanActor,
+  input: { organisationId: string; personId?: string; recordId?: string },
+  db: TenantDb
+): Promise<PlanActionResult<PlanActor & { organisationId: string }>> {
+  assertTenantDb(db, actor.clerkOrgId);
+  const companies = await resolveAccountCompanies(actor.clerkOrgId, db);
+  const companyIds = companies.map((company) => company.id);
+  const scope = {
+    clerk_org_id: actor.clerkOrgId,
+    organisation_id: { in: companyIds },
+  };
+  let target: { organisation_id: string } | null = null;
+  if (input.recordId) {
+    target = await db.availabilityRecord.findFirst({
+      select: { organisation_id: true },
+      where: { ...scope, id: input.recordId },
+    });
+  } else if (input.personId) {
+    target = await db.person.findFirst({
+      select: { organisation_id: true },
+      where: { ...scope, archived_at: null, id: input.personId },
+    });
+  }
+  if ((input.recordId || input.personId) && !target) {
+    return validationError("Person or leave record not found.");
+  }
+  const organisationId = target?.organisation_id ?? input.organisationId;
+  if (
+    !companyIds.includes(organisationId) ||
+    organisationId !== input.organisationId
+  ) {
+    return validationError(
+      "The company does not match this person or leave record."
+    );
+  }
+  return { ok: true, value: { ...actor, organisationId } };
+}
+async function resolveActionContext(
+  organisationId: string,
+  recordId?: string
+): Promise<
+  PlanActionResult<{
+    clerkOrgId: string;
+    organisationId: string;
+    orgRole: string | null;
+    userId: string;
+  }>
+> {
+  const actor = await authenticatedPlanActor();
+  if (!actor.ok) {
+    return actor;
+  }
+  return withTenantDb(actor.value.clerkOrgId, (db) =>
+    loadPlanActionContext(actor.value, { organisationId, recordId }, db)
+  );
 }
 function canUsePlans(role: string | null | undefined): boolean {
   return (
@@ -484,7 +715,10 @@ function canUsePlans(role: string | null | undefined): boolean {
     role === "org:owner"
   );
 }
-async function resolveRecoveryContext(organisationId: string): Promise<
+async function resolveRecoveryContext(
+  organisationId: string,
+  recordId?: string
+): Promise<
   PlanActionResult<{
     actingOrgRole: "org:admin" | "org:owner";
     actingUserId: string;
@@ -492,7 +726,7 @@ async function resolveRecoveryContext(organisationId: string): Promise<
     organisationId: string;
   }>
 > {
-  const context = await resolveActionContext(organisationId);
+  const context = await resolveActionContext(organisationId, recordId);
   if (!context.ok) {
     return context;
   }
@@ -534,7 +768,10 @@ async function resolveRecordActionContext(
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-  const context = await resolveActionContext(parsed.data.organisationId);
+  const context = await resolveActionContext(
+    parsed.data.organisationId,
+    parsed.data.recordId
+  );
   if (!context.ok) {
     return context;
   }
@@ -585,16 +822,16 @@ async function resolveFormDates(
     clerkOrgId: string;
     organisationId: string;
   },
-  recordId?: string
+  recordId: string | undefined,
+  db: TenantDb
 ): Promise<
   PlanActionResult<{
     startsAt: Date;
     endsAt: Date;
   }>
 > {
-  const organisation = await tenantDatabase(
-    context.clerkOrgId
-  ).organisation.findFirst({
+  assertTenantDb(db, context.clerkOrgId);
+  const organisation = await db.organisation.findFirst({
     select: { timezone: true },
     where: {
       archived_at: null,
@@ -621,7 +858,7 @@ async function resolveFormDates(
     timezone
   );
   const existing = recordId
-    ? await tenantDatabase(context.clerkOrgId).availabilityRecord.findFirst({
+    ? await db.availabilityRecord.findFirst({
         select: { all_day: true, ends_at: true, starts_at: true },
         where: {
           archived_at: null,

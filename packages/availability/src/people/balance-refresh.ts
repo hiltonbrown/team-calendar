@@ -2,11 +2,16 @@ import { log } from "@repo/observability/log";
 import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { xeroRecoveryMessage } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import {
+  assertTenantDb,
+  scopedQuery,
+  type TenantDb,
+  withTenantDb,
+} from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
 import { dispatchSyncEvent } from "../sync/sync-events";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
-import type { PeopleRole } from "./people-service";
 export type BalanceRefreshError =
   | {
       code: "not_authorised";
@@ -56,21 +61,49 @@ const DispatchBalanceRefreshSchema = z.object({
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
 });
-export async function dispatchBalanceRefresh(input: {
-  actingRole: PeopleRole;
-  actingUserId: string;
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-}): Promise<
-  Result<
-    {
-      queued: boolean;
-      reason?: BalanceRefreshReason;
-    },
-    BalanceRefreshError
-  >
-> {
+type BalanceRefreshInput = z.infer<typeof DispatchBalanceRefreshSchema>;
+interface BalanceRefreshOutcome {
+  queued: boolean;
+  reason?: BalanceRefreshReason;
+}
+export type PreparedBalanceRefresh =
+  | { kind: "skip"; input: BalanceRefreshInput; outcome: BalanceRefreshOutcome }
+  | {
+      kind: "send";
+      input: BalanceRefreshInput;
+      payload: Parameters<BalanceRefreshDispatcher>[0];
+    };
+
+export async function dispatchBalanceRefresh(
+  input: BalanceRefreshInput
+): Promise<Result<BalanceRefreshOutcome, BalanceRefreshError>> {
+  assertNoTenantTransaction("dispatchBalanceRefresh");
+  try {
+    const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+      prepareBalanceRefresh(input, db)
+    );
+    if (!prepared.ok) {
+      return prepared;
+    }
+    const sent = await sendPreparedBalanceRefresh(prepared.value);
+    if (!sent.ok) {
+      return sent;
+    }
+    const outcome = sent.value;
+    const audited = await withTenantDb(input.clerkOrgId, (db) =>
+      recordBalanceRefreshDispatch(input, outcome, db)
+    );
+    return audited.ok ? sent : audited;
+  } catch {
+    return balanceRefreshUnknownError();
+  }
+}
+
+export async function prepareBalanceRefresh(
+  input: BalanceRefreshInput,
+  db: TenantDb
+): Promise<Result<PreparedBalanceRefresh, BalanceRefreshError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = DispatchBalanceRefreshSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -85,9 +118,7 @@ export async function dispatchBalanceRefresh(input: {
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-    const person = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).person.findFirst({
+    const person = await db.person.findFirst({
       select: {
         id: true,
         xero_employee_id: true,
@@ -98,17 +129,22 @@ export async function dispatchBalanceRefresh(input: {
       },
     });
     if (!person) {
-      return await personNotFound(parsed.data);
+      return await personNotFound(parsed.data, db);
     }
     if (!person.xero_employee_id) {
       const value = { queued: false, reason: "not_xero_linked" as const };
-      await auditDispatch(parsed.data, value);
-      return { ok: true, value };
+      return {
+        ok: true,
+        value: { input: parsed.data, kind: "skip", outcome: value },
+      };
     }
-    const xeroStateResult = await getXeroConnectionStateForScope({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-    });
+    const xeroStateResult = await getXeroConnectionStateForScope(
+      {
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      },
+      db
+    );
     if (!xeroStateResult.ok) {
       return {
         error: {
@@ -135,12 +171,12 @@ export async function dispatchBalanceRefresh(input: {
     const hasXero = xeroConnectionState === "connected";
     if (!hasXero) {
       const value = { queued: false, reason: "xero_not_connected" as const };
-      await auditDispatch(parsed.data, value);
-      return { ok: true, value };
+      return {
+        ok: true,
+        value: { input: parsed.data, kind: "skip", outcome: value },
+      };
     }
-    const xeroConnection = await tenantDatabase(
-      parsed.data.clerkOrgId
-    ).xeroConnection.findFirst({
+    const xeroConnection = await db.xeroConnection.findFirst({
       select: { id: true },
       where: {
         ...scoped,
@@ -149,69 +185,110 @@ export async function dispatchBalanceRefresh(input: {
     });
     if (!xeroConnection) {
       const value = { queued: false, reason: "xero_not_connected" as const };
-      await auditDispatch(parsed.data, value);
-      return { ok: true, value };
+      return {
+        ok: true,
+        value: { input: parsed.data, kind: "skip", outcome: value },
+      };
     }
     if (!balanceRefreshDispatcher) {
       const value = { queued: false, reason: "job_not_registered" as const };
-      await auditDispatch(parsed.data, value);
-      return { ok: true, value };
+      return {
+        ok: true,
+        value: { input: parsed.data, kind: "skip", outcome: value },
+      };
     }
-    const dispatched = await balanceRefreshDispatcher({
-      clerkOrgId: parsed.data.clerkOrgId,
-      connectionId: xeroConnection.id,
-      dispatchedBy: parsed.data.actingUserId,
-      organisationId: parsed.data.organisationId,
-      personId: parsed.data.personId,
-    });
-    if (!dispatched.ok) {
-      const value = { queued: false, reason: "dispatch_failed" as const };
-      await auditDispatch(parsed.data, value);
-      return { ok: true, value };
-    }
-    const value = { queued: true };
-    await auditDispatch(parsed.data, value);
-    return { ok: true, value };
-  } catch {
     return {
-      error: {
-        code: "unknown_error",
-        message: "Failed to dispatch balance refresh.",
+      ok: true,
+      value: {
+        input: parsed.data,
+        kind: "send",
+        payload: {
+          clerkOrgId: parsed.data.clerkOrgId,
+          connectionId: xeroConnection.id,
+          dispatchedBy: parsed.data.actingUserId,
+          organisationId: parsed.data.organisationId,
+          personId: parsed.data.personId,
+        },
       },
-      ok: false,
     };
+  } catch {
+    return balanceRefreshUnknownError();
   }
 }
-async function auditDispatch(
-  input: z.infer<typeof DispatchBalanceRefreshSchema>,
+
+export async function sendPreparedBalanceRefresh(
+  prepared: PreparedBalanceRefresh
+): Promise<Result<BalanceRefreshOutcome, BalanceRefreshError>> {
+  assertNoTenantTransaction("sendPreparedBalanceRefresh");
+  if (prepared.kind === "skip") {
+    return { ok: true, value: prepared.outcome };
+  }
+  if (!balanceRefreshDispatcher) {
+    return { ok: true, value: { queued: false, reason: "job_not_registered" } };
+  }
+  try {
+    const sent = await balanceRefreshDispatcher(prepared.payload);
+    // Preserve the existing non-fatal failed-dispatch receipt.
+    return {
+      ok: true,
+      value: sent.ok
+        ? { queued: true }
+        : { queued: false, reason: "dispatch_failed" },
+    };
+  } catch {
+    return balanceRefreshUnknownError();
+  }
+}
+
+function balanceRefreshUnknownError(): Result<never, BalanceRefreshError> {
+  return {
+    error: {
+      code: "unknown_error",
+      message: "Failed to dispatch balance refresh.",
+    },
+    ok: false,
+  };
+}
+export async function recordBalanceRefreshDispatch(
+  input: BalanceRefreshInput,
   result: {
     queued: boolean;
     reason?: BalanceRefreshReason;
-  }
-) {
-  await tenantDatabase(input.clerkOrgId).auditEvent.create({
-    data: {
-      action: "availability_records.balance_refresh_dispatched",
-      actor_user_id: input.actingUserId,
-      clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
-      payload: {
-        actingUserId: input.actingUserId,
-        personId: input.personId,
-        queued: result.queued,
-        reason: result.reason ?? null,
+  },
+  db: TenantDb
+): Promise<Result<void, BalanceRefreshError>> {
+  assertTenantDb(db, input.clerkOrgId);
+  try {
+    await db.auditEvent.create({
+      data: {
+        action: "availability_records.balance_refresh_dispatched",
+        actor_user_id: input.actingUserId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+        payload: {
+          actingUserId: input.actingUserId,
+          personId: input.personId,
+          queued: result.queued,
+          reason: result.reason ?? null,
+        },
+        resource_id: input.personId,
+        resource_type: "person",
       },
-      resource_id: input.personId,
-      resource_type: "person",
-    },
-  });
+    });
+    return { ok: true, value: undefined };
+  } catch {
+    return balanceRefreshUnknownError();
+  }
 }
-async function personNotFound(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-}): Promise<Result<never, BalanceRefreshError>> {
-  const exists = await tenantDatabase(input.clerkOrgId).person.findFirst({
+async function personNotFound(
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<Result<never, BalanceRefreshError>> {
+  const exists = await db.person.findFirst({
     select: { clerk_org_id: true, organisation_id: true },
     where: { id: input.personId },
   });

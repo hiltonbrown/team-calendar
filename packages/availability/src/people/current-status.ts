@@ -5,7 +5,7 @@ import {
   type OrganisationId,
   startOfUtcDay,
 } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import type {
   availability_approval_status,
   availability_contactability,
@@ -129,263 +129,306 @@ const LOCAL_PRIORITY: Array<{
   },
 ];
 
-export async function computeCurrentStatusForPeople(input: {
-  at: Date;
-  clerkOrgId: string;
-  organisationId: string;
-  people: CurrentStatusPersonInput[];
-}): Promise<Map<string, CurrentStatus>> {
-  const clerkOrgId = input.clerkOrgId as ClerkOrgId;
-  const organisationId = input.organisationId as OrganisationId;
-  const personIds = input.people.map((person) => person.personId);
-  if (personIds.length === 0) {
-    return new Map();
-  }
+export async function computeCurrentStatusForPeople(
+  input: {
+    at: Date;
+    clerkOrgId: string;
+    organisationId: string;
+    people: CurrentStatusPersonInput[];
+  },
+  db: TenantDb
+): Promise<Map<string, CurrentStatus>> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  const locationIds = [
-    ...new Set(
-      input.people
-        .map((person) => person.locationId)
-        .filter((locationId): locationId is string => locationId !== null)
-    ),
-  ];
-
-  const [locations, organisation, activeRecords] = await Promise.all([
-    locationIds.length
-      ? tenantDatabase(clerkOrgId).location.findMany({
-          select: {
-            country_code: true,
-            id: true,
-            region_code: true,
-            timezone: true,
-          },
-          where: {
-            ...scopedQuery(clerkOrgId, organisationId),
-            id: { in: locationIds },
-          },
-        })
-      : Promise.resolve([]),
-    tenantDatabase(clerkOrgId).organisation.findFirst({
-      select: {
-        country_code: true,
-        timezone: true,
-      },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-    tenantDatabase(clerkOrgId).availabilityRecord.findMany({
-      select: {
-        approval_status: true,
-        archived_at: true,
-        contactability: true,
-        ends_at: true,
-        id: true,
-        person_id: true,
-        record_type: true,
-        source_type: true,
-        starts_at: true,
-        title: true,
-      },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        approval_status: { in: ["approved", "submitted"] },
-        archived_at: null,
-        ends_at: { gte: input.at },
-        person_id: { in: personIds },
-        starts_at: { lte: input.at },
-      },
-    }),
-  ]);
-
-  const locationsById = new Map(
-    locations.map((location) => [location.id, location])
-  );
-  const recordsByPersonId = new Map<string, CurrentStatusRecord[]>();
-  for (const record of activeRecords) {
-    const records = recordsByPersonId.get(record.person_id) ?? [];
-    records.push(toStatusRecord(record));
-    recordsByPersonId.set(record.person_id, records);
-  }
-
-  const localDates = input.people.map((person) => {
-    const location = person.locationId
-      ? (locationsById.get(person.locationId) ?? null)
-      : null;
-    return dateOnlyInTimeZone(
-      input.at,
-      location?.timezone ?? organisation?.timezone ?? "UTC"
-    );
-  });
-  const holidays = await resolveHolidaysForDates({
-    clerkOrgId,
-    localDates,
-    organisationId,
-  });
-
-  const statuses = new Map<string, CurrentStatus>();
-  for (const person of input.people) {
-    const records = recordsByPersonId.get(person.personId) ?? [];
-    const leaveStatus = statusFromApprovedOrPendingLeave(records);
-    if (leaveStatus) {
-      statuses.set(person.personId, leaveStatus);
-      continue;
+    const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+    const organisationId = input.organisationId as OrganisationId;
+    const personIds = input.people.map((person) => person.personId);
+    if (personIds.length === 0) {
+      return new Map();
     }
 
-    const location = person.locationId
-      ? (locationsById.get(person.locationId) ?? null)
-      : null;
+    const locationIds = [
+      ...new Set(
+        input.people
+          .map((person) => person.locationId)
+          .filter((locationId): locationId is string => locationId !== null)
+      ),
+    ];
+
+    const [locations, organisation, activeRecords] = [
+      await (locationIds.length
+        ? client.location.findMany({
+            select: {
+              country_code: true,
+              id: true,
+              region_code: true,
+              timezone: true,
+            },
+            where: {
+              ...scopedQuery(clerkOrgId, organisationId),
+              id: { in: locationIds },
+            },
+          })
+        : Promise.resolve([])),
+      await client.organisation.findFirst({
+        select: {
+          country_code: true,
+          timezone: true,
+        },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          id: organisationId,
+        },
+      }),
+      await client.availabilityRecord.findMany({
+        select: {
+          approval_status: true,
+          archived_at: true,
+          contactability: true,
+          ends_at: true,
+          id: true,
+          person_id: true,
+          record_type: true,
+          source_type: true,
+          starts_at: true,
+          title: true,
+        },
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          approval_status: { in: ["approved", "submitted"] },
+          archived_at: null,
+          ends_at: { gte: input.at },
+          person_id: { in: personIds },
+          starts_at: { lte: input.at },
+        },
+      }),
+    ];
+
+    const locationsById = new Map(
+      locations.map((location) => [location.id, location])
+    );
+    const recordsByPersonId = new Map<string, CurrentStatusRecord[]>();
+    for (const record of activeRecords) {
+      const records = recordsByPersonId.get(record.person_id) ?? [];
+      records.push(toStatusRecord(record));
+      recordsByPersonId.set(record.person_id, records);
+    }
+
+    const localDates = input.people.map((person) => {
+      const location = person.locationId
+        ? (locationsById.get(person.locationId) ?? null)
+        : null;
+      return dateOnlyInTimeZone(
+        input.at,
+        location?.timezone ?? organisation?.timezone ?? "UTC"
+      );
+    });
+    const holidays = await resolveHolidaysForDates(
+      {
+        clerkOrgId,
+        localDates,
+        organisationId,
+      },
+      client
+    );
+
+    const statuses = new Map<string, CurrentStatus>();
+    for (const person of input.people) {
+      const records = recordsByPersonId.get(person.personId) ?? [];
+      const leaveStatus = statusFromApprovedOrPendingLeave(records);
+      if (leaveStatus) {
+        statuses.set(person.personId, leaveStatus);
+        continue;
+      }
+
+      const location = person.locationId
+        ? (locationsById.get(person.locationId) ?? null)
+        : null;
+      const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
+      const localDate = dateOnlyInTimeZone(input.at, timezone);
+      const holiday = holidayOn(holidays, localDate, person.locationId);
+      statuses.set(person.personId, statusFromHolidayOrLocal(records, holiday));
+    }
+
+    return statuses;
+  }
+}
+
+export async function computePublicHolidayApplicability(
+  input: {
+    at: Date;
+    clerkOrgId: string;
+    locationIds: string[];
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<PublicHolidayApplicability> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+    const organisationId = input.organisationId as OrganisationId;
+    const [locations, organisation] = [
+      await (input.locationIds.length
+        ? client.location.findMany({
+            select: {
+              country_code: true,
+              id: true,
+              region_code: true,
+              timezone: true,
+            },
+            where: {
+              ...scopedQuery(clerkOrgId, organisationId),
+              id: { in: input.locationIds },
+            },
+          })
+        : Promise.resolve([])),
+      await client.organisation.findFirst({
+        select: { country_code: true, timezone: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          id: organisationId,
+        },
+      }),
+    ];
+    const subjects = [
+      ...locations.map((location) => ({
+        localDate: dateOnlyInTimeZone(
+          input.at,
+          location.timezone ?? organisation?.timezone ?? "UTC"
+        ),
+        locationId: location.id as string | null,
+      })),
+      {
+        localDate: dateOnlyInTimeZone(
+          input.at,
+          organisation?.timezone ?? "UTC"
+        ),
+        locationId: null,
+      },
+    ];
+    const holidays = await resolveHolidaysForDates(
+      {
+        clerkOrgId,
+        localDates: subjects.map((subject) => subject.localDate),
+        organisationId,
+      },
+      client
+    );
+    const applicable = new Set<string>();
+    let unassigned = false;
+    for (const subject of subjects) {
+      const holiday = holidayOn(
+        holidays,
+        subject.localDate,
+        subject.locationId
+      );
+      if (!holiday) {
+        continue;
+      }
+      if (subject.locationId) {
+        applicable.add(subject.locationId);
+      } else {
+        unassigned = true;
+      }
+    }
+    return { locationIds: applicable, unassigned };
+  }
+}
+
+export async function computeCurrentStatus(
+  input: {
+    at: Date;
+    clerkOrgId: string;
+    locationId: string | null;
+    organisationId: string;
+    personId: string;
+  },
+  db: TenantDb
+): Promise<CurrentStatus> {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+    const organisationId = input.organisationId as OrganisationId;
+    const [location, organisation, activeRecords] = [
+      await (input.locationId
+        ? client.location.findFirst({
+            select: {
+              country_code: true,
+              region_code: true,
+              timezone: true,
+            },
+            where: {
+              ...scopedQuery(clerkOrgId, organisationId),
+              id: input.locationId,
+            },
+          })
+        : Promise.resolve(null)),
+      await client.organisation.findFirst({
+        select: {
+          country_code: true,
+          timezone: true,
+        },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          id: organisationId,
+        },
+      }),
+      await client.availabilityRecord.findMany({
+        select: {
+          approval_status: true,
+          archived_at: true,
+          contactability: true,
+          ends_at: true,
+          id: true,
+          record_type: true,
+          source_type: true,
+          starts_at: true,
+          title: true,
+        },
+        where: {
+          ...scopedQuery(clerkOrgId, organisationId),
+          approval_status: { in: ["approved", "submitted"] },
+          archived_at: null,
+          ends_at: { gte: input.at },
+          person_id: input.personId,
+          starts_at: { lte: input.at },
+        },
+      }),
+    ];
+
+    const mappedRecords = activeRecords.map(toStatusRecord);
+    const leaveStatus = statusFromApprovedOrPendingLeave(mappedRecords);
+    if (leaveStatus) {
+      return leaveStatus;
+    }
+
     const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
     const localDate = dateOnlyInTimeZone(input.at, timezone);
-    const holiday = holidayOn(holidays, localDate, person.locationId);
-    statuses.set(person.personId, statusFromHolidayOrLocal(records, holiday));
+    const holidays = await resolveHolidaysForDates(
+      {
+        clerkOrgId,
+        localDates: [localDate],
+        organisationId,
+      },
+      client
+    );
+    return statusFromHolidayOrLocal(
+      mappedRecords,
+      holidayOn(holidays, localDate, input.locationId)
+    );
   }
-
-  return statuses;
-}
-
-export async function computePublicHolidayApplicability(input: {
-  at: Date;
-  clerkOrgId: string;
-  locationIds: string[];
-  organisationId: string;
-}): Promise<PublicHolidayApplicability> {
-  const clerkOrgId = input.clerkOrgId as ClerkOrgId;
-  const organisationId = input.organisationId as OrganisationId;
-  const [locations, organisation] = await Promise.all([
-    input.locationIds.length
-      ? tenantDatabase(clerkOrgId).location.findMany({
-          select: {
-            country_code: true,
-            id: true,
-            region_code: true,
-            timezone: true,
-          },
-          where: {
-            ...scopedQuery(clerkOrgId, organisationId),
-            id: { in: input.locationIds },
-          },
-        })
-      : Promise.resolve([]),
-    tenantDatabase(clerkOrgId).organisation.findFirst({
-      select: { country_code: true, timezone: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-  ]);
-  const subjects = [
-    ...locations.map((location) => ({
-      localDate: dateOnlyInTimeZone(
-        input.at,
-        location.timezone ?? organisation?.timezone ?? "UTC"
-      ),
-      locationId: location.id as string | null,
-    })),
-    {
-      localDate: dateOnlyInTimeZone(input.at, organisation?.timezone ?? "UTC"),
-      locationId: null,
-    },
-  ];
-  const holidays = await resolveHolidaysForDates({
-    clerkOrgId,
-    localDates: subjects.map((subject) => subject.localDate),
-    organisationId,
-  });
-  const applicable = new Set<string>();
-  let unassigned = false;
-  for (const subject of subjects) {
-    const holiday = holidayOn(holidays, subject.localDate, subject.locationId);
-    if (!holiday) {
-      continue;
-    }
-    if (subject.locationId) {
-      applicable.add(subject.locationId);
-    } else {
-      unassigned = true;
-    }
-  }
-  return { locationIds: applicable, unassigned };
-}
-
-export async function computeCurrentStatus(input: {
-  at: Date;
-  clerkOrgId: string;
-  locationId: string | null;
-  organisationId: string;
-  personId: string;
-}): Promise<CurrentStatus> {
-  const clerkOrgId = input.clerkOrgId as ClerkOrgId;
-  const organisationId = input.organisationId as OrganisationId;
-  const [location, organisation, activeRecords] = await Promise.all([
-    input.locationId
-      ? tenantDatabase(clerkOrgId).location.findFirst({
-          select: {
-            country_code: true,
-            region_code: true,
-            timezone: true,
-          },
-          where: {
-            ...scopedQuery(clerkOrgId, organisationId),
-            id: input.locationId,
-          },
-        })
-      : Promise.resolve(null),
-    tenantDatabase(clerkOrgId).organisation.findFirst({
-      select: {
-        country_code: true,
-        timezone: true,
-      },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-    tenantDatabase(clerkOrgId).availabilityRecord.findMany({
-      select: {
-        approval_status: true,
-        archived_at: true,
-        contactability: true,
-        ends_at: true,
-        id: true,
-        record_type: true,
-        source_type: true,
-        starts_at: true,
-        title: true,
-      },
-      where: {
-        ...scopedQuery(clerkOrgId, organisationId),
-        approval_status: { in: ["approved", "submitted"] },
-        archived_at: null,
-        ends_at: { gte: input.at },
-        person_id: input.personId,
-        starts_at: { lte: input.at },
-      },
-    }),
-  ]);
-
-  const mappedRecords = activeRecords.map(toStatusRecord);
-  const leaveStatus = statusFromApprovedOrPendingLeave(mappedRecords);
-  if (leaveStatus) {
-    return leaveStatus;
-  }
-
-  const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
-  const localDate = dateOnlyInTimeZone(input.at, timezone);
-  const holidays = await resolveHolidaysForDates({
-    clerkOrgId,
-    localDates: [localDate],
-    organisationId,
-  });
-  return statusFromHolidayOrLocal(
-    mappedRecords,
-    holidayOn(holidays, localDate, input.locationId)
-  );
 }
 
 function toStatusRecord(record: {
@@ -503,23 +546,30 @@ function statusFromHolidayOrLocal(
 }
 
 /** Resolves holidays covering every local date the lookups need, in one call. */
-async function resolveHolidaysForDates(input: {
-  clerkOrgId: ClerkOrgId;
-  localDates: string[];
-  organisationId: OrganisationId;
-}): Promise<ResolvedPublicHoliday[]> {
+async function resolveHolidaysForDates(
+  input: {
+    clerkOrgId: ClerkOrgId;
+    localDates: string[];
+    organisationId: OrganisationId;
+  },
+  db: TenantDb
+): Promise<ResolvedPublicHoliday[]> {
   const sorted = [...input.localDates].sort();
   const [from] = sorted;
   const to = sorted.at(-1);
   if (!(from && to)) {
     return [];
   }
-  const result = await resolvePublicHolidays({
-    clerkOrgId: input.clerkOrgId,
-    from,
-    organisationId: input.organisationId,
-    to,
-  });
+  const result = await resolvePublicHolidays(
+    {
+      clerkOrgId: input.clerkOrgId,
+      from,
+      organisationId: input.organisationId,
+      to,
+    },
+    undefined,
+    db
+  );
   if (result.ok) {
     return result.value;
   }

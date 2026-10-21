@@ -1,4 +1,9 @@
 import { Prisma } from "@repo/database/generated/client";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -18,13 +23,32 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+  resolveAccountCompanies: async () => [
+    {
+      country_code: "AU",
+      id: "00000000-0000-4000-8000-000000000001",
+      name: "Acme Org",
+      timezone: "Australia/Brisbane",
+    },
+  ],
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Only the delegates consumed by this area are implemented; transaction ownership is real.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       availabilityRecord: {
         count: mocks.availabilityCount,
         groupBy: mocks.availabilityGroupBy,
@@ -34,27 +58,9 @@ vi.mock("@repo/database", () => ({
         count: mocks.personCount,
         findMany: mocks.personFindMany,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        availabilityRecord: {
-          count: mocks.availabilityCount,
-          groupBy: mocks.availabilityGroupBy,
-        },
-        location: { findMany: mocks.locationFindMany },
-        person: {
-          count: mocks.personCount,
-          findMany: mocks.personFindMany,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("@repo/database/generated/client", () => ({
   Prisma: {
     Decimal: class {
@@ -122,77 +128,149 @@ describe("people-service", () => {
     "applies %s direct-person access for actor %s and target %s",
     async (role, actingPersonId, personId, expected) => {
       await expect(
-        canAccessPerson({
-          actingPersonId,
-          clerkOrgId: "org_1",
-          organisationId,
-          personId,
-          role,
-        })
+        withTestTenantDb(
+          tenantTestAccount({
+            actingPersonId,
+            clerkOrgId: "org_1",
+            organisationId,
+            personId,
+            role,
+          }),
+          (db) =>
+            canAccessPerson(
+              {
+                actingPersonId,
+                clerkOrgId: "org_1",
+                organisationId,
+                personId,
+                role,
+              },
+              db
+            )
+        )
       ).resolves.toBe(expected);
     }
   );
 
   it("limits a manager to the central visibility scope", async () => {
     await expect(
-      canAccessPerson({
-        actingPersonId: managerId,
-        clerkOrgId: "org_1",
-        organisationId,
-        personId: directReportId,
-        role: "manager",
-      })
+      withTestTenantDb(
+        tenantTestAccount({
+          actingPersonId: managerId,
+          clerkOrgId: "org_1",
+          organisationId,
+          personId: directReportId,
+          role: "manager",
+        }),
+        (db) =>
+          canAccessPerson(
+            {
+              actingPersonId: managerId,
+              clerkOrgId: "org_1",
+              organisationId,
+              personId: directReportId,
+              role: "manager",
+            },
+            db
+          )
+      )
     ).resolves.toBe(true);
     await expect(
-      canAccessPerson({
-        actingPersonId: managerId,
-        clerkOrgId: "org_1",
-        organisationId,
-        personId: "00000000-0000-4000-8000-000000000099",
-        role: "manager",
-      })
+      withTestTenantDb(
+        tenantTestAccount({
+          actingPersonId: managerId,
+          clerkOrgId: "org_1",
+          organisationId,
+          personId: "00000000-0000-4000-8000-000000000099",
+          role: "manager",
+        }),
+        (db) =>
+          canAccessPerson(
+            {
+              actingPersonId: managerId,
+              clerkOrgId: "org_1",
+              organisationId,
+              personId: "00000000-0000-4000-8000-000000000099",
+              role: "manager",
+            },
+            db
+          )
+      )
     ).resolves.toBe(false);
   });
 
   it("applies settings-aware manager visibility to the people directory", async () => {
-    const result = await listPeople({
-      actingPersonId: managerId,
-      clerkOrgId: "org_1",
-      filters: {
-        includeArchived: false,
-        personType: "all",
-        xeroLinked: "all",
-        xeroSyncFailedOnly: false,
-      },
-      organisationId,
-      pagination: { pageSize: 50 },
-      role: "manager",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingPersonId: managerId,
+        clerkOrgId: "org_1",
+        filters: {
+          includeArchived: false,
+          personType: "all",
+          xeroLinked: "all",
+          xeroSyncFailedOnly: false,
+        },
+        organisationId,
+        pagination: { pageSize: 50 },
+        role: "manager",
+      }),
+      (db) =>
+        listPeople(
+          {
+            actingPersonId: managerId,
+            clerkOrgId: "org_1",
+            filters: {
+              includeArchived: false,
+              personType: "all",
+              xeroLinked: "all",
+              xeroSyncFailedOnly: false,
+            },
+            organisationId,
+            pagination: { pageSize: 50 },
+            role: "manager",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
-    expect(mocks.managerScopePersonIds).toHaveBeenCalledWith({
-      actingPersonId: managerId,
-      clerkOrgId: "org_1",
-      organisationId,
-    });
+    expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
+      {
+        actingPersonId: managerId,
+        clerkOrgId: "org_1",
+      },
+      expect.any(Object)
+    );
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: "org_1",
           id: { in: [managerId, directReportId] },
-          organisation_id: organisationId,
+          organisation_id: { in: [organisationId] },
         }),
       })
     );
   });
 
   it("denies a manager without a linked acting person before querying people", async () => {
-    const result = await listPeople({
-      actingPersonId: null,
-      clerkOrgId: "org_1",
-      organisationId,
-      role: "manager",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingPersonId: null,
+        clerkOrgId: "org_1",
+        organisationId,
+        role: "manager",
+      }),
+      (db) =>
+        listPeople(
+          {
+            actingPersonId: null,
+            clerkOrgId: "org_1",
+            organisationId,
+            role: "manager",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
@@ -204,12 +282,24 @@ describe("people-service", () => {
   it("returns an empty page without querying for an empty manager scope", async () => {
     mocks.managerScopePersonIds.mockResolvedValue([]);
 
-    const result = await listPeople({
-      actingPersonId: managerId,
-      clerkOrgId: "org_1",
-      organisationId,
-      role: "manager",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingPersonId: managerId,
+        clerkOrgId: "org_1",
+        organisationId,
+        role: "manager",
+      }),
+      (db) =>
+        listPeople(
+          {
+            actingPersonId: managerId,
+            clerkOrgId: "org_1",
+            organisationId,
+            role: "manager",
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -230,11 +320,24 @@ describe("people-service", () => {
       { _count: { _all: 1 }, person_id: people[3]?.id },
     ]);
 
-    const result = await listPeople({
-      clerkOrgId: "org_1",
-      organisationId,
-      pagination: { pageSize: 50 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        organisationId,
+        pagination: { pageSize: 50 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            organisationId,
+            pagination: { pageSize: 50 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityCount).not.toHaveBeenCalled();
@@ -245,7 +348,7 @@ describe("people-service", () => {
       where: {
         approval_status: "xero_sync_failed",
         clerk_org_id: "org_1",
-        organisation_id: organisationId,
+        organisation_id: { in: [organisationId] },
         person_id: { in: people.map((person) => person.id) },
       },
     });
@@ -263,33 +366,63 @@ describe("people-service", () => {
     mocks.personFindMany.mockResolvedValue(people);
     mocks.personCount.mockResolvedValue(4);
 
-    const result = await listPeople({
-      clerkOrgId: "org_1",
-      organisationId,
-      pagination: { pageSize: 50 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        organisationId,
+        pagination: { pageSize: 50 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            organisationId,
+            pagination: { pageSize: 50 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledOnce();
-    expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledWith({
-      at: expect.any(Date),
-      clerkOrgId: "org_1",
-      organisationId,
-      people: people.map((person) => ({
-        locationId: person.location_id,
-        personId: person.id,
-      })),
-    });
+    expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledWith(
+      {
+        at: expect.any(Date),
+        clerkOrgId: "org_1",
+        organisationId,
+        people: people.map((person) => ({
+          locationId: person.location_id,
+          personId: person.id,
+        })),
+      },
+      expect.any(Object)
+    );
     expect(mocks.computeCurrentStatus).not.toHaveBeenCalled();
   });
 
   it("pushes xero sync failed only filtering into the person query", async () => {
-    await listPeople({
-      clerkOrgId: "org_1",
-      filters: { xeroSyncFailedOnly: true },
-      organisationId,
-      pagination: { pageSize: 50 },
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        filters: { xeroSyncFailedOnly: true },
+        organisationId,
+        pagination: { pageSize: 50 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            filters: { xeroSyncFailedOnly: true },
+            organisationId,
+            pagination: { pageSize: 50 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -298,7 +431,7 @@ describe("people-service", () => {
             some: {
               approval_status: "xero_sync_failed",
               clerk_org_id: "org_1",
-              organisation_id: organisationId,
+              organisation_id: { in: [organisationId] },
             },
           },
         }),
@@ -324,11 +457,24 @@ describe("people-service", () => {
     mocks.personFindMany.mockResolvedValue(people);
     mocks.personCount.mockResolvedValue(7);
 
-    const result = await listPeople({
-      clerkOrgId: "org_1",
-      organisationId,
-      pagination: { pageSize: 2 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        organisationId,
+        pagination: { pageSize: 2 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            organisationId,
+            pagination: { pageSize: 2 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledWith(
@@ -337,7 +483,7 @@ describe("people-service", () => {
     expect(mocks.personCount).toHaveBeenCalledWith({
       where: expect.objectContaining({
         clerk_org_id: "org_1",
-        organisation_id: organisationId,
+        organisation_id: { in: [organisationId] },
       }),
     });
     expect(result.value.people).toHaveLength(2);
@@ -352,11 +498,24 @@ describe("people-service", () => {
     ]);
     mocks.personCount.mockResolvedValue(2);
 
-    const result = await listPeople({
-      clerkOrgId: "org_1",
-      organisationId,
-      pagination: { pageSize: 2 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        organisationId,
+        pagination: { pageSize: 2 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            organisationId,
+            pagination: { pageSize: 2 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     expect(result.value.people).toHaveLength(2);
@@ -372,12 +531,26 @@ describe("people-service", () => {
     ]);
     mocks.personCount.mockResolvedValue(3);
 
-    const result = await listPeople({
-      clerkOrgId: "org_1",
-      filters: { status: ["available"] },
-      organisationId,
-      pagination: { pageSize: 2 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        filters: { status: ["available"] },
+        organisationId,
+        pagination: { pageSize: 2 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            filters: { status: ["available"] },
+            organisationId,
+            pagination: { pageSize: 2 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledWith(
@@ -393,29 +566,49 @@ describe("people-service", () => {
     mocks.personFindMany.mockResolvedValue([]);
     mocks.personCount.mockResolvedValue(0);
 
-    const result = await listPeople({
-      clerkOrgId: "org_1",
-      filters: { status: ["public_holiday"] },
-      organisationId,
-      pagination: { pageSize: 50 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        filters: { status: ["public_holiday"] },
+        organisationId,
+        pagination: { pageSize: 50 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: "org_1",
+            filters: { status: ["public_holiday"] },
+            organisationId,
+            pagination: { pageSize: 50 },
+            role: "admin",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
-    expect(mocks.personFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          AND: expect.arrayContaining([
-            expect.objectContaining({
-              OR: expect.arrayContaining([
+    const query = mocks.personFindMany.mock.calls[0]?.[0];
+    expect(query.where.AND[0]).toMatchObject({
+      clerk_org_id: "org_1",
+      organisation_id: { in: [organisationId] },
+    });
+    expect(query.where.AND[1]).toMatchObject({
+      OR: [
+        {
+          AND: [
+            { organisation_id: organisationId },
+            {
+              OR: [
                 expect.objectContaining({
                   AND: expect.arrayContaining([{ id: { in: [] } }]),
                 }),
-              ]),
-            }),
-          ]),
-        }),
-      })
-    );
+              ],
+            },
+          ],
+        },
+      ],
+    });
   });
 });
 
@@ -439,6 +632,8 @@ function personRow(
     location: null,
     location_id: null,
     manager: null,
+    organisation: { id: organisationId, name: "Acme Org" },
+    organisation_id: organisationId,
     person_type: "employee",
     team: null,
     xero_employee_id: null,

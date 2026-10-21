@@ -5,7 +5,7 @@ import { checkPayrollEntityEntitlement } from "./src/queries/payroll-entitlement
 import { syncPlansFromCatalogue } from "./src/seed/plan-sync";
 import { getPlanDefinition } from "./src/seed/plans";
 import { systemDatabase } from "./src/system-client";
-import { tenantTransaction } from "./src/tenant-client";
+import { withTenantDb } from "./src/tenant-db";
 
 const ownerUrl = process.env.DATABASE_URL;
 if (!(ownerUrl && isLocalDatabase(ownerUrl))) {
@@ -22,7 +22,7 @@ test.each(["premium", "basic"] as const)(
     const definition = { ...getPlanDefinition(planKey), plan_key: key };
     await syncPlansFromCatalogue(systemDatabase, [definition]);
     try {
-      await tenantTransaction(
+      await withTenantDb(
         account,
         async (tx) => {
           await tx.clerkOrgSubscription.create({

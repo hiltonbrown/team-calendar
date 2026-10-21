@@ -1,5 +1,5 @@
-import type { Database } from "@repo/database";
 import type { notification_type } from "@repo/database/generated/enums";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import type { NotificationCategory } from "../types/notification-type-registry";
 import {
   getNotificationSseStreamClient,
@@ -17,6 +17,8 @@ export type NotificationSseEvent =
         body: string;
         actionUrl: string | null;
         createdAt: string;
+        organisationId: string;
+        organisationName: string;
         unreadCount: number;
       };
     }
@@ -45,28 +47,25 @@ export type NotificationSseEvent =
       };
     };
 
-export interface NotificationSseRecipientDatabase {
-  person: Pick<Database["person"], "findMany">;
-}
-
 export function streamKey(input: {
-  organisationId: string;
+  clerkOrgId: string;
   userId: string;
 }): string {
-  return `${input.userId}:${input.organisationId}`;
+  return `account:${input.clerkOrgId}:${input.userId}`;
 }
 
 export function notificationSseChannel(input: {
-  organisationId: string;
+  clerkOrgId: string;
   userId: string;
 }): string {
   return `sse:${streamKey(input)}`;
 }
 
 export function pollNotificationStream(
-  input: { organisationId: string; userId: string },
+  input: { clerkOrgId: string; userId: string },
   sinceId: string
 ): Promise<NotificationSseStreamEntry[]> {
+  assertNoTenantTransaction("pollNotificationStream");
   const client = getNotificationSseStreamClient();
   if (!client) {
     return Promise.resolve([]);
@@ -75,9 +74,10 @@ export function pollNotificationStream(
 }
 
 export async function publishNotificationEvent(
-  input: { organisationId: string; userId: string },
+  input: { clerkOrgId: string; userId: string },
   event: NotificationSseEvent
 ): Promise<void> {
+  assertNoTenantTransaction("publishNotificationEvent");
   const client = getNotificationSseStreamClient();
   if (!client) {
     return;
@@ -87,39 +87,38 @@ export async function publishNotificationEvent(
 
 export async function publishOrganisationNotificationEvent(
   input: { clerkOrgId: string; organisationId: string },
-  event: NotificationSseEvent,
-  client?: NotificationSseRecipientDatabase
+  event: NotificationSseEvent
 ): Promise<void> {
+  assertNoTenantTransaction("publishOrganisationNotificationEvent");
   const streamClient = getNotificationSseStreamClient();
   if (!streamClient) {
     return;
   }
 
-  const recipientClient =
-    client ?? (await import("@repo/database")).tenantDatabase(input.clerkOrgId);
-  const recipients = await recipientClient.person.findMany({
-    select: { clerk_user_id: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-      clerk_user_id: { not: null },
-      is_active: true,
-      organisation_id: input.organisationId,
-    },
-  });
-  await Promise.all(
+  const { withTenantDb } = await import("@repo/database");
+  const recipients = await withTenantDb(input.clerkOrgId, (db) =>
+    db.person.findMany({
+      select: { clerk_user_id: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+        clerk_user_id: { not: null },
+        is_active: true,
+        organisation: { clerk_org_id: input.clerkOrgId },
+      },
+    })
+  );
+  const userIds = new Set(
     recipients.flatMap((recipient) =>
-      recipient.clerk_user_id
-        ? [
-            streamClient.append(
-              notificationSseChannel({
-                organisationId: input.organisationId,
-                userId: recipient.clerk_user_id,
-              }),
-              event
-            ),
-          ]
-        : []
+      recipient.clerk_user_id ? [recipient.clerk_user_id] : []
+    )
+  );
+  await Promise.all(
+    [...userIds].map((userId) =>
+      streamClient.append(
+        notificationSseChannel({ clerkOrgId: input.clerkOrgId, userId }),
+        event
+      )
     )
   );
 }

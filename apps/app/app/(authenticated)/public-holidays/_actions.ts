@@ -1,6 +1,6 @@
 "use server";
 
-import { requireRole } from "@repo/auth/helpers";
+import { requireOrg, requireRole } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import {
   addCustomHoliday,
@@ -11,9 +11,11 @@ import {
   setPublicHolidayClassification,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { afterTenantCommit, withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 type ActionResult<T> = { ok: true; value: T } | { error: string; ok: false };
 
@@ -40,16 +42,15 @@ async function resolveAdminContext(
   if (!user) {
     return { error: "You need to sign in again.", ok: false };
   }
-  const context = await getActiveOrgContext(organisationId);
-  if (!context.ok) {
-    return { error: context.error.message, ok: false };
-  }
+  // Authentication completes before the action owns its SQL scope.
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+
   return {
     ok: true,
     value: {
       actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId as ClerkOrgId,
-      organisationId: context.value.organisationId as OrganisationId,
+      clerkOrgId,
+      organisationId: organisationId as OrganisationId,
       role,
     },
   };
@@ -78,6 +79,7 @@ const AddCustomHolidaySchema = z.object({
 export async function addCustomHolidayAction(
   input: z.input<typeof AddCustomHolidaySchema>
 ): Promise<ActionResult<{ id: string; message: string }>> {
+  assertNoTenantTransaction("addCustomHolidayAction");
   const parsed = AddCustomHolidaySchema.safeParse(input);
   if (!parsed.success) {
     return { error: firstIssue(parsed.error), ok: false };
@@ -86,24 +88,48 @@ export async function addCustomHolidayAction(
   if (!context.ok) {
     return context;
   }
-  const result = await addCustomHoliday({
-    appliesToAllJurisdictions: parsed.data.appliesToAllJurisdictions,
-    clerkOrgId: context.value.clerkOrgId,
-    countryCode: parsed.data.countryCode,
-    date: parsed.data.date,
-    name: parsed.data.name,
-    organisationId: context.value.organisationId,
-    regionCode: parsed.data.regionCode,
-    userId: context.value.actingUserId,
-  });
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof addCustomHolidayAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await addCustomHoliday(
+          {
+            appliesToAllJurisdictions: parsed.data.appliesToAllJurisdictions,
+            clerkOrgId: context.value.clerkOrgId,
+            countryCode: parsed.data.countryCode,
+            date: parsed.data.date,
+            name: parsed.data.name,
+            organisationId: context.value.organisationId,
+            regionCode: parsed.data.regionCode,
+            userId: context.value.actingUserId,
+          },
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+        afterTenantCommit(db, () => {
+          revalidateHolidayPaths();
+
+          return Promise.resolve();
+        });
+        return {
+          ok: true,
+          value: { id: result.value.id, message: `${parsed.data.name} added.` },
+        };
+      }
+    );
+  } catch {
+    return { error: "Failed to update public holidays.", ok: false };
   }
-  revalidateHolidayPaths();
-  return {
-    ok: true,
-    value: { id: result.value.id, message: `${parsed.data.name} added.` },
-  };
 }
 
 const DeleteCustomHolidaySchema = z.object({
@@ -115,6 +141,7 @@ const DeleteCustomHolidaySchema = z.object({
 export async function deleteCustomHolidayAction(
   input: z.input<typeof DeleteCustomHolidaySchema>
 ): Promise<ActionResult<{ message: string }>> {
+  assertNoTenantTransaction("deleteCustomHolidayAction");
   const parsed = DeleteCustomHolidaySchema.safeParse(input);
   if (!parsed.success) {
     return { error: firstIssue(parsed.error), ok: false };
@@ -123,16 +150,38 @@ export async function deleteCustomHolidayAction(
   if (!context.ok) {
     return context;
   }
-  const result = await deleteCustomHoliday(
-    context.value.clerkOrgId,
-    context.value.organisationId,
-    parsed.data.holidayId
-  );
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof deleteCustomHolidayAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await deleteCustomHoliday(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          parsed.data.holidayId,
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+        afterTenantCommit(db, () => {
+          revalidateHolidayPaths();
+
+          return Promise.resolve();
+        });
+        return { ok: true, value: { message: `${parsed.data.name} deleted.` } };
+      }
+    );
+  } catch {
+    return { error: "Failed to update public holidays.", ok: false };
   }
-  revalidateHolidayPaths();
-  return { ok: true, value: { message: `${parsed.data.name} deleted.` } };
 }
 
 const HolidayKeySchema = z.object({
@@ -158,6 +207,7 @@ function where(locationName: string | null) {
 export async function hideHolidayAction(
   input: z.input<typeof HolidayKeySchema>
 ): Promise<ActionResult<{ message: string }>> {
+  assertNoTenantTransaction("hideHolidayAction");
   const parsed = HolidayKeySchema.safeParse(input);
   if (!parsed.success) {
     return { error: firstIssue(parsed.error), ok: false };
@@ -166,29 +216,54 @@ export async function hideHolidayAction(
   if (!context.ok) {
     return context;
   }
-  const result = await hidePublicHoliday({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    holidayKey: parsed.data.holidayKey,
-    locationId: null,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof hideHolidayAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await hidePublicHoliday(
+          {
+            actingRole: context.value.role,
+            actingUserId: context.value.actingUserId,
+            clerkOrgId: context.value.clerkOrgId,
+            holidayKey: parsed.data.holidayKey,
+            locationId: null,
+            organisationId: context.value.organisationId,
+          },
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+        afterTenantCommit(db, () => {
+          revalidateHolidayPaths();
+
+          return Promise.resolve();
+        });
+        return {
+          ok: true,
+          value: {
+            message: `${result.value.holidayName} hidden. Locations with their own working-day setting keep it.`,
+          },
+        };
+      }
+    );
+  } catch {
+    return { error: "Failed to update public holidays.", ok: false };
   }
-  revalidateHolidayPaths();
-  return {
-    ok: true,
-    value: {
-      message: `${result.value.holidayName} hidden. Locations with their own working-day setting keep it.`,
-    },
-  };
 }
 
 export async function restoreHolidayAction(
   input: z.input<typeof ScopedKeySchema>
 ): Promise<ActionResult<{ message: string }>> {
+  assertNoTenantTransaction("restoreHolidayAction");
   const parsed = ScopedKeySchema.safeParse(input);
   if (!parsed.success) {
     return { error: firstIssue(parsed.error), ok: false };
@@ -197,29 +272,54 @@ export async function restoreHolidayAction(
   if (!context.ok) {
     return context;
   }
-  const result = await restorePublicHoliday({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    holidayKey: parsed.data.holidayKey,
-    locationId: parsed.data.locationId,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof restoreHolidayAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await restorePublicHoliday(
+          {
+            actingRole: context.value.role,
+            actingUserId: context.value.actingUserId,
+            clerkOrgId: context.value.clerkOrgId,
+            holidayKey: parsed.data.holidayKey,
+            locationId: parsed.data.locationId,
+            organisationId: context.value.organisationId,
+          },
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+        afterTenantCommit(db, () => {
+          revalidateHolidayPaths();
+
+          return Promise.resolve();
+        });
+        return {
+          ok: true,
+          value: {
+            message: `${result.value.holidayName} restored ${where(result.value.locationName)}.`,
+          },
+        };
+      }
+    );
+  } catch {
+    return { error: "Failed to update public holidays.", ok: false };
   }
-  revalidateHolidayPaths();
-  return {
-    ok: true,
-    value: {
-      message: `${result.value.holidayName} restored ${where(result.value.locationName)}.`,
-    },
-  };
 }
 
 export async function setHolidayClassificationAction(
   input: z.input<typeof ClassificationSchema>
 ): Promise<ActionResult<{ message: string }>> {
+  assertNoTenantTransaction("setHolidayClassificationAction");
   const parsed = ClassificationSchema.safeParse(input);
   if (!parsed.success) {
     return { error: firstIssue(parsed.error), ok: false };
@@ -228,34 +328,59 @@ export async function setHolidayClassificationAction(
   if (!context.ok) {
     return context;
   }
-  const result = await setPublicHolidayClassification({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    classification: parsed.data.classification,
-    clerkOrgId: context.value.clerkOrgId,
-    holidayKey: parsed.data.holidayKey,
-    locationId: parsed.data.locationId,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof setHolidayClassificationAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await setPublicHolidayClassification(
+          {
+            actingRole: context.value.role,
+            actingUserId: context.value.actingUserId,
+            classification: parsed.data.classification,
+            clerkOrgId: context.value.clerkOrgId,
+            holidayKey: parsed.data.holidayKey,
+            locationId: parsed.data.locationId,
+            organisationId: context.value.organisationId,
+          },
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+        afterTenantCommit(db, () => {
+          revalidateHolidayPaths();
+
+          return Promise.resolve();
+        });
+        const kind =
+          parsed.data.classification === "working"
+            ? "a working day"
+            : "a non-working day";
+        return {
+          ok: true,
+          value: {
+            message: `${result.value.holidayName} is now ${kind} ${where(result.value.locationName)}.`,
+          },
+        };
+      }
+    );
+  } catch {
+    return { error: "Failed to update public holidays.", ok: false };
   }
-  revalidateHolidayPaths();
-  const kind =
-    parsed.data.classification === "working"
-      ? "a working day"
-      : "a non-working day";
-  return {
-    ok: true,
-    value: {
-      message: `${result.value.holidayName} is now ${kind} ${where(result.value.locationName)}.`,
-    },
-  };
 }
 
 export async function setLocalHolidayEnabledAction(
   input: z.input<typeof LocalDaySchema>
 ): Promise<ActionResult<{ message: string }>> {
+  assertNoTenantTransaction("setLocalHolidayEnabledAction");
   const parsed = LocalDaySchema.safeParse(input);
   if (!parsed.success) {
     return { error: firstIssue(parsed.error), ok: false };
@@ -264,23 +389,47 @@ export async function setLocalHolidayEnabledAction(
   if (!context.ok) {
     return context;
   }
-  const result = await setLocalHolidayEnabled({
-    actingRole: context.value.role,
-    actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
-    enabled: parsed.data.enabled,
-    holidayKey: parsed.data.holidayKey,
-    locationId: parsed.data.locationId,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
+  try {
+    return await withTenantResult(
+      context.value.clerkOrgId,
+      async (db): ReturnType<typeof setLocalHolidayEnabledAction> => {
+        const company = await getOrganisationById(
+          context.value.clerkOrgId,
+          context.value.organisationId,
+          db
+        );
+        if (!company.ok) {
+          return { error: company.error.message, ok: false };
+        }
+        const result = await setLocalHolidayEnabled(
+          {
+            actingRole: context.value.role,
+            actingUserId: context.value.actingUserId,
+            clerkOrgId: context.value.clerkOrgId,
+            enabled: parsed.data.enabled,
+            holidayKey: parsed.data.holidayKey,
+            locationId: parsed.data.locationId,
+            organisationId: context.value.organisationId,
+          },
+          db
+        );
+        if (!result.ok) {
+          return { error: result.error.message, ok: false };
+        }
+        afterTenantCommit(db, () => {
+          revalidateHolidayPaths();
+
+          return Promise.resolve();
+        });
+        return {
+          ok: true,
+          value: {
+            message: `${result.value.holidayName} switched ${parsed.data.enabled ? "on" : "off"} ${where(result.value.locationName)}.`,
+          },
+        };
+      }
+    );
+  } catch {
+    return { error: "Failed to update public holidays.", ok: false };
   }
-  revalidateHolidayPaths();
-  return {
-    ok: true,
-    value: {
-      message: `${result.value.holidayName} switched ${parsed.data.enabled ? "on" : "off"} ${where(result.value.locationName)}.`,
-    },
-  };
 }

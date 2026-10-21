@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  withTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
 
 const mocks = vi.hoisted(() => ({
+  delegateOverride: null as object | null,
   recordFindMany: vi.fn(),
   teamFindFirst: vi.fn(),
   teamFindMany: vi.fn(),
@@ -8,14 +14,21 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({
-    availabilityRecord: { findMany: mocks.recordFindMany },
-    team: {
-      findFirst: mocks.teamFindFirst,
-      findMany: mocks.teamFindMany,
-      updateMany: mocks.teamUpdateMany,
-    },
-  }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async () => [],
+        ...{
+          availabilityRecord: { findMany: mocks.recordFindMany },
+          team: {
+            findFirst: mocks.teamFindFirst,
+            findMany: mocks.teamFindMany,
+            updateMany: mocks.teamUpdateMany,
+          },
+        },
+        ...mocks.delegateOverride,
+      }),
+  },
 }));
 
 const {
@@ -61,6 +74,7 @@ const countInput = (overrides: Partial<{ from: string; to: string }> = {}) => ({
 describe("team queries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.delegateOverride = null;
   });
 
   describe("listTeamsWithCoverageMinimum", () => {
@@ -80,7 +94,10 @@ describe("team queries", () => {
         },
       ]);
 
-      const result = await listTeamsWithCoverageMinimum(scope);
+      const result = await withTestTenantResult(
+        tenantTestAccount(scope),
+        (db) => listTeamsWithCoverageMinimum(scope, db)
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -112,12 +129,14 @@ describe("team queries", () => {
       });
     });
 
-    it("returns an internal error when the read fails", async () => {
+    it("propagates a failed read for entry-point rollback", async () => {
       mocks.teamFindMany.mockRejectedValue(new Error("down"));
 
-      const result = await listTeamsWithCoverageMinimum(scope);
+      const result = withTestTenantResult(tenantTestAccount(scope), (db) =>
+        listTeamsWithCoverageMinimum(scope, db)
+      );
 
-      expect(result).toMatchObject({ error: { code: "internal" }, ok: false });
+      await expect(result).rejects.toThrow("down");
     });
   });
 
@@ -130,11 +149,22 @@ describe("team queries", () => {
       });
       mocks.teamUpdateMany.mockResolvedValue({ count: 1 });
 
-      const result = await setTeamCoverageMinimum({
-        ...scope,
-        minimum: 2,
-        teamId: teamA,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...scope,
+          minimum: 2,
+          teamId: teamA,
+        }),
+        (db) =>
+          setTeamCoverageMinimum(
+            {
+              ...scope,
+              minimum: 2,
+              teamId: teamA,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -162,11 +192,22 @@ describe("team queries", () => {
     it("returns not_found without updating when the team is outside the tenant", async () => {
       mocks.teamFindFirst.mockResolvedValue(null);
 
-      const result = await setTeamCoverageMinimum({
-        ...scope,
-        minimum: 1,
-        teamId: teamB,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...scope,
+          minimum: 1,
+          teamId: teamB,
+        }),
+        (db) =>
+          setTeamCoverageMinimum(
+            {
+              ...scope,
+              minimum: 1,
+              teamId: teamB,
+            },
+            db
+          )
+      );
 
       expect(result).toMatchObject({ error: { code: "not_found" }, ok: false });
       expect(mocks.teamUpdateMany).not.toHaveBeenCalled();
@@ -184,10 +225,9 @@ describe("team queries", () => {
         },
       };
 
-      const result = await setTeamCoverageMinimum(
-        { ...scope, minimum: null, teamId: teamA },
-        // The test double implements only the two delegate methods used.
-        tx as unknown as Parameters<typeof setTeamCoverageMinimum>[1]
+      mocks.delegateOverride = tx;
+      const result = await withTenantDb(scope.clerkOrgId, (db) =>
+        setTeamCoverageMinimum({ ...scope, minimum: null, teamId: teamA }, db)
       );
 
       expect(result).toMatchObject({
@@ -203,7 +243,9 @@ describe("team queries", () => {
     it("filters approved, non-archived away records of active people in the teams, scoped by both keys", async () => {
       mocks.recordFindMany.mockResolvedValue([]);
 
-      await countAwayPeopleByTeamAndDay(countInput());
+      await withTestTenantResult(tenantTestAccount(countInput()), (db) =>
+        countAwayPeopleByTeamAndDay(countInput(), db)
+      );
 
       const query = mocks.recordFindMany.mock.calls[0]?.[0];
       expect(query.where).toEqual({
@@ -248,7 +290,10 @@ describe("team queries", () => {
         }),
       ]);
 
-      const result = await countAwayPeopleByTeamAndDay(countInput());
+      const result = await withTestTenantResult(
+        tenantTestAccount(countInput()),
+        (db) => countAwayPeopleByTeamAndDay(countInput(), db)
+      );
 
       expect(result.ok).toBe(true);
       if (!result.ok) {
@@ -276,7 +321,10 @@ describe("team queries", () => {
         }),
       ]);
 
-      const result = await countAwayPeopleByTeamAndDay(countInput());
+      const result = await withTestTenantResult(
+        tenantTestAccount(countInput()),
+        (db) => countAwayPeopleByTeamAndDay(countInput(), db)
+      );
 
       expect(
         result.ok && Object.fromEntries(result.value.get(teamA) ?? [])
@@ -305,7 +353,10 @@ describe("team queries", () => {
         }),
       ]);
 
-      const result = await countAwayPeopleByTeamAndDay(countInput());
+      const result = await withTestTenantResult(
+        tenantTestAccount(countInput()),
+        (db) => countAwayPeopleByTeamAndDay(countInput(), db)
+      );
 
       expect(
         result.ok && Object.fromEntries(result.value.get(teamA) ?? [])
@@ -332,10 +383,20 @@ describe("team queries", () => {
         }),
       ]);
 
-      const result = await countAwayPeopleByTeamAndDay({
-        ...countInput({ from: "2026-10-04", to: "2026-10-04" }),
-        timezone: "Australia/Sydney",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...countInput({ from: "2026-10-04", to: "2026-10-04" }),
+          timezone: "Australia/Sydney",
+        }),
+        (db) =>
+          countAwayPeopleByTeamAndDay(
+            {
+              ...countInput({ from: "2026-10-04", to: "2026-10-04" }),
+              timezone: "Australia/Sydney",
+            },
+            db
+          )
+      );
 
       const query = mocks.recordFindMany.mock.calls[0]?.[0];
       // Sydney moves from UTC+10 to UTC+11 at 02:00 on 4 October 2026.
@@ -348,18 +409,33 @@ describe("team queries", () => {
     });
 
     it("skips the query when there are no teams", async () => {
-      const result = await countAwayPeopleByTeamAndDay({
-        ...countInput(),
-        teamIds: [],
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...countInput(),
+          teamIds: [],
+        }),
+        (db) =>
+          countAwayPeopleByTeamAndDay(
+            {
+              ...countInput(),
+              teamIds: [],
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({ ok: true, value: new Map() });
       expect(mocks.recordFindMany).not.toHaveBeenCalled();
     });
 
     it("rejects a range that ends before it starts", async () => {
-      const result = await countAwayPeopleByTeamAndDay(
-        countInput({ from: "2026-10-14", to: "2026-10-12" })
+      const result = await withTestTenantResult(
+        tenantTestAccount(countInput({ from: "2026-10-14", to: "2026-10-12" })),
+        (db) =>
+          countAwayPeopleByTeamAndDay(
+            countInput({ from: "2026-10-14", to: "2026-10-12" }),
+            db
+          )
       );
 
       expect(result).toMatchObject({

@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 process.env.NEXT_PUBLIC_API_URL ||= "https://api.test.local";
@@ -20,7 +22,26 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     feed: {
       count: mocks.feedCount,
@@ -35,10 +56,14 @@ vi.mock("@repo/database", () => {
       findMany: mocks.teamFindMany,
     },
   };
+  tenantTestState.client = client;
   return {
+    resolveAccountCompanies: () =>
+      Promise.resolve([{ id: baseInput.organisationId, name: "Company A" }]),
     scopedTo: mocks.scopedTo,
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )),
   };
 });
 
@@ -64,11 +89,22 @@ describe("feed-service getFeedDetail cross-tenant behavior", () => {
   it("returns feed_not_found without reading another organisation for diagnostics", async () => {
     mocks.feedFindFirst.mockResolvedValue(null);
 
-    const result = await getFeedDetail({
-      ...baseInput,
-      actingPersonId,
-      feedId: "00000000-0000-4000-8000-000000000099",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId,
+        feedId: "00000000-0000-4000-8000-000000000099",
+      }),
+      (db) =>
+        getFeedDetail(
+          {
+            ...baseInput,
+            actingPersonId,
+            feedId: "00000000-0000-4000-8000-000000000099",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "feed_not_found" },
@@ -79,18 +115,40 @@ describe("feed-service getFeedDetail cross-tenant behavior", () => {
 
   it("returns identical result for cross-tenant feed and non-existent feed", async () => {
     mocks.feedFindFirst.mockResolvedValue(null);
-    const crossTenantResult = await getFeedDetail({
-      ...baseInput,
-      actingPersonId,
-      feedId: "00000000-0000-4000-8000-000000000099",
-    });
+    const crossTenantResult = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId,
+        feedId: "00000000-0000-4000-8000-000000000099",
+      }),
+      (db) =>
+        getFeedDetail(
+          {
+            ...baseInput,
+            actingPersonId,
+            feedId: "00000000-0000-4000-8000-000000000099",
+          },
+          db
+        )
+    );
 
     mocks.feedFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
-    const nonExistentResult = await getFeedDetail({
-      ...baseInput,
-      actingPersonId,
-      feedId: "00000000-0000-4000-8000-000000000099",
-    });
+    const nonExistentResult = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId,
+        feedId: "00000000-0000-4000-8000-000000000099",
+      }),
+      (db) =>
+        getFeedDetail(
+          {
+            ...baseInput,
+            actingPersonId,
+            feedId: "00000000-0000-4000-8000-000000000099",
+          },
+          db
+        )
+    );
 
     expect(crossTenantResult).toEqual(nonExistentResult);
   });
@@ -142,12 +200,24 @@ describe("feed-service list", () => {
       )
     );
 
-    const result = await listFeeds({
-      ...baseInput,
-      actingPersonId,
-      filters: { status: ["active", "paused"] },
-      pagination: { pageSize: 5 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId,
+        filters: { status: ["active", "paused"] },
+        pagination: { pageSize: 5 },
+      }),
+      (db) =>
+        listFeeds(
+          {
+            ...baseInput,
+            actingPersonId,
+            filters: { status: ["active", "paused"] },
+            pagination: { pageSize: 5 },
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -192,13 +262,26 @@ describe("feed-service list", () => {
       }),
     ]);
 
-    const result = await listFeeds({
-      ...baseInput,
-      actingPersonId,
-      actingRole: "viewer",
-      filters: { status: ["active"] },
-      pagination: { pageSize: 5 },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        actingPersonId,
+        actingRole: "viewer",
+        filters: { status: ["active"] },
+        pagination: { pageSize: 5 },
+      }),
+      (db) =>
+        listFeeds(
+          {
+            ...baseInput,
+            actingPersonId,
+            actingRole: "viewer",
+            filters: { status: ["active"] },
+            pagination: { pageSize: 5 },
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -253,6 +336,7 @@ function buildPerson(input: {
   teamId: string;
 }) {
   return {
+    clerk_org_id: baseInput.clerkOrgId,
     clerk_user_id: null,
     display_name: `${input.firstName} ${input.lastName}`,
     first_name: input.firstName,
@@ -262,6 +346,7 @@ function buildPerson(input: {
     location: null,
     location_id: null,
     manager_person_id: null,
+    organisation_id: baseInput.organisationId,
     team: { id: input.teamId, name: "Operations" },
     team_id: input.teamId,
   };

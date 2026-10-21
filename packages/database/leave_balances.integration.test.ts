@@ -2,6 +2,8 @@
 import type { ClerkOrgId, OrganisationId, PersonId } from "@repo/core";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 
@@ -202,14 +204,20 @@ describe("leave_balances", () => {
     const organisationId = tenant.organisationId as OrganisationId;
     const personId = tenant.personId as PersonId;
 
-    const forPerson = await listLeaveBalancesForPerson(
-      clerkOrgId,
-      organisationId,
-      personId
+    const forPerson = await withTestTenantResult(
+      tenantTestAccount(clerkOrgId),
+      (db) =>
+        listLeaveBalancesForPerson(clerkOrgId, organisationId, personId, db)
     );
-    const forOrganisation = await listLeaveBalancesForOrganisation(
-      clerkOrgId,
-      organisationId
+    const forOrganisation = await withTestTenantResult(
+      tenantTestAccount(clerkOrgId),
+      (db) =>
+        listLeaveBalancesForOrganisation(
+          clerkOrgId,
+          organisationId,
+          undefined,
+          db
+        )
     );
 
     expect(forPerson.ok).toBe(true);
@@ -253,14 +261,20 @@ describe("leave_balances", () => {
     const organisationId = tenant.organisationId as OrganisationId;
     const personId = tenant.personId as PersonId;
 
-    const forPerson = await listLeaveBalancesForPerson(
-      clerkOrgId,
-      organisationId,
-      personId
+    const forPerson = await withTestTenantResult(
+      tenantTestAccount(clerkOrgId),
+      (db) =>
+        listLeaveBalancesForPerson(clerkOrgId, organisationId, personId, db)
     );
-    const forOrganisation = await listLeaveBalancesForOrganisation(
-      clerkOrgId,
-      organisationId
+    const forOrganisation = await withTestTenantResult(
+      tenantTestAccount(clerkOrgId),
+      (db) =>
+        listLeaveBalancesForOrganisation(
+          clerkOrgId,
+          organisationId,
+          undefined,
+          db
+        )
     );
 
     expect(forPerson.ok).toBe(true);

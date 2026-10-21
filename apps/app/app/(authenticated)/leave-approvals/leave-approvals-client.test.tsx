@@ -55,7 +55,15 @@ describe("LeaveApprovalsClient", () => {
     vi.clearAllMocks();
     mocks.dispatchXeroLeaveSyncAction.mockResolvedValue({
       ok: true,
-      value: { queued: true },
+      value: {
+        companies: [
+          {
+            companyId: organisationId,
+            companyName: "Company A",
+            result: { ok: true, value: { queued: true } },
+          },
+        ],
+      },
     });
   });
 
@@ -65,7 +73,7 @@ describe("LeaveApprovalsClient", () => {
     renderClient();
 
     const disclosure = screen.getByRole("button", {
-      name: "Expand details for Ari Report",
+      name: "Expand details for Ari Report (Company A)",
     });
     const row = screen.getByRole("row", {
       name: APPROVAL_ROW_NAME,
@@ -102,10 +110,8 @@ describe("LeaveApprovalsClient", () => {
     fireEvent.click(sync);
 
     await waitFor(() => {
-      expect(mocks.dispatchXeroLeaveSyncAction).toHaveBeenCalledWith({
-        organisationId,
-      });
-      expect(mocks.toastSuccess).toHaveBeenCalledWith("Xero leave sync queued");
+      expect(mocks.dispatchXeroLeaveSyncAction).toHaveBeenCalledWith();
+      expect(screen.getByText(COMPANY_SYNC_QUEUED_PATTERN)).toBeDefined();
     });
   });
 
@@ -139,6 +145,7 @@ describe("LeaveApprovalsClient", () => {
             mutedActionNote: null,
             notesInternal: "Coverage arranged.",
             organisationId,
+            organisationName: "Company A",
             person: {
               email: "ari@example.com",
               firstName: "Ari",
@@ -147,13 +154,13 @@ describe("LeaveApprovalsClient", () => {
               teamName: "Operations",
             },
             recordType: "annual_leave",
+            requireDeclineReason: true,
             startsAt: "2026-04-15T00:00:00.000Z",
             submittedAt: "2026-04-10T00:00:00.000Z",
             xeroWriteError: null,
           },
         ]}
         nextCursor={null}
-        organisationId={organisationId}
         summary={{
           approvedThisMonth: 2,
           declinedThisMonth: 1,
@@ -188,6 +195,7 @@ describe("LeaveApprovalsClient", () => {
             mutedActionNote: null,
             notesInternal: "Coverage arranged.",
             organisationId,
+            organisationName: "Company A",
             person: {
               email: "ari@example.com",
               firstName: "Ari",
@@ -196,13 +204,13 @@ describe("LeaveApprovalsClient", () => {
               teamName: "Operations",
             },
             recordType: "annual_leave",
+            requireDeclineReason: true,
             startsAt: "2026-04-15T00:00:00.000Z",
             submittedAt: "2026-04-10T00:00:00.000Z",
             xeroWriteError: null,
           },
         ]}
         nextCursor={null}
-        organisationId={organisationId}
         summary={{
           approvedThisMonth: 2,
           declinedThisMonth: 1,
@@ -270,6 +278,7 @@ function renderClient() {
           mutedActionNote: null,
           notesInternal: "Coverage arranged.",
           organisationId,
+          organisationName: "Company A",
           person: {
             email: "ari@example.com",
             firstName: "Ari",
@@ -278,13 +287,13 @@ function renderClient() {
             teamName: "Operations",
           },
           recordType: "annual_leave",
+          requireDeclineReason: true,
           startsAt: "2026-04-15T00:00:00.000Z",
           submittedAt: "2026-04-10T00:00:00.000Z",
           xeroWriteError: null,
         },
       ]}
       nextCursor={null}
-      organisationId={organisationId}
       summary={{
         approvedThisMonth: 2,
         declinedThisMonth: 1,
@@ -294,3 +303,5 @@ function renderClient() {
     />
   );
 }
+
+const COMPANY_SYNC_QUEUED_PATTERN = /Company A: Sync queued/;

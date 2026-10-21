@@ -37,19 +37,19 @@ export interface BellNotificationItem {
   createdAt: string;
   iconKey: string;
   id: string;
+  organisationId: string;
+  organisationName: string;
   title: string;
 }
 
 interface NotificationsBellProps {
   initialRecent: BellNotificationItem[];
   initialUnreadCount: number;
-  organisationId: string;
 }
 
 export function NotificationsBell({
   initialRecent,
   initialUnreadCount,
-  organisationId,
 }: NotificationsBellProps) {
   const router = useRouter();
   const { connectionVersion, status, subscribe } = useNotificationEvents();
@@ -75,6 +75,8 @@ export function NotificationsBell({
                 createdAt: event.payload.createdAt,
                 iconKey: iconForType(event.payload.type),
                 id: event.payload.notificationId,
+                organisationId: event.payload.organisationId,
+                organisationName: event.payload.organisationName,
                 title: event.payload.title,
               },
               ...items,
@@ -101,8 +103,8 @@ export function NotificationsBell({
     }
     startTransition(async () => {
       const [countResult, recentResult] = await Promise.all([
-        refreshUnreadCountAction({ organisationId }),
-        listRecentUnreadAction({ organisationId }),
+        refreshUnreadCountAction(),
+        listRecentUnreadAction(),
       ]);
       if (countResult.ok) {
         setUnreadCount(countResult.value);
@@ -115,6 +117,8 @@ export function NotificationsBell({
             createdAt: item.createdAt.toISOString(),
             iconKey: item.iconKey,
             id: item.id,
+            organisationId: item.organisationId,
+            organisationName: item.organisationName,
             title: item.title,
           }))
         );
@@ -126,13 +130,13 @@ export function NotificationsBell({
         });
       }
     });
-  }, [connectionVersion, organisationId]);
+  }, [connectionVersion]);
 
   const badge = useMemo(() => formatBadge(unreadCount), [unreadCount]);
 
   const markAll = () => {
     startTransition(async () => {
-      const result = await markAllAsReadAction({ organisationId });
+      const result = await markAllAsReadAction();
       if (result.ok) {
         setUnreadCount(0);
         setRecent([]);
@@ -150,13 +154,12 @@ export function NotificationsBell({
     startTransition(async () => {
       const result = await markAsReadAction({
         notificationId: item.id,
-        organisationId,
       });
       if (result.ok) {
         setUnreadCount(result.value.unreadCount);
         setRecent((items) => items.filter((current) => current.id !== item.id));
         if (item.actionUrl) {
-          router.push(withOrg(item.actionUrl, organisationId));
+          router.push(withOrg(item.actionUrl, item.organisationId));
         }
       } else {
         setMessage({ text: result.error.message, tone: "error" });
@@ -237,7 +240,7 @@ export function NotificationsBell({
                       {item.body}
                     </span>
                     <span className="mt-1 block text-label-md text-muted-foreground">
-                      {relativeTime(item.createdAt)}
+                      {item.organisationName} · {relativeTime(item.createdAt)}
                     </span>
                   </span>
                 </button>
@@ -255,9 +258,7 @@ export function NotificationsBell({
             Mark all as read
           </Button>
           <Button asChild size="sm" variant="ghost">
-            <Link href={withOrg("/notifications", organisationId)}>
-              View all
-            </Link>
+            <Link href="/notifications">View all</Link>
           </Button>
         </div>
       </PopoverContent>

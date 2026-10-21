@@ -1,11 +1,10 @@
+import type { TenantDb } from "@repo/database";
+import { withTenantDb } from "@repo/database";
 import "server-only";
 import type { Result } from "@repo/core";
-import {
-  scopedTo as scoped,
-  tenantDatabase,
-  tenantTransaction,
-} from "@repo/database";
+import { scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
@@ -124,6 +123,7 @@ export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
       )
   );
 export function syncXeroLeaveBalances(input: unknown) {
+  assertNoTenantTransaction("syncXeroLeaveBalances");
   const parsed = SyncXeroLeaveBalancesInputSchema.safeParse(input);
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
@@ -143,13 +143,15 @@ async function syncXeroLeaveBalancesInternal(
   const startedAt = new Date();
   let runId: string | null = null;
   try {
-    if (!(await isCurrentXeroSyncBinding(context))) {
+    if (
+      !(await withTenantDb(context.clerkOrgId, (db) =>
+        isCurrentXeroSyncBinding(context, db)
+      ))
+    ) {
       return { ok: true, value: emptyResult(null, "ignored") };
     }
-    const runAcquisition = await acquireSyncRun(
-      context,
-      "leave_balances",
-      startedAt
+    const runAcquisition = await withTenantDb(context.clerkOrgId, (db) =>
+      acquireSyncRun(context, "leave_balances", startedAt, db)
     );
     if (runAcquisition.kind === "terminal") {
       const term = runAcquisition.run;
@@ -182,65 +184,78 @@ async function syncXeroLeaveBalancesInternal(
     context.expectedXeroTenantId = xeroConnection.xero_tenant_id;
     const counts = emptyCounts();
     const isTargetedPerson = Boolean(context.personId);
-    let peopleToProcess: Array<{
-      id: string;
-      xero_employee_id: string | null;
-    }>;
-    let isLastPage = true;
-    let cursorRecord: {
-      balance_sweep_failed?: boolean;
-      balance_next_person_id: string | null;
-      id: string;
-    } | null = null;
-    let initialCursorValue: string | null = null;
-    let nextCursorValue: string | null = null;
-    if (isTargetedPerson) {
-      peopleToProcess = await tenantDatabase(
-        context.clerkOrgId
-      ).person.findMany({
-        select: { id: true, xero_employee_id: true },
-        where: {
-          ...scoped(context),
-          archived_at: null,
-          id: context.personId,
-          xero_employee_id: { not: null },
-        },
-      });
-    } else {
-      cursorRecord = await tenantDatabase(
-        context.clerkOrgId
-      ).xeroConnection.findFirst({
-        select: {
-          balance_next_person_id: true,
-          balance_sweep_failed: true,
-          id: true,
-        },
-        where: {
-          ...scoped(context),
-          id: context.connectionId,
-        },
-      });
-      initialCursorValue = cursorRecord?.balance_next_person_id ?? null;
-      const candidatePeople = await tenantDatabase(
-        context.clerkOrgId
-      ).person.findMany({
-        orderBy: { id: "asc" },
-        select: { id: true, xero_employee_id: true },
-        take: PROBE_PAGE_SIZE,
-        where: {
-          ...scoped(context),
-          archived_at: null,
-          ...(initialCursorValue ? { id: { gt: initialCursorValue } } : {}),
-          xero_employee_id: { not: null },
-        },
-      });
-      const hasMoreAfterPage = candidatePeople.length > BALANCE_PAGE_SIZE;
-      peopleToProcess = candidatePeople.slice(0, BALANCE_PAGE_SIZE);
-      isLastPage = !hasMoreAfterPage;
-      nextCursorValue = hasMoreAfterPage
-        ? (peopleToProcess[BALANCE_PAGE_SIZE - 1]?.id ?? null)
-        : null;
-    }
+    const {
+      peopleToProcess,
+      isLastPage,
+      cursorRecord,
+      initialCursorValue,
+      nextCursorValue,
+    } = await withTenantDb(context.clerkOrgId, async (db) => {
+      let preparedPeopleToProcess: Array<{
+        id: string;
+        xero_employee_id: string | null;
+      }>;
+      let preparedIsLastPage = true;
+      let preparedCursorRecord: {
+        balance_sweep_failed?: boolean;
+        balance_next_person_id: string | null;
+        id: string;
+      } | null = null;
+      let preparedInitialCursorValue: string | null = null;
+      let preparedNextCursorValue: string | null = null;
+      if (isTargetedPerson) {
+        preparedPeopleToProcess = await db.person.findMany({
+          select: { id: true, xero_employee_id: true },
+          where: {
+            ...scoped(context),
+            archived_at: null,
+            id: context.personId,
+            xero_employee_id: { not: null },
+          },
+        });
+      } else {
+        preparedCursorRecord = await db.xeroConnection.findFirst({
+          select: {
+            balance_next_person_id: true,
+            balance_sweep_failed: true,
+            id: true,
+          },
+          where: {
+            ...scoped(context),
+            id: context.connectionId,
+          },
+        });
+        preparedInitialCursorValue =
+          preparedCursorRecord?.balance_next_person_id ?? null;
+        const candidatePeople = await db.person.findMany({
+          orderBy: { id: "asc" },
+          select: { id: true, xero_employee_id: true },
+          take: PROBE_PAGE_SIZE,
+          where: {
+            ...scoped(context),
+            archived_at: null,
+            ...(preparedInitialCursorValue
+              ? { id: { gt: preparedInitialCursorValue } }
+              : {}),
+            xero_employee_id: { not: null },
+          },
+        });
+        const hasMoreAfterPage = candidatePeople.length > BALANCE_PAGE_SIZE;
+        preparedPeopleToProcess = candidatePeople.slice(0, BALANCE_PAGE_SIZE);
+        preparedIsLastPage = !hasMoreAfterPage;
+        preparedNextCursorValue = hasMoreAfterPage
+          ? (preparedPeopleToProcess[BALANCE_PAGE_SIZE - 1]?.id ?? null)
+          : null;
+      }
+
+      return {
+        cursorRecord: preparedCursorRecord,
+        initialCursorValue: preparedInitialCursorValue,
+        isLastPage: preparedIsLastPage,
+        nextCursorValue: preparedNextCursorValue,
+        peopleToProcess: preparedPeopleToProcess,
+      };
+    });
     const employeeIds = peopleToProcess
       .map((person) => person.xero_employee_id)
       .filter((employeeId): employeeId is string => Boolean(employeeId));
@@ -537,20 +552,24 @@ function makeHeartbeat(
       return;
     }
     lastBeatAt = now;
-    await tenantDatabase(context.clerkOrgId).syncRun.updateMany({
-      data: { updated_at: new Date() },
-      where: { ...scoped(context), id: runId, status: "running" },
-    });
+    await withTenantDb(context.clerkOrgId, (db) =>
+      db.syncRun.updateMany({
+        data: { updated_at: new Date() },
+        where: { ...scoped(context), id: runId, status: "running" },
+      })
+    );
   };
 }
 async function cancellationRequested(
   context: SyncXeroLeaveBalancesInput,
   runId: string
 ): Promise<boolean> {
-  const runState = await tenantDatabase(context.clerkOrgId).syncRun.findFirst({
-    select: { cancel_requested_at: true },
-    where: { ...scoped(context), id: runId },
-  });
+  const runState = await withTenantDb(context.clerkOrgId, (db) =>
+    db.syncRun.findFirst({
+      select: { cancel_requested_at: true },
+      where: { ...scoped(context), id: runId },
+    })
+  );
   return Boolean(runState?.cancel_requested_at);
 }
 async function recordFetchFailures(
@@ -645,19 +664,21 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await tenantDatabase(context.clerkOrgId).failedRecord.create({
-    data: {
-      ...scoped(context),
-      entity_type: "leave_balances",
-      error_code: input.errorCode,
-      error_message: input.errorMessage,
-      raw_payload: toPrismaJsonValue(input.rawPayload),
-      record_type: "leave_balances",
-      source_id: input.sourceId,
-      source_remote_id: input.sourceId,
-      sync_run_id: input.runId,
-    },
-  });
+  await withTenantDb(context.clerkOrgId, (db) =>
+    db.failedRecord.create({
+      data: {
+        ...scoped(context),
+        entity_type: "leave_balances",
+        error_code: input.errorCode,
+        error_message: input.errorMessage,
+        raw_payload: toPrismaJsonValue(input.rawPayload),
+        record_type: "leave_balances",
+        source_id: input.sourceId,
+        source_remote_id: input.sourceId,
+        sync_run_id: input.runId,
+      },
+    })
+  );
 }
 async function completeRun(
   context: SyncXeroLeaveBalancesInput,
@@ -668,7 +689,7 @@ async function completeRun(
     status: "cancelled" | "failed" | "partial_success" | "succeeded";
   }
 ) {
-  const persist = async (tx: Prisma.TransactionClient) => {
+  const persist = async (tx: TenantDb) => {
     const updated = await tx.syncRun.updateMany({
       data: {
         completed_at: new Date(),
@@ -692,7 +713,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await tenantTransaction(context.clerkOrgId, persist);
+    await withTenantDb(context.clerkOrgId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }

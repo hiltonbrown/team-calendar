@@ -2,7 +2,7 @@ import "server-only";
 
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { assertTenantDb, type TenantDb } from "@repo/database";
 import type { StageInput, WizardInputs } from "./wizard-rules";
 
 export interface WizardContext {
@@ -23,46 +23,47 @@ function sinceRequest(at: Date | null, requestedAt: Date | null): Date | null {
 }
 
 export async function loadWizardInputs(
-  ctx: WizardContext
+  ctx: WizardContext,
+  db: TenantDb
 ): Promise<Result<WizardInputs>> {
+  assertTenantDb(db, ctx.clerkOrgId);
   const scope = {
     clerk_org_id: ctx.clerkOrgId,
     organisation_id: ctx.organisationId,
   };
-  try {
-    const [organisation, connection, pendingMatches, person] =
-      await Promise.all([
-        tenantDatabase(ctx.clerkOrgId).organisation.findFirst({
-          select: {
-            onboarding_completed_at: true,
-            onboarding_step: true,
-            timezone: true,
-            xero_setup_skipped_at: true,
-          },
-          where: {
-            archived_at: null,
-            clerk_org_id: ctx.clerkOrgId,
-            id: ctx.organisationId,
-          },
-        }),
-        tenantDatabase(ctx.clerkOrgId).xeroConnection.findFirst({
-          select: {
-            id: true,
-            initial_sync_requested_at: true,
-            last_full_leave_records_sync_at: true,
-            last_full_people_sync_at: true,
-            last_leave_balances_sync_at: true,
-          },
-          where: { ...scope, status: { in: ["active", "reconnect_required"] } },
-        }),
-        tenantDatabase(ctx.clerkOrgId).xeroPersonMatch.count({
-          where: { ...scope, status: "pending" },
-        }),
-        tenantDatabase(ctx.clerkOrgId).person.findFirst({
-          select: { id: true },
-          where: { ...scope, archived_at: null, clerk_user_id: ctx.userId },
-        }),
-      ]);
+  const run = async (client: TenantDb): ReturnType<typeof loadWizardInputs> => {
+    const [organisation, connection, pendingMatches, person] = [
+      await client.organisation.findFirst({
+        select: {
+          onboarding_completed_at: true,
+          onboarding_step: true,
+          timezone: true,
+          xero_setup_skipped_at: true,
+        },
+        where: {
+          archived_at: null,
+          clerk_org_id: ctx.clerkOrgId,
+          id: ctx.organisationId,
+        },
+      }),
+      await client.xeroConnection.findFirst({
+        select: {
+          id: true,
+          initial_sync_requested_at: true,
+          last_full_leave_records_sync_at: true,
+          last_full_people_sync_at: true,
+          last_leave_balances_sync_at: true,
+        },
+        where: { ...scope, status: { in: ["active", "reconnect_required"] } },
+      }),
+      await client.xeroPersonMatch.count({
+        where: { ...scope, status: "pending" },
+      }),
+      await client.person.findFirst({
+        select: { id: true },
+        where: { ...scope, archived_at: null, clerk_user_id: ctx.userId },
+      }),
+    ];
     if (!organisation) {
       return {
         error: appError("not_found", "Organisation not found."),
@@ -73,7 +74,7 @@ export async function loadWizardInputs(
     let connectionInputs: WizardInputs["connection"] = null;
     if (connection) {
       const requestedAt = connection.initial_sync_requested_at;
-      const runs = await tenantDatabase(ctx.clerkOrgId).syncRun.findMany({
+      const runs = await client.syncRun.findMany({
         orderBy: { started_at: "desc" },
         select: { run_type: true, status: true },
         take: 30,
@@ -85,7 +86,8 @@ export async function loadWizardInputs(
         },
       });
       const latest = (type: RunType): StageInput["latestRunStatus"] =>
-        runs.find((run) => run.run_type === type)?.status ?? null;
+        runs.find((executeTransaction) => executeTransaction.run_type === type)
+          ?.status ?? null;
       connectionInputs = {
         balances: {
           completedAt: sinceRequest(
@@ -124,10 +126,9 @@ export async function loadWizardInputs(
         xeroSkippedAt: organisation.xero_setup_skipped_at,
       },
     };
-  } catch {
-    return {
-      error: appError("internal", "Failed to load setup progress."),
-      ok: false,
-    };
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, ctx.clerkOrgId);
+    return await run(db);
+  })();
 }

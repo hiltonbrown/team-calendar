@@ -21,7 +21,28 @@ vi.mock("@repo/observability/log", () => ({ log: { info: mocks.metricLog } }));
 beforeEach(() => {
   mocks.metricLog.mockReset();
 });
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({ client: null as object | null }));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
+  const actualTenantCore = await vi.importActual<
+    typeof import("@repo/database/tenant-db")
+  >("@repo/database/tenant-db");
+
   const exports = {
     database: {
       xeroConnection: {
@@ -29,6 +50,7 @@ vi.mock("@repo/database", () => {
       },
     },
   };
+  tenantTestState.client = exports.database;
   return {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
@@ -39,12 +61,8 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
+
+    ...actualTenantCore,
   };
 });
 vi.mock("../oauth/authorisation", () => ({
@@ -60,7 +78,8 @@ vi.mock("../read/dispatch", () => ({
   fetchLeaveForEmployeeForRegion: mocks.fetchLeaveForEmployeeForRegion,
   fetchLeaveRecordsForRegion: mocks.fetchLeaveRecordsForRegion,
 }));
-const { XeroWriteAdapter } = await import("./xero-write-adapter");
+const { resolveWriteEmployeeId, resolveWriteLeaveTypeId, XeroWriteAdapter } =
+  await import("./xero-write-adapter");
 const { toPlainLanguageMessage } = await import("../write/types");
 const submitInput = withPortMutation("create", {
   clerkOrgId: "org_1",
@@ -296,6 +315,36 @@ describe("safe neutral resolution failures", () => {
       expect(result.error).not.toHaveProperty("dispatchPhase");
       expect(result.error).not.toHaveProperty("certainty");
       expect(result.error).not.toHaveProperty("correlationId");
+    }
+  );
+});
+describe("mapping read failures", () => {
+  it.each([
+    [resolveWriteEmployeeId, "Failed to resolve Xero employee mapping."],
+    [resolveWriteLeaveTypeId, "Failed to resolve Xero leave type mapping."],
+  ] as const)(
+    "keeps the Result contract when the mapping read throws (%#)",
+    async (resolve, message) => {
+      const saved = tenantTestState.client;
+      tenantTestState.client = {
+        person: {
+          findFirst: vi.fn().mockRejectedValue(new Error("connection reset")),
+        },
+      };
+      try {
+        await expect(
+          resolve({
+            personId: "person-1",
+            recordType: "annual_leave",
+            xeroConnection: buildTenant("connection-1"),
+          })
+        ).resolves.toEqual({
+          error: { code: "unknown_error", message },
+          ok: false,
+        });
+      } finally {
+        tenantTestState.client = saved;
+      }
     }
   );
 });

@@ -7,11 +7,20 @@ const mocks = vi.hoisted(() => ({
   listAllTypes: vi.fn(),
   listForUser: vi.fn(),
   listPreferences: vi.fn(),
-  requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
+  resolveActiveOrgPageContext: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@repo/auth/helpers", () => ({ requireOrg: async () => "org_1" }));
+vi.mock("@repo/database", () => ({
+  TENANT_READ_TRANSACTION_OPTIONS: {},
+  withTenantDb: async (
+    _account: string,
+    run: (db: unknown) => Promise<unknown>
+  ) =>
+    run({ organisation: { findFirst: async () => ({ name: "Company A" }) } }),
+}));
 vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));
@@ -29,7 +38,7 @@ vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
-  requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.resolveActiveOrgPageContext,
 }));
 vi.mock("../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,
@@ -50,7 +59,7 @@ describe("NotificationsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireActiveOrgPageContext.mockResolvedValue({
+    mocks.resolveActiveOrgPageContext.mockResolvedValue({
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       orgQueryValue: null,

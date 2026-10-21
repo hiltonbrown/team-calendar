@@ -841,6 +841,14 @@ sync; a permission error or unavailable inventory does not prove revocation.
 Lifecycle follows explicit customer actions and authoritative provider events,
 with no activity heuristics, separate remote-cleanup worker or management token.
 
+### Account-wide visibility and request transactions
+
+Every role sees approved leave from all active companies in its Clerk account, with existing private and masked-record rules applied. Dashboard and People default to all companies and offer a company filter. People retains its role permissions across companies. Owners and admins use one combined approval queue; managers approve their reports in any owned company. Owners and admins can assign or clear a manager from any owned company on the People profile.
+
+Manager visibility is stored in `account_settings`: `direct_reports_only` or `all_team_leave`. Decline reasons, declined-request visibility, notification preferences and privacy defaults remain company settings. Leave creation, submission, approval and Xero writes derive the company from the person or record, with each company's connection and settings. The notification inbox and live delivery cover the account; preference edits are company-specific.
+
+Authenticated entry points open `withTenantDb` or `withTenantResult`, pass the required `TenantDb` through services and close the transaction before rendering or external HTTP. Services assert account ownership with `assertTenantDb`; Result failures roll back at the root. Fire-and-forget effects use `afterTenantCommit`, with their SQL inputs prepared before commit. Registered phased flows assert that no tenant transaction is active and open separate database scopes around provider calls.
+
 ### Multi-company identifier map
 
 | Identifier | Boundary and use |

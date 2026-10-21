@@ -1,8 +1,9 @@
+import { assertTenantDb, type TenantDb, withTenantDb } from "../tenant-db";
 import "server-only";
 import type { Result } from "@repo/core";
 import type { Prisma } from "../../generated/client";
 import { systemDatabase } from "../system-client";
-import { tenantDatabase } from "../tenant-client";
+import { assertNoTenantTransaction } from "../tenant-guard";
 export interface XeroScope {
   clerkOrgId: string;
   organisationId: string;
@@ -17,9 +18,7 @@ export async function getScopedXeroConnection(
   input: XeroScope & {
     connectionId?: string;
   },
-  tx: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
-    input.clerkOrgId
-  )
+  db: TenantDb
 ): Promise<
   Result<
     Prisma.XeroConnectionGetPayload<{
@@ -33,25 +32,30 @@ export async function getScopedXeroConnection(
     }
   >
 > {
-  const connection = await tx.xeroConnection.findFirst({
-    where: {
-      ...xeroScope(input),
-      released_at: null,
-      ...(input.connectionId ? { id: input.connectionId } : {}),
-    },
-  });
-  if (!connection) {
-    return {
-      error: { code: "not_connected", message: "Xero is not connected." },
-      ok: false,
-    };
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const tx = db;
+
+    const connection = await tx.xeroConnection.findFirst({
+      where: {
+        ...xeroScope(input),
+        released_at: null,
+        ...(input.connectionId ? { id: input.connectionId } : {}),
+      },
+    });
+    if (!connection) {
+      return {
+        error: { code: "not_connected", message: "Xero is not connected." },
+        ok: false,
+      };
+    }
+    const authorisation = connection.xero_authorisation_id
+      ? await systemDatabase.xeroAuthorisation.findUnique({
+          where: { id: connection.xero_authorisation_id },
+        })
+      : null;
+    return { ok: true, value: { ...connection, authorisation } };
   }
-  const authorisation = connection.xero_authorisation_id
-    ? await systemDatabase.xeroAuthorisation.findUnique({
-        where: { id: connection.xero_authorisation_id },
-      })
-    : null;
-  return { ok: true, value: { ...connection, authorisation } };
 }
 
 export interface XeroProviderConnectionCapture {
@@ -61,27 +65,21 @@ export interface XeroProviderConnectionCapture {
   remoteConnectionId: string;
 }
 
-// Provider I/O happens before this atomic update. A fresh reconnect or changed
-// authorisation must invalidate the old probe even when its tenant is unchanged.
+// This owner-coordinated credential mutation must remain durable independently.
 export async function markScopedXeroConnectionReconnectRequired(
   input: XeroScope &
     XeroProviderConnectionCapture & {
       connectionId: string;
       xeroTenantId: string;
-    },
-  tx: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
-    input.clerkOrgId
-  )
+    }
 ): Promise<boolean> {
-  const connection = await tx.xeroConnection.findFirst({
-    select: { id: true },
-    where: { ...xeroScope(input), id: input.connectionId, released_at: null },
-  });
-  if (!connection) {
+  assertNoTenantTransaction("markScopedXeroConnectionReconnectRequired");
+  const found = await withTenantDb(input.clerkOrgId, (db) =>
+    hasScopedXeroReconnectTarget(input, db)
+  );
+  if (!found) {
     return false;
   }
-  // This credential-lifecycle mutation must compare the grant timestamp in the
-  // same SQL statement; a separate grant read permits a concurrent rotation.
   const changed = await systemDatabase.xeroConnection.updateMany({
     data: {
       last_error_code: "reauthorisation_required",
@@ -107,26 +105,41 @@ export async function markScopedXeroConnectionReconnectRequired(
   return changed.count === 1;
 }
 
+export async function hasScopedXeroReconnectTarget(
+  input: XeroScope & { connectionId: string },
+  db: TenantDb
+): Promise<boolean> {
+  assertTenantDb(db, input.clerkOrgId);
+  const connection = await db.xeroConnection.findFirst({
+    select: { id: true },
+    where: { ...xeroScope(input), id: input.connectionId, released_at: null },
+  });
+  return Boolean(connection);
+}
+
 /** Resolve the tenant connection before reading its credential owner's health. */
 export async function getScopedXeroAuthorisationMetadata(
   input: XeroScope & { connectionId?: string },
-  client: Pick<Prisma.TransactionClient, "xeroConnection"> = tenantDatabase(
-    input.clerkOrgId
-  )
+  db: TenantDb
 ): Promise<{ status: string; last_refreshed_at: Date | null } | null> {
-  const connection = await client.xeroConnection.findFirst({
-    select: { xero_authorisation_id: true },
-    where: {
-      ...xeroScope(input),
-      released_at: null,
-      ...(input.connectionId ? { id: input.connectionId } : {}),
-    },
-  });
-  if (!connection?.xero_authorisation_id) {
-    return null;
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const connection = await client.xeroConnection.findFirst({
+      select: { xero_authorisation_id: true },
+      where: {
+        ...xeroScope(input),
+        released_at: null,
+        ...(input.connectionId ? { id: input.connectionId } : {}),
+      },
+    });
+    if (!connection?.xero_authorisation_id) {
+      return null;
+    }
+    return await systemDatabase.xeroAuthorisation.findUnique({
+      select: { last_refreshed_at: true, status: true },
+      where: { id: connection.xero_authorisation_id },
+    });
   }
-  return await systemDatabase.xeroAuthorisation.findUnique({
-    select: { last_refreshed_at: true, status: true },
-    where: { id: connection.xero_authorisation_id },
-  });
 }

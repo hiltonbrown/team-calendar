@@ -1,24 +1,26 @@
 import "server-only";
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
-import { tenantDatabase } from "@repo/database";
+import { withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 
 export async function captureXeroConnected(input: {
   clerkOrgId: string;
   organisationId: string;
   connectionId: string;
 }): Promise<void> {
+  assertNoTenantTransaction("captureXeroConnected");
   try {
-    const durableConnection = await tenantDatabase(
-      input.clerkOrgId
-    ).xeroConnection.findFirst({
-      select: { created_at: true },
-      where: {
-        clerk_org_id: input.clerkOrgId,
-        id: input.connectionId,
-        organisation_id: input.organisationId,
-      },
-    });
+    const durableConnection = await withTenantDb(input.clerkOrgId, (db) =>
+      db.xeroConnection.findFirst({
+        select: { created_at: true },
+        where: {
+          clerk_org_id: input.clerkOrgId,
+          id: input.connectionId,
+          organisation_id: input.organisationId,
+        },
+      })
+    );
     if (durableConnection) {
       const connectedEvent = createActivationEvent({
         deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,

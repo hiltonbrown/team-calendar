@@ -41,7 +41,6 @@ export type OrganisationSettingsMinAggregateOutputType = {
   show_pending_on_calendar: boolean | null
   show_declined_on_approvals: boolean | null
   notify_managers_on_status_change: boolean | null
-  manager_visibility_scope: string | null
   default_leave_request_advance_days: number | null
   require_decline_reason: boolean | null
   default_privacy_mode: $Enums.availability_privacy_mode | null
@@ -58,7 +57,6 @@ export type OrganisationSettingsMaxAggregateOutputType = {
   show_pending_on_calendar: boolean | null
   show_declined_on_approvals: boolean | null
   notify_managers_on_status_change: boolean | null
-  manager_visibility_scope: string | null
   default_leave_request_advance_days: number | null
   require_decline_reason: boolean | null
   default_privacy_mode: $Enums.availability_privacy_mode | null
@@ -75,7 +73,6 @@ export type OrganisationSettingsCountAggregateOutputType = {
   show_pending_on_calendar: number
   show_declined_on_approvals: number
   notify_managers_on_status_change: number
-  manager_visibility_scope: number
   default_leave_request_advance_days: number
   require_decline_reason: number
   default_privacy_mode: number
@@ -102,7 +99,6 @@ export type OrganisationSettingsMinAggregateInputType = {
   show_pending_on_calendar?: true
   show_declined_on_approvals?: true
   notify_managers_on_status_change?: true
-  manager_visibility_scope?: true
   default_leave_request_advance_days?: true
   require_decline_reason?: true
   default_privacy_mode?: true
@@ -119,7 +115,6 @@ export type OrganisationSettingsMaxAggregateInputType = {
   show_pending_on_calendar?: true
   show_declined_on_approvals?: true
   notify_managers_on_status_change?: true
-  manager_visibility_scope?: true
   default_leave_request_advance_days?: true
   require_decline_reason?: true
   default_privacy_mode?: true
@@ -136,7 +131,6 @@ export type OrganisationSettingsCountAggregateInputType = {
   show_pending_on_calendar?: true
   show_declined_on_approvals?: true
   notify_managers_on_status_change?: true
-  manager_visibility_scope?: true
   default_leave_request_advance_days?: true
   require_decline_reason?: true
   default_privacy_mode?: true
@@ -240,7 +234,6 @@ export type OrganisationSettingsGroupByOutputType = {
   show_pending_on_calendar: boolean
   show_declined_on_approvals: boolean
   notify_managers_on_status_change: boolean
-  manager_visibility_scope: string
   default_leave_request_advance_days: number
   require_decline_reason: boolean
   default_privacy_mode: $Enums.availability_privacy_mode
@@ -280,7 +273,6 @@ export type OrganisationSettingsWhereInput = {
   show_pending_on_calendar?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   show_declined_on_approvals?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   notify_managers_on_status_change?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
-  manager_visibility_scope?: Prisma.StringFilter<"OrganisationSettings"> | string
   default_leave_request_advance_days?: Prisma.IntFilter<"OrganisationSettings"> | number
   require_decline_reason?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"OrganisationSettings"> | $Enums.availability_privacy_mode
@@ -298,7 +290,6 @@ export type OrganisationSettingsOrderByWithRelationInput = {
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
   notify_managers_on_status_change?: Prisma.SortOrder
-  manager_visibility_scope?: Prisma.SortOrder
   default_leave_request_advance_days?: Prisma.SortOrder
   require_decline_reason?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
@@ -319,7 +310,6 @@ export type OrganisationSettingsWhereUniqueInput = Prisma.AtLeast<{
   show_pending_on_calendar?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   show_declined_on_approvals?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   notify_managers_on_status_change?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
-  manager_visibility_scope?: Prisma.StringFilter<"OrganisationSettings"> | string
   default_leave_request_advance_days?: Prisma.IntFilter<"OrganisationSettings"> | number
   require_decline_reason?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"OrganisationSettings"> | $Enums.availability_privacy_mode
@@ -337,7 +327,6 @@ export type OrganisationSettingsOrderByWithAggregationInput = {
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
   notify_managers_on_status_change?: Prisma.SortOrder
-  manager_visibility_scope?: Prisma.SortOrder
   default_leave_request_advance_days?: Prisma.SortOrder
   require_decline_reason?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
@@ -362,7 +351,6 @@ export type OrganisationSettingsScalarWhereWithAggregatesInput = {
   show_pending_on_calendar?: Prisma.BoolWithAggregatesFilter<"OrganisationSettings"> | boolean
   show_declined_on_approvals?: Prisma.BoolWithAggregatesFilter<"OrganisationSettings"> | boolean
   notify_managers_on_status_change?: Prisma.BoolWithAggregatesFilter<"OrganisationSettings"> | boolean
-  manager_visibility_scope?: Prisma.StringWithAggregatesFilter<"OrganisationSettings"> | string
   default_leave_request_advance_days?: Prisma.IntWithAggregatesFilter<"OrganisationSettings"> | number
   require_decline_reason?: Prisma.BoolWithAggregatesFilter<"OrganisationSettings"> | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeWithAggregatesFilter<"OrganisationSettings"> | $Enums.availability_privacy_mode
@@ -378,7 +366,6 @@ export type OrganisationSettingsCreateInput = {
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: string
   default_leave_request_advance_days?: number
   require_decline_reason?: boolean
   default_privacy_mode?: $Enums.availability_privacy_mode
@@ -396,7 +383,6 @@ export type OrganisationSettingsUncheckedCreateInput = {
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: string
   default_leave_request_advance_days?: number
   require_decline_reason?: boolean
   default_privacy_mode?: $Enums.availability_privacy_mode
@@ -412,7 +398,6 @@ export type OrganisationSettingsUpdateInput = {
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   default_leave_request_advance_days?: Prisma.IntFieldUpdateOperationsInput | number
   require_decline_reason?: Prisma.BoolFieldUpdateOperationsInput | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
@@ -430,7 +415,6 @@ export type OrganisationSettingsUncheckedUpdateInput = {
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   default_leave_request_advance_days?: Prisma.IntFieldUpdateOperationsInput | number
   require_decline_reason?: Prisma.BoolFieldUpdateOperationsInput | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
@@ -447,7 +431,6 @@ export type OrganisationSettingsCreateManyInput = {
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: string
   default_leave_request_advance_days?: number
   require_decline_reason?: boolean
   default_privacy_mode?: $Enums.availability_privacy_mode
@@ -463,7 +446,6 @@ export type OrganisationSettingsUpdateManyMutationInput = {
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   default_leave_request_advance_days?: Prisma.IntFieldUpdateOperationsInput | number
   require_decline_reason?: Prisma.BoolFieldUpdateOperationsInput | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
@@ -480,7 +462,6 @@ export type OrganisationSettingsUncheckedUpdateManyInput = {
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   default_leave_request_advance_days?: Prisma.IntFieldUpdateOperationsInput | number
   require_decline_reason?: Prisma.BoolFieldUpdateOperationsInput | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
@@ -502,7 +483,6 @@ export type OrganisationSettingsCountOrderByAggregateInput = {
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
   notify_managers_on_status_change?: Prisma.SortOrder
-  manager_visibility_scope?: Prisma.SortOrder
   default_leave_request_advance_days?: Prisma.SortOrder
   require_decline_reason?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
@@ -523,7 +503,6 @@ export type OrganisationSettingsMaxOrderByAggregateInput = {
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
   notify_managers_on_status_change?: Prisma.SortOrder
-  manager_visibility_scope?: Prisma.SortOrder
   default_leave_request_advance_days?: Prisma.SortOrder
   require_decline_reason?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
@@ -540,7 +519,6 @@ export type OrganisationSettingsMinOrderByAggregateInput = {
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
   notify_managers_on_status_change?: Prisma.SortOrder
-  manager_visibility_scope?: Prisma.SortOrder
   default_leave_request_advance_days?: Prisma.SortOrder
   require_decline_reason?: Prisma.SortOrder
   default_privacy_mode?: Prisma.SortOrder
@@ -604,7 +582,6 @@ export type OrganisationSettingsCreateWithoutOrganisationInput = {
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: string
   default_leave_request_advance_days?: number
   require_decline_reason?: boolean
   default_privacy_mode?: $Enums.availability_privacy_mode
@@ -620,7 +597,6 @@ export type OrganisationSettingsUncheckedCreateWithoutOrganisationInput = {
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: string
   default_leave_request_advance_days?: number
   require_decline_reason?: boolean
   default_privacy_mode?: $Enums.availability_privacy_mode
@@ -652,7 +628,6 @@ export type OrganisationSettingsUpdateWithoutOrganisationInput = {
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   default_leave_request_advance_days?: Prisma.IntFieldUpdateOperationsInput | number
   require_decline_reason?: Prisma.BoolFieldUpdateOperationsInput | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
@@ -668,7 +643,6 @@ export type OrganisationSettingsUncheckedUpdateWithoutOrganisationInput = {
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   default_leave_request_advance_days?: Prisma.IntFieldUpdateOperationsInput | number
   require_decline_reason?: Prisma.BoolFieldUpdateOperationsInput | boolean
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
@@ -687,7 +661,6 @@ export type OrganisationSettingsSelect<ExtArgs extends runtime.Types.Extensions.
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: boolean
   default_leave_request_advance_days?: boolean
   require_decline_reason?: boolean
   default_privacy_mode?: boolean
@@ -705,7 +678,6 @@ export type OrganisationSettingsSelectCreateManyAndReturn<ExtArgs extends runtim
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: boolean
   default_leave_request_advance_days?: boolean
   require_decline_reason?: boolean
   default_privacy_mode?: boolean
@@ -723,7 +695,6 @@ export type OrganisationSettingsSelectUpdateManyAndReturn<ExtArgs extends runtim
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: boolean
   default_leave_request_advance_days?: boolean
   require_decline_reason?: boolean
   default_privacy_mode?: boolean
@@ -741,7 +712,6 @@ export type OrganisationSettingsSelectScalar = {
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
-  manager_visibility_scope?: boolean
   default_leave_request_advance_days?: boolean
   require_decline_reason?: boolean
   default_privacy_mode?: boolean
@@ -751,7 +721,7 @@ export type OrganisationSettingsSelectScalar = {
   updated_at?: boolean
 }
 
-export type OrganisationSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "show_pending_on_calendar" | "show_declined_on_approvals" | "notify_managers_on_status_change" | "manager_visibility_scope" | "default_leave_request_advance_days" | "require_decline_reason" | "default_privacy_mode" | "feeds_include_public_holidays_default" | "default_feed_privacy_mode" | "created_at" | "updated_at", ExtArgs["result"]["organisationSettings"]>
+export type OrganisationSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "show_pending_on_calendar" | "show_declined_on_approvals" | "notify_managers_on_status_change" | "default_leave_request_advance_days" | "require_decline_reason" | "default_privacy_mode" | "feeds_include_public_holidays_default" | "default_feed_privacy_mode" | "created_at" | "updated_at", ExtArgs["result"]["organisationSettings"]>
 export type OrganisationSettingsInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
 }
@@ -774,7 +744,6 @@ export type $OrganisationSettingsPayload<ExtArgs extends runtime.Types.Extension
     show_pending_on_calendar: boolean
     show_declined_on_approvals: boolean
     notify_managers_on_status_change: boolean
-    manager_visibility_scope: string
     default_leave_request_advance_days: number
     require_decline_reason: boolean
     default_privacy_mode: $Enums.availability_privacy_mode
@@ -1212,7 +1181,6 @@ export interface OrganisationSettingsFieldRefs {
   readonly show_pending_on_calendar: Prisma.FieldRef<"OrganisationSettings", 'Boolean'>
   readonly show_declined_on_approvals: Prisma.FieldRef<"OrganisationSettings", 'Boolean'>
   readonly notify_managers_on_status_change: Prisma.FieldRef<"OrganisationSettings", 'Boolean'>
-  readonly manager_visibility_scope: Prisma.FieldRef<"OrganisationSettings", 'String'>
   readonly default_leave_request_advance_days: Prisma.FieldRef<"OrganisationSettings", 'Int'>
   readonly require_decline_reason: Prisma.FieldRef<"OrganisationSettings", 'Boolean'>
   readonly default_privacy_mode: Prisma.FieldRef<"OrganisationSettings", 'availability_privacy_mode'>

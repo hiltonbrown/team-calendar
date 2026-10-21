@@ -265,8 +265,10 @@ Roles are custom roles in the Clerk dashboard. Permission checks use `auth().has
 
 Tenant tables enforce PostgreSQL row-level security using the transaction-local `app.clerk_org_id`. Policies check both the account and ownership of any company ID. Missing context fails closed. RLS complements explicit query filters.
 
-- Use `tenantDatabase(clerkOrgId)` for single queries. Its immutable context wraps each query in a restricted transaction.
-- Use `tenantTransaction(clerkOrgId, async (tx) => { ... })` for related queries, raw SQL or interactive transactions. Do not call `$transaction` on the query client.
+- Entry points authenticate before opening `withTenantDb` or `withTenantResult`. Load the complete tenant data set in that scope and close it before rendering. `withTenantResult` rolls back an unsuccessful business result.
+- Services take a required `db: TenantDb` last, call `assertTenantDb(db, clerkOrgId)`, and pass that same client to tenant callees. Do not open nested transactions or call `$transaction` on the client.
+- Use `afterTenantCommit` for fire-and-forget effects. Prepare their database inputs inside the active scope; result-bearing sends run after the root returns. External HTTP never runs inside a tenant transaction.
+- Register phased flows per export and call `assertNoTenantTransaction` before opening their database phases. Each provider call stays between closed database scopes. Use `withTenantReads` only in measured, registered entry-point loaders.
 - `systemDatabase` is restricted to the checked import allowlist: migrations/fixtures, account discovery for scheduled fan-out, public-token discovery, Stripe routing and canonical Xero grant/ownership operations. Once the account is known, tenant data uses the restricted client.
 - Canonical Xero authorisations and Stripe routing events have no app-role grant. Public plan definitions and limits are read-only to the app role. New tables require an explicit grant and policy review.
 
@@ -274,12 +276,17 @@ Provision each environment by applying owner migrations first. The RLS migration
 
 ### Query scoping pattern
 
-Every company-scoped service must accept and apply both `clerk_org_id` and `organisation_id`. Account-wide calendar/feed queries validate company sets with `resolveAccountCompanies(clerkOrgId)` and use the owned IDs explicitly:
+Every company-scoped service must accept and apply both `clerk_org_id` and `organisation_id`. Account-wide calendar/feed queries validate company sets with `resolveAccountCompanies(clerkOrgId, db)` and use the owned IDs explicitly:
 
 ```typescript
 // Correct
-async function listPeople(clerkOrgId: ClerkOrgId, organisationId: OrganisationId) {
-  return tenantDatabase(clerkOrgId).person.findMany({
+async function listPeople(
+  clerkOrgId: ClerkOrgId,
+  organisationId: OrganisationId,
+  db: TenantDb
+) {
+  assertTenantDb(db, clerkOrgId);
+  return db.person.findMany({
     where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
   });
 }

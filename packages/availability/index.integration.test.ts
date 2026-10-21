@@ -1,5 +1,44 @@
+const tenantQueryCounter = vi.hoisted(() => ({ active: false, count: 0 }));
+vi.mock("@repo/database/tenant-client", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("@repo/database/tenant-client")>();
+  return {
+    ...original,
+    referenceDatabase: new Proxy(original.referenceDatabase, {
+      get(target, property, receiver) {
+        if (property !== "$transaction") {
+          return Reflect.get(target, property, receiver);
+        }
+        return <T>(
+          run: (
+            db: import("@repo/database").Prisma.TransactionClient
+          ) => Promise<T>,
+          options: import("@repo/database").TenantTransactionOptions
+        ) =>
+          target
+            .$extends({
+              query: {
+                $allOperations: ({ args, query }) => {
+                  if (tenantQueryCounter.active) {
+                    tenantQueryCounter.count += 1;
+                  }
+                  return query(args);
+                },
+              },
+            })
+            .$transaction(run, options);
+      },
+    }),
+  };
+});
+
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import {
   afterAll,
   afterEach,
@@ -171,6 +210,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  tenantQueryCounter.active = false;
   vi.restoreAllMocks();
 });
 afterAll(async () => {
@@ -184,10 +224,15 @@ afterAll(async () => {
 });
 describe("manual availability services", () => {
   test("creates records visible to scoped calendar and people queries", async () => {
-    const result = await createManualAvailability(
-      contextFor(tenantA),
-      inputFor(tenantA),
-      { orgRole: "org:admin", userId: "user_test" }
+    const result = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        createManualAvailability(
+          contextFor(tenantA),
+          inputFor(tenantA),
+          { orgRole: "org:admin", userId: "user_test" },
+          db
+        )
     );
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -203,7 +248,11 @@ describe("manual availability services", () => {
       title: "Working from home",
       workingLocation: "Brisbane",
     });
-    await expect(listAvailabilityRecords(contextFor(tenantA))).resolves.toEqual(
+    await expect(
+      withTestTenantDb(tenantTestAccount(contextFor(tenantA)), (db) =>
+        listAvailabilityRecords(contextFor(tenantA), undefined, db)
+      )
+    ).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: result.value.id,
@@ -214,23 +263,29 @@ describe("manual availability services", () => {
   });
   test("rejects invalid dates and person IDs outside the tenant", async () => {
     await expect(
-      createManualAvailability(
-        contextFor(tenantA),
-        {
-          ...inputFor(tenantA),
-          endsAt: new Date("2026-05-09T00:00:00.000Z"),
-        },
-        { orgRole: "org:admin", userId: "user_test" }
+      withTestTenantResult(tenantTestAccount(contextFor(tenantA)), (db) =>
+        createManualAvailability(
+          contextFor(tenantA),
+          {
+            ...inputFor(tenantA),
+            endsAt: new Date("2026-05-09T00:00:00.000Z"),
+          },
+          { orgRole: "org:admin", userId: "user_test" },
+          db
+        )
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "bad_request" }),
       ok: false,
     });
     await expect(
-      createManualAvailability(
-        contextFor(tenantA),
-        { ...inputFor(tenantA), personId: tenantB.personId },
-        { orgRole: "org:admin", userId: "user_test" }
+      withTestTenantResult(tenantTestAccount(contextFor(tenantA)), (db) =>
+        createManualAvailability(
+          contextFor(tenantA),
+          { ...inputFor(tenantA), personId: tenantB.personId },
+          { orgRole: "org:admin", userId: "user_test" },
+          db
+        )
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
@@ -241,15 +296,20 @@ describe("manual availability services", () => {
     const actor = { orgRole: "org:admin", userId: "user_admin" };
     const startsAt = new Date("2026-10-02T23:00:00.000Z");
     const endsAt = new Date("2026-10-03T00:00:00.000Z");
-    const created = await createManualAvailability(
-      contextFor(tenantA),
-      {
-        ...inputFor(tenantA),
-        allDay: false,
-        endsAt,
-        startsAt,
-      },
-      actor
+    const created = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        createManualAvailability(
+          contextFor(tenantA),
+          {
+            ...inputFor(tenantA),
+            allDay: false,
+            endsAt,
+            startsAt,
+          },
+          actor,
+          db
+        )
     );
     expect(created.ok).toBe(true);
     if (!created.ok) {
@@ -266,16 +326,21 @@ describe("manual availability services", () => {
     });
     expect(original.starts_at.toISOString()).toBe(startsAt.toISOString());
     expect(original.ends_at.toISOString()).toBe(endsAt.toISOString());
-    const updated = await updateManualAvailability(
-      contextFor(tenantA),
-      created.value.id,
-      {
-        allDay: false,
-        endsAt: new Date("2026-10-04T00:00:00.000Z"),
-        recordType: "training",
-        startsAt: new Date("2026-10-03T23:00:00.000Z"),
-      },
-      actor
+    const updated = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        updateManualAvailability(
+          contextFor(tenantA),
+          created.value.id,
+          {
+            allDay: false,
+            endsAt: new Date("2026-10-04T00:00:00.000Z"),
+            recordType: "training",
+            startsAt: new Date("2026-10-03T23:00:00.000Z"),
+          },
+          actor,
+          db
+        )
     );
     expect(updated.ok).toBe(true);
     const stored = await database.availabilityRecord.findFirstOrThrow({
@@ -303,36 +368,49 @@ describe("manual availability services", () => {
     ).toBe(0);
   });
   test("updates and archives only manual records in the active tenant", async () => {
-    const created = await createManualAvailability(
-      contextFor(tenantA),
-      inputFor(tenantA),
-      { orgRole: "org:admin", userId: "user_test" }
+    const created = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        createManualAvailability(
+          contextFor(tenantA),
+          inputFor(tenantA),
+          { orgRole: "org:admin", userId: "user_test" },
+          db
+        )
     );
     expect(created.ok).toBe(true);
     if (!created.ok) {
       return;
     }
     await expect(
-      updateManualAvailability(
-        contextFor(tenantB),
-        created.value.id,
-        patchInput,
-        { orgRole: "org:admin", userId: "user_test" }
+      withTestTenantResult(tenantTestAccount(contextFor(tenantB)), (db) =>
+        updateManualAvailability(
+          contextFor(tenantB),
+          created.value.id,
+          patchInput,
+          { orgRole: "org:admin", userId: "user_test" },
+          db
+        )
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
       ok: false,
     });
-    const updated = await updateManualAvailability(
-      contextFor(tenantA),
-      created.value.id,
-      {
-        ...patchInput,
-        contactability: "unavailable",
-        includeInFeed: false,
-        title: "Training day",
-      },
-      { orgRole: "org:admin", userId: "user_test" }
+    const updated = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        updateManualAvailability(
+          contextFor(tenantA),
+          created.value.id,
+          {
+            ...patchInput,
+            contactability: "unavailable",
+            includeInFeed: false,
+            title: "Training day",
+          },
+          { orgRole: "org:admin", userId: "user_test" },
+          db
+        )
     );
     expect(updated).toMatchObject({
       ok: true,
@@ -343,22 +421,38 @@ describe("manual availability services", () => {
       }),
     });
     await expect(
-      archiveManualAvailability(contextFor(tenantB), created.value.id, {
-        orgRole: "org:admin",
-        userId: "user_test",
-      })
+      withTestTenantResult(tenantTestAccount(contextFor(tenantB)), (db) =>
+        archiveManualAvailability(
+          contextFor(tenantB),
+          created.value.id,
+          {
+            orgRole: "org:admin",
+            userId: "user_test",
+          },
+          db
+        )
+      )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
       ok: false,
     });
     await expect(
-      archiveManualAvailability(contextFor(tenantA), created.value.id, {
-        orgRole: "org:admin",
-        userId: "user_test",
-      })
+      withTestTenantResult(tenantTestAccount(contextFor(tenantA)), (db) =>
+        archiveManualAvailability(
+          contextFor(tenantA),
+          created.value.id,
+          {
+            orgRole: "org:admin",
+            userId: "user_test",
+          },
+          db
+        )
+      )
     ).resolves.toMatchObject({ ok: true });
     await expect(
-      listAvailabilityRecords(contextFor(tenantA))
+      withTestTenantDb(tenantTestAccount(contextFor(tenantA)), (db) =>
+        listAvailabilityRecords(contextFor(tenantA), undefined, db)
+      )
     ).resolves.not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: created.value.id }),
@@ -370,11 +464,22 @@ describe("current user person identity", () => {
   test("provisions one account-wide default feed when ensuring an organisation", async () => {
     await cleanTestData();
     await createProvisioningOrganisation();
-    await ensureOrganisationForClerk({
-      clerkOrgId: provisioningClerkOrgId,
-      countryCode: "AU",
-      name: "Default feed provisioning",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: provisioningClerkOrgId,
+        countryCode: "AU",
+        name: "Default feed provisioning",
+      }),
+      (db) =>
+        ensureOrganisationForClerk(
+          {
+            clerkOrgId: provisioningClerkOrgId,
+            countryCode: "AU",
+            name: "Default feed provisioning",
+          },
+          db
+        )
+    );
     await expect(
       database.organisation.count({
         where: { clerk_org_id: provisioningClerkOrgId },
@@ -414,11 +519,22 @@ describe("current user person identity", () => {
         },
       })
     ).resolves.toBe(1);
-    await ensureOrganisationForClerk({
-      clerkOrgId: provisioningClerkOrgId,
-      countryCode: "AU",
-      name: "Default feed provisioning renamed",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: provisioningClerkOrgId,
+        countryCode: "AU",
+        name: "Default feed provisioning renamed",
+      }),
+      (db) =>
+        ensureOrganisationForClerk(
+          {
+            clerkOrgId: provisioningClerkOrgId,
+            countryCode: "AU",
+            name: "Default feed provisioning renamed",
+          },
+          db
+        )
+    );
     await expect(
       database.feed.count({
         where: {
@@ -431,11 +547,22 @@ describe("current user person identity", () => {
   test("stores no official public holidays when ensuring an organisation", async () => {
     await cleanTestData();
     await createProvisioningOrganisation();
-    const context = await ensureOrganisationForClerk({
-      clerkOrgId: provisioningClerkOrgId,
-      countryCode: "AU",
-      name: "Default holiday provisioning test",
-    });
+    const context = await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: provisioningClerkOrgId,
+        countryCode: "AU",
+        name: "Default holiday provisioning test",
+      }),
+      (db) =>
+        ensureOrganisationForClerk(
+          {
+            clerkOrgId: provisioningClerkOrgId,
+            countryCode: "AU",
+            name: "Default holiday provisioning test",
+          },
+          db
+        )
+    );
     const orgCount = await database.organisation.count({
       where: { clerk_org_id: provisioningClerkOrgId },
     });
@@ -455,22 +582,38 @@ describe("current user person identity", () => {
       data: { clerk_user_id: "user_existing" },
       where: { id: tenantA.personId },
     });
-    const result = await ensureCurrentUserPerson(contextFor(tenantA), {
-      clerkUserId: "user_existing",
-      displayName: "Existing User",
-      email: `${tenantA.clerkOrgId}@example.com`,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_existing",
+            displayName: "Existing User",
+            email: `${tenantA.clerkOrgId}@example.com`,
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       ok: true,
       value: expect.objectContaining({ id: tenantA.personId }),
     });
   });
   test("links one same-email unlinked person in the active tenant", async () => {
-    const result = await ensureCurrentUserPerson(contextFor(tenantA), {
-      clerkUserId: "user_same_email",
-      displayName: "Manual Person",
-      email: `${tenantA.clerkOrgId}@example.com`,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_same_email",
+            displayName: "Manual Person",
+            email: `${tenantA.clerkOrgId}@example.com`,
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       ok: true,
       value: expect.objectContaining({ id: tenantA.personId }),
@@ -487,11 +630,19 @@ describe("current user person identity", () => {
     ).resolves.toEqual({ id: tenantA.personId });
   });
   test("does not link same-email people outside the active tenant", async () => {
-    const result = await ensureCurrentUserPerson(contextFor(tenantA), {
-      clerkUserId: "user_cross_tenant",
-      displayName: "Cross Tenant",
-      email: `${tenantB.clerkOrgId}@example.com`,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_cross_tenant",
+            displayName: "Cross Tenant",
+            email: `${tenantB.clerkOrgId}@example.com`,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -505,12 +656,20 @@ describe("current user person identity", () => {
     ).resolves.toEqual({ clerk_user_id: null });
   });
   test("creates a manual person when no same-email profile exists", async () => {
-    const result = await ensureCurrentUserPerson(contextFor(tenantA), {
-      avatarUrl: "https://img.clerk.com/avatar.png",
-      clerkUserId: "user_new",
-      displayName: "New User",
-      email: "New.User@example.com",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            avatarUrl: "https://img.clerk.com/avatar.png",
+            clerkUserId: "user_new",
+            displayName: "New User",
+            email: "New.User@example.com",
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -562,11 +721,17 @@ describe("current user person identity", () => {
       ],
     });
     await expect(
-      ensureCurrentUserPerson(contextFor(tenantA), {
-        clerkUserId: "user_conflict",
-        displayName: "Duplicate User",
-        email: "duplicate@example.com",
-      })
+      withTestTenantResult(tenantTestAccount(contextFor(tenantA)), (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_conflict",
+            displayName: "Duplicate User",
+            email: "duplicate@example.com",
+          },
+          db
+        )
+      )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "conflict" }),
       ok: false,
@@ -575,13 +740,26 @@ describe("current user person identity", () => {
 });
 describe("release list-query evidence", () => {
   test("returns no public-holiday people when no holiday applies", async () => {
-    const result = await listPeople({
-      clerkOrgId: tenantA.clerkOrgId,
-      filters: { status: ["public_holiday"] },
-      organisationId: tenantA.organisationId,
-      pagination: { pageSize: 50 },
-      role: "admin",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: tenantA.clerkOrgId,
+        filters: { status: ["public_holiday"] },
+        organisationId: tenantA.organisationId,
+        pagination: { pageSize: 50 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: tenantA.clerkOrgId,
+            filters: { status: ["public_holiday"] },
+            organisationId: tenantA.organisationId,
+            pagination: { pageSize: 50 },
+            role: "admin",
+          },
+          db
+        )
+    );
     expect(result).toEqual({
       ok: true,
       value: { nextCursor: null, people: [], totalCount: 0 },
@@ -776,15 +954,30 @@ describe("release list-query evidence", () => {
         setting: "working",
       },
     });
-    const oracle = await computeCurrentStatusForPeople({
-      at,
-      clerkOrgId: tenantA.clerkOrgId,
-      organisationId: tenantA.organisationId,
-      people: people.map((person) => ({
-        locationId: person.locationId,
-        personId: person.id,
-      })),
-    });
+    const oracle = await withTestTenantDb(
+      tenantTestAccount({
+        at,
+        clerkOrgId: tenantA.clerkOrgId,
+        organisationId: tenantA.organisationId,
+        people: people.map((person) => ({
+          locationId: person.locationId,
+          personId: person.id,
+        })),
+      }),
+      (db) =>
+        computeCurrentStatusForPeople(
+          {
+            at,
+            clerkOrgId: tenantA.clerkOrgId,
+            organisationId: tenantA.organisationId,
+            people: people.map((person) => ({
+              locationId: person.locationId,
+              personId: person.id,
+            })),
+          },
+          db
+        )
+    );
     const statusKeys = [
       "alternative_contact",
       "another_office",
@@ -809,13 +1002,26 @@ describe("release list-query evidence", () => {
         )
         .map((person) => person.id)
         .sort();
-      const result = await listPeople({
-        clerkOrgId: tenantA.clerkOrgId,
-        filters: { status: [status] },
-        organisationId: tenantA.organisationId,
-        pagination: { pageSize: 200 },
-        role: "admin",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          clerkOrgId: tenantA.clerkOrgId,
+          filters: { status: [status] },
+          organisationId: tenantA.organisationId,
+          pagination: { pageSize: 200 },
+          role: "admin",
+        }),
+        (db) =>
+          listPeople(
+            {
+              clerkOrgId: tenantA.clerkOrgId,
+              filters: { status: [status] },
+              organisationId: tenantA.organisationId,
+              pagination: { pageSize: 200 },
+              role: "admin",
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(true);
       if (!result.ok) {
         continue;
@@ -832,13 +1038,26 @@ describe("release list-query evidence", () => {
     );
     expect(oracle.get(nullLocationPersonId)?.statusKey).toBe("public_holiday");
     expect(oracle.get(availablePersonId)?.statusKey).toBe("available");
-    const archivedResult = await listPeople({
-      clerkOrgId: tenantA.clerkOrgId,
-      filters: { includeArchived: true, status: ["wfh"] },
-      organisationId: tenantA.organisationId,
-      pagination: { pageSize: 200 },
-      role: "admin",
-    });
+    const archivedResult = await withTestTenantResult(
+      tenantTestAccount({
+        clerkOrgId: tenantA.clerkOrgId,
+        filters: { includeArchived: true, status: ["wfh"] },
+        organisationId: tenantA.organisationId,
+        pagination: { pageSize: 200 },
+        role: "admin",
+      }),
+      (db) =>
+        listPeople(
+          {
+            clerkOrgId: tenantA.clerkOrgId,
+            filters: { includeArchived: true, status: ["wfh"] },
+            organisationId: tenantA.organisationId,
+            pagination: { pageSize: 200 },
+            role: "admin",
+          },
+          db
+        )
+    );
     expect(archivedResult).toMatchObject({
       ok: true,
       value: {
@@ -902,7 +1121,10 @@ describe("release list-query evidence", () => {
         organisationId: tenantA.organisationId,
       };
       for (const filters of [undefined, { sourceType: ["xero_leave"] }]) {
-        const result = await listTeamRecordsPage({ ...scope, filters });
+        const result = await withTestTenantResult(
+          tenantTestAccount({ ...scope, filters }),
+          (db) => listTeamRecordsPage({ ...scope, filters }, db)
+        );
         expect(result).toMatchObject({
           ok: true,
           value: {
@@ -917,7 +1139,9 @@ describe("release list-query evidence", () => {
           },
         });
         await expect(
-          listTeamRecords({ ...scope, filters })
+          withTestTenantResult(tenantTestAccount({ ...scope, filters }), (db) =>
+            listTeamRecords({ ...scope, filters }, db)
+          )
         ).resolves.toMatchObject({
           ok: true,
           value: [
@@ -930,11 +1154,22 @@ describe("release list-query evidence", () => {
         });
       }
       await expect(
-        getRecord({
-          ...scope,
-          actingUserId: "recovery_actor",
-          recordId: pendingId,
-        })
+        withTestTenantResult(
+          tenantTestAccount({
+            ...scope,
+            actingUserId: "recovery_actor",
+            recordId: pendingId,
+          }),
+          (db) =>
+            getRecord(
+              {
+                ...scope,
+                actingUserId: "recovery_actor",
+                recordId: pendingId,
+              },
+              db
+            )
+        )
       ).resolves.toMatchObject({
         ok: true,
         value: {
@@ -948,19 +1183,33 @@ describe("release list-query evidence", () => {
         { ...scope, organisationId: tenantB.organisationId },
       ]) {
         await expect(
-          listTeamRecordsPage(mismatchedScope)
+          withTestTenantResult(tenantTestAccount(mismatchedScope), (db) =>
+            listTeamRecordsPage(mismatchedScope, db)
+          )
         ).resolves.toMatchObject({
           ok: true,
           value: { items: [], totalCount: 0 },
         });
       }
       await expect(
-        getRecord({
-          ...scope,
-          actingOrgRole: "org:viewer",
-          actingUserId: "unlinked_viewer",
-          recordId: pendingId,
-        })
+        withTestTenantResult(
+          tenantTestAccount({
+            ...scope,
+            actingOrgRole: "org:viewer",
+            actingUserId: "unlinked_viewer",
+            recordId: pendingId,
+          }),
+          (db) =>
+            getRecord(
+              {
+                ...scope,
+                actingOrgRole: "org:viewer",
+                actingUserId: "unlinked_viewer",
+                recordId: pendingId,
+              },
+              db
+            )
+        )
       ).resolves.toMatchObject({
         error: { code: "not_authorised" },
         ok: false,
@@ -970,19 +1219,8 @@ describe("release list-query evidence", () => {
   test("keeps plan query count constant at 1, 50, and 200 rows", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
-    const tenantClient = await import("@repo/database");
-    const createTenantClient = tenantClient.tenantDatabase;
-    let tenantQueryCount = 0;
-    vi.spyOn(tenantClient, "tenantDatabase").mockImplementation((accountId) =>
-      createTenantClient(accountId).$extends({
-        query: {
-          $allOperations: ({ args, query }) => {
-            tenantQueryCount += 1;
-            return query(args);
-          },
-        },
-      })
-    );
+    tenantQueryCounter.active = true;
+    tenantQueryCounter.count = 0;
     const measurements: Array<{
       durationMs: number;
       payloadBytes: number;
@@ -1016,21 +1254,33 @@ describe("release list-query evidence", () => {
           starts_at: equalStartsAt,
         })),
       });
-      const beforeCalls = tenantQueryCount;
+      const beforeCalls = tenantQueryCounter.count;
       const startedAt = process.hrtime.bigint();
-      const result = await listTeamRecordsPage({
-        actingOrgRole: "org:admin",
-        clerkOrgId: tenantA.clerkOrgId,
-        organisationId: tenantA.organisationId,
-        pageSize: 200,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          actingOrgRole: "org:admin",
+          clerkOrgId: tenantA.clerkOrgId,
+          organisationId: tenantA.organisationId,
+          pageSize: 200,
+        }),
+        (db) =>
+          listTeamRecordsPage(
+            {
+              actingOrgRole: "org:admin",
+              clerkOrgId: tenantA.clerkOrgId,
+              organisationId: tenantA.organisationId,
+              pageSize: 200,
+            },
+            db
+          )
+      );
       const durationMs =
         Number(process.hrtime.bigint() - startedAt) / 1_000_000;
       expect(result.ok).toBe(true);
       if (!result.ok) {
         continue;
       }
-      const afterCalls = tenantQueryCount;
+      const afterCalls = tenantQueryCounter.count;
       const expectedIds = Array.from({ length: rowCount }, (_, index) =>
         fixture.id(`plan-${rowCount}-record`, index)
       ).sort();
@@ -1098,12 +1348,24 @@ describe("release list-query evidence", () => {
         },
       ],
     });
-    const first = await listTeamRecordsPage({
-      actingOrgRole: "org:admin",
-      clerkOrgId: tenantA.clerkOrgId,
-      organisationId: tenantA.organisationId,
-      pageSize: 50,
-    });
+    const first = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:admin",
+        clerkOrgId: tenantA.clerkOrgId,
+        organisationId: tenantA.organisationId,
+        pageSize: 50,
+      }),
+      (db) =>
+        listTeamRecordsPage(
+          {
+            actingOrgRole: "org:admin",
+            clerkOrgId: tenantA.clerkOrgId,
+            organisationId: tenantA.organisationId,
+            pageSize: 50,
+          },
+          db
+        )
+    );
     expect(first.ok).toBe(true);
     if (!first.ok) {
       return;
@@ -1112,13 +1374,26 @@ describe("release list-query evidence", () => {
     expect(first.value.totalCount).toBe(200);
     expect(first.value.nextCursor).not.toBeNull();
     await database.availabilityRecord.delete({ where: { id: ids[49] ?? "" } });
-    const second = await listTeamRecordsPage({
-      actingOrgRole: "org:admin",
-      clerkOrgId: tenantA.clerkOrgId,
-      cursor: first.value.nextCursor,
-      organisationId: tenantA.organisationId,
-      pageSize: 50,
-    });
+    const second = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:admin",
+        clerkOrgId: tenantA.clerkOrgId,
+        cursor: first.value.nextCursor,
+        organisationId: tenantA.organisationId,
+        pageSize: 50,
+      }),
+      (db) =>
+        listTeamRecordsPage(
+          {
+            actingOrgRole: "org:admin",
+            clerkOrgId: tenantA.clerkOrgId,
+            cursor: first.value.nextCursor,
+            organisationId: tenantA.organisationId,
+            pageSize: 50,
+          },
+          db
+        )
+    );
     expect(second).toMatchObject({
       ok: true,
       value: { totalCount: 199 },
@@ -1128,13 +1403,26 @@ describe("release list-query evidence", () => {
         ids.slice(50, 100)
       );
     }
-    const allHistory = await listTeamRecordsPage({
-      actingOrgRole: "org:admin",
-      allHistory: true,
-      clerkOrgId: tenantA.clerkOrgId,
-      organisationId: tenantA.organisationId,
-      pageSize: 200,
-    });
+    const allHistory = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:admin",
+        allHistory: true,
+        clerkOrgId: tenantA.clerkOrgId,
+        organisationId: tenantA.organisationId,
+        pageSize: 200,
+      }),
+      (db) =>
+        listTeamRecordsPage(
+          {
+            actingOrgRole: "org:admin",
+            allHistory: true,
+            clerkOrgId: tenantA.clerkOrgId,
+            organisationId: tenantA.organisationId,
+            pageSize: 200,
+          },
+          db
+        )
+    );
     expect(allHistory.ok).toBe(true);
     if (allHistory.ok) {
       expect(allHistory.value.totalCount).toBe(200);
@@ -1194,7 +1482,11 @@ describe("onboarding wizard snapshot", () => {
       organisationId: tenantA.organisationId,
       userId: "user_wizard_admin",
     };
-    await expect(loadWizardSnapshot(actor)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(actor), (db) =>
+        loadWizardSnapshot(actor, db)
+      )
+    ).resolves.toEqual({
       ok: true,
       value: {
         actingUserLinked: true,
@@ -1207,11 +1499,22 @@ describe("onboarding wizard snapshot", () => {
       },
     });
     await expect(
-      loadWizardSnapshot({
-        ...actor,
-        clerkOrgId: tenantB.clerkOrgId,
-        organisationId: tenantB.organisationId,
-      })
+      withTestTenantResult(
+        tenantTestAccount({
+          ...actor,
+          clerkOrgId: tenantB.clerkOrgId,
+          organisationId: tenantB.organisationId,
+        }),
+        (db) =>
+          loadWizardSnapshot(
+            {
+              ...actor,
+              clerkOrgId: tenantB.clerkOrgId,
+              organisationId: tenantB.organisationId,
+            },
+            db
+          )
+      )
     ).resolves.toMatchObject({
       ok: true,
       value: {

@@ -1,3 +1,4 @@
+import { withTenantResult } from "@repo/database";
 import "server-only";
 import {
   createHash,
@@ -10,8 +11,7 @@ import { createCompany } from "@repo/availability/src/companies/create-company";
 import type { Result } from "@repo/core";
 import {
   systemDatabase,
-  tenantDatabase,
-  tenantTransaction,
+  withTenantDb,
   withXeroGrantLock,
 } from "@repo/database";
 import type {
@@ -24,6 +24,7 @@ import {
   claimXeroTenant,
   listXeroTenantOwnership,
 } from "@repo/database/queries/xero-ownership";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { invalidateAccountFeedCaches } from "@repo/feeds";
 import { z } from "zod";
 import { keys } from "../../keys";
@@ -151,19 +152,20 @@ async function resolveOrganisationForTenantSelection(input: {
     };
   }
 
-  const organisation = await tenantDatabase(
-    input.clerkOrgId
-  ).organisation.findFirst({
-    select: {
-      country_code: true,
-      id: true,
-    },
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-      id: input.organisationId,
-    },
-  });
+  const { organisationId } = input;
+  const organisation = await withTenantDb(input.clerkOrgId, (db) =>
+    db.organisation.findFirst({
+      select: {
+        country_code: true,
+        id: true,
+      },
+      where: {
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+        id: organisationId,
+      },
+    })
+  );
   if (!organisation) {
     return {
       error: {
@@ -538,32 +540,33 @@ export async function getPendingXeroOAuthSession(input: {
     XeroOAuthError
   >
 > {
+  assertNoTenantTransaction("getPendingXeroOAuthSession");
   const session = await loadPendingSession(input);
   if (!session.ok) {
     return session;
   }
 
-  const organisations = await tenantDatabase(
-    input.clerkOrgId
-  ).organisation.findMany({
-    orderBy: [{ created_at: "asc" }, { name: "asc" }],
-    select: {
-      country_code: true,
-      id: true,
-      name: true,
-    },
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-    },
-  });
+  const organisations = await withTenantDb(input.clerkOrgId, (db) =>
+    db.organisation.findMany({
+      orderBy: [{ created_at: "asc" }, { name: "asc" }],
+      select: {
+        country_code: true,
+        id: true,
+        name: true,
+      },
+      where: {
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+      },
+    })
+  );
 
   const tenants = readAvailableTenants(session.value.available_tenants_json);
   const ownership = await listXeroTenantOwnership(
     input.clerkOrgId,
     tenants.map((tenant) => tenant.tenantId)
   );
-  const allowance = await tenantTransaction(input.clerkOrgId, (tx) =>
+  const allowance = await withTenantDb(input.clerkOrgId, (tx) =>
     checkPayrollEntityEntitlement(input.clerkOrgId, tx)
   );
   if (!allowance.ok) {
@@ -616,6 +619,7 @@ export async function buildXeroOAuthStartUrl(input: {
   returnTo?: string;
   userId?: string | null;
 }): Promise<Result<{ nonce: string; redirectUrl: string }, XeroOAuthError>> {
+  assertNoTenantTransaction("buildXeroOAuthStartUrl");
   if (isPreviewDeployment()) {
     return xeroConnectDisabled();
   }
@@ -630,15 +634,18 @@ export async function buildXeroOAuthStartUrl(input: {
   if (input.returnTo !== undefined && !isLocalApplicationPath(input.returnTo)) {
     return invalidState();
   }
+  const { organisationId } = input;
   if (
-    input.organisationId &&
-    !(await tenantDatabase(input.clerkOrgId).organisation.findFirst({
-      where: {
-        archived_at: null,
-        clerk_org_id: input.clerkOrgId,
-        id: input.organisationId,
-      },
-    }))
+    organisationId &&
+    !(await withTenantDb(input.clerkOrgId, (db) =>
+      db.organisation.findFirst({
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          id: organisationId,
+        },
+      })
+    ))
   ) {
     return {
       error: {
@@ -839,11 +846,12 @@ export async function completeXeroOAuth(input: {
     XeroOAuthError
   >
 > {
+  assertNoTenantTransaction("completeXeroOAuth");
   const state = verifyState(input.state);
   if (!state.ok) {
     return state;
   }
-  const signed = state.value;
+  const { value: signed } = state;
   if (
     !(
       input.nonce &&
@@ -995,11 +1003,12 @@ export async function cancelXeroOAuth(input: {
   nonce: string | null;
   state: string;
 }): Promise<Result<{ redirectTo: string; sessionId: string }, XeroOAuthError>> {
+  assertNoTenantTransaction("cancelXeroOAuth");
   const state = verifyState(input.state);
   if (!state.ok) {
     return state;
   }
-  const signed = state.value;
+  const { value: signed } = state;
   if (
     !(
       input.nonce &&
@@ -1187,11 +1196,9 @@ async function completeSingleXeroTenantSelection(input: {
   if (!loaded.ok) {
     return loaded;
   }
-  const session = loaded.value;
-  if (
-    input.organisationId &&
-    input.organisationId !== session.organisation_id
-  ) {
+  const { value: session } = loaded;
+  const { organisationId } = input;
+  if (organisationId && input.organisationId !== session.organisation_id) {
     return invalidState();
   }
 
@@ -1302,21 +1309,23 @@ async function completeSingleXeroTenantSelection(input: {
   const targetOrganisationId =
     session.organisation_id ?? input.organisationId ?? null;
   const connectionSnapshot = targetOrganisationId
-    ? await tenantDatabase(input.clerkOrgId).xeroConnection.findFirst({
-        select: {
-          id: true,
-          remote_connection_id: true,
-          status: true,
-          updated_at: true,
-          xero_authorisation_id: true,
-          xero_tenant_id: true,
-        },
-        where: {
-          clerk_org_id: input.clerkOrgId,
-          organisation_id: targetOrganisationId,
-          released_at: null,
-        },
-      })
+    ? await withTenantDb(input.clerkOrgId, (db) =>
+        db.xeroConnection.findFirst({
+          select: {
+            id: true,
+            remote_connection_id: true,
+            status: true,
+            updated_at: true,
+            xero_authorisation_id: true,
+            xero_tenant_id: true,
+          },
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: targetOrganisationId,
+            released_at: null,
+          },
+        })
+      )
     : null;
   const connections = await fetchConnections(
     "",
@@ -1421,13 +1430,13 @@ async function completeSingleXeroTenantSelection(input: {
       ) {
         throw new Error("tenant_binding_conflict");
       }
-      const organisationId = organisation.value.id;
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-organisation:${organisationId}`}, 0))::text`;
+      const { id: scopedOrganisationId } = organisation.value;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-organisation:${scopedOrganisationId}`}, 0))::text`;
       const scope = {
         clerk_org_id: input.clerkOrgId,
-        organisation_id: organisationId,
+        organisation_id: scopedOrganisationId,
       };
-      await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${organisationId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${scopedOrganisationId}::uuid FOR UPDATE`;
       const current = await tx.xeroConnection.findFirst({ where: scope });
       if (
         Boolean(current) !== Boolean(connectionSnapshot) ||
@@ -1517,6 +1526,7 @@ async function completeSingleXeroTenantSelection(input: {
 export async function purgeClosedXeroOAuthSessions(
   now = new Date()
 ): Promise<void> {
+  assertNoTenantTransaction("purgeClosedXeroOAuthSessions");
   const closed: Prisma.XeroOAuthSessionWhereInput = {
     OR: [
       { expires_at: { lte: now } },
@@ -1603,6 +1613,7 @@ export function completeXeroTenantSelection(
     XeroOAuthError
   >
 > {
+  assertNoTenantTransaction("completeXeroTenantSelection");
   return "tenantIds" in input
     ? completeMultiXeroTenantSelection(input)
     : completeSingleXeroTenantSelection(input);
@@ -1714,7 +1725,7 @@ async function completeMultiXeroTenantSelection(
   // Each provider phase (inventory, then each file's region probe) gets its own
   // budget so a multi-file selection does not starve later files.
   let deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
-  const grantId = grant.id;
+  const { id: grantId } = grant;
   const resolveBootstrapAccess = async (): Promise<
     Result<{ accessToken: string; grant: XeroAuthorisation }, XeroOAuthError>
   > => {
@@ -1760,20 +1771,20 @@ async function completeMultiXeroTenantSelection(
     input.clerkOrgId,
     ids.data
   );
-  const connectionSnapshots = await tenantDatabase(
-    input.clerkOrgId
-  ).xeroConnection.findMany({
-    where: {
-      clerk_org_id: input.clerkOrgId,
-      OR: [
-        { xero_tenant_id: { in: ids.data } },
-        ...(session.organisation_id
-          ? [{ organisation_id: session.organisation_id }]
-          : []),
-      ],
-      released_at: null,
-    },
-  });
+  const connectionSnapshots = await withTenantDb(input.clerkOrgId, (db) =>
+    db.xeroConnection.findMany({
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        OR: [
+          { xero_tenant_id: { in: ids.data } },
+          ...(session.organisation_id
+            ? [{ organisation_id: session.organisation_id }]
+            : []),
+        ],
+        released_at: null,
+      },
+    })
+  );
   const obsoleteGrants = new Set<string>();
   const inventory = await fetchConnections(
     "",
@@ -2111,7 +2122,12 @@ async function completeMultiXeroTenantSelection(
     [...obsoleteGrants, grantId].map(cleanupUnusedSelectionGrant)
   );
   if (outcomes.some((outcome) => outcome.ok)) {
-    await invalidateAccountFeedCaches({ clerkOrgId: input.clerkOrgId });
+    const phaseInput1 = { clerkOrgId: input.clerkOrgId } satisfies Parameters<
+      typeof invalidateAccountFeedCaches
+    >[0];
+    await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+      invalidateAccountFeedCaches(phaseInput1, db)
+    );
   }
   return { ok: true, value: { outcomes: finalizedOutcomes, returnTo } };
 }

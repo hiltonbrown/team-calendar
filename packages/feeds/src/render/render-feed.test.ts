@@ -12,16 +12,37 @@ const mocks = vi.hoisted(() => ({
   warn: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     auditEvent: { createMany: mocks.audit, findUnique: mocks.auditFind },
     feed: { updateMany: mocks.update },
     feedToken: { findUnique: mocks.token, updateMany: mocks.used },
   };
+  tenantTestState.client = client;
   return {
     systemDatabase: client,
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )),
   };
 });
 vi.mock("@repo/observability/log", () => ({ log: { warn: mocks.warn } }));

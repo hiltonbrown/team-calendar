@@ -1,6 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is availability_records.integration.test.ts.
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "./src/tenant-db";
+import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 const fixture = allocateLiveTestFixture(
@@ -318,7 +320,9 @@ describe("availability_records", () => {
       prepareAndClaimSubmitOperation(request),
     ]);
     expect(results.filter(Boolean)).toHaveLength(1);
-    const operation = await getSubmitOperation(scope);
+    const operation = await withTestTenantDb(tenantTestAccount(scope), (db) =>
+      getSubmitOperation(scope, db)
+    );
     expect(operation).toMatchObject({
       action: "approve",
       actor_user_id: "fixture_manager",
@@ -326,14 +330,33 @@ describe("availability_records", () => {
       status: "prepared",
     });
     expect(
-      await getSubmitOperation({
-        ...scope,
-        clerkOrgId: tenantB.clerkOrgId,
-        organisationId: tenantB.organisationId,
-      })
+      await withTestTenantDb(
+        tenantTestAccount({
+          ...scope,
+          clerkOrgId: tenantB.clerkOrgId,
+          organisationId: tenantB.organisationId,
+        }),
+        (db) =>
+          getSubmitOperation(
+            {
+              ...scope,
+              clerkOrgId: tenantB.clerkOrgId,
+              organisationId: tenantB.organisationId,
+            },
+            db
+          )
+      )
     ).toBeNull();
     expect(
-      await markSubmitDispatchStarted({ ...scope, attemptGeneration: 1 })
+      await withTestTenantDb(
+        tenantTestAccount({ ...scope, attemptGeneration: 1 }),
+        (db) =>
+          markSubmitDispatchStarted(
+            { ...scope, attemptGeneration: 1 },
+            undefined,
+            db
+          )
+      )
     ).toBe(true);
     await database.availabilityRecord.updateMany({
       data: { xero_write_claimed_at: new Date(0) },
@@ -343,7 +366,9 @@ describe("availability_records", () => {
         organisation_id: tenantA.organisationId,
       },
     });
-    const dispatched = await getSubmitOperation(scope);
+    const dispatched = await withTestTenantDb(tenantTestAccount(scope), (db) =>
+      getSubmitOperation(scope, db)
+    );
     const replay = await prepareAndClaimSubmitOperation({
       ...request,
       actorUserId: "second_manager",
@@ -358,14 +383,23 @@ describe("availability_records", () => {
       },
       replayedUnknown: true,
     });
-    expect(await getSubmitOperation(scope)).toMatchObject({
+    expect(
+      await withTestTenantDb(tenantTestAccount(scope), (db) =>
+        getSubmitOperation(scope, db)
+      )
+    ).toMatchObject({
       attempt_generation: 2,
       status: "outcome_unknown",
     });
     expect(
-      await markSubmitDispatchStarted(
-        { ...scope, attemptGeneration: 2 },
-        replay?.mutation
+      await withTestTenantDb(
+        tenantTestAccount({ ...scope, attemptGeneration: 2 }),
+        (db) =>
+          markSubmitDispatchStarted(
+            { ...scope, attemptGeneration: 2 },
+            replay?.mutation,
+            db
+          )
       )
     ).toBe(true);
     await database.availabilityRecord.updateMany({
@@ -394,7 +428,11 @@ describe("availability_records", () => {
       },
     });
     expect(await prepareAndClaimSubmitOperation(request)).toBeNull();
-    expect(await getSubmitOperation(scope)).toMatchObject({
+    expect(
+      await withTestTenantDb(tenantTestAccount(scope), (db) =>
+        getSubmitOperation(scope, db)
+      )
+    ).toMatchObject({
       actor_user_id: "fixture_manager",
       attempt_generation: 2,
       idempotency_key: dispatched?.idempotency_key,

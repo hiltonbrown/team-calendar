@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const canonicalAccess = vi.hoisted(() => vi.fn());
+vi.mock("../oauth/authorisation", () => ({
+  resolveXeroAccess: canonicalAccess,
+}));
+
 const metricLog = vi.hoisted(() => vi.fn());
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: metricLog, warn: vi.fn() },
 }));
 beforeEach(() => {
   metricLog.mockReset();
+  canonicalAccess.mockReset();
 });
 
 import { mapXeroTransportError } from "../adapter/classify-xero-failure";
@@ -1051,6 +1057,45 @@ describe("scoped credentials at dispatch", () => {
     organisation_id: "org",
     payroll_region: "AU" as const,
     xero_tenant_id: "org-a",
+  });
+  it("uses the canonical credential resolver when no resolver is injected", async () => {
+    const access = context();
+    canonicalAccess.mockResolvedValue({
+      ok: true,
+      value: {
+        accessToken: "current-token",
+        connectionId: access.id,
+        deadline: access.deadline,
+        payrollRegion: access.payroll_region,
+        xeroTenantId: access.xero_tenant_id,
+      },
+    });
+    const fetchImpl = vi.fn<typeof fetch>(async () => new Response("{}"));
+    const response = await xeroFetch(
+      {
+        accessContext: access,
+        deadline: access.deadline,
+        init: {
+          headers: {
+            Authorization: "Bearer captured",
+            "Xero-Tenant-Id": access.xero_tenant_id,
+          },
+        },
+        rateClass,
+        url: "https://api.xero.com/payroll.xro/1.0/Employees",
+      },
+      { fetchImpl, limiter: permissiveLimiter() }
+    );
+    expect(response.status).toBe(200);
+    expect(canonicalAccess).toHaveBeenCalledWith({
+      capability: undefined,
+      clerkOrgId: access.clerk_org_id,
+      connectionId: access.id,
+      deadline: access.deadline,
+      organisationId: access.organisation_id,
+    });
+    const sentHeaders = new Headers(fetchImpl.mock.calls[0]?.[1]?.headers);
+    expect(sentHeaders.get("Authorization")).toBe("Bearer current-token");
   });
   it("re-reads current credentials for every retry after another worker rotates", async () => {
     let token = "first";

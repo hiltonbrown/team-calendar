@@ -7,11 +7,11 @@ import {
   mergeCandidateIntoXeroPerson,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { type TenantDb, withTenantDb, withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ResolveMatchSchema = z.object({
   clerkUserId: z.string().trim().startsWith("user_").optional(),
@@ -28,10 +28,10 @@ type ActionError =
 type ActionResult<T> = Result<T, ActionError>;
 
 type ParsedInput = z.infer<typeof ResolveMatchSchema>;
-type OrgContextValue = Extract<
-  Awaited<ReturnType<typeof getActiveOrgContext>>,
-  { ok: true }
->["value"];
+interface OrgContextValue {
+  clerkOrgId: string;
+  organisationId: string;
+}
 type CallerUser = Exclude<Awaited<ReturnType<typeof currentUser>>, null>;
 type MatchWithRelations = Exclude<Awaited<ReturnType<typeof loadMatch>>, null>;
 
@@ -41,6 +41,7 @@ export async function resolveXeroPersonMatchAction(input: {
   organisationId: string;
   resolution: "ignore" | "match";
 }): Promise<ActionResult<{ resolved: true }>> {
+  assertNoTenantTransaction("resolveXeroPersonMatchAction");
   const [admin, owner] = await Promise.all([
     requireRole("org:admin"),
     requireRole("org:owner"),
@@ -59,7 +60,13 @@ export async function resolveXeroPersonMatchAction(input: {
   }
   const { orgId, user, context } = caller.value;
 
-  const match = await loadMatch(context, parsed.data.matchId);
+  const match = await withTenantDb(orgId, async (db) => {
+    const company = await db.organisation.findFirst({
+      select: { id: true },
+      where: { clerk_org_id: orgId, id: context.organisationId },
+    });
+    return company ? loadMatch(context, parsed.data.matchId, db) : null;
+  });
   if (!match) {
     return unknownError("Possible match not found.");
   }
@@ -101,24 +108,14 @@ async function resolveCallerContext(
     return notAuthorised();
   }
 
-  const context = await getActiveOrgContext(organisationId);
-  if (!context.ok) {
-    if (context.error.code === "unauthorised") {
-      return notAuthorised();
-    }
-    if (context.error.code === "not_found") {
-      return unknownError(
-        "Organisation not found or not accessible in your context."
-      );
-    }
-    return unknownError(context.error.message);
-  }
-
-  return { ok: true, value: { context: context.value, orgId, user } };
+  return {
+    ok: true,
+    value: { context: { clerkOrgId: orgId, organisationId }, orgId, user },
+  };
 }
 
-function loadMatch(context: OrgContextValue, matchId: string) {
-  return tenantDatabase(context.clerkOrgId).xeroPersonMatch.findFirst({
+function loadMatch(context: OrgContextValue, matchId: string, db: TenantDb) {
+  return db.xeroPersonMatch.findFirst({
     include: {
       candidate_person: {
         select: {
@@ -168,27 +165,6 @@ async function resolveClerkUserId(args: {
     }
   }
 
-  if (resolvedClerkUserId) {
-    const alreadyLinked = await tenantDatabase(orgId).person.findFirst({
-      select: { id: true },
-      where: {
-        clerk_org_id: orgId,
-        clerk_user_id: resolvedClerkUserId,
-        id: {
-          notIn: [match.xero_person.id, match.candidate_person?.id].filter(
-            Boolean
-          ) as string[],
-        },
-        organisation_id: match.organisation_id,
-      },
-    });
-    if (alreadyLinked) {
-      return validationError(
-        "That user is already linked to another person in this organisation."
-      );
-    }
-  }
-
   return { ok: true, value: resolvedClerkUserId };
 }
 
@@ -199,51 +175,71 @@ async function applyResolution(args: {
   resolvedClerkUserId: string | null;
   user: CallerUser;
 }): Promise<ActionResult<void>> {
-  const { context, match, parsed, resolvedClerkUserId, user } = args;
-
-  const actorDisplay =
-    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-    user.emailAddresses[0]?.emailAddress ||
-    user.id;
-
-  if (parsed.resolution === "match") {
-    const result = await mergeCandidateIntoXeroPerson(
-      {
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-      },
-      {
-        actorDisplay,
-        actorUserId: user.id,
-        candidatePersonId: match.candidate_person?.id ?? null,
-        clerkOrgId: context.clerkOrgId,
-        clerkUserId: resolvedClerkUserId,
-        matchId: match.id,
-        organisationId: match.organisation_id,
-        xeroPersonId: match.xero_person.id,
+  const { context, parsed, resolvedClerkUserId, user } = args;
+  return await withTenantResult(
+    context.clerkOrgId,
+    async (db): Promise<ActionResult<void>> => {
+      const company = await db.organisation.findFirst({
+        select: { id: true },
+        where: { clerk_org_id: context.clerkOrgId, id: context.organisationId },
+      });
+      if (!company) {
+        return notAuthorised();
       }
-    );
-    if (!result.ok) {
-      return unknownError(result.error.message);
-    }
-  } else {
-    const result = await ignorePersonMatch(
-      {
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-      },
-      {
-        actorDisplay,
-        actorUserId: user.id,
-        matchId: match.id,
+      const match = await loadMatch(context, parsed.matchId, db);
+      if (match?.status !== "pending") {
+        return validationError(
+          "This possible match has already changed. Reload and try again."
+        );
       }
-    );
-    if (!result.ok) {
-      return unknownError(result.error.message);
-    }
-  }
 
-  return { ok: true, value: undefined };
+      const actorDisplay =
+        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+        user.emailAddresses[0]?.emailAddress ||
+        user.id;
+
+      if (parsed.resolution === "match") {
+        const result = await mergeCandidateIntoXeroPerson(
+          {
+            clerkOrgId: context.clerkOrgId,
+            organisationId: context.organisationId,
+          },
+          {
+            actorDisplay,
+            actorUserId: user.id,
+            candidatePersonId: match.candidate_person?.id ?? null,
+            clerkOrgId: context.clerkOrgId,
+            clerkUserId: resolvedClerkUserId,
+            matchId: match.id,
+            organisationId: match.organisation_id,
+            xeroPersonId: match.xero_person.id,
+          },
+          db
+        );
+        if (!result.ok) {
+          return unknownError(result.error.message);
+        }
+      } else {
+        const result = await ignorePersonMatch(
+          {
+            clerkOrgId: context.clerkOrgId,
+            organisationId: context.organisationId,
+          },
+          {
+            actorDisplay,
+            actorUserId: user.id,
+            matchId: match.id,
+          },
+          db
+        );
+        if (!result.ok) {
+          return unknownError(result.error.message);
+        }
+      }
+
+      return { ok: true, value: undefined };
+    }
+  );
 }
 
 function notAuthorised(): ActionResult<never> {

@@ -1,3 +1,5 @@
+import { withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 
 import { clerkClient } from "@repo/auth/server";
@@ -12,13 +14,19 @@ interface DefaultOrganisationContext {
 export async function ensureDefaultOrganisation(
   clerkOrgId: ClerkOrgId
 ): Promise<DefaultOrganisationContext> {
+  assertNoTenantTransaction("ensureDefaultOrganisation");
   const name = await loadClerkOrganisationName(clerkOrgId);
 
-  return ensureOrganisationForClerk({
-    clerkOrgId,
-    countryCode: "AU",
-    name,
-  });
+  return withTenantDb(clerkOrgId, (db) =>
+    ensureOrganisationForClerk(
+      {
+        clerkOrgId,
+        countryCode: "AU",
+        name,
+      },
+      db
+    )
+  );
 }
 
 async function loadClerkOrganisationName(

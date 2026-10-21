@@ -22,6 +22,7 @@ vi.mock("./actions", () => ({
   startPortal: vi.fn(),
 }));
 vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: vi.fn(async () => "org_1"),
   requireRole: mocks.requireRole,
 }));
 vi.mock("@repo/auth/server", () => ({
@@ -30,18 +31,36 @@ vi.mock("@repo/auth/server", () => ({
 vi.mock("@repo/availability", () => ({
   getBillingSummary: mocks.getBillingSummary,
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
   getActivationDashboardSummary: mocks.getActivationDashboardSummary,
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
   getUnresolvedStripeEventsForOrg: mocks.getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
-  tenantDatabase: vi.fn(() => ({ auditEvent: { create: mocks.auditCreate } })),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
+function buildTenantTestDatabase() {
+  return { auditEvent: { create: mocks.auditCreate } };
+}
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 
 const Page = (await import("./page")).default;
@@ -136,7 +155,8 @@ describe("BillingPage", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(mocks.getBillingSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ actingRole: "owner" })
+      expect.objectContaining({ actingRole: "owner" }),
+      expect.any(Object)
     );
     expect(
       screen.queryByText("Billing actions are managed by the account owner.")
@@ -149,7 +169,8 @@ describe("BillingPage", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(mocks.getBillingSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ actingRole: "admin" })
+      expect.objectContaining({ actingRole: "admin" }),
+      expect.any(Object)
     );
   });
 });

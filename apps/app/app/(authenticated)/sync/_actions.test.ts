@@ -1,3 +1,59 @@
+const tenantPoolMocks = vi.hoisted(() => ({
+  organisationFindFirst: vi.fn((query: { where: { id?: string } }) =>
+    Promise.resolve(
+      query.where.id === "00000000-0000-4000-8000-000000000001"
+        ? {
+            country_code: "AU",
+            id: "00000000-0000-4000-8000-000000000001",
+            name: "Company A",
+            timezone: "Australia/Brisbane",
+          }
+        : null
+    )
+  ),
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (client: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: tenantPoolMocks.organisationFindFirst,
+          findMany: vi.fn(() =>
+            Promise.resolve([
+              {
+                country_code: "AU",
+                id: "00000000-0000-4000-8000-000000000001",
+                name: "Company A",
+                timezone: "Australia/Brisbane",
+              },
+            ])
+          ),
+        },
+        person: {
+          findFirst: vi.fn(() =>
+            Promise.resolve({
+              id: "person-1",
+              organisation_id: "00000000-0000-4000-8000-000000000001",
+            })
+          ),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/account-companies")
+  >("../../../../../packages/database/src/queries/account-companies")),
+
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/organisations")
+  >("../../../../../packages/database/src/queries/organisations")),
+}));
 vi.mock("@repo/auth/helpers", () => ({
   requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
 }));
@@ -20,8 +76,13 @@ vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));
 vi.mock("@repo/availability", () => ({
-  cancelRun: mocks.cancelRun,
   exportFailedRecordsCsv: mocks.exportFailedRecordsCsv,
+  prepareSyncCancellation: vi.fn(async (input: unknown) => ({
+    ok: true,
+    value: input,
+  })),
+  recordSyncCancellation: vi.fn(async () => ({ ok: true, value: undefined })),
+  sendPreparedSyncCancellation: mocks.cancelRun,
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -50,6 +111,7 @@ describe("sync server actions", () => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({
       getToken: mocks.getToken,
+      orgId: clerkOrgId,
       orgRole: "org:admin",
     });
     mocks.currentUser.mockResolvedValue({ id: userId });
@@ -109,6 +171,7 @@ describe("sync server actions", () => {
   it("rejects non-admin roles", async () => {
     mocks.auth.mockResolvedValue({
       getToken: mocks.getToken,
+      orgId: clerkOrgId,
       orgRole: "org:manager",
     });
 

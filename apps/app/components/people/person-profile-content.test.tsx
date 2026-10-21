@@ -55,6 +55,8 @@ const profile: PersonProfile = {
   header: {
     archivedAt: null,
     avatarUrl: null,
+    companyId: "00000000-0000-4000-8000-000000000001",
+    companyName: "Company A",
     email: "jane@example.com",
     firstName: "Jane",
     id: "00000000-0000-4000-8000-000000000003",

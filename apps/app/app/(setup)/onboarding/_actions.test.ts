@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   database: {
     auditEvent: { create: vi.fn() },
+    organisation: { findFirst: vi.fn() },
     person: { findFirst: vi.fn(), updateMany: vi.fn() },
   },
   ensureCurrentUserPerson: vi.fn(),
   finishWizard: vi.fn(),
   getActiveOrgContext: vi.fn(),
   inviteMember: vi.fn(),
+  lockPlanLimitMutations: vi.fn(() => Promise.resolve()),
   revalidatePath: vi.fn(),
   setXeroSetupSkipped: vi.fn(),
   updateOrganisationAction: vi.fn(),
@@ -36,9 +38,27 @@ vi.mock("@repo/database/queries/onboarding", () => ({
   setXeroSetupSkipped: mocks.setXeroSetupSkipped,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => mocks.database),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  lockPlanLimitMutations: mocks.lockPlanLimitMutations,
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("@/app/actions/settings/invite-member", () => ({
   inviteMember: mocks.inviteMember,
 }));
@@ -82,7 +102,12 @@ const actor = {
 describe("onboarding actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
+    mocks.database.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      id: organisationId,
+      name: "Company A",
+    });
     mocks.currentUser.mockResolvedValue({ id: "user_admin" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
@@ -132,7 +157,11 @@ describe("onboarding actions", () => {
       organisationId,
       timezone: "Australia/Brisbane",
     });
-    expect(mocks.advanceWizard).toHaveBeenCalledWith(actor, "details");
+    expect(mocks.advanceWizard).toHaveBeenCalledWith(
+      actor,
+      "details",
+      expect.any(Object)
+    );
     expect(mocks.captureOnboardingEvent).toHaveBeenCalledWith({
       distinctId: "user_admin",
       event: "Onboarding Step Completed",
@@ -176,9 +205,14 @@ describe("onboarding actions", () => {
     expect(mocks.setXeroSetupSkipped).toHaveBeenCalledWith(
       "org_1",
       organisationId,
-      true
+      true,
+      expect.any(Object)
     );
-    expect(mocks.advanceWizard).toHaveBeenCalledWith(actor, "xero");
+    expect(mocks.advanceWizard).toHaveBeenCalledWith(
+      actor,
+      "xero",
+      expect.any(Object)
+    );
   });
 
   it("passes service refusals through without recording a step", async () => {
@@ -204,7 +238,11 @@ describe("onboarding actions", () => {
       ok: true,
       value: { redirectTo: "/calendar" },
     });
-    expect(mocks.finishWizard).toHaveBeenCalledWith(actor, { force: true });
+    expect(mocks.finishWizard).toHaveBeenCalledWith(
+      actor,
+      { force: true },
+      expect.any(Object)
+    );
     expect(mocks.captureOnboardingEvent).toHaveBeenCalledWith({
       distinctId: "user_admin",
       event: "Onboarding Completed",
@@ -282,7 +320,8 @@ describe("onboarding actions", () => {
           clerkUserId: "user_admin",
           displayName: "Ava Lee",
           email: "ava@example.test",
-        })
+        }),
+        expect.any(Object)
       );
     });
 
@@ -297,14 +336,17 @@ describe("onboarding actions", () => {
         lastName: "Ng",
         organisationId,
       });
-      expect(mocks.createManualPerson).toHaveBeenCalledWith({
-        clerkOrgId: "org_1",
-        email: "ben@example.test",
-        employmentType: "employee",
-        firstName: "Ben",
-        lastName: "Ng",
-        organisationId,
-      });
+      expect(mocks.createManualPerson).toHaveBeenCalledWith(
+        {
+          clerkOrgId: "org_1",
+          email: "ben@example.test",
+          employmentType: "employee",
+          firstName: "Ben",
+          lastName: "Ng",
+          organisationId,
+        },
+        expect.any(Object)
+      );
       expect(
         await addPersonAction({
           email: "not-an-email",

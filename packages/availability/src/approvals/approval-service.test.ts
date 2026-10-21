@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -46,12 +48,23 @@ const mocks = vi.hoisted(() => ({
   xeroTenantFindFirst: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   fenceSubmitRecoverySideEffectClaim: vi.fn(async () => true),
   getSubmitOperation: mocks.getOperation,
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   lockActiveScopedXeroConnection: vi.fn(async () => true),
+  lockPlanLimitMutations: vi.fn(async () => undefined),
   markSubmitCompleted: mocks.markSubmitCompleted,
   markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
   markSubmitDispatchStarted: mocks.markSubmitDispatchStarted,
@@ -59,37 +72,47 @@ vi.mock("@repo/database", () => ({
   markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
   prepareAndClaimSubmitOperation: mocks.prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects: vi.fn(),
+  resolveAccountCompanies: async () => [
+    {
+      country_code: "AU",
+      id: input.organisationId,
+      name: "Acme Org",
+      timezone: "Australia/Brisbane",
+    },
+  ],
   scopedTo: mocks.scopedTo,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
-      $transaction: async (callback: (tx: unknown) => unknown) =>
-        await callback({
-          auditEvent: {
-            create: mocks.auditCreate,
-            findFirst: vi.fn(async () => null),
-          },
-          availabilityRecord: {
-            updateMany: (mutation: {
-              data: { xero_write_claimed_at?: Date | null };
-            }) =>
-              mutation.data.xero_write_claimed_at
-                ? mocks.availabilityClaimUpdateMany(mutation)
-                : mocks.availabilityUpdateMany(mutation),
-          },
-        }),
+}));
+function buildTestDatabase() {
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       auditEvent: {
-        create: mocks.auditCreate,
-        findFirst: vi.fn(async () => null),
-        findMany: mocks.auditCreate,
+        ...{
+          create: mocks.auditCreate,
+          findFirst: vi.fn(async () => null),
+          findMany: mocks.auditCreate,
+        },
+        ...{
+          create: mocks.auditCreate,
+          findFirst: vi.fn(async () => null),
+        },
       },
       availabilityRecord: {
-        count: mocks.availabilityCount,
-        findFirst: mocks.availabilityFindFirst,
-        findMany: mocks.availabilityFindMany,
-        updateMany: mocks.availabilityClaimUpdateMany,
+        ...{
+          count: mocks.availabilityCount,
+          findFirst: mocks.availabilityFindFirst,
+          findMany: mocks.availabilityFindMany,
+          updateMany: mocks.availabilityClaimUpdateMany,
+        },
+        ...{
+          updateMany: (mutation: {
+            data: { xero_write_claimed_at?: Date | null };
+          }) =>
+            mutation.data.xero_write_claimed_at
+              ? mocks.availabilityClaimUpdateMany(mutation)
+              : mocks.availabilityUpdateMany(mutation),
+        },
       },
       leaveBalance: {
         findFirst: mocks.leaveBalanceFindFirst,
@@ -101,54 +124,9 @@ vi.mock("@repo/database", () => ({
         findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
       },
       xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: async (callback: (tx: unknown) => unknown) =>
-          await callback({
-            auditEvent: {
-              create: mocks.auditCreate,
-              findFirst: vi.fn(async () => null),
-            },
-            availabilityRecord: {
-              updateMany: (mutation: {
-                data: { xero_write_claimed_at?: Date | null };
-              }) =>
-                mutation.data.xero_write_claimed_at
-                  ? mocks.availabilityClaimUpdateMany(mutation)
-                  : mocks.availabilityUpdateMany(mutation),
-            },
-          }),
-        auditEvent: {
-          create: mocks.auditCreate,
-          findFirst: vi.fn(async () => null),
-          findMany: mocks.auditCreate,
-        },
-        availabilityRecord: {
-          count: mocks.availabilityCount,
-          findFirst: mocks.availabilityFindFirst,
-          findMany: mocks.availabilityFindMany,
-          updateMany: mocks.availabilityClaimUpdateMany,
-        },
-        leaveBalance: {
-          findFirst: mocks.leaveBalanceFindFirst,
-          findMany: mocks.leaveBalanceFindMany,
-        },
-        location: { findMany: mocks.locationFindMany },
-        organisation: { findFirst: mocks.organisationFindFirst },
-        person: {
-          findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
-        },
-        xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,
   computeWorkingDaysFromReferenceData:
@@ -170,7 +148,8 @@ vi.mock("../settings/manager-scope", () => ({
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
-  publishPersistedNotification: vi.fn(),
+  prepareNotificationPublication: vi.fn(async () => null),
+  sendPreparedNotificationPublication: vi.fn(),
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
@@ -198,6 +177,7 @@ const mockPort = {
 const {
   approve,
   decline,
+  dispatchApprovalReconciliation,
   dispatchXeroLeaveSync,
   getApprovalDetail,
   getApprovalSummaryCounts,
@@ -232,6 +212,7 @@ const record = {
   failed_action: null,
   id: input.recordId,
   notes_internal: "Family event",
+  organisation: { id: input.organisationId, name: "Acme Org" },
   organisation_id: input.organisationId,
   person: {
     clerk_user_id: "employee_1",
@@ -272,6 +253,7 @@ function deferred<T>() {
 describe("approval-service", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
       actorUserId: "manager_1",
       attemptGeneration: 1,
@@ -375,7 +357,10 @@ describe("approval-service", () => {
         xero_write_claimed_at: new Date(0),
       };
       mocks.availabilityFindMany.mockResolvedValue([pendingRecord]);
-      const listed = await listForApprover(input);
+      const listed = await withTestTenantResult(
+        tenantTestAccount(input),
+        (db) => listForApprover(input, db)
+      );
       expect(listed).toMatchObject({
         ok: true,
         value: { items: [{ availableActions: [action] }] },
@@ -452,7 +437,11 @@ describe("approval-service", () => {
         xero_write_claimed_at: operation.claim,
       },
     ]);
-    expect(await listForApprover(input)).toMatchObject({
+    expect(
+      await withTestTenantResult(tenantTestAccount(input), (db) =>
+        listForApprover(input, db)
+      )
+    ).toMatchObject({
       ok: true,
       value: { items: [{ availableActions: ["view_only"] }] },
     });
@@ -477,7 +466,8 @@ describe("approval-service", () => {
     );
     expect(mocks.markSubmitProviderAccepted).toHaveBeenCalledWith(
       expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
-      record.source_remote_id
+      record.source_remote_id,
+      expect.any(Object)
     );
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
   });
@@ -719,13 +709,32 @@ describe("approval-service", () => {
     expect(mocks.dispatchSyncEvent).not.toHaveBeenCalled();
   });
   it.each([
+    ["reconciliation", dispatchApprovalReconciliation],
+    ["leave records", dispatchXeroLeaveSync],
+  ] as const)(
+    "preserves the %s failed-send Result",
+    async (_name, dispatch) => {
+      mocks.dispatchSyncEvent.mockResolvedValueOnce({
+        error: { code: "dispatch_failed", message: "Queue unavailable" },
+        ok: false,
+      });
+      await expect(dispatch({ ...input, role: "admin" })).resolves.toEqual({
+        error: { code: "dispatch_failed", message: "Queue unavailable" },
+        ok: false,
+      });
+    }
+  );
+  it.each([
     {
       configure: () =>
         mocks.availabilityFindMany.mockRejectedValueOnce(new Error("list")),
       message: "Failed to load leave approvals.",
       operation: "list_for_approver",
       recordId: undefined,
-      run: () => listForApprover(input),
+      run: () =>
+        withTestTenantResult(tenantTestAccount(input), (db) =>
+          listForApprover(input, db)
+        ),
     },
     {
       configure: () =>
@@ -733,7 +742,10 @@ describe("approval-service", () => {
       message: "Failed to load this approval.",
       operation: "get_approval_detail",
       recordId: input.recordId,
-      run: () => getApprovalDetail(input),
+      run: () =>
+        withTestTenantResult(tenantTestAccount(input), (db) =>
+          getApprovalDetail(input, db)
+        ),
     },
     {
       configure: () =>
@@ -741,7 +753,10 @@ describe("approval-service", () => {
       message: "Failed to load approval summary.",
       operation: "get_approval_summary_counts",
       recordId: undefined,
-      run: () => getApprovalSummaryCounts(input),
+      run: () =>
+        withTestTenantResult(tenantTestAccount(input), (db) =>
+          getApprovalSummaryCounts(input, db)
+        ),
     },
     {
       configure: () =>
@@ -758,7 +773,17 @@ describe("approval-service", () => {
       operation: "request_more_info",
       recordId: input.recordId,
       run: () =>
-        requestMoreInfo({ ...input, question: "Please clarify this leave" }),
+        withTestTenantResult(
+          tenantTestAccount({
+            ...input,
+            question: "Please clarify this leave",
+          }),
+          (db) =>
+            requestMoreInfo(
+              { ...input, question: "Please clarify this leave" },
+              db
+            )
+        ),
     },
     {
       configure: () =>
@@ -769,25 +794,30 @@ describe("approval-service", () => {
       run: () => revertApprovalAttempt(input),
     },
   ])(
-    "logs $operation catch failures with unchanged public results",
+    "handles $operation SQL failures at its owning boundary",
     async (testCase) => {
       testCase.configure();
-      const result = await testCase.run();
-      expect(result).toMatchObject({
-        error: { code: "unknown_error", message: testCase.message },
-        ok: false,
-      });
-      expect(mocks.logError).toHaveBeenCalledOnce();
-      expect(mocks.logError).toHaveBeenCalledWith(
-        "Unexpected approval service failure",
-        expect.objectContaining({
-          clerkOrgId: input.clerkOrgId,
-          operation: testCase.operation,
-          organisationId: input.organisationId,
-          ...(testCase.recordId ? { recordId: testCase.recordId } : {}),
-          error: expect.any(Error),
-        })
-      );
+      const messages: Record<string, string> = {
+        get_approval_detail: "detail",
+        get_approval_summary_counts: "summary",
+        list_for_approver: "list",
+        request_more_info: "info",
+      };
+      if (
+        testCase.operation === "retry_decline_preflight" ||
+        testCase.operation === "revert_approval_attempt"
+      ) {
+        expect(await testCase.run()).toMatchObject({
+          error: { code: "unknown_error", message: testCase.message },
+          ok: false,
+        });
+        expect(mocks.logError).toHaveBeenCalledOnce();
+      } else {
+        await expect(testCase.run()).rejects.toThrow(
+          messages[testCase.operation]
+        );
+        expect(mocks.logError).not.toHaveBeenCalled();
+      }
     }
   );
   it.each([
@@ -937,8 +967,8 @@ describe("approval-service", () => {
         recipientUserId: "employee_1",
         type: "leave_approved",
       }),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -956,10 +986,20 @@ describe("approval-service", () => {
     [
       "request more information",
       () =>
-        requestMoreInfo({
-          ...input,
-          question: "Could you clarify this leave?",
-        }),
+        withTestTenantResult(
+          tenantTestAccount({
+            ...input,
+            question: "Could you clarify this leave?",
+          }),
+          (db) =>
+            requestMoreInfo(
+              {
+                ...input,
+                question: "Could you clarify this leave?",
+              },
+              db
+            )
+        ),
     ],
     ["revert an approval attempt", () => revertApprovalAttempt(input)],
   ])("does not let a manager %s their own leave", async (_action, command) => {
@@ -975,7 +1015,8 @@ describe("approval-service", () => {
       ok: false,
     });
     expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
-      expect.objectContaining({ excludeSelf: true })
+      expect.objectContaining({ excludeSelf: true }),
+      expect.any(Object)
     );
   });
   it("lets a manager approve direct-report leave using a self-excluding scope", async () => {
@@ -989,7 +1030,8 @@ describe("approval-service", () => {
     const result = await approve(input, mockPort);
     expect(result.ok).toBe(true);
     expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
-      expect.objectContaining({ excludeSelf: true })
+      expect.objectContaining({ excludeSelf: true }),
+      expect.any(Object)
     );
   });
   it("lets an admin approve their own leave", async () => {
@@ -1034,12 +1076,13 @@ describe("approval-service", () => {
         recipientUserId: "employee_1",
         type: "leave_approved",
       }),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
   });
   it("keeps a declined transition when notification dispatch fails", async () => {
     mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
       .mockResolvedValueOnce(record)
       .mockResolvedValueOnce({ ...record, approval_status: "declined" });
     mocks.declineLeaveApplicationForRegion.mockResolvedValue({
@@ -1067,8 +1110,8 @@ describe("approval-service", () => {
         recipientUserId: "employee_1",
         type: "leave_declined",
       }),
-      expect.anything(),
-      { publishRealtime: false }
+      { publishRealtime: false },
+      expect.anything()
     );
   });
   it("persists failed approve without setting approver fields", async () => {
@@ -1177,6 +1220,7 @@ describe("approval-service", () => {
   it("decline failure preserves the reason for retry", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(record)
       .mockResolvedValueOnce({
         ...record,
         approval_note: "Too much overlap",
@@ -1247,7 +1291,7 @@ describe("approval-service", () => {
     expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
   it("rejects decline when the record is not submitted", async () => {
-    mocks.availabilityFindFirst.mockResolvedValueOnce({
+    mocks.availabilityFindFirst.mockResolvedValue({
       ...record,
       approval_status: "declined",
     });
@@ -1293,10 +1337,20 @@ describe("approval-service", () => {
       ...record,
       approval_status: "approved",
     });
-    const result = await requestMoreInfo({
-      ...input,
-      question: "Can you add more context?",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        question: "Can you add more context?",
+      }),
+      (db) =>
+        requestMoreInfo(
+          {
+            ...input,
+            question: "Can you add more context?",
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_info_request");
@@ -1398,12 +1452,22 @@ describe("approval-service", () => {
   });
   it("lists only direct reports for managers", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+    expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: input.clerkOrgId,
@@ -1416,8 +1480,8 @@ describe("approval-service", () => {
       expect.objectContaining({
         actingPersonId: input.actingPersonId,
         clerkOrgId: input.clerkOrgId,
-        organisationId: input.organisationId,
-      })
+      }),
+      expect.any(Object)
     );
   });
   it("preloads approver list durations and balances without per-row reference queries", async () => {
@@ -1467,10 +1531,20 @@ describe("approval-service", () => {
         updated_at: new Date("2026-04-02T00:00:00.000Z"),
       },
     ]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1545,10 +1619,20 @@ describe("approval-service", () => {
         updated_at: new Date("2026-04-02T00:00:00.000Z"),
       },
     ]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1568,11 +1652,20 @@ describe("approval-service", () => {
   });
   it("includes declined and xero_sync_failed in the default filter when showDeclinedOnApprovals is true", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+    expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
           OR: expect.arrayContaining([
@@ -1614,11 +1707,20 @@ describe("approval-service", () => {
       },
     });
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+    expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
           OR: expect.arrayContaining([
@@ -1668,7 +1770,12 @@ describe("approval-service", () => {
         expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
       }
     );
-    it("does not allow a legacy false setting to bypass reason validation", async () => {
+    it("allows an empty reason when the request company makes it optional", async () => {
+      mocks.declineLeaveApplicationForRegion.mockResolvedValue({
+        ok: true,
+        value: undefined,
+      });
+
       mocks.getSettings.mockResolvedValueOnce({
         ok: true,
         value: {
@@ -1686,19 +1793,22 @@ describe("approval-service", () => {
         },
       });
       const result = await decline({ ...input, reason: "" }, mockPort);
-      expect(result).toMatchObject({
-        error: { code: "validation_error" },
-        ok: false,
-      });
-      expect(mocks.getSettings).not.toHaveBeenCalled();
-      expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
-      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(result.ok).toBe(true);
+      expect(mocks.getSettings).toHaveBeenCalledWith(
+        {
+          clerkOrgId: input.clerkOrgId,
+          organisationId: record.organisation_id,
+        },
+        expect.any(Object)
+      );
+      expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledOnce();
     });
     it.each([
       ["exactly 3 characters", "abc"],
       ["exactly 1,000 characters", "a".repeat(1000)],
     ])("accepts a reason with %s", async (_label, reason) => {
       mocks.availabilityFindFirst
+        .mockResolvedValueOnce(record)
         .mockResolvedValueOnce(record)
         .mockResolvedValueOnce({ ...record, approval_status: "declined" });
       mocks.declineLeaveApplicationForRegion.mockResolvedValueOnce({
@@ -1713,7 +1823,7 @@ describe("approval-service", () => {
     });
     it.each([
       [
-        "a legacy false setting",
+        "an optional company policy",
         {
           ok: true,
           value: {
@@ -1736,10 +1846,11 @@ describe("approval-service", () => {
         { error: { code: "unknown_error", message: "Failed" }, ok: false },
       ],
     ] as const)(
-      "accepts a valid reason with %s",
+      "honours a valid reason with %s",
       async (_label, settingsResult) => {
         mocks.getSettings.mockResolvedValueOnce(settingsResult);
         mocks.availabilityFindFirst
+          .mockResolvedValueOnce(record)
           .mockResolvedValueOnce(record)
           .mockResolvedValueOnce({ ...record, approval_status: "declined" });
         mocks.declineLeaveApplicationForRegion.mockResolvedValueOnce({
@@ -1750,8 +1861,14 @@ describe("approval-service", () => {
           { ...input, reason: "Valid reason" },
           mockPort
         );
-        expect(result.ok).toBe(true);
-        expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledOnce();
+        expect(result.ok).toBe(settingsResult.ok);
+        if (!settingsResult.ok) {
+          expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+          expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
+        }
+        if (settingsResult.ok) {
+          expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledOnce();
+        }
       }
     );
     it("omits declined records from default list filter when getSettings fails", async () => {
@@ -1760,11 +1877,20 @@ describe("approval-service", () => {
         ok: false,
       });
       mocks.availabilityFindMany.mockResolvedValue([record]);
-      const result = await listForApprover({
-        ...input,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...input,
+        }),
+        (db) =>
+          listForApprover(
+            {
+              ...input,
+            },
+            db
+          )
+      );
       expect(result.ok).toBe(true);
-      expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect(companyApprovalQuery()).toMatchObject(
         expect.objectContaining({
           where: expect.objectContaining({
             OR: expect.arrayContaining([
@@ -1787,12 +1913,22 @@ describe("approval-service", () => {
   });
   it("passes explicit status filter through unchanged", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+    expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
           approval_status: {
@@ -1804,10 +1940,20 @@ describe("approval-service", () => {
   });
   it("does not select audit blobs source_payload_json or xero_write_error_raw", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     const select = mocks.availabilityFindMany.mock.calls[0]?.[0]
       ?.select as Record<string, unknown>;
@@ -1816,10 +1962,20 @@ describe("approval-service", () => {
   });
   it("selects the plain-language xero_write_error column", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     const select = mocks.availabilityFindMany.mock.calls[0]?.[0]
       ?.select as Record<string, unknown>;
@@ -1827,12 +1983,22 @@ describe("approval-service", () => {
   });
   it("requests take as pageSize plus one", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+    expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({ take: 51 })
     );
   });
@@ -1851,10 +2017,20 @@ describe("approval-service", () => {
     });
     mocks.loadHolidaysForYears.mockResolvedValue(new Map());
     mocks.leaveBalanceFindMany.mockResolvedValue([]);
-    const result = await listForApprover({
-      ...input,
-      pageSize: 50,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        pageSize: 50,
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            pageSize: 50,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1865,11 +2041,22 @@ describe("approval-service", () => {
   });
   it("returns null nextCursor when fewer results than page size", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-      pageSize: 50,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+        pageSize: 50,
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+            pageSize: 50,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1879,13 +2066,22 @@ describe("approval-service", () => {
   });
   it("does not hide actionable submitted records with old ends_at", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    const where = mocks.availabilityFindMany.mock.calls[0]?.[0]
-      ?.where as Record<string, unknown>;
+    const where = companyApprovalQuery().where as Record<string, unknown>;
     expect(where).not.toHaveProperty("ends_at");
     expect(where).toMatchObject({
       approval_status: { in: ["submitted"] },
@@ -1895,9 +2091,12 @@ describe("approval-service", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-01T00:00:00.000Z"));
     mocks.availabilityFindMany.mockResolvedValue([]);
-    const result = await listForApprover({ ...input });
+    const result = await withTestTenantResult(
+      tenantTestAccount({ ...input }),
+      (db) => listForApprover({ ...input }, db)
+    );
     expect(result.ok).toBe(true);
-    const where = mocks.availabilityFindMany.mock.calls[0]?.[0]?.where as {
+    const where = companyApprovalQuery().where as {
       OR?: Record<string, unknown>[];
     };
     expect(where.OR).toBeDefined();
@@ -1914,13 +2113,22 @@ describe("approval-service", () => {
   it("does not window terminal records when caller supplies explicit dateFrom", async () => {
     const dateFrom = new Date("2024-01-01T00:00:00.000Z");
     mocks.availabilityFindMany.mockResolvedValue([]);
-    const result = await listForApprover({
-      ...input,
-      filters: { dateFrom, status: ["approved"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { dateFrom, status: ["approved"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { dateFrom, status: ["approved"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    const where = mocks.availabilityFindMany.mock.calls[0]?.[0]
-      ?.where as Record<string, unknown>;
+    const where = companyApprovalQuery().where as Record<string, unknown>;
     expect(where).toMatchObject({
       approval_status: { in: ["approved"] },
       ends_at: { gte: dateFrom },
@@ -1929,12 +2137,22 @@ describe("approval-service", () => {
   });
   it("keeps clerk_org_id and organisation_id in the where clause", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-    const result = await listForApprover({
-      ...input,
-      filters: { status: ["submitted"] },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...input,
+        filters: { status: ["submitted"] },
+      }),
+      (db) =>
+        listForApprover(
+          {
+            ...input,
+            filters: { status: ["submitted"] },
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+    expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: input.clerkOrgId,
@@ -2004,3 +2222,21 @@ describe("undispatched approval recovery", () => {
     }
   );
 });
+
+function companyApprovalQuery() {
+  const query = mocks.availabilityFindMany.mock.calls.at(-1)?.[0];
+  if (!query) {
+    throw new Error("Expected approval query");
+  }
+  expect(query.where.clerk_org_id).toBe(input.clerkOrgId);
+  expect(query.where.organisation_id).toEqual({ in: [input.organisationId] });
+  const { OR: branches, ...accountPredicate } = query.where;
+  const branch = branches.find(
+    (candidate: { organisation_id: string }) =>
+      candidate.organisation_id === input.organisationId
+  );
+  if (!branch) {
+    throw new Error("Expected owned company policy branch");
+  }
+  return { ...query, where: { ...accountPredicate, ...branch } };
+}

@@ -1,8 +1,16 @@
+import { TENANT_READ_TRANSACTION_OPTIONS } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { type AppError, appError, type Result } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import {
+  afterTenantCommit,
+  assertTenantDb,
+  scopedQuery,
+  type TenantDb,
+  withTenantResult,
+} from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import { log } from "@repo/observability/log";
@@ -191,28 +199,36 @@ const mapRecord = (record: {
   workingLocation: record.working_location,
 });
 
-export const listAvailabilityRecords = async (
+export async function listAvailabilityRecords(
   tenant: TenantContext,
-  range?: { startsBefore?: Date; endsAfter?: Date; personId?: string }
-): Promise<AvailabilityRecordView[]> => {
-  const records = await tenantDatabase(
-    tenant.clerkOrgId
-  ).availabilityRecord.findMany({
-    include: { person: true },
-    orderBy: [{ starts_at: "asc" }, { title: "asc" }],
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      ...(range?.personId ? { person_id: range.personId } : {}),
-      ...(range?.startsBefore
-        ? { starts_at: { lte: range.startsBefore } }
-        : {}),
-      ...(range?.endsAfter ? { ends_at: { gte: range.endsAfter } } : {}),
-    },
-  });
+  range:
+    | { startsBefore?: Date; endsAfter?: Date; personId?: string }
+    | undefined,
+  db: TenantDb
+): Promise<AvailabilityRecordView[]> {
+  assertTenantDb(db, tenant.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof listAvailabilityRecords> => {
+    const records = await client.availabilityRecord.findMany({
+      include: { person: true },
+      orderBy: [{ starts_at: "asc" }, { title: "asc" }],
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        ...(range?.personId ? { person_id: range.personId } : {}),
+        ...(range?.startsBefore
+          ? { starts_at: { lte: range.startsBefore } }
+          : {}),
+        ...(range?.endsAfter ? { ends_at: { gte: range.endsAfter } } : {}),
+      },
+    });
 
-  return records.map(mapRecord);
-};
+    return records.map(mapRecord);
+  };
+  assertTenantDb(db, tenant.clerkOrgId);
+  return await run(db);
+}
 
 const DUPLICATE_MANUAL_MESSAGE =
   "A matching manual availability record already exists.";
@@ -224,246 +240,173 @@ const isUniqueConflict = (error: unknown): boolean =>
   error instanceof Prisma.PrismaClientKnownRequestError &&
   error.code === "P2002";
 
-export const createManualAvailability = async (
+export async function createManualAvailability(
   tenant: TenantContext,
   input: unknown,
-  actor: ManualAvailabilityActor
-): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> => {
-  const parsed = ManualAvailabilityInputSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      error: appError(
-        "bad_request",
-        parsed.error.issues[0]?.message ?? "Invalid availability record"
-      ),
-      ok: false,
-    };
-  }
+  actor: ManualAvailabilityActor,
+  db: TenantDb
+): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> {
+  assertTenantDb(db, tenant.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof createManualAvailability> => {
+    const parsed = ManualAvailabilityInputSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        error: appError(
+          "bad_request",
+          parsed.error.issues[0]?.message ?? "Invalid availability record"
+        ),
+        ok: false,
+      };
+    }
 
-  const person = await tenantDatabase(tenant.clerkOrgId).person.findFirst({
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      id: parsed.data.personId,
-    },
-  });
-
-  if (!person) {
-    return { error: appError("not_found", "Person not found"), ok: false };
-  }
-
-  const authorisation = await authoriseManualAvailabilityActor(
-    tenant,
-    actor,
-    person
-  );
-  if (!authorisation.ok) {
-    return authorisation;
-  }
-
-  const duplicate = await tenantDatabase(
-    tenant.clerkOrgId
-  ).availabilityRecord.findFirst({
-    select: { id: true },
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      ends_at: parsed.data.endsAt,
-      person_id: parsed.data.personId,
-      record_type: parsed.data.recordType,
-      source_remote_id: null,
-      source_type: "manual",
-      starts_at: parsed.data.startsAt,
-    },
-  });
-
-  if (duplicate) {
-    return {
-      error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
-      ok: false,
-    };
-  }
-
-  const id = randomUUID();
-  try {
-    const record = await tenantDatabase(
-      tenant.clerkOrgId
-    ).availabilityRecord.create({
-      data: {
-        all_day: parsed.data.allDay,
-        approval_status: "approved",
-        approved_at: new Date(),
-        clerk_org_id: tenant.clerkOrgId,
-        contactability: parsed.data.contactability,
-        created_by_user_id: actor.userId,
-        derived_uid_key: deriveAvailabilityUidKey({
-          clerkOrgId: tenant.clerkOrgId,
-          endsAt: parsed.data.endsAt,
-          organisationId: tenant.organisationId,
-          personId: parsed.data.personId,
-          recordType: parsed.data.recordType,
-          sourceType: "manual",
-          stableSourceKey: id,
-          startsAt: parsed.data.startsAt,
-        }),
-        ends_at: parsed.data.endsAt,
-        id,
-        include_in_feed: parsed.data.includeInFeed,
-        notes_internal: parsed.data.notesInternal,
-        organisation_id: tenant.organisationId,
-        person_id: parsed.data.personId,
-        preferred_contact_method: parsed.data.preferredContactMethod,
-        privacy_mode: parsed.data.privacyMode,
-        record_type: parsed.data.recordType,
-        source_type: "manual",
-        starts_at: parsed.data.startsAt,
-        title: parsed.data.title,
-        updated_by_user_id: actor.userId,
-        working_location: parsed.data.workingLocation,
+    const person = await client.person.findFirst({
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        id: parsed.data.personId,
       },
-      include: { person: true },
     });
 
-    await materialisePublication(tenant, record.id);
+    if (!person) {
+      return { error: appError("not_found", "Person not found"), ok: false };
+    }
 
-    return { ok: true, value: mapRecord(record) };
-  } catch (error) {
-    if (isUniqueConflict(error)) {
+    const authorisation = await authoriseManualAvailabilityActor(
+      tenant,
+      actor,
+      person,
+      client
+    );
+    if (!authorisation.ok) {
+      return authorisation;
+    }
+
+    const duplicate = await client.availabilityRecord.findFirst({
+      select: { id: true },
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        ends_at: parsed.data.endsAt,
+        person_id: parsed.data.personId,
+        record_type: parsed.data.recordType,
+        source_remote_id: null,
+        source_type: "manual",
+        starts_at: parsed.data.startsAt,
+      },
+    });
+
+    if (duplicate) {
       return {
         error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
         ok: false,
       };
     }
-    throw error;
-  }
-};
 
-export const updateManualAvailability = async (
+    const id = randomUUID();
+    try {
+      const record = await client.availabilityRecord.create({
+        data: {
+          all_day: parsed.data.allDay,
+          approval_status: "approved",
+          approved_at: new Date(),
+          clerk_org_id: tenant.clerkOrgId,
+          contactability: parsed.data.contactability,
+          created_by_user_id: actor.userId,
+          derived_uid_key: deriveAvailabilityUidKey({
+            clerkOrgId: tenant.clerkOrgId,
+            endsAt: parsed.data.endsAt,
+            organisationId: tenant.organisationId,
+            personId: parsed.data.personId,
+            recordType: parsed.data.recordType,
+            sourceType: "manual",
+            stableSourceKey: id,
+            startsAt: parsed.data.startsAt,
+          }),
+          ends_at: parsed.data.endsAt,
+          id,
+          include_in_feed: parsed.data.includeInFeed,
+          notes_internal: parsed.data.notesInternal,
+          organisation_id: tenant.organisationId,
+          person_id: parsed.data.personId,
+          preferred_contact_method: parsed.data.preferredContactMethod,
+          privacy_mode: parsed.data.privacyMode,
+          record_type: parsed.data.recordType,
+          source_type: "manual",
+          starts_at: parsed.data.startsAt,
+          title: parsed.data.title,
+          updated_by_user_id: actor.userId,
+          working_location: parsed.data.workingLocation,
+        },
+        include: { person: true },
+      });
+
+      afterTenantCommit(client, async () => {
+        await materialisePublication(tenant, record.id);
+      });
+
+      return { ok: true, value: mapRecord(record) };
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        return {
+          error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
+          ok: false,
+        };
+      }
+      throw error;
+    }
+  };
+  return await (async () => {
+    assertTenantDb(db, tenant.clerkOrgId);
+    return await run(db);
+  })();
+}
+
+export async function updateManualAvailability(
   tenant: TenantContext,
   recordId: string,
   input: unknown,
-  actor: ManualAvailabilityActor
-): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> => {
-  const parsed = ManualAvailabilityPatchSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      error: appError(
-        "bad_request",
-        parsed.error.issues[0]?.message ?? "Invalid availability record"
-      ),
-      ok: false,
-    };
-  }
+  actor: ManualAvailabilityActor,
+  db: TenantDb
+): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> {
+  assertTenantDb(db, tenant.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof updateManualAvailability> => {
+    const parsed = ManualAvailabilityPatchSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        error: appError(
+          "bad_request",
+          parsed.error.issues[0]?.message ?? "Invalid availability record"
+        ),
+        ok: false,
+      };
+    }
 
-  const existing = await tenantDatabase(
-    tenant.clerkOrgId
-  ).availabilityRecord.findFirst({
-    select: {
-      all_day: true,
-      contactability: true,
-      ends_at: true,
-      include_in_feed: true,
-      notes_internal: true,
-      person: {
-        select: {
-          clerk_user_id: true,
-          id: true,
-          manager_person_id: true,
+    const existing = await client.availabilityRecord.findFirst({
+      select: {
+        all_day: true,
+        contactability: true,
+        ends_at: true,
+        include_in_feed: true,
+        notes_internal: true,
+        person: {
+          select: {
+            clerk_user_id: true,
+            id: true,
+            manager_person_id: true,
+          },
         },
+        person_id: true,
+        preferred_contact_method: true,
+        privacy_mode: true,
+        record_type: true,
+        starts_at: true,
+        title: true,
+        working_location: true,
       },
-      person_id: true,
-      preferred_contact_method: true,
-      privacy_mode: true,
-      record_type: true,
-      starts_at: true,
-      title: true,
-      working_location: true,
-    },
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      id: recordId,
-      source_type: "manual",
-    },
-  });
-
-  if (!existing) {
-    return { error: appError("not_found", "Record not found"), ok: false };
-  }
-
-  const authorisation = await authoriseManualAvailabilityActor(
-    tenant,
-    actor,
-    existing.person
-  );
-  if (!authorisation.ok) {
-    return authorisation;
-  }
-
-  if (parsed.data.personId && parsed.data.personId !== existing.person_id) {
-    return {
-      error: appError(
-        "bad_request",
-        "An availability record cannot be reassigned to another person."
-      ),
-      ok: false,
-    };
-  }
-
-  const merged = mergeManualAvailabilityPatch(existing, parsed.data);
-  if (!merged.success) {
-    return {
-      error: appError(
-        "bad_request",
-        merged.error.issues[0]?.message ?? "Invalid availability record"
-      ),
-      ok: false,
-    };
-  }
-
-  const duplicate = await tenantDatabase(
-    tenant.clerkOrgId
-  ).availabilityRecord.findFirst({
-    select: { id: true },
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      ends_at: merged.data.endsAt,
-      id: { not: recordId },
-      person_id: existing.person_id,
-      record_type: merged.data.recordType,
-      source_remote_id: null,
-      source_type: "manual",
-      starts_at: merged.data.startsAt,
-    },
-  });
-
-  if (duplicate) {
-    return {
-      error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
-      ok: false,
-    };
-  }
-
-  try {
-    const record = await tenantDatabase(
-      tenant.clerkOrgId
-    ).availabilityRecord.update({
-      data: {
-        all_day: merged.data.allDay,
-        contactability: merged.data.contactability,
-        ends_at: merged.data.endsAt,
-        include_in_feed: merged.data.includeInFeed,
-        notes_internal: merged.data.notesInternal,
-        preferred_contact_method: merged.data.preferredContactMethod,
-        privacy_mode: merged.data.privacyMode,
-        record_type: merged.data.recordType,
-        starts_at: merged.data.startsAt,
-        title: merged.data.title,
-        updated_by_user_id: actor.userId,
-        working_location: merged.data.workingLocation,
-      },
-      include: { person: true },
       where: {
         ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
         archived_at: null,
@@ -472,81 +415,187 @@ export const updateManualAvailability = async (
       },
     });
 
-    await materialisePublication(tenant, record.id);
+    if (!existing) {
+      return { error: appError("not_found", "Record not found"), ok: false };
+    }
 
-    return { ok: true, value: mapRecord(record) };
-  } catch (error) {
-    if (isUniqueConflict(error)) {
+    const authorisation = await authoriseManualAvailabilityActor(
+      tenant,
+      actor,
+      existing.person,
+      client
+    );
+    if (!authorisation.ok) {
+      return authorisation;
+    }
+
+    if (parsed.data.personId && parsed.data.personId !== existing.person_id) {
+      return {
+        error: appError(
+          "bad_request",
+          "An availability record cannot be reassigned to another person."
+        ),
+        ok: false,
+      };
+    }
+
+    const merged = mergeManualAvailabilityPatch(existing, parsed.data);
+    if (!merged.success) {
+      return {
+        error: appError(
+          "bad_request",
+          merged.error.issues[0]?.message ?? "Invalid availability record"
+        ),
+        ok: false,
+      };
+    }
+
+    const duplicate = await client.availabilityRecord.findFirst({
+      select: { id: true },
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        ends_at: merged.data.endsAt,
+        id: { not: recordId },
+        person_id: existing.person_id,
+        record_type: merged.data.recordType,
+        source_remote_id: null,
+        source_type: "manual",
+        starts_at: merged.data.startsAt,
+      },
+    });
+
+    if (duplicate) {
       return {
         error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
         ok: false,
       };
     }
-    throw error;
-  }
-};
 
-export const archiveManualAvailability = async (
+    try {
+      const record = await client.availabilityRecord.update({
+        data: {
+          all_day: merged.data.allDay,
+          contactability: merged.data.contactability,
+          ends_at: merged.data.endsAt,
+          include_in_feed: merged.data.includeInFeed,
+          notes_internal: merged.data.notesInternal,
+          preferred_contact_method: merged.data.preferredContactMethod,
+          privacy_mode: merged.data.privacyMode,
+          record_type: merged.data.recordType,
+          starts_at: merged.data.startsAt,
+          title: merged.data.title,
+          updated_by_user_id: actor.userId,
+          working_location: merged.data.workingLocation,
+        },
+        include: { person: true },
+        where: {
+          ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+          archived_at: null,
+          id: recordId,
+          source_type: "manual",
+        },
+      });
+
+      afterTenantCommit(client, async () => {
+        await materialisePublication(tenant, record.id);
+      });
+
+      return { ok: true, value: mapRecord(record) };
+    } catch (error) {
+      if (isUniqueConflict(error)) {
+        return {
+          error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
+          ok: false,
+        };
+      }
+      throw error;
+    }
+  };
+  return await (async () => {
+    assertTenantDb(db, tenant.clerkOrgId);
+    return await run(db);
+  })();
+}
+
+export async function archiveManualAvailability(
   tenant: TenantContext,
   recordId: string,
-  actor: ManualAvailabilityActor
-): Promise<Result<void, ManualAvailabilityServiceError>> => {
-  const existing = await tenantDatabase(
-    tenant.clerkOrgId
-  ).availabilityRecord.findFirst({
-    select: {
-      person: {
-        select: {
-          clerk_user_id: true,
-          id: true,
-          manager_person_id: true,
+  actor: ManualAvailabilityActor,
+  db: TenantDb
+): Promise<Result<void, ManualAvailabilityServiceError>> {
+  assertTenantDb(db, tenant.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof archiveManualAvailability> => {
+    const existing = await client.availabilityRecord.findFirst({
+      select: {
+        person: {
+          select: {
+            clerk_user_id: true,
+            id: true,
+            manager_person_id: true,
+          },
         },
       },
-    },
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      id: recordId,
-      source_type: "manual",
-    },
-  });
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        id: recordId,
+        source_type: "manual",
+      },
+    });
 
-  if (!existing) {
-    return { error: appError("not_found", "Record not found"), ok: false };
-  }
+    if (!existing) {
+      return { error: appError("not_found", "Record not found"), ok: false };
+    }
 
-  const authorisation = await authoriseManualAvailabilityActor(
-    tenant,
-    actor,
-    existing.person
-  );
-  if (!authorisation.ok) {
-    return authorisation;
-  }
+    const authorisation = await authoriseManualAvailabilityActor(
+      tenant,
+      actor,
+      existing.person,
+      client
+    );
+    if (!authorisation.ok) {
+      return authorisation;
+    }
 
-  await tenantDatabase(tenant.clerkOrgId).availabilityRecord.update({
-    data: {
-      archived_at: new Date(),
-      publish_status: "archived",
-      updated_by_user_id: actor.userId,
-    },
-    where: { id: recordId },
-  });
+    await client.availabilityRecord.update({
+      data: {
+        archived_at: new Date(),
+        publish_status: "archived",
+        updated_by_user_id: actor.userId,
+      },
+      where: { id: recordId },
+    });
 
-  await materialisePublication(tenant, recordId);
+    afterTenantCommit(client, async () => {
+      await materialisePublication(tenant, recordId);
+    });
 
-  return { ok: true, value: undefined };
-};
+    return { ok: true, value: undefined };
+  };
+  return await (async () => {
+    assertTenantDb(db, tenant.clerkOrgId);
+    return await run(db);
+  })();
+}
 
-async function materialisePublication(
+export async function materialisePublication(
   tenant: TenantContext,
   availabilityRecordId: string
 ): Promise<void> {
-  const result = await materialiseAvailabilityPublication({
+  assertNoTenantTransaction("materialisePublication");
+  const phaseInput1 = {
     availabilityRecordId,
     clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
-  });
+  } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
+  const result = await withTenantResult(
+    phaseInput1.clerkOrgId,
+    (db) => materialiseAvailabilityPublication(phaseInput1, db),
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
   if (!result.ok) {
     // Best-effort: the availability record is already persisted. Log the failed
     // feed projection rather than failing the write; it is corrected on the next
@@ -557,6 +606,7 @@ async function materialisePublication(
       error: result.error.message,
       organisationId: tenant.organisationId,
     });
+    throw new Error(result.error.message);
   }
 }
 
@@ -567,22 +617,26 @@ async function authoriseManualAvailabilityActor(
     clerk_user_id: string | null;
     id: string;
     manager_person_id: string | null;
-  }
+  },
+  db: TenantDb
 ): Promise<Result<void, ManualAvailabilityServiceError>> {
   if (isAdminOrOwner(actor.orgRole)) {
     return { ok: true, value: undefined };
   }
 
-  const actingPerson = await tenantDatabase(tenant.clerkOrgId).person.findFirst(
-    {
-      select: { id: true },
-      where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+  const actingPerson = await db.person.findFirst({
+    select: { id: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: tenant.clerkOrgId,
+      clerk_user_id: actor.userId,
+      organisation: {
         archived_at: null,
-        clerk_user_id: actor.userId,
+        clerk_org_id: tenant.clerkOrgId,
+        is_active: true,
       },
-    }
-  );
+    },
+  });
 
   const isOwner = targetPerson.clerk_user_id === actor.userId;
   const isDirectManager = targetPerson.manager_person_id === actingPerson?.id;

@@ -1,8 +1,9 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, tenantDatabase } from "@repo/database";
+import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
 import { notification_type as notificationTypes } from "@repo/database/generated/enums";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { sendNotificationEmail } from "@repo/email";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
@@ -11,17 +12,6 @@ export type EmailQueueServiceError =
   | { code: "configuration_error"; message: string }
   | { code: "unknown_error"; message: string }
   | { code: "validation_error"; message: string };
-
-export interface EmailQueueDatabase {
-  notificationEmailQueue: Pick<Database["notificationEmailQueue"], "create">;
-}
-
-export interface EmailQueueDrainDatabase {
-  notificationEmailQueue: Pick<
-    Database["notificationEmailQueue"],
-    "findMany" | "update"
-  >;
-}
 
 export interface SendQueuedNotificationEmailsSummary {
   readonly failed: number;
@@ -44,7 +34,7 @@ const QueueSchema = z.object({
 
 export async function enqueueNotificationEmail(
   input: z.input<typeof QueueSchema>,
-  providedClient?: EmailQueueDatabase
+  db: TenantDb
 ): Promise<
   Result<{ queued: boolean; queueId: string }, EmailQueueServiceError>
 > {
@@ -52,13 +42,18 @@ export async function enqueueNotificationEmail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const client = providedClient ?? tenantDatabase(parsed.data.clerkOrgId);
-  if (!isNotificationType(parsed.data.notificationType)) {
-    return validationErrorMessage("Invalid notification type.");
-  }
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof enqueueNotificationEmail> => {
+    if (!isNotificationType(parsed.data.notificationType)) {
+      return validationErrorMessage("Invalid notification type.");
+    }
 
-  try {
-    const unsubscribeUrl = preferencesUrl(parsed.data.notificationType);
+    const unsubscribeUrl = preferencesUrl(
+      parsed.data.notificationType,
+      parsed.data.organisationId
+    );
     const row = await client.notificationEmailQueue.create({
       data: {
         action_url: parsed.data.actionUrl ?? null,
@@ -80,17 +75,19 @@ export async function enqueueNotificationEmail(
       select: { id: true },
     });
     return { ok: true, value: { queued: true, queueId: row.id } };
-  } catch {
-    return unknownError("Failed to queue notification email.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function sendQueuedNotificationEmails(
-  clerkOrgId: string,
-  client: EmailQueueDrainDatabase = tenantDatabase(clerkOrgId)
+  clerkOrgId: string
 ): Promise<
   Result<SendQueuedNotificationEmailsSummary, EmailQueueServiceError>
 > {
+  assertNoTenantTransaction("sendQueuedNotificationEmails");
   if (!hasConfiguredEmailTransport()) {
     return {
       error: {
@@ -102,11 +99,13 @@ export async function sendQueuedNotificationEmails(
   }
 
   try {
-    const rows = await client.notificationEmailQueue.findMany({
-      orderBy: { queued_at: "asc" },
-      take: 50,
-      where: { clerk_org_id: clerkOrgId, status: "queued" },
-    });
+    const rows = await withTenantDb(clerkOrgId, (db) =>
+      db.notificationEmailQueue.findMany({
+        orderBy: { queued_at: "asc" },
+        take: 50,
+        where: { clerk_org_id: clerkOrgId, status: "queued" },
+      })
+    );
     const summary = { failed: 0, processed: rows.length, sent: 0 };
 
     for (const row of rows) {
@@ -121,26 +120,22 @@ export async function sendQueuedNotificationEmails(
         });
 
         if (result.ok) {
-          await client.notificationEmailQueue.update({
-            data: {
-              attempts: { increment: 1 },
-              sent_at: new Date(),
-              status: "sent",
-            },
-            where: { clerk_org_id: clerkOrgId, id: row.id },
-          });
+          await withTenantDb(clerkOrgId, (db) =>
+            db.notificationEmailQueue.update({
+              data: {
+                attempts: { increment: 1 },
+                sent_at: new Date(),
+                status: "sent",
+              },
+              where: { clerk_org_id: clerkOrgId, id: row.id },
+            })
+          );
           summary.sent += 1;
           continue;
         }
 
         summary.failed += 1;
-        await updateFailedEmail(
-          clerkOrgId,
-          row.id,
-          row.attempts,
-          result.error,
-          client
-        );
+        await updateFailedEmail(clerkOrgId, row.id, row.attempts, result.error);
       } catch (error) {
         summary.failed += 1;
         const message =
@@ -151,13 +146,7 @@ export async function sendQueuedNotificationEmails(
           error,
           queueId: row.id,
         });
-        await updateFailedEmail(
-          clerkOrgId,
-          row.id,
-          row.attempts,
-          message,
-          client
-        );
+        await updateFailedEmail(clerkOrgId, row.id, row.attempts, message);
       }
     }
 
@@ -182,25 +171,30 @@ async function updateFailedEmail(
   clerkOrgId: string,
   id: string,
   attempts: number,
-  error: string,
-  client: EmailQueueDrainDatabase
+  error: string
 ): Promise<void> {
   const nextAttempts = attempts + 1;
-  await client.notificationEmailQueue.update({
-    data: {
-      attempts: { increment: 1 },
-      last_error: error,
-      status: nextAttempts >= 5 ? "failed" : "queued",
-    },
-    where: { clerk_org_id: clerkOrgId, id },
-  });
+  await withTenantDb(clerkOrgId, (db) =>
+    db.notificationEmailQueue.update({
+      data: {
+        attempts: { increment: 1 },
+        last_error: error,
+        status: nextAttempts >= 5 ? "failed" : "queued",
+      },
+      where: { clerk_org_id: clerkOrgId, id },
+    })
+  );
 }
 
-export function preferencesUrl(notificationType: string): string {
+export function preferencesUrl(
+  notificationType: string,
+  organisationId: string
+): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const url = new URL("/notifications", baseUrl);
   url.searchParams.set("tab", "preferences");
   url.searchParams.set("focus", notificationType);
+  url.searchParams.set("org", organisationId);
   return url.toString();
 }
 

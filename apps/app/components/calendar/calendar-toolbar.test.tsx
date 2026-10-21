@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   setFilterParams: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/calendar",
   useRouter: () => ({ push: mocks.push }),
   useSearchParams: () => new URLSearchParams("org=org_1"),
 }));

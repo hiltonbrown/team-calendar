@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { icsUidSuffix } from "@repo/seo/branding";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,15 +55,36 @@ const mocks = vi.hoisted(() => {
   };
 });
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   hasUnresolvedSubmitOperation: mocks.hasUnresolvedSubmitOperation,
+  lockPlanLimitMutations: vi.fn(async () => undefined),
+  resolveAccountCompanies: async () => [
+    {
+      country_code: "AU",
+      id: baseInput.organisationId,
+      name: "Acme Org",
+      timezone: "Australia/Brisbane",
+    },
+  ],
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       $transaction: (callback: (tx: unknown) => unknown) =>
         callback({
           auditEvent: { create: mocks.auditCreate },
@@ -71,46 +94,28 @@ vi.mock("@repo/database", () => ({
             updateMany: mocks.availabilityUpdateMany,
           },
         }),
+      auditEvent: { create: mocks.auditCreate },
       availabilityRecord: {
         count: mocks.availabilityCount,
+        create: mocks.availabilityCreate,
+        deleteMany: mocks.availabilityDeleteMany,
         findFirst: mocks.availabilityFindFirst,
         findMany: mocks.availabilityFindMany,
+        updateMany: mocks.availabilityUpdateMany,
       },
       leaveBalance: {
         findFirst: mocks.leaveBalanceFindFirst,
         findMany: mocks.leaveBalanceFindMany,
       },
       person: { findFirst: mocks.personFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: (callback: (tx: unknown) => unknown) =>
-          callback({
-            auditEvent: { create: mocks.auditCreate },
-            availabilityRecord: {
-              create: mocks.availabilityCreate,
-              deleteMany: mocks.availabilityDeleteMany,
-              updateMany: mocks.availabilityUpdateMany,
-            },
-          }),
-        availabilityRecord: {
-          count: mocks.availabilityCount,
-          findFirst: mocks.availabilityFindFirst,
-          findMany: mocks.availabilityFindMany,
-        },
-        leaveBalance: {
-          findFirst: mocks.leaveBalanceFindFirst,
-          findMany: mocks.leaveBalanceFindMany,
-        },
-        person: { findFirst: mocks.personFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
+    },
+  };
+}
+vi.mock("../settings/organisation-settings-service", () => ({
+  getSettings: vi.fn(async () => ({
+    ok: true,
+    value: { defaultPrivacyMode: "named" },
+  })),
 }));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
@@ -219,16 +224,32 @@ describe("plan-service", () => {
   });
   it("pages plans with one exact count and a bounded stable query", async () => {
     mocks.availabilityCount.mockResolvedValue(241);
-    const result = await listTeamRecordsPage({
-      actingOrgRole: "org:admin",
-      clerkOrgId: baseInput.clerkOrgId,
-      filters: {
-        approvalStatus: ["approved"],
-        sourceType: ["manual"],
-      },
-      organisationId: baseInput.organisationId,
-      pageSize: 50,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:admin",
+        clerkOrgId: baseInput.clerkOrgId,
+        filters: {
+          approvalStatus: ["approved"],
+          sourceType: ["manual"],
+        },
+        organisationId: baseInput.organisationId,
+        pageSize: 50,
+      }),
+      (db) =>
+        listTeamRecordsPage(
+          {
+            actingOrgRole: "org:admin",
+            clerkOrgId: baseInput.clerkOrgId,
+            filters: {
+              approvalStatus: ["approved"],
+              sourceType: ["manual"],
+            },
+            organisationId: baseInput.organisationId,
+            pageSize: 50,
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       ok: true,
       value: { nextCursor: null, totalCount: 241 },
@@ -257,12 +278,24 @@ describe("plan-service", () => {
   ])(
     "keeps page size %i to one bounded query with take %i",
     async (pageSize, take) => {
-      await listTeamRecordsPage({
-        actingOrgRole: "org:admin",
-        clerkOrgId: baseInput.clerkOrgId,
-        organisationId: baseInput.organisationId,
-        pageSize,
-      });
+      await withTestTenantResult(
+        tenantTestAccount({
+          actingOrgRole: "org:admin",
+          clerkOrgId: baseInput.clerkOrgId,
+          organisationId: baseInput.organisationId,
+          pageSize,
+        }),
+        (db) =>
+          listTeamRecordsPage(
+            {
+              actingOrgRole: "org:admin",
+              clerkOrgId: baseInput.clerkOrgId,
+              organisationId: baseInput.organisationId,
+              pageSize,
+            },
+            db
+          )
+      );
       expect(mocks.availabilityFindMany).toHaveBeenCalledTimes(1);
       expect(mocks.availabilityCount).toHaveBeenCalledTimes(1);
       expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
@@ -271,51 +304,111 @@ describe("plan-service", () => {
     }
   );
   it("removes the overlap window only when all history is requested", async () => {
-    await listTeamRecordsPage({
-      actingOrgRole: "org:admin",
-      allHistory: true,
-      clerkOrgId: baseInput.clerkOrgId,
-      organisationId: baseInput.organisationId,
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:admin",
+        allHistory: true,
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+      }),
+      (db) =>
+        listTeamRecordsPage(
+          {
+            actingOrgRole: "org:admin",
+            allHistory: true,
+            clerkOrgId: baseInput.clerkOrgId,
+            organisationId: baseInput.organisationId,
+          },
+          db
+        )
+    );
     const where = mocks.availabilityFindMany.mock.calls[0]?.[0]?.where;
     expect(where).not.toHaveProperty("ends_at");
     expect(where).not.toHaveProperty("starts_at");
   });
   it("returns no team records without querying when a manager has no reports", async () => {
     mocks.managerScopePersonIds.mockResolvedValue([]);
-    const result = await listTeamRecords({
-      actingOrgRole: "org:manager",
-      clerkOrgId: baseInput.clerkOrgId,
-      managerPersonId: "00000000-0000-4000-8000-000000000031",
-      organisationId: baseInput.organisationId,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:manager",
+        clerkOrgId: baseInput.clerkOrgId,
+        managerPersonId: "00000000-0000-4000-8000-000000000031",
+        organisationId: baseInput.organisationId,
+      }),
+      (db) =>
+        listTeamRecords(
+          {
+            actingOrgRole: "org:manager",
+            clerkOrgId: baseInput.clerkOrgId,
+            managerPersonId: "00000000-0000-4000-8000-000000000031",
+            organisationId: baseInput.organisationId,
+          },
+          db
+        )
+    );
     expect(result).toEqual({ ok: true, value: [] });
     expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
     expect(mocks.getXeroConnectionStateForScope).not.toHaveBeenCalled();
   });
   it("returns no team records when requested people are outside manager scope", async () => {
-    const result = await listTeamRecords({
-      actingOrgRole: "org:manager",
-      clerkOrgId: baseInput.clerkOrgId,
-      filters: {
-        personId: ["00000000-0000-4000-8000-000000000099"],
-      },
-      managerPersonId: "00000000-0000-4000-8000-000000000031",
-      organisationId: baseInput.organisationId,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:manager",
+        clerkOrgId: baseInput.clerkOrgId,
+        filters: {
+          personId: ["00000000-0000-4000-8000-000000000099"],
+        },
+        managerPersonId: "00000000-0000-4000-8000-000000000031",
+        organisationId: baseInput.organisationId,
+      }),
+      (db) =>
+        listTeamRecords(
+          {
+            actingOrgRole: "org:manager",
+            clerkOrgId: baseInput.clerkOrgId,
+            filters: {
+              personId: ["00000000-0000-4000-8000-000000000099"],
+            },
+            managerPersonId: "00000000-0000-4000-8000-000000000031",
+            organisationId: baseInput.organisationId,
+          },
+          db
+        )
+    );
     expect(result).toEqual({ ok: true, value: [] });
     expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
   });
   it("intersects requested people with manager scope", async () => {
-    await listTeamRecords({
-      actingOrgRole: "org:manager",
-      clerkOrgId: baseInput.clerkOrgId,
-      filters: {
-        personId: [baseInput.personId, "00000000-0000-4000-8000-000000000099"],
-      },
-      managerPersonId: "00000000-0000-4000-8000-000000000031",
-      organisationId: baseInput.organisationId,
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:manager",
+        clerkOrgId: baseInput.clerkOrgId,
+        filters: {
+          personId: [
+            baseInput.personId,
+            "00000000-0000-4000-8000-000000000099",
+          ],
+        },
+        managerPersonId: "00000000-0000-4000-8000-000000000031",
+        organisationId: baseInput.organisationId,
+      }),
+      (db) =>
+        listTeamRecords(
+          {
+            actingOrgRole: "org:manager",
+            clerkOrgId: baseInput.clerkOrgId,
+            filters: {
+              personId: [
+                baseInput.personId,
+                "00000000-0000-4000-8000-000000000099",
+              ],
+            },
+            managerPersonId: "00000000-0000-4000-8000-000000000031",
+            organisationId: baseInput.organisationId,
+          },
+          db
+        )
+    );
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -325,20 +418,34 @@ describe("plan-service", () => {
         }),
       })
     );
-    expect(mocks.managerScopePersonIds).toHaveBeenCalledWith({
-      actingPersonId: "00000000-0000-4000-8000-000000000031",
-      clerkOrgId: baseInput.clerkOrgId,
-      excludeSelf: true,
-      organisationId: baseInput.organisationId,
-    });
+    expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
+      {
+        actingPersonId: "00000000-0000-4000-8000-000000000031",
+        clerkOrgId: baseInput.clerkOrgId,
+        excludeSelf: true,
+      },
+      expect.any(Object)
+    );
   });
   it("denies a manager without a linked acting person", async () => {
-    const result = await listTeamRecords({
-      actingOrgRole: "org:manager",
-      clerkOrgId: baseInput.clerkOrgId,
-      managerPersonId: null,
-      organisationId: baseInput.organisationId,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:manager",
+        clerkOrgId: baseInput.clerkOrgId,
+        managerPersonId: null,
+        organisationId: baseInput.organisationId,
+      }),
+      (db) =>
+        listTeamRecords(
+          {
+            actingOrgRole: "org:manager",
+            clerkOrgId: baseInput.clerkOrgId,
+            managerPersonId: null,
+            organisationId: baseInput.organisationId,
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
@@ -349,12 +456,24 @@ describe("plan-service", () => {
   it.each(["org:admin", "org:owner"])(
     "allows %s to query the scoped organisation without a manager person",
     async (actingOrgRole) => {
-      await listTeamRecords({
-        actingOrgRole,
-        clerkOrgId: baseInput.clerkOrgId,
-        managerPersonId: null,
-        organisationId: baseInput.organisationId,
-      });
+      await withTestTenantResult(
+        tenantTestAccount({
+          actingOrgRole,
+          clerkOrgId: baseInput.clerkOrgId,
+          managerPersonId: null,
+          organisationId: baseInput.organisationId,
+        }),
+        (db) =>
+          listTeamRecords(
+            {
+              actingOrgRole,
+              clerkOrgId: baseInput.clerkOrgId,
+              managerPersonId: null,
+              organisationId: baseInput.organisationId,
+            },
+            db
+          )
+      );
       expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -375,13 +494,26 @@ describe("plan-service", () => {
       error: { code: "state_unavailable" },
       ok: false,
     });
-    const result = await getRecord({
-      actingOrgRole: "org:admin",
-      actingUserId: baseInput.createdByUserId,
-      clerkOrgId: baseInput.clerkOrgId,
-      organisationId: baseInput.organisationId,
-      recordId: "00000000-0000-4000-8000-000000000021",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        actingOrgRole: "org:admin",
+        actingUserId: baseInput.createdByUserId,
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+        recordId: "00000000-0000-4000-8000-000000000021",
+      }),
+      (db) =>
+        getRecord(
+          {
+            actingOrgRole: "org:admin",
+            actingUserId: baseInput.createdByUserId,
+            clerkOrgId: baseInput.clerkOrgId,
+            organisationId: baseInput.organisationId,
+            recordId: "00000000-0000-4000-8000-000000000021",
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -393,7 +525,10 @@ describe("plan-service", () => {
       error: { code: "state_unavailable" },
       ok: false,
     });
-    const result = await createRecord({ ...baseInput, recordType: "wfh" });
+    const result = await withTestTenantResult(
+      tenantTestAccount({ ...baseInput, recordType: "wfh" }),
+      (db) => createRecord({ ...baseInput, recordType: "wfh" }, db)
+    );
     expect(result).toMatchObject({
       ok: true,
       value: { approvalStatus: "approved", sourceType: "manual" },
@@ -404,10 +539,20 @@ describe("plan-service", () => {
       error: { code: "state_unavailable" },
       ok: false,
     });
-    const result = await createRecord({
-      ...baseInput,
-      recordType: "annual_leave",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        recordType: "annual_leave",
+      }),
+      (db) =>
+        createRecord(
+          {
+            ...baseInput,
+            recordType: "annual_leave",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: {
         message:
@@ -433,7 +578,10 @@ describe("plan-service", () => {
           state: hasXero ? "connected" : "not_connected",
         },
       });
-      const result = await createRecord({ ...baseInput, recordType });
+      const result = await withTestTenantResult(
+        tenantTestAccount({ ...baseInput, recordType }),
+        (db) => createRecord({ ...baseInput, recordType }, db)
+      );
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -461,11 +609,22 @@ describe("plan-service", () => {
   );
   it("denies updates when a viewer has no linked person and the target has no manager", async () => {
     mocks.personFindFirst.mockResolvedValue(null);
-    const result = await updateRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-      patch: {},
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+        patch: {},
+      }),
+      (db) =>
+        updateRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+            patch: {},
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
@@ -473,10 +632,20 @@ describe("plan-service", () => {
   });
   it("denies archiving when a viewer has no linked person and the target has no manager", async () => {
     mocks.personFindFirst.mockResolvedValue(null);
-    const result = await archiveRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+      }),
+      (db) =>
+        archiveRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
@@ -484,10 +653,20 @@ describe("plan-service", () => {
   });
   it("allows an admin without a linked person to archive a record", async () => {
     mocks.personFindFirst.mockResolvedValue(null);
-    const result = await archiveRecord({
-      ...actionInput,
-      actingOrgRole: "org:admin",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:admin",
+      }),
+      (db) =>
+        archiveRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:admin",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({ ok: true });
   });
   it("allows a linked manager to archive their report's record", async () => {
@@ -496,27 +675,58 @@ describe("plan-service", () => {
       scopedRecordFixture({ managerPersonId })
     );
     mocks.personFindFirst.mockResolvedValue({ id: managerPersonId });
-    const result = await archiveRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+      }),
+      (db) =>
+        archiveRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({ ok: true });
   });
   it("allows a linked person to archive their own record", async () => {
     mocks.personFindFirst.mockResolvedValue({ id: baseInput.personId });
-    const result = await archiveRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+      }),
+      (db) =>
+        archiveRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({ ok: true });
   });
   it("does not edit a record while an outbound Xero claim is active", async () => {
     mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
-    const result = await updateRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-      patch: { notesInternal: "Changed" },
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+        patch: { notesInternal: "Changed" },
+      }),
+      (db) =>
+        updateRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+            patch: { notesInternal: "Changed" },
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "not_editable_after_submission" },
       ok: false,
@@ -524,10 +734,20 @@ describe("plan-service", () => {
   });
   it("does not archive a record while an outbound Xero claim is active", async () => {
     mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
-    const result = await archiveRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+      }),
+      (db) =>
+        archiveRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "invalid_state_for_archive" },
       ok: false,
@@ -540,10 +760,20 @@ describe("plan-service", () => {
       source_type: "team_calendar_leave",
     });
     mocks.availabilityDeleteMany.mockResolvedValueOnce({ count: 0 });
-    const result = await deleteDraftRecord({
-      ...actionInput,
-      actingOrgRole: "org:viewer",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:viewer",
+      }),
+      (db) =>
+        deleteDraftRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:viewer",
+          },
+          db
+        )
+    );
     expect(result).toMatchObject({
       error: { code: "invalid_state_for_delete" },
       ok: false,
@@ -569,7 +799,10 @@ describe("plan-service", () => {
         source_type: "team_calendar_leave",
       });
       expect(
-        await getRecord({ ...actionInput, actingOrgRole: "org:admin" })
+        await withTestTenantResult(
+          tenantTestAccount({ ...actionInput, actingOrgRole: "org:admin" }),
+          (db) => getRecord({ ...actionInput, actingOrgRole: "org:admin" }, db)
+        )
       ).toMatchObject({ ok: true, value: { editableActions } });
     }
   );
@@ -585,7 +818,10 @@ describe("plan-service", () => {
       source_type: "team_calendar_leave",
     });
     expect(
-      await getRecord({ ...actionInput, actingOrgRole: "org:admin" })
+      await withTestTenantResult(
+        tenantTestAccount({ ...actionInput, actingOrgRole: "org:admin" }),
+        (db) => getRecord({ ...actionInput, actingOrgRole: "org:admin" }, db)
+      )
     ).toMatchObject({
       ok: true,
       value: { editableActions: ["view", "withdraw", "archive"] },
@@ -631,10 +867,20 @@ describe("plan-service", () => {
       currency_code: "NZD",
       updated_at: new Date("2026-04-01T00:00:00.000Z"),
     });
-    const result = await getRecord({
-      ...actionInput,
-      actingOrgRole: "org:admin",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
+        actingOrgRole: "org:admin",
+      }),
+      (db) =>
+        getRecord(
+          {
+            ...actionInput,
+            actingOrgRole: "org:admin",
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;

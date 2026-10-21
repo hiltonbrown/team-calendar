@@ -1,10 +1,10 @@
-import type { Prisma } from "@repo/database";
+import type { TenantDb } from "@repo/database";
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import {
+  assertTenantDb,
   getOrCreateOrganisationSettings,
-  tenantDatabase,
   updateOrganisationSettings,
 } from "@repo/database";
 import { z } from "zod";
@@ -33,33 +33,34 @@ const UpdateSettingsSchema = GetSettingsSchema.extend({
 
 export async function getSettings(
   input: z.input<typeof GetSettingsSchema>,
-  client?: Prisma.TransactionClient
+  db: TenantDb
 ): Promise<Result<OrganisationSettings, SettingsServiceError>> {
   const parsed = GetSettingsSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
-    const value = client
-      ? mapOrganisationSettingsRow(
-          await getOrCreateOrganisationSettings(
-            {
-              clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
-              organisationId: parsed.data.organisationId as OrganisationId,
-            },
-            client
-          )
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    const tenantDb = db;
+    return await {
+      ok: true,
+      value: mapOrganisationSettingsRow(
+        await getOrCreateOrganisationSettings(
+          {
+            clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+            organisationId: parsed.data.organisationId as OrganisationId,
+          },
+          tenantDb
         )
-      : await loadSettings(parsed.data.clerkOrgId, parsed.data.organisationId);
-    return { ok: true, value };
-  } catch {
-    return unknownError("Failed to load organisation settings.");
+      ),
+    };
   }
 }
 
 export async function updateSettings(
-  input: z.input<typeof UpdateSettingsSchema>
+  input: z.input<typeof UpdateSettingsSchema>,
+  db: TenantDb
 ): Promise<Result<OrganisationSettings, SettingsServiceError>> {
   const parsed = UpdateSettingsSchema.safeParse(input);
   if (!parsed.success) {
@@ -70,22 +71,26 @@ export async function updateSettings(
   ) {
     return notAuthorised();
   }
-
-  try {
-    const before = await getOrCreateOrganisationSettings({
-      clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
-      organisationId: parsed.data.organisationId as OrganisationId,
-    });
-    const after = await updateOrganisationSettings({
-      clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
-      organisationId: parsed.data.organisationId as OrganisationId,
-      patch: mapPatch(parsed.data.patch),
-    });
-    settingsCache.delete(
-      settingsCacheKey(parsed.data.clerkOrgId, parsed.data.organisationId)
+  assertTenantDb(db, parsed.data.clerkOrgId);
+  const run = async (
+    tenantDb2: TenantDb
+  ): ReturnType<typeof updateSettings> => {
+    const before = await getOrCreateOrganisationSettings(
+      {
+        clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+        organisationId: parsed.data.organisationId as OrganisationId,
+      },
+      tenantDb2
     );
-
-    await tenantDatabase(parsed.data.clerkOrgId).auditEvent.create({
+    const after = await updateOrganisationSettings(
+      {
+        clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+        organisationId: parsed.data.organisationId as OrganisationId,
+        patch: mapPatch(parsed.data.patch),
+      },
+      tenantDb2
+    );
+    await tenantDb2.auditEvent.create({
       data: {
         action: "organisation_settings.updated",
         actor_user_id: parsed.data.actingUserId,
@@ -109,9 +114,11 @@ export async function updateSettings(
     });
 
     return { ok: true, value: mapOrganisationSettingsRow(after) };
-  } catch {
-    return unknownError("Failed to update organisation settings.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export function defaultOrganisationSettingsPatch(): OrganisationSettingsPatch {
@@ -120,7 +127,6 @@ export function defaultOrganisationSettingsPatch(): OrganisationSettingsPatch {
     defaultLeaveRequestAdvanceDays: 0,
     defaultPrivacyMode: "named",
     feedsIncludePublicHolidaysDefault: false,
-    managerVisibilityScope: "direct_reports_only",
     notifyManagersOnStatusChange: true,
     requireDeclineReason: true,
     showDeclinedOnApprovals: true,
@@ -143,9 +149,6 @@ function mapPatch(input: OrganisationSettingsPatch) {
       feeds_include_public_holidays_default:
         input.feedsIncludePublicHolidaysDefault,
     }),
-    ...(input.managerVisibilityScope && {
-      manager_visibility_scope: input.managerVisibilityScope,
-    }),
     ...(input.notifyManagersOnStatusChange !== undefined && {
       notify_managers_on_status_change: input.notifyManagersOnStatusChange,
     }),
@@ -159,37 +162,6 @@ function mapPatch(input: OrganisationSettingsPatch) {
       show_pending_on_calendar: input.showPendingOnCalendar,
     }),
   };
-}
-
-const settingsCache = new Map<string, Promise<OrganisationSettings>>();
-
-function loadSettings(
-  clerkOrgId: string,
-  organisationId: string
-): Promise<OrganisationSettings> {
-  const key = settingsCacheKey(clerkOrgId, organisationId);
-  const existing = settingsCache.get(key);
-  if (existing) {
-    return existing;
-  }
-
-  const loading = getOrCreateOrganisationSettings({
-    clerkOrgId: clerkOrgId as ClerkOrgId,
-    organisationId: organisationId as OrganisationId,
-  })
-    .then((row) => mapOrganisationSettingsRow(row))
-    .catch((error: unknown) => {
-      if (settingsCache.get(key) === loading) {
-        settingsCache.delete(key);
-      }
-      throw error;
-    });
-  settingsCache.set(key, loading);
-  return loading;
-}
-
-function settingsCacheKey(clerkOrgId: string, organisationId: string): string {
-  return `${clerkOrgId}:${organisationId}`;
 }
 
 function validationError(
@@ -212,8 +184,4 @@ function notAuthorised(): Result<never, SettingsServiceError> {
     },
     ok: false,
   };
-}
-
-function unknownError(message: string): Result<never, SettingsServiceError> {
-  return { error: { code: "unknown_error", message }, ok: false };
 }

@@ -51,6 +51,7 @@ import {
   useTransition,
 } from "react";
 import { dispatchManualSyncAction } from "@/app/(authenticated)/sync/_actions";
+import { CompanyFilter } from "@/components/calendar/company-filter";
 import {
   PeopleProvenanceBadge,
   PeopleStatusChip,
@@ -71,6 +72,8 @@ interface FilterOption {
 interface PeopleClientProps {
   canIncludeArchived: boolean;
   canManageClerkAccess?: boolean;
+  companies?: FilterOption[];
+  companyIds?: string[];
   connectionId: string | null;
   filters: PeopleFilterInput;
   locations: FilterOption[];
@@ -174,6 +177,8 @@ export function PeopleClient({
   xeroConnectionState,
   locations,
   nextCursor,
+  companies = [],
+  companyIds,
   organisationId,
   orgQueryValue,
   people,
@@ -216,12 +221,14 @@ export function PeopleClient({
       subscribe((event) => {
         if (
           event.type === "sync.run_status_changed" &&
-          event.payload.organisationId === organisationId
+          (companyIds ?? companies.map((company) => company.id)).includes(
+            event.payload.organisationId
+          )
         ) {
           router.refresh();
         }
       }),
-    [organisationId, router, subscribe]
+    [companyIds, companies, router, subscribe]
   );
   const handleSyncFromXero = () => {
     if (!connectionId) {
@@ -359,10 +366,14 @@ export function PeopleClient({
         </div>
       </div>
 
+      <CompanyFilter companies={companies} companyIds={companyIds} />
       <form
         className="grid gap-4 rounded-2xl bg-muted p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,4fr)]"
         method="get"
       >
+        {companyIds?.map((id) => (
+          <input key={id} name="companyIds" type="hidden" value={id} />
+        ))}
         {orgQueryValue ? (
           <input name="org" type="hidden" value={orgQueryValue} />
         ) : null}
@@ -543,7 +554,7 @@ export function PeopleClient({
                   <td className="block">
                     <Link
                       className="flex items-center gap-3 rounded-xl focus-visible:outline-[3px] focus-visible:outline-ring"
-                      href={withOrg(`/people/${person.id}`, orgQueryValue)}
+                      href={withOrg(`/people/${person.id}`, person.companyId)}
                     >
                       <Avatar person={person} />
                       <span className="min-w-0">
@@ -557,6 +568,9 @@ export function PeopleClient({
                         </span>
                         <span className="block break-all text-label-md text-muted-foreground">
                           {person.email}
+                        </span>
+                        <span className="block text-label-md text-muted-foreground">
+                          {person.companyName}
                         </span>
                       </span>
                     </Link>
@@ -1031,6 +1045,9 @@ function peopleHref(
   orgQueryValue: string | null
 ): string {
   const params = new URLSearchParams();
+  for (const id of filters.companyIds ?? []) {
+    params.append("companyIds", id);
+  }
   if (filters.cursor) {
     params.set("cursor", filters.cursor);
   }

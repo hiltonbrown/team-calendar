@@ -121,6 +121,26 @@
     "./queries/payroll-entitlements": {
       "types": "./queries/payroll-entitlements.ts",
       "default": "./queries/payroll-entitlements.ts"
+    },
+    "./tenant-guard": {
+      "types": "./tenant-guard.ts",
+      "default": "./tenant-guard.ts"
+    },
+    "./tenant-db": {
+      "types": "./src/tenant-db.ts",
+      "default": "./src/tenant-db.ts"
+    },
+    "./tenant-client": {
+      "types": "./src/tenant-client.ts",
+      "default": "./src/tenant-client.ts"
+    },
+    "./test-fixtures/tenant-scope": {
+      "types": "./src/test-fixtures/tenant-scope.ts",
+      "default": "./src/test-fixtures/tenant-scope.ts"
+    },
+    "./is-local-database": {
+      "types": "./src/is-local-database.ts",
+      "default": "./src/is-local-database.ts"
     }
   },
   "main": "./index.ts",
@@ -141,6 +161,7 @@
     "@prisma/client": "7.10.0",
     "@prisma/client-runtime-utils": "^7.10.0",
     "@repo/core": "*",
+    "@repo/observability": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
     "pg": "^8.23.0",
     "server-only": "^0.0.1",

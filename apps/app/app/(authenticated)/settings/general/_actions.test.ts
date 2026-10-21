@@ -21,9 +21,26 @@ vi.mock("@repo/auth/server", () => ({
   clerkClient: mocks.clerkClient,
   currentUser: mocks.currentUser,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => mocks.database),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("@/lib/server/get-active-org-context", () => ({
@@ -37,7 +54,7 @@ describe("general settings organisation actions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: "admin@example.com" }],
       firstName: "Admin",

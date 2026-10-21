@@ -1,3 +1,7 @@
+import { withTenantDb as withTestTenantDb } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
+
+vi.mock("server-only", () => ({}));
 vi.mock("./billing", () => ({
   getUnresolvedStripeEventsForOrg: async () => [{}, {}],
 }));
@@ -6,7 +10,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ queryRaw: vi.fn() }));
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({ $queryRaw: mocks.queryRaw }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async (
+          strings: TemplateStringsArray,
+          ...values: unknown[]
+        ) =>
+          strings[0]?.includes("set_config")
+            ? []
+            : mocks.queryRaw(strings, ...values),
+      }),
+  },
 }));
 
 const { getActivationDashboardSummary } = await import(
@@ -31,10 +46,20 @@ describe("getActivationDashboardSummary", () => {
   });
 
   it("requires all three succeeded sync types and the durable feed milestone", async () => {
-    await getActivationDashboardSummary({
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: "org_1",
+        organisationId: "11111111-1111-4111-8111-111111111111",
+      }),
+      (db) =>
+        getActivationDashboardSummary(
+          {
+            clerkOrgId: "org_1",
+            organisationId: "11111111-1111-4111-8111-111111111111",
+          },
+          db
+        )
+    );
 
     const [strings] = mocks.queryRaw.mock.calls[0] ?? [];
     const sql = Array.from(strings as TemplateStringsArray).join("?");

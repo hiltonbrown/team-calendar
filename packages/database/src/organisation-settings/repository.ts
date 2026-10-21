@@ -1,6 +1,5 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import type { Prisma } from "../../generated/client";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 export interface OrganisationSettingsRow {
@@ -11,7 +10,6 @@ export interface OrganisationSettingsRow {
   default_privacy_mode: "masked" | "named" | "private";
   feeds_include_public_holidays_default: boolean;
   id: string;
-  manager_visibility_scope: string;
   notify_managers_on_status_change: boolean;
   organisation_id: string;
   require_decline_reason: boolean;
@@ -25,7 +23,6 @@ export interface OrganisationSettingsUpdateInput {
   default_leave_request_advance_days?: number;
   default_privacy_mode?: "masked" | "named" | "private";
   feeds_include_public_holidays_default?: boolean;
-  manager_visibility_scope?: "all_team_leave" | "direct_reports_only";
   notify_managers_on_status_change?: boolean;
   require_decline_reason?: boolean;
   show_declined_on_approvals?: boolean;
@@ -40,7 +37,6 @@ const organisationSettingsSelect = {
   default_privacy_mode: true,
   feeds_include_public_holidays_default: true,
   id: true,
-  manager_visibility_scope: true,
   notify_managers_on_status_change: true,
   organisation_id: true,
   require_decline_reason: true,
@@ -54,28 +50,29 @@ export async function getOrCreateForOrganisation(
     clerkOrgId: ClerkOrgId;
     organisationId: OrganisationId;
   },
-  client: Pick<
-    Prisma.TransactionClient,
-    "organisationSettings"
-  > = tenantDatabase(input.clerkOrgId)
+  db: TenantDb
 ): Promise<OrganisationSettingsRow> {
-  const existing = await client.organisationSettings.findFirst({
-    select: organisationSettingsSelect,
-    where: scopedQuery(input.clerkOrgId, input.organisationId),
-  });
-  if (existing) {
-    return existing;
-  }
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  try {
-    return await client.organisationSettings.create({
+    const existing = await client.organisationSettings.findFirst({
+      select: organisationSettingsSelect,
+      where: scopedQuery(input.clerkOrgId, input.organisationId),
+    });
+    if (existing) {
+      return existing;
+    }
+
+    // ON CONFLICT DO NOTHING keeps PostgreSQL's interactive transaction usable
+    // when another request wins the organisation's unique settings row.
+    await client.organisationSettings.createMany({
       data: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
       },
-      select: organisationSettingsSelect,
+      skipDuplicates: true,
     });
-  } catch {
     return await client.organisationSettings.findFirstOrThrow({
       select: organisationSettingsSelect,
       where: scopedQuery(input.clerkOrgId, input.organisationId),
@@ -89,20 +86,22 @@ export async function updateForOrganisation(
     organisationId: OrganisationId;
     patch: OrganisationSettingsUpdateInput;
   },
-  client: Pick<
-    Prisma.TransactionClient,
-    "organisationSettings"
-  > = tenantDatabase(input.clerkOrgId)
+  db: TenantDb
 ): Promise<OrganisationSettingsRow> {
-  await getOrCreateForOrganisation(input, client);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
 
-  await client.organisationSettings.updateMany({
-    data: input.patch,
-    where: scopedQuery(input.clerkOrgId, input.organisationId),
-  });
+    await getOrCreateForOrganisation(input, client);
 
-  return await client.organisationSettings.findFirstOrThrow({
-    select: organisationSettingsSelect,
-    where: scopedQuery(input.clerkOrgId, input.organisationId),
-  });
+    await client.organisationSettings.updateMany({
+      data: input.patch,
+      where: scopedQuery(input.clerkOrgId, input.organisationId),
+    });
+
+    return await client.organisationSettings.findFirstOrThrow({
+      select: organisationSettingsSelect,
+      where: scopedQuery(input.clerkOrgId, input.organisationId),
+    });
+  }
 }

@@ -1,12 +1,26 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
+vi.mock(
+  "@repo/database",
+  async () =>
+    await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )
+);
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      mocks.poolTransaction(run),
+  },
+}));
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   findUnique: vi.fn(),
-  tenantDatabase: vi.fn(),
+  poolTransaction: vi.fn(),
   upsert: vi.fn(),
 }));
 
@@ -30,19 +44,26 @@ const input = {
 describe("preferences-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.tenantDatabase.mockReturnValue(client);
+    mocks.poolTransaction.mockImplementation(
+      async (run: (db: unknown) => Promise<unknown>) =>
+        run({ ...client, $queryRaw: vi.fn(async () => []) })
+    );
     mocks.findMany.mockResolvedValue([]);
     mocks.findUnique.mockResolvedValue(null);
   });
 
-  it("loads preferences through the account-bound default client", async () => {
-    const result = await listPreferences(input);
+  it("loads preferences through the caller account scope", async () => {
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      listPreferences(input, db)
+    );
     expect(result.ok).toBe(true);
-    expect(mocks.tenantDatabase).toHaveBeenCalledWith(input.clerkOrgId);
+    expect(mocks.poolTransaction).toHaveBeenCalledOnce();
   });
 
   it("returns defaults for every registry type", async () => {
-    const result = await listPreferences(input, client);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      listPreferences(input, db)
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -60,7 +81,9 @@ describe("preferences-service", () => {
       },
     ]);
 
-    const result = await listPreferences(input, client);
+    const result = await withTestTenantResult(tenantTestAccount(input), (db) =>
+      listPreferences(input, db)
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -75,14 +98,23 @@ describe("preferences-service", () => {
   });
 
   it("rejects both channels disabled", async () => {
-    const result = await upsertPreference(
-      {
+    const result = await withTestTenantResult(
+      tenantTestAccount({
         ...input,
         emailEnabled: false,
         inAppEnabled: false,
         notificationType: "leave_submitted",
-      },
-      client
+      }),
+      (db) =>
+        upsertPreference(
+          {
+            ...input,
+            emailEnabled: false,
+            inAppEnabled: false,
+            notificationType: "leave_submitted",
+          },
+          db
+        )
     );
 
     expect(result.ok).toBe(false);
@@ -92,13 +124,21 @@ describe("preferences-service", () => {
   });
 
   it("falls back to registry defaults for delivery checks", async () => {
-    const result = await shouldDeliverToChannel(
-      {
+    const result = await withTestTenantResult(
+      tenantTestAccount({
         ...input,
         channel: "email",
         notificationType: "leave_withdrawn",
-      },
-      client
+      }),
+      (db) =>
+        shouldDeliverToChannel(
+          {
+            ...input,
+            channel: "email",
+            notificationType: "leave_withdrawn",
+          },
+          db
+        )
     );
 
     expect(result).toEqual({ ok: true, value: false });

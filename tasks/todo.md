@@ -1,5 +1,371 @@
 # Current work
 
+## Stage 7 execution resumed (21 October 2026)
+
+- [x] Fix and verify the duplicate acting-person warning in both approvals entry points.
+- [x] Measure configured Neon adapter concurrency and host round trips, including bounded read-only access patterns.
+- [ ] Measure populated Vercel loaders and jobs, with named fan-out comparisons and the endpoint frontend connection limit.
+- [ ] Apply only measured fan-out decisions, with equivalence coverage where a split is justified.
+- [ ] Rerun branch Preview app/API preflight and resolve configuration from existing verified values.
+- [ ] Complete available multi-company acceptance and sync observation; record actual external-access gaps precisely.
+- [ ] Run affected and required gates, reconcile plan evidence, and record the final review.
+
+Execution boundary: use the authorised configured development database. Do not create a new branch, request a Neon API key, repeat the reset or expand the release scope. Existing database and fixture guards remain in force. Earlier source gates and database-reset evidence remain valid unless a relevant change invalidates them.
+
+### Resumed execution review
+
+The duplicate-person regression failed with no warning before the fix. Both approval entry points now share a bounded, tenant-scoped lookup, selecting the earliest match and warning on duplicates without blocking approval. Fresh lint PASS (1,321 files), typecheck PASS (19 tasks), full unit suite PASS (18 tasks, including 991 app tests). Independent scoped review found no Critical or Important findings. A frozen-lockfile install restored the missing local database-to-observability workspace link; no lockfile or dependency metadata changed. Logs: `/tmp/tc-stage7-resume-EIauFj/{typecheck,unit}.log`.
+
+Actual restricted-role PrismaNeon concurrency and commit/rollback context cleanup PASS. Twenty warm host-to-Neon samples: RTT p50 21.06 ms, p95 25.22 ms. Pool maximum 10; PostgreSQL maximum connections 112; these do not establish the PgBouncer frontend limit. Read-only comparison and driver traces are in the measurements document. No application rows were written by these diagnostics. The current database has one company, no active staff, no grants/connections and no approved records. Named-loader and populated Vercel measurements remain NOT VERIFIED; the fan-out register stays empty.
+
+Fresh branch Preview preflight: app FAIL and API FAIL. Added only the existing root local KV URL/token to app Preview on `feat/tenant-request-transactions`, with sensitive values passed privately and exact branch/target metadata read back. No deployment triggered. Both projects lack Preview Sentry DSN/org/project/auth token and Xero callback/tier. API additionally lacks Clerk webhook secret, Resend sender, early-access recipient and HMAC secret. Sensitive downloaded database/Xero/KV blanks are redaction, not absence. The catalogue phase was not reached. Preview downloads remain private, mode 0600, in the existing session scratch directory.
+
+Fresh integration verification of the warning change remains NOT VERIFIED; no protected fixture run was started and no guard was bypassed. The last complete CI integration PASS is at `5c9cb42`, before the warning change. The earlier database reset, migration checks and Neon RLS verification remain complete. Four-role/two-company provider acceptance and a full sync-cycle Sentry observation still require the actual connected demo companies and monitoring access. The plan is not complete.
+
+## Tenant transactions per request (plan `docs/superpowers/plans/2026-10-12-tenant-transaction-per-request.md`)
+
+- [x] Reconcile Stage 0 with the source spec and preserve the explicit Gate 0 decision.
+- [x] Implement the guarded, read-only PrismaPg statement recorder and four baseline/concurrency assertions.
+- [x] Implement opt-in driver timing, scoped summaries and unit coverage; align dependency metadata.
+- [x] Fix omitted BEGIN counts, queued-pool request attribution, logger-failure semantics and environment-test typing.
+- [x] Obtain independent Stage 0 review and reproduce/fix its Important finding with a RED/GREEN regression.
+- [x] Verify real database counts and concurrency on restricted CI PostgreSQL (six statement-count tests at `5c9cb42`).
+- [ ] Record Neon preview latency, critical-path statement counts, fan-out comparisons and pool limits.
+- [x] Obtain explicit owner confirmation at Gate 0: proceed with Stage 1 despite the verification gaps.
+- [x] Implement Stage 1 core API and legacy-helper detector with RED/GREEN unit tests.
+- [x] Add Stage 1 restricted-role isolation, pooled cleanup and statement-count assertions.
+- [x] Verify Stage 1 database-backed assertions on restricted CI PostgreSQL (16 RLS tests), plus configured-Neon catalogue/context checks.
+- [ ] Stage 2: verify phased guards, split dispatch phases and measured fan-out boundary.
+- [x] Stage 3.1: shared query-helper conversion and CI verification.
+- [x] Stage 3.2: notification helpers and post-commit effects, with CI verification.
+- [x] Stage 3.3: feed conversion and post-commit cache effects, with CI verification.
+- [x] Stage 4.1: account manager visibility implementation and CI verification.
+- [x] Stage 4.2: cross-company manager assignment implementation and CI verification.
+- [x] Stage 4.3: account-wide calendar/feed scope and entry points, with CI verification.
+- [x] Stage 4.4: account-wide dashboard implementation and CI verification.
+- [x] Stage 4.5: account-wide People entry points and CI verification.
+- [x] Stage 4.6: combined approval queue and CI verification; omitted warning subsequently fixed and unit-verified above.
+- [x] Stage 4.7: person/record-derived leave routing, verified with fake providers in CI.
+- [x] Stage 5.1: reference-data conversion and CI verification.
+- [x] Stage 5.2: manual records, analytics and onboarding conversion, with CI verification.
+- [x] Stage 5.3: settings/account-wide notifications conversion and CI verification.
+- [x] Stage 5.4: sync/integrations conversion and CI verification, not live provider acceptance.
+- [x] Stage 5.5: webhooks/support conversion and CI verification.
+- [x] Stage 5.6: database-only job phases and CI verification.
+- [x] Stage 5.7: Xero job persistence phases and CI verification, using fake providers.
+- [x] Stage 6: required clients, legacy helper removal, documentation and applied column-drop migration.
+- [ ] Complete measured Stage 2 fan-out decisions and Stage 7 live verification/release gates.
+
+### Historical review (superseded by the results above and later dated sections)
+
+Stage 0 preparation and Stage 1 core API are implemented. Stage 2 dispatch
+preparation entry points now thread TenantDb; most production entry points and
+multi-company outcomes remain for later stages. Timing is disabled by default; preview measurement
+callers must explicitly label loaders/steps with `withTenantQueryTiming`.
+The independent review found queued pg pool queries inheriting the preceding
+request's measurement scope. The regression observed counts A=2/B=0 before
+the fix and A=1/B=1 after binding queued callback dispatch to its originating
+async context. Timing, standalone client and connection-guard suites pass 20
+tests. The database package typecheck passes.
+
+The first broad unit run overlapped Prisma generation and failed the availability
+entry-point import. App and web UI tests also timed out under excessive worker
+contention. The full bounded-worker rerun passes all 18 package tasks, including all 965 app
+tests and all 122 database tests. Full typecheck initially found
+missing workspace links for database and analytics; these were restored in
+ignored `node_modules`, and the standard typecheck then passed 19/19 tasks. Final source-only typecheck
+passes 18/18 tasks after Prisma generation; `bun run check` passes all 1,279
+checked files. Unit command: `bun run test -- --concurrency=1 -- --maxWorkers=2`.
+
+`bun run test:integration -- --concurrency=3 --continue=always` fails all six
+package tasks on this host: local database connections are denied by the sandbox
+and `DATABASE_APP_URL` is not supplied. The four new statement tests specifically
+fail with `connect EPERM` at localhost:5432. Database-backed assertions remain
+NOT VERIFIED; no fixture or schema was changed. The measurement document records
+the missing Neon evidence and exact local reproduction command. The owner
+explicitly approved Gate 0 and Stage 1 despite these gaps. This plan is not complete.
+
+Stage 1 core and detector suites pass 28 tests. A fresh review found no Critical
+or Important issues. Restricted-role integration still cannot run successfully:
+`bun run test:integration --filter @repo/database` reports 77 failures, 4 skips
+and 3 errors on this host, with database access denied and `DATABASE_APP_URL`
+absent. No schema or database-role changes were made.
+
+Deferred minor: Neon transaction pooling can change the backend PID between
+transactions, falsely failing the same-session cleanup assertion. Use a direct
+database endpoint for that evidence. Final Stage 1 source gates pass: `bun run check` checks 1,281 files,
+source-only typecheck passes 18/18 tasks against the already generated client,
+and the full unit suite passes 18/18 tasks (3,589 tests, database 149).
+The plan's exact root-level unit command also passes all 28 API/detector tests;
+its server-only dependency is mocked consistently with the existing tests.
+Stage 1 is committed in the plan's three logical steps. Stage 2 source now has per-export phase guards, typed database preparation and
+separate result-bearing send functions for approvals, manual sync, cancellation,
+balance refresh, submit notification delivery and reconciled feed rebuilds.
+Cancellation flags, notification checkpoints and email attempts retain independent
+commit phases. Token rotation now rolls back revocation on replacement conflict. Default
+notification persistence also rolls back an in-app row on required email enqueue
+failure and publishes realtime only after commit.
+The fan-out approval register is empty until Neon evidence exists; candidate
+loaders are documented separately. Verification is paused at the user's request,
+including unit tests, lint, typecheck, integration and builds. New Stage 2 tests
+are written but pending; the plan is not complete.
+
+Stage 3 query, notification and feed source expansion is drafted and unverified.
+The owner superseded the compatibility decision: expanded helpers accept only
+TenantDb, and the extra legacy-client bridge is removed. Affected atomic callers
+are being migrated to branded scopes. Notification persistence and feed writes
+have default Result rollback boundaries; cache and best-effort realtime effects
+run after commit. Scope/effect tests are written but have not run. Remaining
+fixture and later-stage caller reconciliation is pending; the plan is not complete.
+
+### Local verification before Stage 6 (14 October 2026)
+
+Stages 2 to 5 have source and fixture changes. Final `bun run check` passes
+all 1,318 checked files. Final `bun run typecheck --concurrency=1
+--continue=always` passes all 19 tasks. Existing passing unit evidence is
+retained where later changes do not affect it: availability 717 tests, Xero
+727, feeds 196, jobs 206, notifications 86, auth 16 and billing 16.
+
+All 30 app files that failed in the earlier full run now have passing results
+in corrected targeted batches. The final two feed-page files pass 13 tests,
+and sync actions pass 10. The corrected Clerk webhook passes 14 tests; the
+other corrected API files retain their passing batch results. The affected
+database queries and transaction guard/boundary checks pass 31 tests; the
+expanded query reuse and account-mismatch suite passes another 116. This is
+combined full-run and targeted evidence, not a fresh passing root unit run.
+
+Database integration, Neon timings, preview acceptance and the full preview
+sync cycle remain unverified and paused by the owner. The earlier Gate 0
+exception only authorised Stage 1; it does not waive these later gates.
+At this pre-contraction checkpoint, Stage 6 and Stage 7 had not started.
+The subsequent Stage 6 authorisation and current status are recorded below. No migration was applied, and no commit, push or deployment was
+performed during this reconciliation.
+
+### Stage 6 authorised source contraction
+
+The owner explicitly authorised Stage 6 after local reconciliation. Database and
+Neon execution remain paused; the pending preview cycle is recorded rather than
+claimed complete.
+
+- [x] Make tenant service clients required and migrate their callers.
+- [x] Delete `inTenant`, the per-query helpers and their public exports.
+- [x] Enforce production client and entry-point/phase boundaries (RED then GREEN).
+- [x] Update the five tenancy and product documentation files named by Task 6.3.
+- [x] Remove the company manager visibility column from the schema, regenerate
+  Prisma and generate the one-statement drop migration offline.
+- [x] Finish local lint, typecheck and affected unit verification using full runs plus corrected targeted batches.
+- [ ] Finish the restricted-role/settings integration suites; migrations and
+  read-only role/policy verification were completed on 21 October below.
+
+Local Stage 6 evidence: lint passes 1,318 files and typecheck passes all 19
+tasks. Full package runs plus corrected targeted files cover availability 717,
+database 287, Xero 727, jobs 206, feeds 196, notifications 86, auth 16 and
+billing 16 tests. The API support corrections pass 13 tests alongside its
+unchanged full-run results. App coverage totals 987 tests: its full run passed
+150 files, the corrected seven-file batch passed all fixture cases, and the
+two UI files passed with a 15-second runner budget; the last disclosure file
+passed when run alone after formatting ended. These are combined results;
+no fresh passing root unit command is claimed.
+
+The migration at
+`packages/database/prisma/migrations/20261014020000_drop_company_manager_visibility/migration.sql`
+is unapplied. Commits, pushes and deployments remain unstarted.
+
+### Stage 7 preview verification
+
+Started on 14 October 2026 at the owner's request. The earlier pause on
+database verification does not prevent the Stage 7 checks now requested.
+
+- [x] Inspect managed-environment readiness and existing app/API previews.
+- [ ] Step 0: demonstrate the two-company, four-role visibility, routing and
+  approval outcomes on the deployed implementation.
+- [ ] Step 1: measure the implementation on a fresh Neon preview branch.
+- [ ] Step 2: observe one complete sync cycle in preview Sentry without tenant
+  fallback warnings or transaction timeouts.
+- [ ] Step 3: run app and API preflight with that preview's environment.
+- [x] Step 4: record current results and verification gaps here.
+
+Access findings: the Vercel connector can read `teamcalendar-app` and
+`teamcalendar-api`. Their newest preview deployments both reference
+`d0de937bd7a5a88cce18b4b5f3f2d3a48e2b7098` on
+`docs/tenant-transaction-per-request-plan`, before this implementation. They
+cannot establish acceptance of the current worktree. The managed environment
+has Clerk variables ready, but no configured Neon credentials, Sentry
+credentials or outbound identities. No local preview environment or Vercel
+project linkage is present in the repository or app/API directories.
+
+No preview database was provisioned, migration applied, deployment published,
+provider write made or remote preflight claimed. Steps 0 to 3 remain blocked
+on an isolated Neon branch and app/API previews of the implementation with
+demo-company and monitoring access. Existing local verification is retained;
+the long unit suites were not repeated.
+
+The owner subsequently selected option 1, authorising a disposable Neon branch,
+app/API preview deployments and migrations confined to that branch. This
+authorisation persists; no further deployment permission is required for that
+scope. Provisioning is blocked by access, not by approval.
+
+Vercel metadata identifies Neon project `soft-dream-28768887` (`calendar-sync`,
+Sydney). Both app/API projects reference its store for development, preview and
+production; branch isolation is not yet established. No `DATABASE_APP_URL` is
+configured in either project's environment metadata. The Neon Marketplace
+connection advertises read-only MCP access, and the currently callable tools
+provide no Neon branch-creation operation. No Neon API credential is present
+in the runtime. Required next input: securely configure `NEON_API_KEY` for
+branch provisioning, or supply an already-created disposable branch through
+private environment variables. Do not reuse the shared store URL for migrations.
+
+Preview acceptance also needs an explicit demo-grant setup: existing behaviour
+disables Xero OAuth connections on previews (`README.md`, Xero OAuth section).
+No bypass or behaviour change was introduced. The inspected preview metadata
+also lacks Xero token encryption settings; these and demo-only access must be
+resolved before exercising provider writes or a full sync cycle.
+
+
+Stage 7 resumed on 20 October 2026: disposable previews remain authorised.
+The credential-free Neon provisioning request was aborted before a result
+returned; creation is not confirmed. No blind provisioning retry, migration
+or deployment was performed. Network readiness is unknown and no Neon secret
+binding is configured in the current managed-environment report.
+
+### Stage 7 review, 21 October 2026
+
+Release remains blocked. Current remote evidence supersedes the earlier
+deployment and local-environment access findings above.
+
+- PASS: Vercel authentication and project identity checks. The feature-branch
+  app preview is [READY](https://teamcalendar-bunuguuqw-hiltonb.vercel.app)
+  (`dpl_Gnyy71diDS1NCNHNadLFsoaiqcU8`); the API preview is
+  [READY](https://teamcalendar-dc53hdt7e-hiltonb.vercel.app)
+  (`dpl_HmZR8sSjRh5kgiWeLARyoTLLZcw2`). Both reference current implementation
+  commit `c2a3a60120e6ee4a1c446b17325a678e3d97bcb9`.
+- NOT VERIFIED, Steps 0 and 1: isolated Neon branch, restricted runtime role,
+  two-company/four-role acceptance, provider routing and approvals, and Neon
+  measurements. Local env files exist, but contain the shared owner connection
+  and no `DATABASE_APP_URL` or Neon API credential. The Neon configuration
+  directory is empty and no Neon provisioning tool is callable. Remote app/API
+  database metadata still names the same store for Development, Preview and
+  Production, with no feature-branch database override. No migration or fixture
+  write was attempted against that shared target.
+- NOT VERIFIED, Step 2: a full preview sync cycle and Sentry observation.
+  Sentry credentials are unavailable; remote Preview metadata has no Sentry
+  configuration. Preview Xero connect remains disabled by the existing contract,
+  and demo-only grant access has not been established.
+- FAIL, preflight diagnostic for Step 3: both app and API entry points exit 1
+  using freshly pulled Preview environments with feature-branch overrides.
+  The commands were `bun --no-env-file packages/next-config/bin/preflight.ts app`
+  and the equivalent `api` command, with only the downloaded Preview variables
+  supplied. This executes the preflight entry point directly because the
+  `bun run preflight` script starts another Bun process that can load local env
+  files. Metadata confirms Preview lacks `DATABASE_APP_URL`, launch mode,
+  app/web/API URLs, Sentry settings, Xero redirect URI and tier.
+  API also lacks the Clerk webhook secret, sender and early-access application
+  configuration. Downloaded Xero client and some other secret values are empty
+  despite being configured remotely; these are download limitations, not proof
+  that the secrets are absent. Preflight stopped before the database role check.
+  Encryption provenance is unresolved: metadata scopes its key to Production,
+  while both Preview downloads contain a non-empty key. Do not infer isolated
+  demo-grant access from that discrepancy.
+- NOT VERIFIED, exact deployed-environment preflight: Vercel rejected an env
+  pull by deployment ID with `Deployment is in READY state, expected INITIALIZING`.
+  The diagnostic above uses current branch Preview settings, not a claimed
+  snapshot of the deployed environment.
+
+Operator correction: use the database already configured in `.env.local`.
+An isolated branch and `NEON_API_KEY` are not required for this execution.
+This direction supersedes the earlier branch-provisioning blockers and the
+plan's fresh-branch measurement setup. Inspect the configured database's roles
+and migration status, retain the protected runner and owned-fixture requirements
+for integration tests, and complete the remaining configuration, acceptance,
+measurement and monitoring checks on that target. Existing preflight failures
+and unexecuted checks remain as recorded above.
+
+Following that correction, a read-only connection to the configured database
+succeeded: database `neondb`, role `neondb_owner`, transaction read-only `on`.
+The role catalogue contains no `team_calendar_app` role; the connected owner has
+`BYPASSRLS`. The migration inventory returned no rows, so migration deployment
+state is not established. No data, roles or schema were changed. The next
+database work is to establish schema/migration state and provision the required
+restricted runtime access on this target, rather than create another branch.
+
+Development database remediation is authorised by the owner:
+
+- [x] Reconcile migration history and apply the repository's pending migrations
+  to the existing configured development database without a reset.
+- [x] Provision restricted `team_calendar_app` login and `DATABASE_APP_URL`.
+- [x] Verify migrated schema, role restrictions and fail-closed tenant access.
+- [x] Record results and resume the remaining Stage 7 checks.
+
+### Stage 7 development database result
+
+- Subsequent explicit owner instruction: reset the development database.
+  Executed `prisma migrate reset --force` against the configured direct Neon
+  connection. PASS: reset succeeded and all 41 migrations actually executed from
+  the initial migration, superseding the earlier baseline-only history.
+  Post-reset verification PASS: all application tables empty; all migration SQL
+  checksums match; Prisma schema diff reports no differences; all 29 tenant
+  tables have RLS policies and grants; the restricted login remains safe and
+  usable; transaction context clears after commit and rollback. Existing-account
+  visibility is not claimed on the empty database. Existing application data was
+  deleted. No pre-reset backup was created by this operation; recovery was not
+  verified. No seed or provider/browser acceptance was run.
+- Migration-first verification at the owner's request: PASS. Fresh
+  `prisma migrate status` reports up to date; `prisma migrate diff
+  --from-config-datasource --to-schema prisma/schema.prisma --exit-code` exits 0
+  with no differences. All 41 successfully applied SQL checksums match the
+  repository. Fresh read-only role/policy/isolation checks pass on all 29 tenant
+  tables, including no-context denial and commit/rollback context cleanup.
+  Migration deployment and catalogue/schema verification are complete. This
+  result does not claim the full integration suites or later provider/browser
+  acceptance ran.
+- PASS: Prisma found no difference between the existing schema and historical
+  commit `9dcfeee`. Restored tracking for its 28 baseline migrations using
+  `prisma migrate resolve --applied`, then applied all 13 pending migrations.
+  No database reset was performed. `prisma migrate status` now reports all
+  41 migrations present and the database up to date.
+- Fixed the observed Neon deployment failure in the handwritten RLS migration:
+  `ALTER ROLE ... NOSUPERUSER` failed with PostgreSQL `42501` because it requires
+  a superuser. The migration now rejects elevated role attributes explicitly
+  without attempting to alter superuser-only attributes. Marked the failed
+  attempt rolled back and successfully redeployed the corrected migration.
+- PASS: enabled the `team_calendar_app` login and configured its unique generated
+  credential in the four Git-ignored local env files (root, app, API and
+  database). No credential values were printed. Also configured sensitive
+  `DATABASE_APP_URL` variables for app/API Preview, scoped only to
+  `feat/tenant-request-transactions`. These remote variables require a new
+  deployment to take effect; existing previews were not redeployed.
+- PASS: read-only catalogue and access checks confirm RLS, tenant policies and
+  grants on all 29 tenant tables, safe reference-table grants, no access to
+  system tables, no elevated runtime-role memberships or table ownership,
+  no-context denial, correct existing-account reads, absent-account denial and
+  context cleanup after commit and rollback. These checks wrote no tenant data;
+  they are not a passing restricted-role integration-suite claim.
+- NOT VERIFIED, Steps 0 to 2: required live multi-company acceptance, Vercel/Neon
+  measurements and a complete sync cycle observed in Sentry. Actual development
+  inventory is one company, zero multi-company accounts, zero active people,
+  zero active Xero connections and zero approved records. The plan's two-demo-
+  company/four-role scenario cannot be exercised from that inventory. Sentry
+  access remains unconfigured. No synthetic provider or performance evidence
+  was substituted.
+- Step 3 remains FAIL for the previously inspected Preview configuration; the
+  restricted database variable is now configured, but the other recorded
+  configuration failures remain unresolved. Step 4 is complete: results and
+  limits are recorded here. Stage 7 remains incomplete and release is not
+  approved. Continuing live acceptance requires the actual demo-company grants,
+  staff/role access and monitoring configuration. No Neon branch or API key is
+  required.
+
+After the owner's correction about stopping prematurely, configured Preview-only
+feature-branch launch mode (`early_access`) and the verified app/API branch-alias
+URLs plus the existing public web URL on both Vercel projects. These settings,
+like the new database variable, await redeployment. A fresh aggregate query
+confirmed zero stored canonical Xero grants and zero Xero connections, including
+inactive connections; no reusable consent was overlooked. Checked all seven
+local env files and local Sentry config locations: no Sentry credentials or
+project settings were found. Requested the locations of existing demo-company
+grants and Sentry access while continuing the available configuration work.
+Neither live acceptance nor Sentry observation is complete.
+
 ## Xero multi-company accounts (plan `docs/superpowers/plans/2026-10-10-xero-multi-company.md`)
 
 - [x] Inspect schema, OAuth, refresh, disconnect, jobs, calendar, feeds and settings UI; record findings and gaps.
@@ -863,3 +1229,82 @@ Final verification on disposable local PostgreSQL 16 with a restricted applicati
 Security review fixes: removed-company custom feeds and tokens are archived/revoked with active-company projection checks; selection compares pre-inventory connection and ownership state under lock, including same-account and cross-account Remove races; runtime-role preflight rejects inherited ownership/elevated membership; confirmed Disconnect then Remove reuses locked audit proof; Starter preset picker does not count an extra company. Each finding has regression coverage.
 
 No live Xero calls were made. Authenticated browser walkthroughs, live multi-file Xero and Neon preview RLS/latency remain NOT VERIFIED. Deployment requires provisioning the restricted role and `DATABASE_APP_URL`, applying both migrations and passing the app/API role preflight, as documented in `SECURITY.md` and `AGENTS.md`.
+
+## 2026-10-21 Onboarding runtime boundary fix
+
+- [x] Trace the reported server/client error and inspect existing test coverage.
+- [x] Reproduce the boundary failure in the page regression test.
+- [x] Move callback message selection out of the client component module.
+- [x] Verify onboarding tests and required gates; record runtime verification limits.
+
+Stopping condition: fix the onboarding boundary failure, retain callback behaviour and report evidence for the timestamp errors without unrelated changes.
+
+### Review
+
+- Moved `xeroReturnMessage` unchanged into `steps/xero-return-message.ts`, outside the client component boundary. The server page passes the selected message as a serialisable prop.
+- Removed the page test's callable client-helper mock. RED: two page tests failed at the original helper call. GREEN: all 49 onboarding tests passed, including expired, cancelled and unknown callback codes.
+- PASS: Prisma generation, `bun run check` (1,322 files), `bun run typecheck` (19 tasks) and `git diff --check`.
+- Integration NOT VERIFIED: `bun run test:integration` stopped at `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No guard bypass or live fixture run was attempted.
+- Authenticated browser onboarding and absence of the timestamp errors remain NOT VERIFIED. React's documented profiler bug can produce negative measures for errored or aborted Server Components (https://github.com/react/react/issues/37561); the installed development client has the affected error path. This fix removes the confirmed onboarding render exception, without suppressing profiler errors or changing dependencies.
+
+- PASS: `bun run test`, all 18 tasks. Existing unrelated workspace changes were preserved.
+
+## 2026-10-21 Calendar loading repair
+
+- [x] Trace the calendar error boundary to the logged Prisma validation failure.
+- [x] Reproduce rejection of the invalid Xero connection query in a regression test.
+- [x] Correct the lookup using the current connection lifecycle and preserve tenant/company scoping.
+- [x] Verify calendar tests and required checks; record evidence and limits.
+
+Stopping condition: repair the demonstrated invalid calendar query without changing calendar filters, schema or unrelated work.
+
+### Review
+
+- Root cause confirmed in `.next/dev/logs/next-development.log`: Prisma rejected `db.xeroConnection.findFirst` because `archived_at` is not a connection field.
+- Replaced that predicate with `released_at: null`, consistent with the canonical connection queries; retained `clerk_org_id` and `organisation_id`. No schema, filter or UI changes.
+- RED: the new page regression failed on the emitted `archived_at` predicate. GREEN: 14 calendar test files, 69 tests passed.
+- PASS: `bun run check` (1,322 files), `bun run typecheck` (19 tasks), `git diff --check`.
+- Integration NOT VERIFIED: reused this session's unchanged prerequisite failure, `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No database guard bypass or provider operation.
+- Authenticated browser reload remains NOT VERIFIED.
+
+- PASS: `bun run test`, 18 successful tasks (app: 157 files, 994 tests).
+
+## 2026-10-21 People loading repair
+
+- [x] Trace the People page failure to its logged invalid connection archive predicate.
+- [x] Add a failing regression for the connection lookup and company selection.
+- [x] Use the current connection release predicate while retaining tenant/company scoping.
+- [x] Verify People tests and required checks; record runtime limits.
+
+Stopping condition: repair the demonstrated People page query failure, without changing directory behaviour or unrelated work.
+
+### Review
+
+- The People page log confirms Prisma rejected the connection query's `archived_at` predicate. Replaced it with `released_at: null`, consistent with canonical connection queries and the preceding calendar repair. Tenant and company predicates remain intact.
+- Added page regression coverage for the emitted query, no connection, multiple companies and rejecting a foreign company before connection access. RED: the supported-query regression failed on the old predicate. GREEN: 37 People tests across five files passed.
+- PASS: `bun run check` (1,323 files), `bun run typecheck` (19 tasks), `git diff --check`.
+- Integration NOT VERIFIED: reused this session's unchanged guard failure, `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No guard bypass or provider calls.
+- Authenticated browser reload remains NOT VERIFIED.
+
+- PASS: `bun run test`, 18 successful tasks (app: 158 files, 998 tests).
+
+## 2026-10-21 Xero people-sync repair
+
+- [x] Confirm dispatch/execution and inspect failed run summaries with tenant-scoped read-only queries.
+- [x] Isolate the pre-dispatch failure and reproduce the affected production path.
+- [x] Apply the smallest source fix and add regression coverage.
+- [x] Verify relevant suites and required checks, separating local checks from live sync proof.
+
+Stopping condition: repair the demonstrated people-sync failure without bypassing database/provider test guards or expanding into unrelated sync changes.
+
+### Review
+
+- Read-only, restricted-role queries scoped by both tenancy keys confirmed failed people runs fetched/upserted zero records with `retry_later`; the AU connection is active and unpaused. No credentials were printed or database rows changed.
+- Confirmed the compiled API transport contained a `MODULE_NOT_FOUND` stub for `../oauth/authorisation.js`. Executing the compiled credential resolver in isolation reproduced the pre-dispatch failure with fake inputs and no network.
+- Replaced the dynamic missing-file import with a static canonical resolver import, retaining dispatch-time credential lookup, tenant binding checks and injected resolver support. Added default-resolver coverage; two existing pure-mapping test files now mock the server-only marker pulled in by that import.
+- Fresh Turbopack compilation resolves the real authorisation module. Read-only `/api/inngest` introspection returned HTTP 200. The fresh compiled resolver passed a fake-credential execution without network calls.
+- Focused checks: 94 transport/read tests and 24 people-sync/access/initial-import job tests passed before the final import adjustment; the final full unit gate covers those paths.
+- PASS: typecheck (19 tasks), lint and `git diff --check`.
+- Integration and full live people-import completion remain NOT VERIFIED. Reused this session's unchanged remote-database integration guard failure; no live sync was dispatched, no provider call was made and no database guard was bypassed.
+
+- PASS: final `bun run test`, 18 successful tasks including all 730 Xero tests.

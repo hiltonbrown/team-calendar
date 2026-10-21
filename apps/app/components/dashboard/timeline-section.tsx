@@ -10,8 +10,8 @@ const HEADING = "Who is in this week";
 
 const CALENDAR_SCOPES: Record<TimelineRole, string> = {
   admin: "all_teams",
-  employee: "my_self",
-  manager: "my_team",
+  employee: "all_teams",
+  manager: "all_teams",
 };
 
 interface TimelineSectionProps {

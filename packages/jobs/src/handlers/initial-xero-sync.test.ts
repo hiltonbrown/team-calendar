@@ -123,3 +123,10 @@ describe("one durable full initial import", () => {
     expect(mocks.capture).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

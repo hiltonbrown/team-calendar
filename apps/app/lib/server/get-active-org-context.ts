@@ -1,3 +1,5 @@
+import { withTenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 
 import { requireOrg } from "@repo/auth/helpers";
@@ -19,6 +21,7 @@ export async function getActiveOrgContext(organisationId: string): Promise<
     organisationId: OrganisationId;
   }>
 > {
+  assertNoTenantTransaction("getActiveOrgContext");
   // Get authenticated Clerk Org ID
   let clerkOrgId: ClerkOrgId;
   try {
@@ -34,9 +37,8 @@ export async function getActiveOrgContext(organisationId: string): Promise<
   }
 
   // Validate organisation exists and is within scope
-  const orgResult = await getOrganisationById(
-    clerkOrgId,
-    organisationId as OrganisationId
+  const orgResult = await withTenantDb(clerkOrgId, (db) =>
+    getOrganisationById(clerkOrgId, organisationId as OrganisationId, db)
   );
 
   if (!orgResult.ok) {

@@ -1,8 +1,15 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
-import { type Database, tenantDatabase } from "@repo/database";
+import {
+  afterTenantCommit,
+  assertTenantDb,
+  type Database,
+  type TenantDb,
+  withTenantDb,
+} from "@repo/database";
 import type { notification_type } from "@repo/database/generated/enums";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
 import { enqueueNotificationEmail } from "./email-queue-service";
 import { invalidateUnreadCount } from "./notification-service";
@@ -34,13 +41,6 @@ export interface NotificationDispatchDatabase {
   person: Pick<Database["person"], "findFirst">;
 }
 
-function resolveDispatchClient(
-  clerkOrgId: string,
-  providedClient?: NotificationDispatchDatabase
-): NotificationDispatchDatabase {
-  return providedClient ?? tenantDatabase(clerkOrgId);
-}
-
 const DispatchSchema = z.object({
   actionUrl: z.string().min(1).nullable().optional(),
   actorUserId: z.string().min(1).nullable().optional(),
@@ -57,35 +57,53 @@ const DispatchSchema = z.object({
 
 export async function dispatchNotification(
   input: z.input<typeof DispatchSchema>,
-  providedClient?: NotificationDispatchDatabase,
-  options: { publishRealtime?: boolean } = {}
+  options: { publishRealtime?: boolean } | undefined,
+  db: TenantDb
 ): Promise<Result<DispatchNotificationResult, DispatchNotificationError>> {
   const parsed = DispatchSchema.safeParse(input);
   if (!parsed.success) {
-    return validationError(parsed.error);
+    return await validationError(parsed.error);
   }
-  const client = resolveDispatchClient(parsed.data.clerkOrgId, providedClient);
   if (!isKnownNotificationType(parsed.data.type)) {
-    return {
+    return await {
       error: { code: "invalid_type", message: "Unknown notification type." },
       ok: false,
     };
   }
-  const notificationType = parsed.data.type;
+  const validated = { ...parsed.data, type: parsed.data.type };
+
+  {
+    assertTenantDb(db, parsed.data.clerkOrgId);
+    const client = db;
+    return await dispatchNotificationWithClient(
+      validated,
+      client,
+      options ?? {}
+    );
+  }
+}
+
+async function dispatchNotificationWithClient(
+  input: z.infer<typeof DispatchSchema> & { type: notification_type },
+  client: TenantDb,
+  options: { publishRealtime?: boolean }
+): Promise<Result<DispatchNotificationResult, DispatchNotificationError>> {
+  const notificationType = input.type;
 
   try {
-    const [inAppEnabled, emailEnabled] = await Promise.all([
-      shouldDeliverToChannel(
+    const [inAppEnabled, emailEnabled] = [
+      await shouldDeliverToChannel(
         client,
-        { ...parsed.data, type: notificationType },
+        { ...input, type: notificationType },
         "in_app"
       ),
-      shouldDeliverToChannel(
+      await shouldDeliverToChannel(
         client,
-        { ...parsed.data, type: notificationType },
+        { ...input, type: notificationType },
         "email"
       ),
-    ]);
+    ];
+    let publication: PreparedNotificationPublication | null = null;
     const config = getTypeConfig(notificationType);
     let notificationId: string | null = null;
     let inAppDelivered = false;
@@ -93,78 +111,77 @@ export async function dispatchNotification(
     if (inAppEnabled) {
       const row = await client.notification.create({
         data: {
-          action_url: parsed.data.actionUrl ?? null,
-          actor_user_id: parsed.data.actorUserId ?? null,
-          body: parsed.data.body,
-          clerk_org_id: parsed.data.clerkOrgId,
-          object_id: parsed.data.objectId ?? null,
-          object_type: parsed.data.objectType ?? null,
-          organisation_id: parsed.data.organisationId,
-          recipient_person_id: parsed.data.recipientPersonId ?? null,
-          recipient_user_id: parsed.data.recipientUserId,
-          title: parsed.data.title,
+          action_url: input.actionUrl ?? null,
+          actor_user_id: input.actorUserId ?? null,
+          body: input.body,
+          clerk_org_id: input.clerkOrgId,
+          object_id: input.objectId ?? null,
+          object_type: input.objectType ?? null,
+          organisation_id: input.organisationId,
+          recipient_person_id: input.recipientPersonId ?? null,
+          recipient_user_id: input.recipientUserId,
+          title: input.title,
           type: notificationType,
         },
         select: {
           created_at: true,
           id: true,
+          organisation: { select: { name: true } },
         },
       });
       notificationId = row.id;
       inAppDelivered = true;
-      invalidateUnreadCount({
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-        userId: parsed.data.recipientUserId,
-      });
-      const unreadCount = await client.notification.count({
-        where: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          organisation_id: parsed.data.organisationId,
-          read_at: null,
-          recipient_user_id: parsed.data.recipientUserId,
-        },
-      });
       if (options.publishRealtime !== false) {
-        await publishNotificationEvent(
-          {
-            organisationId: parsed.data.organisationId,
-            userId: parsed.data.recipientUserId,
+        const unreadCount = await client.notification.count({
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            organisation: { clerk_org_id: input.clerkOrgId },
+            read_at: null,
+            recipient_user_id: input.recipientUserId,
           },
-          {
+        });
+        publication = {
+          clerkOrgId: input.clerkOrgId,
+          event: {
             payload: {
-              actionUrl: parsed.data.actionUrl ?? null,
-              body: parsed.data.body,
+              actionUrl: input.actionUrl ?? null,
+              body: input.body,
               category: config.userFacingCategory,
               createdAt: row.created_at.toISOString(),
               notificationId: row.id,
-              title: parsed.data.title,
+              organisationId: input.organisationId,
+              organisationName: row.organisation.name,
+              title: input.title,
               type: notificationType,
               unreadCount,
             },
             type: "notification.created",
-          }
-        ).catch(() => undefined);
+          },
+          scope: {
+            clerkOrgId: input.clerkOrgId,
+            userId: input.recipientUserId,
+          },
+        };
       }
     }
 
     let emailQueued = false;
     const emailTemplate = emailTemplateForType(notificationType);
     if (emailEnabled && emailTemplate) {
-      const recipientEmail = await resolveRecipientEmail(client, parsed.data);
+      const recipientEmail = await resolveRecipientEmail(client, input);
       if (recipientEmail) {
         const queued = await enqueueNotificationEmail(
           {
-            actionUrl: parsed.data.actionUrl ?? null,
-            body: parsed.data.body,
-            clerkOrgId: parsed.data.clerkOrgId,
+            actionUrl: input.actionUrl ?? null,
+            body: input.body,
+            clerkOrgId: input.clerkOrgId,
             emailTemplate,
             notificationId,
             notificationType,
-            organisationId: parsed.data.organisationId,
+            organisationId: input.organisationId,
             recipientEmail,
-            recipientUserId: parsed.data.recipientUserId,
-            title: parsed.data.title,
+            recipientUserId: input.recipientUserId,
+            title: input.title,
           },
           client
         );
@@ -181,6 +198,12 @@ export async function dispatchNotification(
       }
     }
 
+    if (publication) {
+      const prepared = publication;
+      afterTenantCommit(client, () =>
+        sendPreparedNotificationPublication(prepared)
+      );
+    }
     return { ok: true, value: { emailQueued, inAppDelivered, notificationId } };
   } catch {
     return {
@@ -235,11 +258,15 @@ async function resolveRecipientEmail(
   const person = await client.person.findFirst({
     select: { email: true },
     where: {
+      archived_at: null,
       clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
-      ...(input.recipientPersonId
-        ? { id: input.recipientPersonId }
-        : { clerk_user_id: input.recipientUserId }),
+      clerk_user_id: input.recipientUserId,
+      organisation: {
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+        is_active: true,
+      },
+      ...(input.recipientPersonId ? { id: input.recipientPersonId } : {}),
     },
   });
   return person?.email ?? null;
@@ -257,14 +284,42 @@ function validationError(
   };
 }
 
+interface NotificationPublicationInput {
+  clerkOrgId: string;
+  notificationId: string;
+  organisationId: string;
+}
+export interface PreparedNotificationPublication {
+  clerkOrgId: string;
+  event: Parameters<typeof publishNotificationEvent>[1];
+  scope: Parameters<typeof publishNotificationEvent>[0];
+}
+
 /** Publish an existing committed row without creating another notification or email. */
 export async function publishPersistedNotification(
-  input: { clerkOrgId: string; organisationId: string; notificationId: string },
-  client: {
-    notification: Pick<Database["notification"], "findFirst" | "count">;
-  } = tenantDatabase(input.clerkOrgId)
+  input: NotificationPublicationInput
 ): Promise<void> {
+  assertNoTenantTransaction("publishPersistedNotification");
+  const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+    prepareNotificationPublication(input, db)
+  );
+  await sendPreparedNotificationPublication(prepared);
+}
+
+export function prepareNotificationPublication(
+  input: NotificationPublicationInput,
+  db: TenantDb
+): Promise<PreparedNotificationPublication | null> {
+  assertTenantDb(db, input.clerkOrgId);
+  return loadNotificationPublication(input, db);
+}
+
+async function loadNotificationPublication(
+  input: NotificationPublicationInput,
+  client: TenantDb
+): Promise<PreparedNotificationPublication | null> {
   const row = await client.notification.findFirst({
+    include: { organisation: { select: { name: true } } },
     where: {
       clerk_org_id: input.clerkOrgId,
       id: input.notificationId,
@@ -272,35 +327,50 @@ export async function publishPersistedNotification(
     },
   });
   if (!row) {
-    return;
+    return null;
   }
-  invalidateUnreadCount({
-    clerkOrgId: input.clerkOrgId,
-    organisationId: input.organisationId,
-    userId: row.recipient_user_id,
-  });
   const unreadCount = await client.notification.count({
     where: {
       clerk_org_id: input.clerkOrgId,
-      organisation_id: input.organisationId,
+      organisation: { clerk_org_id: input.clerkOrgId },
       read_at: null,
       recipient_user_id: row.recipient_user_id,
     },
   });
-  await publishNotificationEvent(
-    { organisationId: input.organisationId, userId: row.recipient_user_id },
-    {
+  return {
+    clerkOrgId: input.clerkOrgId,
+    event: {
       payload: {
         actionUrl: row.action_url,
         body: row.body,
         category: getTypeConfig(row.type).userFacingCategory,
         createdAt: row.created_at.toISOString(),
         notificationId: row.id,
+        organisationId: row.organisation_id,
+        organisationName: row.organisation.name,
         title: row.title,
         type: row.type,
         unreadCount,
       },
       type: "notification.created",
-    }
-  );
+    },
+    scope: {
+      clerkOrgId: input.clerkOrgId,
+      userId: row.recipient_user_id,
+    },
+  };
+}
+
+export async function sendPreparedNotificationPublication(
+  prepared: PreparedNotificationPublication | null
+): Promise<void> {
+  assertNoTenantTransaction("sendPreparedNotificationPublication");
+  if (!prepared) {
+    return;
+  }
+  invalidateUnreadCount({
+    clerkOrgId: prepared.clerkOrgId,
+    userId: prepared.scope.userId,
+  });
+  await publishNotificationEvent(prepared.scope, prepared.event);
 }

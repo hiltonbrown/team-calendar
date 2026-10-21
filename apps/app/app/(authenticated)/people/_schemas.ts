@@ -41,6 +41,7 @@ const stringParam = z.preprocess(
 );
 
 export const PeopleFilterSchema = z.object({
+  companyIds: arrayParam(z.string().uuid()),
   cursor: stringParam,
   includeArchived: boolParam.default(false),
   locationId: arrayParam(z.string().uuid()),

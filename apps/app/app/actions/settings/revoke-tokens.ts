@@ -1,10 +1,11 @@
 "use server";
 
 import { auth } from "@repo/auth/server";
+import { afterTenantCommit, withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revokeAllFeedTokens } from "@repo/feeds";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const RevokeTokensSchema = z.object({
   organisationId: z.string().uuid(),
@@ -15,6 +16,7 @@ type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 export const revokeAllTokens = async (
   input: z.infer<typeof RevokeTokensSchema>
 ): Promise<Result<{ revokedCount: number }>> => {
+  assertNoTenantTransaction("revokeAllTokens");
   const parsed = RevokeTokensSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -32,19 +34,37 @@ export const revokeAllTokens = async (
     };
   }
 
-  const contextResult = await getActiveOrgContext(parsed.data.organisationId);
-  if (!contextResult.ok) {
-    return { error: contextResult.error.message, ok: false };
-  }
+  return withTenantResult(
+    orgId,
+    async (db): Promise<Result<{ revokedCount: number }>> => {
+      const company = await db.organisation.findFirst({
+        select: { id: true },
+        where: { clerk_org_id: orgId, id: parsed.data.organisationId },
+      });
+      if (!company) {
+        return {
+          error: "Organisation not found or not accessible in your context",
+          ok: false,
+        };
+      }
+      const result = await revokeAllFeedTokens(
+        {
+          clerkOrgId: orgId,
+          organisationId: company.id,
+        },
+        db
+      );
+      if (!result.ok) {
+        return { error: result.error.message, ok: false };
+      }
+      afterTenantCommit(db, () => {
+        for (const path of ["/", "/feeds", "/calendar", "/settings/feeds"]) {
+          revalidatePath(path);
+        }
 
-  const result = await revokeAllFeedTokens(contextResult.value);
-  if (!result.ok) {
-    return { error: result.error.message, ok: false };
-  }
-
-  for (const path of ["/", "/feeds", "/calendar", "/settings/feeds"]) {
-    revalidatePath(path);
-  }
-
-  return { ok: true, value: result.value };
+        return Promise.resolve();
+      });
+      return { ok: true, value: result.value };
+    }
+  );
 };

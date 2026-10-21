@@ -2,7 +2,12 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { type AppError, appError, type PlanKey, type Result } from "@repo/core";
-import { getSubscriptionForOrg, PLAN_CATALOGUE } from "@repo/database";
+import {
+  getSubscriptionForOrg,
+  PLAN_CATALOGUE,
+  withTenantDb,
+} from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import Stripe from "stripe";
 
 export const STRIPE_API_VERSION = "2025-11-17.clover";
@@ -65,6 +70,7 @@ export const createCheckoutSession = async (
   clerkOrgId: string,
   planKey: PlanKey
 ): Promise<Result<string, AppError>> => {
+  assertNoTenantTransaction("createCheckoutSession");
   const plan = PLAN_CATALOGUE.find((item) => item.plan_key === planKey);
   if (!plan?.priceId) {
     return {
@@ -84,7 +90,9 @@ export const createCheckoutSession = async (
   if (!cancel.ok) {
     return cancel;
   }
-  const subscription = await getSubscriptionForOrg(clerkOrgId);
+  const subscription = await withTenantDb(clerkOrgId, (db) =>
+    getSubscriptionForOrg(clerkOrgId, db)
+  );
   if (
     subscription &&
     !TERMINAL_SUBSCRIPTION_STATUSES.has(subscription.status)
@@ -127,12 +135,15 @@ export const createCheckoutSession = async (
 export const createPortalSession = async (
   clerkOrgId: string
 ): Promise<Result<string>> => {
+  assertNoTenantTransaction("createPortalSession");
   const stripe = getStripe();
   const returnUrl = urlEnv("STRIPE_PORTAL_RETURN_URL");
   if (!(stripe.ok && returnUrl.ok)) {
     return stripe.ok ? returnUrl : stripe;
   }
-  const subscription = await getSubscriptionForOrg(clerkOrgId);
+  const subscription = await withTenantDb(clerkOrgId, (db) =>
+    getSubscriptionForOrg(clerkOrgId, db)
+  );
   if (!subscription?.stripe_customer_id) {
     return {
       error: appError(

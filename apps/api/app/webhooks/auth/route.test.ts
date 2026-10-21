@@ -1,4 +1,4 @@
-import { tenantDatabase } from "@repo/database";
+import { referenceDatabase } from "@repo/database/tenant-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const uuidV5Pattern =
@@ -28,12 +28,29 @@ vi.mock("@repo/analytics/server", () => ({
 vi.mock("@repo/availability", () => ({
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: vi.fn(
+      async (executeTransaction: (client: unknown) => Promise<unknown>) =>
+        executeTransaction({
+          $executeRaw: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => []),
+          ...buildTenantTestDatabase(),
+        })
+    ),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return {
     organisation: { findMany: mocks.organisationFindMany },
     person: { updateMany: mocks.personUpdateMany },
-  })),
-}));
+  };
+}
 vi.mock("@repo/observability/log", () => ({
   log: {
     error: vi.fn(),
@@ -100,8 +117,10 @@ describe("Clerk organisation membership webhook handling", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(tenantDatabase).toHaveBeenCalledWith(
-      membershipFixture().organization.id
+    expect(referenceDatabase.$transaction).toHaveBeenCalledTimes(3);
+    expect(referenceDatabase.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { maxWait: 5000, timeout: 15_000 }
     );
     expect(mocks.organisationFindMany).toHaveBeenCalledWith({
       select: {
@@ -126,7 +145,8 @@ describe("Clerk organisation membership webhook handling", () => {
         email: "person@example.com",
         firstName: "Test",
         lastName: "Person",
-      }
+      },
+      expect.any(Object)
     );
   });
 

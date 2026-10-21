@@ -1,13 +1,11 @@
+import type { TenantDb } from "@repo/database";
 import "server-only";
 import { reconcileXeroPerson } from "@repo/availability";
 import type { Result } from "@repo/core";
-import {
-  scopedTo as scoped,
-  tenantDatabase,
-  tenantTransaction,
-} from "@repo/database";
+import { scopedTo as scoped, withTenantDb } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { advanceXeroSyncCursor } from "@repo/database/queries/xero-sync-cursors";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
@@ -85,6 +83,7 @@ export const syncXeroPeopleFunction: InngestFunction.Any =
       )
   );
 export function syncXeroPeople(input: unknown) {
+  assertNoTenantTransaction("syncXeroPeople");
   const parsed = SyncXeroPeopleInputSchema.safeParse(input);
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
@@ -123,10 +122,16 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
   const startedAt = new Date();
   let runId: string | null = null;
   try {
-    if (!(await isCurrentXeroSyncBinding(context))) {
+    if (
+      !(await withTenantDb(context.clerkOrgId, (db) =>
+        isCurrentXeroSyncBinding(context, db)
+      ))
+    ) {
       return { ok: true, value: emptyResult(null, "ignored") };
     }
-    const runAcquisition = await acquireSyncRun(context, "people", startedAt);
+    const runAcquisition = await withTenantDb(context.clerkOrgId, (db) =>
+      acquireSyncRun(context, "people", startedAt, db)
+    );
     if (runAcquisition.kind === "terminal") {
       const term = runAcquisition.run;
       return {
@@ -206,12 +211,12 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       .filter((id) => id.length > 0);
     await recordMappingFailures(context, run.id, failures, counts);
     for (let index = 0; index < employees.length; index += BATCH_SIZE) {
-      const runState = await tenantDatabase(
-        context.clerkOrgId
-      ).syncRun.findFirst({
-        select: { cancel_requested_at: true },
-        where: { ...scoped(context), id: run.id },
-      });
+      const runState = await withTenantDb(context.clerkOrgId, (db) =>
+        db.syncRun.findFirst({
+          select: { cancel_requested_at: true },
+          where: { ...scoped(context), id: run.id },
+        })
+      );
       if (runState?.cancel_requested_at) {
         await completeRun(context, run.id, {
           counts,
@@ -228,12 +233,12 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
         await sleep(150);
       }
     }
-    const postBatchRunState = await tenantDatabase(
-      context.clerkOrgId
-    ).syncRun.findFirst({
-      select: { cancel_requested_at: true },
-      where: { ...scoped(context), id: run.id },
-    });
+    const postBatchRunState = await withTenantDb(context.clerkOrgId, (db) =>
+      db.syncRun.findFirst({
+        select: { cancel_requested_at: true },
+        where: { ...scoped(context), id: run.id },
+      })
+    );
     if (postBatchRunState?.cancel_requested_at) {
       await completeRun(context, run.id, {
         counts,
@@ -488,20 +493,22 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await tenantDatabase(context.clerkOrgId).failedRecord.create({
-    data: {
-      clerk_org_id: context.clerkOrgId,
-      entity_type: "people",
-      error_code: input.errorCode,
-      error_message: input.errorMessage,
-      organisation_id: context.organisationId,
-      raw_payload: toPrismaJsonValue(input.rawPayload),
-      record_type: "people",
-      source_id: input.sourceId,
-      source_remote_id: input.sourceId,
-      sync_run_id: input.runId,
-    },
-  });
+  await withTenantDb(context.clerkOrgId, (db) =>
+    db.failedRecord.create({
+      data: {
+        clerk_org_id: context.clerkOrgId,
+        entity_type: "people",
+        error_code: input.errorCode,
+        error_message: input.errorMessage,
+        organisation_id: context.organisationId,
+        raw_payload: toPrismaJsonValue(input.rawPayload),
+        record_type: "people",
+        source_id: input.sourceId,
+        source_remote_id: input.sourceId,
+        sync_run_id: input.runId,
+      },
+    })
+  );
 }
 async function completeRun(
   context: SyncXeroPeopleInput,
@@ -517,7 +524,7 @@ async function completeRun(
     status: "cancelled" | "failed" | "partial_success" | "succeeded";
   }
 ) {
-  const persist = async (tx: Prisma.TransactionClient) => {
+  const persist = async (tx: TenantDb) => {
     const updated = await tx.syncRun.updateMany({
       data: {
         completed_at: new Date(),
@@ -541,7 +548,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await tenantTransaction(context.clerkOrgId, persist);
+    await withTenantDb(context.clerkOrgId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }

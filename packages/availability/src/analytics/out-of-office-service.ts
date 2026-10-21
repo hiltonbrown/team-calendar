@@ -1,3 +1,4 @@
+import { tenantAggregationCache } from "./tenant-request-cache";
 import "server-only";
 
 import {
@@ -6,7 +7,7 @@ import {
   type OrganisationId,
   type Result,
 } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type { availability_record_type } from "@repo/database/generated/enums";
 import { z } from "zod";
@@ -165,16 +166,24 @@ interface Dataset {
 }
 
 export async function aggregateOutOfOffice(
-  input: z.input<typeof AggregateSchema> & { cache?: AggregationCache }
+  input: z.input<typeof AggregateSchema> & { cache?: AggregationCache },
+  db: TenantDb
 ): Promise<Result<OutOfOfficeData, AnalyticsServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = AggregateSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof aggregateOutOfOffice> => {
     const filters = normaliseFilters(parsed.data.filters, parsed.data.role);
-    const dataset = await loadDataset(parsed.data, filters, input.cache);
+    const dataset = await loadDataset(
+      parsed.data,
+      filters,
+      tenantAggregationCache(input.clerkOrgId, client),
+      client
+    );
     if (!dataset.ok) {
       return dataset;
     }
@@ -229,22 +238,27 @@ export async function aggregateOutOfOffice(
         wfhPatternByDayOfWeek: wfhPattern(data.entries),
       },
     };
-  } catch {
-    return unknownError("Failed to aggregate out of office reports.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 export async function listOutOfOfficeRecordsForDrilldown(
-  input: z.input<typeof DrilldownSchema> & { cache?: AggregationCache }
+  input: z.input<typeof DrilldownSchema> & { cache?: AggregationCache },
+  db: TenantDb
 ): Promise<Result<RecordListPage, AnalyticsServiceError>> {
+  assertTenantDb(db, input.clerkOrgId);
   const parsed = DrilldownSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
-  try {
+  const run = async (
+    client: TenantDb
+  ): ReturnType<typeof listOutOfOfficeRecordsForDrilldown> => {
     const filters = normaliseFilters(parsed.data.filters, parsed.data.role);
-    const peopleResult = await loadPeople(parsed.data, filters);
+    const peopleResult = await loadPeople(parsed.data, filters, client);
     if (!peopleResult.ok) {
       return peopleResult;
     }
@@ -252,9 +266,7 @@ export async function listOutOfOfficeRecordsForDrilldown(
     if (personIds.length === 0) {
       return { ok: true, value: { nextCursor: null, records: [] } };
     }
-    const records = await tenantDatabase(
-      input.clerkOrgId
-    ).availabilityRecord.findMany({
+    const records = await client.availabilityRecord.findMany({
       cursor: parsed.data.cursor ? { id: parsed.data.cursor } : undefined,
       orderBy: [{ starts_at: "desc" }, { id: "desc" }],
       select: analyticsRecordSelect,
@@ -273,9 +285,11 @@ export async function listOutOfOfficeRecordsForDrilldown(
         records: pageRows.map((record) => recordListItem(record, workingDays)),
       },
     };
-  } catch {
-    return unknownError("Failed to list out of office records.");
-  }
+  };
+  return await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    return await run(db);
+  })();
 }
 
 function normaliseFilters(
@@ -299,56 +313,72 @@ function normaliseFilters(
 async function loadDataset(
   input: AggregateInput,
   filters: OutOfOfficeFilters,
-  cache?: AggregationCache
+  cache: AggregationCache | undefined,
+  db: TenantDb
 ): Promise<Result<Dataset, AnalyticsServiceError>> {
-  const key = aggregationFingerprint({
-    clerkOrgId: input.clerkOrgId,
-    dateRangeKey: `${input.dateRange.start.toISOString()}:${input.dateRange.end.toISOString()}`,
-    filterKey: { filters, role: input.role },
-    organisationId: input.organisationId,
-    serviceMethod: "out-of-office:dataset",
-  });
-  const load = () => loadDatasetUncached(input, filters);
-  return cache ? await cache.getOrLoad(key, load) : await load();
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const key = aggregationFingerprint({
+      clerkOrgId: input.clerkOrgId,
+      dateRangeKey: `${input.dateRange.start.toISOString()}:${input.dateRange.end.toISOString()}`,
+      filterKey: {
+        actingUserId: input.actingUserId,
+        filters,
+        role: input.role,
+      },
+      organisationId: input.organisationId,
+      serviceMethod: "out-of-office:dataset",
+    });
+    const load = () => loadDatasetUncached(input, filters, client);
+    return cache ? await cache.getOrLoad(key, load) : await load();
+  }
 }
 
 async function loadDatasetUncached(
   input: AggregateInput,
-  filters: OutOfOfficeFilters
+  filters: OutOfOfficeFilters,
+  db: TenantDb
 ): Promise<Result<Dataset, AnalyticsServiceError>> {
-  const peopleResult = await loadPeople(input, filters);
-  if (!peopleResult.ok) {
-    return peopleResult;
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const peopleResult = await loadPeople(input, filters, client);
+    if (!peopleResult.ok) {
+      return peopleResult;
+    }
+    const people = peopleResult.value;
+    const personIds = people.map((person) => person.id);
+    if (personIds.length === 0) {
+      return { ok: true, value: { entries: [], people, records: [] } };
+    }
+    const records = await client.availabilityRecord.findMany({
+      orderBy: [{ starts_at: "asc" }, { id: "asc" }],
+      select: analyticsRecordSelect,
+      where: recordWhere(input, filters, personIds),
+    });
+    const entries = records.flatMap((record) =>
+      expandRecordAcrossDays({
+        locationHolidays: [],
+        rangeEnd: input.dateRange.end,
+        rangeStart: input.dateRange.start,
+        record: {
+          allDay: record.all_day,
+          endsAt: record.ends_at,
+          id: record.id,
+          locationId: record.person.location_id,
+          personId: record.person_id,
+          recordType: record.record_type,
+          startsAt: record.starts_at,
+        },
+      })
+    );
+    return { ok: true, value: { entries, people, records } };
   }
-  const people = peopleResult.value;
-  const personIds = people.map((person) => person.id);
-  if (personIds.length === 0) {
-    return { ok: true, value: { entries: [], people, records: [] } };
-  }
-  const records = await tenantDatabase(
-    input.clerkOrgId
-  ).availabilityRecord.findMany({
-    orderBy: [{ starts_at: "asc" }, { id: "asc" }],
-    select: analyticsRecordSelect,
-    where: recordWhere(input, filters, personIds),
-  });
-  const entries = records.flatMap((record) =>
-    expandRecordAcrossDays({
-      locationHolidays: [],
-      rangeEnd: input.dateRange.end,
-      rangeStart: input.dateRange.start,
-      record: {
-        allDay: record.all_day,
-        endsAt: record.ends_at,
-        id: record.id,
-        locationId: record.person.location_id,
-        personId: record.person_id,
-        recordType: record.record_type,
-        startsAt: record.starts_at,
-      },
-    })
-  );
-  return { ok: true, value: { entries, people, records } };
 }
 
 async function loadPeople(
@@ -356,54 +386,66 @@ async function loadPeople(
     AggregateInput,
     "actingUserId" | "clerkOrgId" | "organisationId" | "role"
   >,
-  filters: OutOfOfficeFilters
+  filters: OutOfOfficeFilters,
+  db: TenantDb
 ): Promise<Result<PersonRow[], AnalyticsServiceError>> {
-  const scoped = scopedQuery(
-    input.clerkOrgId as ClerkOrgId,
-    input.organisationId as OrganisationId
-  );
-  const where: Prisma.PersonWhereInput = {
-    ...scoped,
-    ...(filters.includeArchivedPeople ? {} : { archived_at: null }),
-    ...(filters.locationId?.length
-      ? { location_id: { in: filters.locationId } }
-      : {}),
-    ...(filters.personId?.length ? { id: { in: filters.personId } } : {}),
-    ...(filters.teamId?.length ? { team_id: { in: filters.teamId } } : {}),
-    ...(filters.personType === "all"
-      ? {}
-      : { person_type: filters.personType }),
-  };
-  if (input.role === "viewer") {
-    where.clerk_user_id = input.actingUserId;
-  } else if (input.role === "manager") {
-    const actingPerson = await tenantDatabase(
-      input.clerkOrgId
-    ).person.findFirst({
-      select: { id: true },
-      where: {
-        ...scoped,
-        archived_at: null,
-        clerk_user_id: input.actingUserId,
-      },
-    });
-    if (!actingPerson) {
-      return { ok: true, value: [] };
-    }
-    where.id = {
-      in: await managerScopePersonIds({
-        actingPersonId: actingPerson.id,
-        clerkOrgId: input.clerkOrgId,
-        organisationId: input.organisationId,
-      }),
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const scoped = scopedQuery(
+      input.clerkOrgId as ClerkOrgId,
+      input.organisationId as OrganisationId
+    );
+    const where: Prisma.PersonWhereInput = {
+      ...scoped,
+      ...(filters.includeArchivedPeople ? {} : { archived_at: null }),
+      ...(filters.locationId?.length
+        ? { location_id: { in: filters.locationId } }
+        : {}),
+      ...(filters.personId?.length ? { id: { in: filters.personId } } : {}),
+      ...(filters.teamId?.length ? { team_id: { in: filters.teamId } } : {}),
+      ...(filters.personType === "all"
+        ? {}
+        : { person_type: filters.personType }),
     };
+    if (input.role === "viewer") {
+      where.clerk_user_id = input.actingUserId;
+    } else if (input.role === "manager") {
+      const actingPerson = await client.person.findFirst({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          clerk_user_id: input.actingUserId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: input.clerkOrgId,
+            is_active: true,
+          },
+        },
+      });
+      if (!actingPerson) {
+        return { ok: true, value: [] };
+      }
+      where.id = {
+        in: await managerScopePersonIds(
+          {
+            actingPersonId: actingPerson.id,
+            clerkOrgId: input.clerkOrgId,
+          },
+          client
+        ),
+      };
+    }
+    const people = await client.person.findMany({
+      include: { location: true, team: true },
+      orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
+      where,
+    });
+    return { ok: true, value: people };
   }
-  const people = await tenantDatabase(input.clerkOrgId).person.findMany({
-    include: { location: true, team: true },
-    orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
-    where,
-  });
-  return { ok: true, value: people };
 }
 
 function recordWhere(
@@ -689,8 +731,4 @@ function validationError(
     },
     ok: false,
   };
-}
-
-function unknownError(message: string): Result<never, AnalyticsServiceError> {
-  return { error: { code: "unknown_error", message }, ok: false };
 }

@@ -26,7 +26,6 @@ const settings: OrganisationSettings = {
   defaultPrivacyMode: "named",
   feedsIncludePublicHolidaysDefault: false,
   id: "70000000-0000-4000-8000-000000000002",
-  managerVisibilityScope: "direct_reports_only",
   notifyManagersOnStatusChange: true,
   organisationId,
   requireDeclineReason: true,

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   ),
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   materialiseAvailabilityPublication: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
@@ -22,14 +23,22 @@ vi.mock("../client", () => ({
     send: mocks.inngestSend,
   },
 }));
-vi.mock("@repo/database", () => {
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       availabilityRecord: { findMany: mocks.availabilityRecordFindMany },
     },
   };
-  return {
+  const mockedModule = {
     ...exports,
+    assertTenantDb: vi.fn(),
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
       value: {
@@ -38,13 +47,22 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
+    withTenantDb: vi.fn(
+      async (_clerkOrgId: string, callback: (db: unknown) => unknown) =>
+        callback(exports.database)
     ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  );
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/feeds", () => ({
   feedIdsForPeople: mocks.feedIdsForPeople,
@@ -97,6 +115,20 @@ it("throws execution failures with valid input at the queue boundary", async () 
   expect(mocks.availabilityRecordFindMany).toHaveBeenCalled();
 });
 describe("reconcileFeedPublications", () => {
+  it("preserves materialised records when the rebuild send fails", async () => {
+    mocks.materialiseAvailabilityPublication.mockResolvedValue(
+      materialised(true)
+    );
+    mocks.inngestSend.mockRejectedValueOnce(new Error("Queue unavailable"));
+    await expect(reconcileFeedPublications(input())).resolves.toMatchObject({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.materialiseAvailabilityPublication.mock.invocationCallOrder.at(-1)
+    ).toBeLessThan(mocks.inngestSend.mock.invocationCallOrder[0]);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.availabilityRecordFindMany.mockResolvedValue([
@@ -153,7 +185,8 @@ describe("reconcileFeedPublications", () => {
         clerkOrgId: CLERK_ORG_ID,
         invalidateCache: false,
         organisationId: ORGANISATION_ID,
-      })
+      }),
+      expect.any(Object)
     );
   });
   it("is idempotent: no rebuilds enqueued when nothing materially changed", async () => {
@@ -177,11 +210,14 @@ describe("reconcileFeedPublications", () => {
     if (result.ok) {
       expect(result.value).toMatchObject({ changed: 2, feedsQueued: 1 });
     }
-    expect(mocks.feedIdsForPeople).toHaveBeenCalledWith({
-      clerkOrgId: CLERK_ORG_ID,
-      organisationId: ORGANISATION_ID,
-      personIds: [PERSON_ID],
-    });
+    expect(mocks.feedIdsForPeople).toHaveBeenCalledWith(
+      {
+        clerkOrgId: CLERK_ORG_ID,
+        organisationId: ORGANISATION_ID,
+        personIds: [PERSON_ID],
+      },
+      expect.anything()
+    );
     const { RebuildFeedCacheInputSchema } = await import(
       "./rebuild-feed-cache"
     );

@@ -1,14 +1,28 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({ tenantDatabase: mocks.tenantDatabase }));
+vi.mock(
+  "@repo/database",
+  async () =>
+    await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )
+);
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (db: unknown) => Promise<unknown>) =>
+      mocks.poolTransaction(run),
+  },
+}));
 vi.mock("@repo/email", () => ({ sendNotificationEmail: mocks.send }));
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   findMany: vi.fn(),
+  poolTransaction: vi.fn(),
   send: vi.fn(),
-  tenantDatabase: vi.fn(),
   update: vi.fn(),
 }));
 
@@ -41,7 +55,11 @@ const queuedEmail = (overrides: Record<string, unknown> = {}) => ({
 describe("email-queue-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.tenantDatabase.mockReturnValue(client);
+    mocks.poolTransaction.mockImplementation(
+      async (run: (db: unknown) => Promise<unknown>) =>
+        run({ ...client, $queryRaw: vi.fn(async () => []) })
+    );
+
     vi.stubEnv("RESEND_FROM", "notifications@teamcalendar.test");
     vi.stubEnv("RESEND_TOKEN", "re_test_token");
     mocks.create.mockResolvedValue({
@@ -65,7 +83,7 @@ describe("email-queue-service", () => {
     async (name, value) => {
       vi.stubEnv(name, value);
 
-      const result = await sendQueuedNotificationEmails("org_1", client);
+      const result = await sendQueuedNotificationEmails("org_1");
 
       expect(result).toEqual({
         error: {
@@ -87,13 +105,13 @@ describe("email-queue-service", () => {
     ]);
     vi.stubEnv("RESEND_TOKEN", "");
 
-    const unavailable = await sendQueuedNotificationEmails("org_1", client);
+    const unavailable = await sendQueuedNotificationEmails("org_1");
 
     expect(unavailable.ok).toBe(false);
     expect(mocks.findMany).not.toHaveBeenCalled();
 
     vi.stubEnv("RESEND_TOKEN", "re_restored_token");
-    const recovered = await sendQueuedNotificationEmails("org_1", client);
+    const recovered = await sendQueuedNotificationEmails("org_1");
 
     expect(recovered).toEqual({
       ok: true,
@@ -104,8 +122,8 @@ describe("email-queue-service", () => {
   });
 
   it("creates a durable queue row with preference URL", async () => {
-    const result = await enqueueNotificationEmail(
-      {
+    const result = await withTestTenantResult(
+      tenantTestAccount({
         actionUrl: "/plans?recordId=00000000-0000-4000-8000-000000000099",
         body: "Approved.",
         clerkOrgId: "org_1",
@@ -116,8 +134,23 @@ describe("email-queue-service", () => {
         recipientEmail: "ava@example.com",
         recipientUserId: "user_1",
         title: "Leave approved",
-      },
-      client
+      }),
+      (db) =>
+        enqueueNotificationEmail(
+          {
+            actionUrl: "/plans?recordId=00000000-0000-4000-8000-000000000099",
+            body: "Approved.",
+            clerkOrgId: "org_1",
+            emailTemplate: "LeaveApproved",
+            notificationId: "00000000-0000-4000-8000-000000000101",
+            notificationType: "leave_approved",
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            recipientEmail: "ava@example.com",
+            recipientUserId: "user_1",
+            title: "Leave approved",
+          },
+          db
+        )
     );
 
     expect(result.ok).toBe(true);
@@ -133,9 +166,15 @@ describe("email-queue-service", () => {
   });
 
   it("builds a non-mutating preferences URL", () => {
-    expect(preferencesUrl("leave_submitted")).toContain(
-      "/notifications?tab=preferences&focus=leave_submitted"
-    );
+    expect(
+      preferencesUrl("leave_submitted", "00000000-0000-4000-8000-000000000001")
+    ).toContain("/notifications?tab=preferences&focus=leave_submitted");
+  });
+
+  it("links unsubscribe preferences to the notification's company", () => {
+    const url = new URL(preferencesUrl("leave_submitted", "company-B"));
+    expect(url.searchParams.get("org")).toBe("company-B");
+    expect(url.searchParams.get("tab")).toBe("preferences");
   });
 
   it("drains only the account-bound queue by default", async () => {
@@ -144,7 +183,7 @@ describe("email-queue-service", () => {
       ok: true,
       value: { failed: 0, processed: 0, sent: 0 },
     });
-    expect(mocks.tenantDatabase).toHaveBeenCalledWith("org_1");
+    expect(mocks.poolTransaction).toHaveBeenCalledOnce();
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { clerk_org_id: "org_1", status: "queued" },
@@ -155,7 +194,7 @@ describe("email-queue-service", () => {
   it("marks a successfully sent row as sent", async () => {
     mocks.findMany.mockResolvedValue([queuedEmail()]);
 
-    const result = await sendQueuedNotificationEmails("org_1", client);
+    const result = await sendQueuedNotificationEmails("org_1");
 
     expect(result).toEqual({
       ok: true,
@@ -181,7 +220,7 @@ describe("email-queue-service", () => {
     mocks.findMany.mockResolvedValue([queuedEmail({ attempts: 3 })]);
     mocks.send.mockResolvedValue({ error: "Provider unavailable", ok: false });
 
-    await sendQueuedNotificationEmails("org_1", client);
+    await sendQueuedNotificationEmails("org_1");
 
     expect(mocks.update).toHaveBeenCalledWith({
       data: {
@@ -200,7 +239,7 @@ describe("email-queue-service", () => {
     mocks.findMany.mockResolvedValue([queuedEmail({ attempts: 4 })]);
     mocks.send.mockResolvedValue({ error: "Provider unavailable", ok: false });
 
-    await sendQueuedNotificationEmails("org_1", client);
+    await sendQueuedNotificationEmails("org_1");
 
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -218,7 +257,7 @@ describe("email-queue-service", () => {
       .mockResolvedValueOnce({ error: "Provider unavailable", ok: false })
       .mockResolvedValueOnce({ ok: true, value: { id: "email_2" } });
 
-    const result = await sendQueuedNotificationEmails("org_1", client);
+    const result = await sendQueuedNotificationEmails("org_1");
 
     expect(result).toEqual({
       ok: true,

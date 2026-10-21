@@ -2,9 +2,9 @@ import "server-only";
 
 import type { Result } from "@repo/core";
 import {
+  assertTenantDb,
   resolveAccountCompanies,
-  TENANT_READ_TRANSACTION_OPTIONS,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
 import { z } from "zod";
 import {
@@ -38,73 +38,75 @@ const PreviewFeedSchema = z.object({
 });
 
 export async function previewFeed(
-  input: unknown
+  input: unknown,
+  db: TenantDb
 ): Promise<Result<PreviewEvent[], PreviewServiceError>> {
   const parsed = PreviewFeedSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
+  assertTenantDb(db, parsed.data.clerkOrgId);
   try {
-    return await tenantTransaction(
-      parsed.data.clerkOrgId,
-      async (client) => {
-        const role = normaliseRole(parsed.data.actingRole);
-        const feed = await client.feed.findFirst({
-          select: {
-            created_by_user_id: true,
-            organisation_id: true,
-            privacy_mode: true,
-            scopes: {
-              select: {
-                scope_type: true,
-                scope_value: true,
-              },
+    {
+      assertTenantDb(db, parsed.data.clerkOrgId);
+      const client = db;
+
+      const role = normaliseRole(parsed.data.actingRole);
+      const feed = await client.feed.findFirst({
+        select: {
+          created_by_user_id: true,
+          organisation_id: true,
+          privacy_mode: true,
+          scopes: {
+            select: {
+              scope_type: true,
+              scope_value: true,
             },
           },
-          where: scopedFeed(parsed.data),
-        });
-        if (!feed) {
-          return feedNotFound();
-        }
+        },
+        where: scopedFeed(parsed.data),
+      });
+      if (!feed) {
+        return feedNotFound();
+      }
 
-        const actingPerson = await client.person.findFirst({
-          select: { id: true },
-          where: {
-            archived_at: null,
-            clerk_org_id: parsed.data.clerkOrgId,
-            clerk_user_id: parsed.data.actingUserId,
-            is_active: true,
-            organisation_id: parsed.data.organisationId ?? {
-              in: (
-                await resolveAccountCompanies(parsed.data.clerkOrgId, client)
-              ).map((company) => company.id),
-            },
+      const actingPerson = await client.person.findFirst({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: parsed.data.clerkOrgId,
+          clerk_user_id: parsed.data.actingUserId,
+          is_active: true,
+          organisation_id: parsed.data.organisationId ?? {
+            in: (
+              await resolveAccountCompanies(parsed.data.clerkOrgId, client)
+            ).map((company) => company.id),
           },
-        });
-        const actingPersonId = actingPerson?.id ?? null;
+        },
+      });
+      const actingPersonId = actingPerson?.id ?? null;
 
-        const requestedPrivacy = parsed.data.privacyMode ?? feed.privacy_mode;
-        const ownsFeed = isFeedOwner(
-          {
-            createdByUserId: feed.created_by_user_id,
-            scopes: feed.scopes.map((scope) => ({
-              scopeType: scope.scope_type,
-            })),
-          },
-          parsed.data.actingUserId
-        );
-        if (
-          !(isAdminOrOwner(role) || ownsFeed) &&
-          requestedPrivacy !== feed.privacy_mode
-        ) {
-          return notAuthorised();
-        }
+      const requestedPrivacy = parsed.data.privacyMode ?? feed.privacy_mode;
+      const ownsFeed = isFeedOwner(
+        {
+          createdByUserId: feed.created_by_user_id,
+          scopes: feed.scopes.map((scope) => ({
+            scopeType: scope.scope_type,
+          })),
+        },
+        parsed.data.actingUserId
+      );
+      if (
+        !(isAdminOrOwner(role) || ownsFeed) &&
+        requestedPrivacy !== feed.privacy_mode
+      ) {
+        return notAuthorised();
+      }
 
-        const visible = await canViewFeed({
+      const visible = await canViewFeed(
+        {
           actingPersonId,
           clerkOrgId: parsed.data.clerkOrgId,
-          client,
           createdByUserId: feed.created_by_user_id,
           organisationId: feed.organisation_id,
           role,
@@ -112,31 +114,33 @@ export async function previewFeed(
             scopeType: scope.scope_type,
             scopeValue: scope.scope_value,
           })),
-        });
-        if (!visible.ok) {
-          return { error: visible.error, ok: false };
-        }
-        if (!visible.value) {
-          return notAuthorised();
-        }
+        },
+        client
+      );
+      if (!visible.ok) {
+        return { error: visible.error, ok: false };
+      }
+      if (!visible.value) {
+        return notAuthorised();
+      }
 
-        const result = await projectFeedEvents({
+      const result = await projectFeedEvents(
+        {
           actingPersonId,
           actingRole: role,
           clerkOrgId: parsed.data.clerkOrgId,
-          client,
           feedId: parsed.data.feedId,
           horizonDays: parsed.data.horizonDays,
           organisationId: feed.organisation_id,
           privacyMode: requestedPrivacy,
-        });
-        if (!result.ok) {
-          return { error: result.error, ok: false };
-        }
-        return result;
-      },
-      TENANT_READ_TRANSACTION_OPTIONS
-    );
+        },
+        client
+      );
+      if (!result.ok) {
+        return { error: result.error, ok: false };
+      }
+      return result;
+    }
   } catch {
     return {
       error: {

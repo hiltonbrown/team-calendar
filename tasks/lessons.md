@@ -158,7 +158,35 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Working with the operator
 
+- Keep verification within the user's current scope. Update affected fixtures
+  before broad checks, reuse passing results that remain valid, and rerun only
+  affected tests unless a required gate calls for the full suite. Do not resume
+  paused database or Neon checks or begin a gated stage without authorisation.
+
 - When the user supplies a database through environment variables, use that target via the guarded integration runner and owned fixtures. Do not substitute a disposable local database without an explicit request; inspect existing environment and runner configuration first.
+- Do not insist on an isolated Neon branch or API key when the user directs
+  verification against the configured database. Record that instruction against
+  the plan and retain the existing database and fixture guards.
+- Treat the owner's authorisation to change the development database schema as
+  persistent authority. Resolve pending migrations and runtime-role setup rather
+  than repeatedly reporting them as prerequisites needing new permission.
+- Do not substitute an intermediate database result or a status report for an
+  authorised verification stage. Complete available configuration and checks,
+  investigate fixture setup, and request only the specific external access that
+  is actually unavailable. When the owner specifies migrations and verification
+  first, finish that deliverable before seeking later provider or monitoring
+  access.
+- When authorised execution resumes, work through the unchecked outcomes without
+  another permission hand-off. Finish independent measurements and source fixes
+  while checking specific provider or monitoring access in parallel. Never treat
+  an external-access gap as a reason to stop unrelated authorised work.
+- Distinguish a repository's production preflight configuration from provider
+  eligibility or purchasing requirements. A missing `XERO_APP_TIER` value does
+  not establish that demo verification requires a paid subscription or upgrade;
+  report the exact configuration rule without inventing a commercial blocker.
+- Execute an explicitly requested development database reset against the
+  resolved configured target, then reapply and verify migrations. Do not replace
+  that instruction with a preserve-data migration path or a new approval gate.
 
 - When told not to block, a host permission denial ends only the denied action.
   Record it with the exact operator command in `plans/README.md` in the same
@@ -185,6 +213,10 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Dashboard design
 
+- When the user pauses verification, pause all checks, including unit tests and
+  typechecks. Continue the requested implementation and record checks as pending;
+  do not silently narrow the pause to database or network verification.
+
 - Dashboards hold frequently checked, up-to-the-minute information only. Do not
   put Xero sync failures, sync health metrics, Xero connection banners or other
   rare exception or setup states on a dashboard. Failures belong in the action
@@ -199,3 +231,7 @@ Keep one-off task evidence in that task's review, not here.
   apps, packages, scripts and tooling).
 - When the user says "commit and push" while on main, commit and push to main.
   Only create a branch if they ask for one.
+
+- For this pre-launch app, do not add compatibility parameters or bridges for
+  existing internal callers. Migrate the callers to the planned API instead;
+  internal source compatibility is not a user or account migration requirement.

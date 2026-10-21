@@ -1,3 +1,8 @@
+import type { TenantDb } from "@repo/database";
+import {
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult,
+} from "@repo/database";
 import "server-only";
 
 import type {
@@ -7,6 +12,7 @@ import type {
 } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
+  assertTenantDb,
   getSubmitOperation,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
@@ -14,10 +20,10 @@ import {
   persistSubmitRecoveryMerge,
   releaseSubmitRecoverySideEffects,
   scopedTo,
-  tenantDatabase,
-  tenantTransaction,
+  withTenantDb,
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import { z } from "zod";
 import { XERO_WRITE_CLAIM_LEASE_MS } from "../xero-write-claim";
@@ -75,7 +81,10 @@ export async function listSubmitRecoveryCandidates(
     SubmitRecoveryError
   >
 > {
-  const context = await loadRecoveryContext(input);
+  assertNoTenantTransaction("listSubmitRecoveryCandidates");
+  const context = await withTenantDb(input.clerkOrgId, (db) =>
+    loadRecoveryContext(input, db)
+  );
   if (!context.ok) {
     return context;
   }
@@ -105,11 +114,14 @@ export async function attachSubmitRecoveryCandidate(
   input: z.input<typeof AttachSchema>,
   externalWritePort: ExternalWritePort
 ): Promise<Result<void, SubmitRecoveryError>> {
+  assertNoTenantTransaction("attachSubmitRecoveryCandidate");
   const parsed = AttachSchema.safeParse(input);
   if (!parsed.success) {
     return recoveryError("invalid_input", "Invalid recovery request.");
   }
-  const context = await loadRecoveryContext(parsed.data);
+  const context = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+    loadRecoveryContext(parsed.data, db)
+  );
   if (!context.ok) {
     return context;
   }
@@ -144,13 +156,22 @@ export async function attachSubmitRecoveryCandidate(
     );
   }
 
-  const accepted = await markSubmitProviderAccepted(
+  const accepted = await withTenantDb(
     operationAttempt(
       parsed.data,
       context.value.operation.attempt_generation,
       context.value.operation.action
-    ),
-    candidate.remoteId
+    ).clerkOrgId,
+    (db) =>
+      markSubmitProviderAccepted(
+        operationAttempt(
+          parsed.data,
+          context.value.operation.attempt_generation,
+          context.value.operation.action
+        ),
+        candidate.remoteId,
+        db
+      )
   );
   if (!accepted && context.value.operation.status !== "provider_accepted") {
     return recoveryError(
@@ -170,18 +191,20 @@ export async function attachSubmitRecoveryCandidate(
     context.value.record.approval_status === targetStatus;
   const originalApprover =
     context.value.operation.action === "approve"
-      ? await tenantDatabase(parsed.data.clerkOrgId).person.findFirst({
-          select: { id: true },
-          where: {
-            ...scopedTo(parsed.data),
-            archived_at: null,
-            clerk_user_id: context.value.operation.actor_user_id,
-          },
-        })
+      ? await withTenantDb(parsed.data.clerkOrgId, (db) =>
+          db.person.findFirst({
+            select: { id: true },
+            where: {
+              ...scopedTo(parsed.data),
+              archived_at: null,
+              clerk_user_id: context.value.operation.actor_user_id,
+            },
+          })
+        )
       : null;
   if (!alreadyAttached) {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep verified recovery state, original actor and reason, merge fencing and audit in one transaction.
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await withTenantDb(parsed.data.clerkOrgId, async (tx) => {
       const duplicate = await tx.availabilityRecord.findFirst({
         where: {
           ...scopedTo(parsed.data),
@@ -272,9 +295,12 @@ export async function attachSubmitRecoveryCandidate(
     context.value.operation.attempt_generation,
     context.value.operation.action
   );
-  const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
-    attempt,
-    new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+  const sideEffectClaimedAt = await withTenantDb(attempt.clerkOrgId, (db) =>
+    acquireSubmitRecoverySideEffects(
+      attempt,
+      new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
+      db
+    )
   );
   if (!sideEffectClaimedAt) {
     return recoveryError(
@@ -291,14 +317,15 @@ export async function attachSubmitRecoveryCandidate(
     mergedRecordId,
   });
   if (!sideEffects.ok) {
-    await releaseSubmitRecoverySideEffects(attempt, sideEffectClaimedAt);
+    await withTenantDb(attempt.clerkOrgId, (db) =>
+      releaseSubmitRecoverySideEffects(attempt, sideEffectClaimedAt, db)
+    );
     return sideEffects;
   }
 
   if (
-    !(await markSubmitCompleted(
-      attempt,
-      tenantDatabase(parsed.data.clerkOrgId)
+    !(await withTenantDb(attempt.clerkOrgId, (db) =>
+      markSubmitCompleted(attempt, db)
     ))
   ) {
     return recoveryError(
@@ -348,11 +375,16 @@ async function completeRecoverySideEffects(input: {
     return recoveryError("provider_error", primary.error.message);
   }
   if (input.mergedRecordId) {
-    const duplicatePublication = await materialiseAvailabilityPublication({
+    const phaseInput1 = {
       availabilityRecordId: input.mergedRecordId,
       clerkOrgId: input.input.clerkOrgId,
       organisationId: input.input.organisationId,
-    });
+    } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
+    const duplicatePublication = await withTenantResult(
+      phaseInput1.clerkOrgId,
+      (db) => materialiseAvailabilityPublication(phaseInput1, db),
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
     if (!duplicatePublication.ok) {
       return recoveryError(
         "provider_error",
@@ -367,18 +399,21 @@ async function completeRecoverySideEffects(input: {
 export async function resolveSubmitAsNotCreated(
   input: z.input<typeof DefinitiveNotCreatedSchema>
 ): Promise<Result<void, SubmitRecoveryError>> {
+  assertNoTenantTransaction("resolveSubmitAsNotCreated");
   const parsed = DefinitiveNotCreatedSchema.safeParse(input);
   if (!parsed.success) {
     return recoveryError("invalid_input", "Invalid recovery request.");
   }
-  const operation = await getRecoveryOperation(parsed.data);
+  const operation = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+    getRecoveryOperation(parsed.data, db)
+  );
   if (operation?.status !== "outcome_unknown") {
     return recoveryError(
       "not_recoverable",
       "No uncertain leave action is awaiting resolution."
     );
   }
-  const resolved = await tenantTransaction(input.clerkOrgId, async (tx) => {
+  const resolved = await withTenantDb(input.clerkOrgId, async (tx) => {
     const marked = await markSubmitDefinitiveFailure(
       operationAttempt(
         parsed.data,
@@ -420,95 +455,107 @@ export async function resolveSubmitAsNotCreated(
   return { ok: true, value: undefined };
 }
 
-async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
-  const parsed = RecoveryScopeSchema.safeParse(input);
-  if (!parsed.success) {
-    return recoveryError("not_authorised", "Administrator access is required.");
-  }
-  const [record, operation] = await Promise.all([
-    tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
-      include: {
-        person: {
-          select: {
-            clerk_user_id: true,
-            id: true,
-            location_id: true,
-            manager: { select: { clerk_user_id: true, id: true } },
+async function loadRecoveryContext(
+  input: z.input<typeof RecoveryScopeSchema>,
+  db: TenantDb
+) {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const parsed = RecoveryScopeSchema.safeParse(input);
+    if (!parsed.success) {
+      return recoveryError(
+        "not_authorised",
+        "Administrator access is required."
+      );
+    }
+    const [record, operation] = [
+      await client.availabilityRecord.findFirst({
+        include: {
+          person: {
+            select: {
+              clerk_user_id: true,
+              id: true,
+              location_id: true,
+              manager: { select: { clerk_user_id: true, id: true } },
+            },
           },
         },
-      },
-      where: { ...scopedTo(parsed.data), id: parsed.data.recordId },
-    }),
-    getRecoveryOperation(parsed.data),
-  ]);
-  if (!record) {
-    return recoveryError("record_not_found", "Leave record not found.");
-  }
-  if (
-    !(
-      operation &&
-      ["outcome_unknown", "provider_accepted"].includes(operation.status)
-    )
-  ) {
-    return recoveryError(
-      "not_recoverable",
-      "This leave action does not require recovery."
-    );
-  }
-  if (
-    !(
-      operation.request_employee_id &&
-      (operation.request_leave_type_id || isRemoteTransition(operation)) &&
-      operation.request_starts_at &&
-      operation.request_ends_at
-    ) ||
-    operation.request_units === null
-  ) {
-    return recoveryError(
-      "provider_error",
-      "The original immutable Xero request is unavailable."
-    );
-  }
-  const immutableFingerprint = submitRequestFingerprint({
-    employeeId: operation.request_employee_id,
-    endsAt: operation.request_ends_at,
-    leaveTypeId: operation.request_leave_type_id ?? "",
-    startsAt: operation.request_starts_at,
-    title: operation.request_title,
-    units: Number(operation.request_units),
-  });
-  const fingerprint = isRemoteTransition(operation)
-    ? mutationRequestFingerprint({
-        body: operation.request_body_json,
-        method: operation.request_method as "POST",
-        url: operation.request_url ?? "",
-        xeroTenantId: operation.request_xero_tenant_id ?? "",
-      })
-    : immutableFingerprint;
-  if (fingerprint !== operation.request_fingerprint) {
-    return recoveryError(
-      "not_recoverable",
-      "The original request fingerprint is invalid."
-    );
-  }
-  return {
-    ok: true as const,
-    value: {
-      duration: Number(operation.request_units),
+        where: { ...scopedTo(parsed.data), id: parsed.data.recordId },
+      }),
+      await getRecoveryOperation(parsed.data, client),
+    ];
+    if (!record) {
+      return recoveryError("record_not_found", "Leave record not found.");
+    }
+    if (
+      !(
+        operation &&
+        ["outcome_unknown", "provider_accepted"].includes(operation.status)
+      )
+    ) {
+      return recoveryError(
+        "not_recoverable",
+        "This leave action does not require recovery."
+      );
+    }
+    if (
+      !(
+        operation.request_employee_id &&
+        (operation.request_leave_type_id || isRemoteTransition(operation)) &&
+        operation.request_starts_at &&
+        operation.request_ends_at
+      ) ||
+      operation.request_units === null
+    ) {
+      return recoveryError(
+        "provider_error",
+        "The original immutable Xero request is unavailable."
+      );
+    }
+    const immutableFingerprint = submitRequestFingerprint({
       employeeId: operation.request_employee_id,
-      input: parsed.data,
+      endsAt: operation.request_ends_at,
       leaveTypeId: operation.request_leave_type_id ?? "",
-      operation: {
-        ...operation,
-        request_employee_id: operation.request_employee_id,
-        request_ends_at: operation.request_ends_at,
-        request_leave_type_id: operation.request_leave_type_id,
-        request_starts_at: operation.request_starts_at,
-        request_units: operation.request_units,
+      startsAt: operation.request_starts_at,
+      title: operation.request_title,
+      units: Number(operation.request_units),
+    });
+    const fingerprint = isRemoteTransition(operation)
+      ? mutationRequestFingerprint({
+          body: operation.request_body_json,
+          method: operation.request_method as "POST",
+          url: operation.request_url ?? "",
+          xeroTenantId: operation.request_xero_tenant_id ?? "",
+        })
+      : immutableFingerprint;
+    if (fingerprint !== operation.request_fingerprint) {
+      return recoveryError(
+        "not_recoverable",
+        "The original request fingerprint is invalid."
+      );
+    }
+    return {
+      ok: true as const,
+      value: {
+        duration: Number(operation.request_units),
+        employeeId: operation.request_employee_id,
+        input: parsed.data,
+        leaveTypeId: operation.request_leave_type_id ?? "",
+        operation: {
+          ...operation,
+          request_employee_id: operation.request_employee_id,
+          request_ends_at: operation.request_ends_at,
+          request_leave_type_id: operation.request_leave_type_id,
+          request_starts_at: operation.request_starts_at,
+          request_units: operation.request_units,
+        },
+        record,
       },
-      record,
-    },
-  };
+    };
+  }
 }
 
 const candidateMatches = (
@@ -580,24 +627,42 @@ const recoveryError = (
   ok: false,
 });
 
-async function getRecoveryOperation(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  recordId: string;
-}) {
-  const operations = await Promise.all([
-    getSubmitOperation({ ...operationScope(input), action: "approve" }),
-    getSubmitOperation({ ...operationScope(input), action: "decline" }),
-    getSubmitOperation({ ...operationScope(input), action: "withdraw" }),
-  ]);
-  const unresolved = operations.filter(
-    (operation) =>
-      operation &&
-      ["outcome_unknown", "provider_accepted"].includes(operation.status)
-  );
-  // Multiple unresolved operations violate the record invariant. Fail
-  // closed rather than choosing an actor or payroll request arbitrarily.
-  return unresolved.length === 1 ? unresolved[0] : null;
+async function getRecoveryOperation(
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+    recordId: string;
+  },
+  db: TenantDb
+) {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const operations = [
+      await getSubmitOperation(
+        { ...operationScope(input), action: "approve" },
+        client
+      ),
+      await getSubmitOperation(
+        { ...operationScope(input), action: "decline" },
+        client
+      ),
+      await getSubmitOperation(
+        { ...operationScope(input), action: "withdraw" },
+        client
+      ),
+    ];
+    const unresolved = operations.filter(
+      (operation) =>
+        operation &&
+        ["outcome_unknown", "provider_accepted"].includes(operation.status)
+    );
+    // Multiple unresolved operations violate the record invariant. Fail
+    // closed rather than choosing an actor or payroll request arbitrarily.
+    return unresolved.length === 1 ? unresolved[0] : null;
+  }
 }
 
 const REMOTE_TRANSITION_PATH = /\/(approve|reject)$/;

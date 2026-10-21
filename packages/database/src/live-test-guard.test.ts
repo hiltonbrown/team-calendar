@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 const originalEnvironment = { ...process.env };
@@ -11,6 +11,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   process.env = { ...originalEnvironment };
 });
 
@@ -53,7 +54,7 @@ describe("database unit-test isolation", () => {
     }
   );
   it("denies a test connection when only DATABASE_URL is present", () => {
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     process.env.DATABASE_URL = "postgresql://user:password@localhost/database";
     delete process.env.ALLOW_LIVE_DATABASE_TESTS;
     expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
@@ -62,12 +63,12 @@ describe("database unit-test isolation", () => {
   });
 
   it("does not constrain production client construction", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     expect(() => assertTestDatabaseConnectionAllowed()).not.toThrow();
   });
 
   it("denies source-gate connections even when a framework changes NODE_ENV", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     process.env.TC_SOURCE_GATES = "1";
     expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
       "source-only gates"
@@ -130,7 +131,7 @@ describe("database unit-test isolation", () => {
   );
 
   it("permits local test connections when ALLOW_LOCAL_DATABASE_TESTS is enabled", () => {
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     process.env.ALLOW_LOCAL_DATABASE_TESTS = "1";
     process.env.DATABASE_URL =
       "postgresql://user:password@localhost:5432/test_db";
@@ -139,7 +140,7 @@ describe("database unit-test isolation", () => {
   });
 
   it("permits 127.0.0.1 test connections when ALLOW_LOCAL_DATABASE_TESTS is enabled", () => {
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     process.env.ALLOW_LOCAL_DATABASE_TESTS = "1";
     process.env.DATABASE_URL =
       "postgresql://user:password@127.0.0.1:5432/test_db";
@@ -148,7 +149,7 @@ describe("database unit-test isolation", () => {
   });
 
   it("denies remote database connections with ALLOW_LOCAL_DATABASE_TESTS", () => {
-    process.env.NODE_ENV = "test";
+    vi.stubEnv("NODE_ENV", "test");
     process.env.ALLOW_LOCAL_DATABASE_TESTS = "1";
     process.env.DATABASE_URL =
       "postgresql://user:password@remote.neon.tech/production_db";

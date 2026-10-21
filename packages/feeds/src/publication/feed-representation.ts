@@ -1,9 +1,11 @@
+import type { TenantDb } from "@repo/database";
 import "server-only";
 
 import { createHash } from "node:crypto";
 import type { Result } from "@repo/core";
-import { tenantTransaction } from "@repo/database";
+import { withTenantDb } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import {
   type PreviewEvent,
   projectFeedEvents,
@@ -31,9 +33,10 @@ interface RepresentationError {
 export async function establishFeedRepresentation(
   input: RepresentationScope
 ): Promise<Result<FeedRepresentation, RepresentationError>> {
+  assertNoTenantTransaction("establishFeedRepresentation");
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await tenantTransaction(
+      return await withTenantDb(
         input.clerkOrgId,
         async (tx) => reconcileRepresentation(tx, input),
         {
@@ -64,7 +67,7 @@ export async function establishFeedRepresentation(
 }
 
 async function reconcileRepresentation(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: RepresentationScope
 ): Promise<Result<FeedRepresentation, RepresentationError>> {
   const scope = {
@@ -86,12 +89,14 @@ async function reconcileRepresentation(
       ok: false,
     };
   }
-  const projected = await projectFeedEvents({
-    ...input,
-    actingRole: "viewer",
-    client: tx,
-    horizonDays: 366,
-  });
+  const projected = await projectFeedEvents(
+    {
+      ...input,
+      actingRole: "viewer",
+      horizonDays: 366,
+    },
+    tx
+  );
   if (!projected.ok) {
     if (projected.error.code === "feed_not_found") {
       return {
@@ -204,7 +209,7 @@ async function reconcileRepresentation(
 }
 
 async function markRemovedEvents(
-  tx: Prisma.TransactionClient,
+  tx: TenantDb,
   input: RepresentationScope,
   ledger: Array<{ id: string; present: boolean; source_key: string }>,
   seen: Set<string>,

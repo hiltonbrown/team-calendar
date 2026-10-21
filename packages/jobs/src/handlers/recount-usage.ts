@@ -1,4 +1,4 @@
-import { tenantDatabase, tenantTransaction } from "@repo/database";
+import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
@@ -10,42 +10,45 @@ const RecountUsageSchema = z.object({
 
 export type RecountUsageInput = z.input<typeof RecountUsageSchema>;
 
-export const recountUsage = async (input: unknown) => {
+export const recountUsage = async (input: unknown, db: TenantDb) => {
   const parsed = RecountUsageSchema.parse(input);
-  const [seats, payrollEntities, feeds] = await Promise.all([
-    tenantDatabase(parsed.clerkOrgId).person.count({
-      where: {
-        archived_at: null,
-        clerk_org_id: parsed.clerkOrgId,
-        is_active: true,
-      },
-    }),
-    tenantDatabase(parsed.clerkOrgId).organisation.count({
-      where: {
-        archived_at: null,
-        clerk_org_id: parsed.clerkOrgId,
-        is_active: true,
-      },
-    }),
-    tenantDatabase(parsed.clerkOrgId).feed.count({
-      where: {
-        archived_at: null,
-        clerk_org_id: parsed.clerkOrgId,
-        status: "active",
-      },
-    }),
-  ]);
-  const now = new Date();
-  const periodStart = new Date("1970-01-01T00:00:00.000Z");
-  const periodEnd = new Date("9999-12-31T23:59:59.999Z");
-  for (const [counterType, value] of Object.entries({
-    feeds,
-    payroll_entities: payrollEntities,
-    seats,
-  })) {
-    await tenantTransaction(
-      parsed.clerkOrgId,
-      (tx) => tx.$executeRaw`
+  assertTenantDb(db, parsed.clerkOrgId);
+  {
+    assertTenantDb(db, parsed.clerkOrgId);
+    const client = db;
+
+    const [seats, payrollEntities, feeds] = [
+      await client.person.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: parsed.clerkOrgId,
+          is_active: true,
+        },
+      }),
+      await client.organisation.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: parsed.clerkOrgId,
+          is_active: true,
+        },
+      }),
+      await client.feed.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: parsed.clerkOrgId,
+          status: "active",
+        },
+      }),
+    ];
+    const now = new Date();
+    const periodStart = new Date("1970-01-01T00:00:00.000Z");
+    const periodEnd = new Date("9999-12-31T23:59:59.999Z");
+    for (const [counterType, value] of Object.entries({
+      feeds,
+      payroll_entities: payrollEntities,
+      seats,
+    })) {
+      await client.$executeRaw`
       INSERT INTO usage_counters (id, clerk_org_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
       VALUES (gen_random_uuid(), ${parsed.clerkOrgId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
       ON CONFLICT (clerk_org_id, counter_type) DO UPDATE SET
@@ -54,10 +57,10 @@ export const recountUsage = async (input: unknown) => {
         period_start = EXCLUDED.period_start,
         period_end = EXCLUDED.period_end,
         updated_at = EXCLUDED.updated_at
-    `
-    );
+    `;
+    }
+    return { feeds, payrollEntities, seats };
   }
-  return { feeds, payrollEntities, seats };
 };
 
 export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
@@ -66,5 +69,7 @@ export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
     triggers: { event: "recount-usage" },
   },
   async ({ event, step }) =>
-    await step.run("recount-usage", async () => recountUsage(event.data))
+    await step.run("recount-usage", async () =>
+      withTenantDb(event.data.clerkOrgId, (db) => recountUsage(event.data, db))
+    )
 );

@@ -1,9 +1,11 @@
 import { constructEvent } from "@repo/billing";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { NextResponse } from "next/server";
 import { env } from "@/env";
 import { deliverStripeEvent } from "@/lib/stripe-event-delivery";
 
 export async function POST(request: Request) {
+  assertNoTenantTransaction("POST");
   const eventResult = constructEvent(
     await request.text(),
     request.headers.get("stripe-signature"),

@@ -1,7 +1,9 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { SupportSubmissionPayloadSchema } from "@repo/core";
+import { withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { createSupportGitHubIssue } from "@/lib/github/create-support-issue-service";
@@ -32,6 +34,7 @@ interface SupportGitHubIssueSuccessResponse {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  assertNoTenantTransaction("POST");
   try {
     let clerkOrgId: string;
     try {
@@ -105,7 +108,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (organisationContext.value?.organisationId) {
-      const auditResult = await persistSupportSubmissionAudit({
+      const phaseInput1 = {
         category: parsedBody.data.category,
         clerkOrgId: clerkOrgId as ClerkOrgId,
         issueNumber: result.value.issueNumber,
@@ -117,11 +120,16 @@ export async function POST(request: Request): Promise<Response> {
         status: "created",
         subject: parsedBody.data.subject,
         userId: user.id,
-      });
+      } satisfies Parameters<typeof persistSupportSubmissionAudit>[0];
+      // The issue already exists, so an audit failure is logged, never surfaced.
+      const auditResult = await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+        persistSupportSubmissionAudit(phaseInput1, db)
+      ).catch((error: unknown) => ({ error, ok: false as const }));
 
       if (!auditResult.ok) {
         log.error("Failed to persist support submission audit event", {
           clerkOrgId,
+          error: auditResult.error,
           issueNumber: result.value.issueNumber,
           organisationId: organisationContext.value.organisationId,
           userId: user.id,
@@ -180,10 +188,14 @@ async function resolveOrganisationContext(
     };
   }
 
-  const organisationResult = await getOrganisationById(
-    // Query helpers use branded IDs, this route derives the scoped raw values from Clerk auth and a validated UUID.
+  const organisationResult = await withTenantResult(
     clerkOrgId as ClerkOrgId,
-    parsedOrganisationId.data as OrganisationId
+    (db) =>
+      getOrganisationById(
+        clerkOrgId as ClerkOrgId,
+        parsedOrganisationId.data as OrganisationId,
+        db
+      )
   );
 
   if (!organisationResult.ok) {

@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -13,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   })),
-  transaction: vi.fn(async (cb: (tx: any) => Promise<any>) =>
+  transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
     cb({
       alternativeContact: {
         create: mocks.alternativeContactCreate,
@@ -33,41 +35,40 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       $transaction: mocks.transaction,
       alternativeContact: {
+        create: mocks.alternativeContactCreate,
+        delete: mocks.alternativeContactDelete,
         findFirst: mocks.alternativeContactFindFirst,
         findMany: mocks.alternativeContactFindMany,
+        update: mocks.alternativeContactUpdate,
       },
+      auditEvent: { create: mocks.auditEventCreate },
       person: {
         findFirst: mocks.personFindFirst,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: mocks.transaction,
-        alternativeContact: {
-          findFirst: mocks.alternativeContactFindFirst,
-          findMany: mocks.alternativeContactFindMany,
-        },
-        person: {
-          findFirst: mocks.personFindFirst,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 
 const {
   addAlternativeContact,
@@ -119,10 +120,20 @@ describe("alternative contact service", () => {
 
   describe("addAlternativeContact", () => {
     it("validates input: fails if neither email nor phone is provided", async () => {
-      const result = await addAlternativeContact({
-        ...testContext,
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -135,11 +146,22 @@ describe("alternative contact service", () => {
     });
 
     it("validates input: fails on invalid email format", async () => {
-      const result = await addAlternativeContact({
-        ...testContext,
-        email: "not-an-email",
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "not-an-email",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "not-an-email",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -150,11 +172,22 @@ describe("alternative contact service", () => {
     it("enforces tenant scoping when resolving person; returns person_not_found when missing", async () => {
       mocks.personFindFirst.mockResolvedValue(null);
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        email: "jane@example.com",
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "jane@example.com",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -177,11 +210,22 @@ describe("alternative contact service", () => {
           organisation_id: "99999999-0000-4000-8000-000000000099",
         }); // unscoped lookup finds across tenant boundary
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        email: "jane@example.com",
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "jane@example.com",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -204,13 +248,26 @@ describe("alternative contact service", () => {
         manager_person_id: "50000000-0000-4000-8000-000000000001",
       });
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        actingPersonId: "60000000-0000-4000-8000-000000000001",
-        actingRole: "viewer",
-        email: "jane@example.com",
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          actingPersonId: "60000000-0000-4000-8000-000000000001",
+          actingRole: "viewer",
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              actingPersonId: "60000000-0000-4000-8000-000000000001",
+              actingRole: "viewer",
+              email: "jane@example.com",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -229,13 +286,26 @@ describe("alternative contact service", () => {
         manager_person_id: managerPersonId,
       });
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        actingPersonId: managerPersonId,
-        actingRole: "manager",
-        email: "jane@example.com",
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          actingPersonId: managerPersonId,
+          actingRole: "manager",
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              actingPersonId: managerPersonId,
+              actingRole: "manager",
+              email: "jane@example.com",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       expect(mocks.alternativeContactCreate).toHaveBeenCalled();
@@ -247,13 +317,26 @@ describe("alternative contact service", () => {
         manager_person_id: "50000000-0000-4000-8000-000000000001",
       });
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        actingPersonId: testContext.personId,
-        actingRole: "viewer",
-        email: "jane@example.com",
-        name: "Jane Doe",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          actingPersonId: testContext.personId,
+          actingRole: "viewer",
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              actingPersonId: testContext.personId,
+              actingRole: "viewer",
+              email: "jane@example.com",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       expect(mocks.alternativeContactCreate).toHaveBeenCalled();
@@ -262,14 +345,28 @@ describe("alternative contact service", () => {
     it("assigns display_order 0 for the first contact and writes audit event", async () => {
       mocks.alternativeContactFindFirst.mockResolvedValue(null);
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        email: "jane@example.com",
-        name: "Jane Doe",
-        notes: "Available mornings",
-        phone: "+61411111111",
-        role: "Stand-in",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "jane@example.com",
+          name: "Jane Doe",
+          notes: "Available mornings",
+          phone: "+61411111111",
+          role: "Stand-in",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "jane@example.com",
+              name: "Jane Doe",
+              notes: "Available mornings",
+              phone: "+61411111111",
+              role: "Stand-in",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       expect(mocks.alternativeContactCreate).toHaveBeenCalledWith({
@@ -300,11 +397,22 @@ describe("alternative contact service", () => {
     it("increments display_order when other contacts already exist", async () => {
       mocks.alternativeContactFindFirst.mockResolvedValue({ display_order: 2 });
 
-      await addAlternativeContact({
-        ...testContext,
-        email: "second@example.com",
-        name: "Second Contact",
-      });
+      await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "second@example.com",
+          name: "Second Contact",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "second@example.com",
+              name: "Second Contact",
+            },
+            db
+          )
+      );
 
       expect(mocks.alternativeContactCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -315,14 +423,28 @@ describe("alternative contact service", () => {
     });
 
     it("maps empty strings to null for optional contact fields", async () => {
-      await addAlternativeContact({
-        ...testContext,
-        email: "",
-        name: "Phone Only Contact",
-        notes: "   ",
-        phone: "+61400000000",
-        role: "",
-      });
+      await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "",
+          name: "Phone Only Contact",
+          notes: "   ",
+          phone: "+61400000000",
+          role: "",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "",
+              name: "Phone Only Contact",
+              notes: "   ",
+              phone: "+61400000000",
+              role: "",
+            },
+            db
+          )
+      );
 
       expect(mocks.alternativeContactCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -337,21 +459,28 @@ describe("alternative contact service", () => {
     });
 
     it("returns unknown_error when a database operation fails", async () => {
-      mocks.transaction.mockRejectedValueOnce(new Error("DB failure"));
+      mocks.alternativeContactCreate.mockRejectedValueOnce(
+        new Error("DB failure")
+      );
 
-      const result = await addAlternativeContact({
-        ...testContext,
-        email: "jane@example.com",
-        name: "Jane Doe",
-      });
+      const result = withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          email: "jane@example.com",
+          name: "Jane Doe",
+        }),
+        (db) =>
+          addAlternativeContact(
+            {
+              ...testContext,
+              email: "jane@example.com",
+              name: "Jane Doe",
+            },
+            db
+          )
+      );
 
-      expect(result).toEqual({
-        error: {
-          code: "unknown_error",
-          message: "Failed to add alternative contact.",
-        },
-        ok: false,
-      });
+      await expect(result).rejects.toThrow("DB failure");
     });
   });
 
@@ -373,11 +502,22 @@ describe("alternative contact service", () => {
     };
 
     it("rejects an empty patch with validation_error", async () => {
-      const result = await updateAlternativeContact({
-        ...testContext,
-        contactId,
-        patch: {},
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          contactId,
+          patch: {},
+        }),
+        (db) =>
+          updateAlternativeContact(
+            {
+              ...testContext,
+              contactId,
+              patch: {},
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -391,11 +531,22 @@ describe("alternative contact service", () => {
     it("returns contact_not_found when the contact does not exist in scope", async () => {
       mocks.alternativeContactFindFirst.mockResolvedValue(null);
 
-      const result = await updateAlternativeContact({
-        ...testContext,
-        contactId,
-        patch: { name: "New Name" },
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          contactId,
+          patch: { name: "New Name" },
+        }),
+        (db) =>
+          updateAlternativeContact(
+            {
+              ...testContext,
+              contactId,
+              patch: { name: "New Name" },
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -414,11 +565,22 @@ describe("alternative contact service", () => {
           organisation_id: "99999999-0000-4000-8000-000000000099",
         });
 
-      const result = await updateAlternativeContact({
-        ...testContext,
-        contactId,
-        patch: { name: "New Name" },
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          contactId,
+          patch: { name: "New Name" },
+        }),
+        (db) =>
+          updateAlternativeContact(
+            {
+              ...testContext,
+              contactId,
+              patch: { name: "New Name" },
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -444,13 +606,26 @@ describe("alternative contact service", () => {
         },
       });
 
-      const result = await updateAlternativeContact({
-        ...testContext,
-        actingPersonId: "70000000-0000-4000-8000-000000000001",
-        actingRole: "viewer",
-        contactId,
-        patch: { name: "New Name" },
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          actingPersonId: "70000000-0000-4000-8000-000000000001",
+          actingRole: "viewer",
+          contactId,
+          patch: { name: "New Name" },
+        }),
+        (db) =>
+          updateAlternativeContact(
+            {
+              ...testContext,
+              actingPersonId: "70000000-0000-4000-8000-000000000001",
+              actingRole: "viewer",
+              contactId,
+              patch: { name: "New Name" },
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -467,11 +642,22 @@ describe("alternative contact service", () => {
         phone: null,
       });
 
-      const result = await updateAlternativeContact({
-        ...testContext,
-        contactId,
-        patch: { email: "" },
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          contactId,
+          patch: { email: "" },
+        }),
+        (db) =>
+          updateAlternativeContact(
+            {
+              ...testContext,
+              contactId,
+              patch: { email: "" },
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -485,14 +671,28 @@ describe("alternative contact service", () => {
     it("updates contact successfully and creates an audit event", async () => {
       mocks.alternativeContactFindFirst.mockResolvedValue(existingContact);
 
-      const result = await updateAlternativeContact({
-        ...testContext,
-        contactId,
-        patch: {
-          name: "Updated Name",
-          role: "New Role",
-        },
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          contactId,
+          patch: {
+            name: "Updated Name",
+            role: "New Role",
+          },
+        }),
+        (db) =>
+          updateAlternativeContact(
+            {
+              ...testContext,
+              contactId,
+              patch: {
+                name: "Updated Name",
+                role: "New Role",
+              },
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       expect(mocks.alternativeContactUpdate).toHaveBeenCalledWith({
@@ -541,10 +741,20 @@ describe("alternative contact service", () => {
         { id: "40000000-0000-4000-8000-000000000002" },
       ]);
 
-      const result = await deleteAlternativeContact({
-        ...testContext,
-        contactId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          contactId,
+        }),
+        (db) =>
+          deleteAlternativeContact(
+            {
+              ...testContext,
+              contactId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -578,12 +788,24 @@ describe("alternative contact service", () => {
         },
       });
 
-      const result = await deleteAlternativeContact({
-        ...testContext,
-        actingPersonId: "80000000-0000-4000-8000-000000000001",
-        actingRole: "viewer",
-        contactId,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          actingPersonId: "80000000-0000-4000-8000-000000000001",
+          actingRole: "viewer",
+          contactId,
+        }),
+        (db) =>
+          deleteAlternativeContact(
+            {
+              ...testContext,
+              actingPersonId: "80000000-0000-4000-8000-000000000001",
+              actingRole: "viewer",
+              contactId,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -608,10 +830,20 @@ describe("alternative contact service", () => {
         { id: contactId2 },
       ]);
 
-      const result = await reorderAlternativeContacts({
-        ...testContext,
-        orderedContactIds: [contactId1, contactId3],
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          orderedContactIds: [contactId1, contactId3],
+        }),
+        (db) =>
+          reorderAlternativeContacts(
+            {
+              ...testContext,
+              orderedContactIds: [contactId1, contactId3],
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {
@@ -631,10 +863,20 @@ describe("alternative contact service", () => {
       ]);
 
       const reordered = [contactId3, contactId1, contactId2];
-      const result = await reorderAlternativeContacts({
-        ...testContext,
-        orderedContactIds: reordered,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          orderedContactIds: reordered,
+        }),
+        (db) =>
+          reorderAlternativeContacts(
+            {
+              ...testContext,
+              orderedContactIds: reordered,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         ok: true,
@@ -668,12 +910,24 @@ describe("alternative contact service", () => {
         manager_person_id: "50000000-0000-4000-8000-000000000001",
       });
 
-      const result = await reorderAlternativeContacts({
-        ...testContext,
-        actingPersonId: "90000000-0000-4000-8000-000000000001",
-        actingRole: "viewer",
-        orderedContactIds: contactIds,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...testContext,
+          actingPersonId: "90000000-0000-4000-8000-000000000001",
+          actingRole: "viewer",
+          orderedContactIds: contactIds,
+        }),
+        (db) =>
+          reorderAlternativeContacts(
+            {
+              ...testContext,
+              actingPersonId: "90000000-0000-4000-8000-000000000001",
+              actingRole: "viewer",
+              orderedContactIds: contactIds,
+            },
+            db
+          )
+      );
 
       expect(result).toEqual({
         error: {

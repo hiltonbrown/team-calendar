@@ -17,36 +17,40 @@ vi.mock("../client", () => ({
     send: mockInngestSend,
   },
 }));
-// Prisma delegates expose methods through a proxy rather than own descriptors.
-// Forward the real read and inject the competing write after its snapshot resolves.
-vi.mock("@repo/database", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@repo/database")>();
+// Extend the restricted pool's query hook without changing the transaction client's identity.
+vi.mock("@repo/database/tenant-client", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("@repo/database/tenant-client")>();
   return {
     ...original,
-    tenantDatabase: (clerkOrgId: string) =>
-      new Proxy(original.tenantDatabase(clerkOrgId), {
-        get(target, property, receiver) {
-          if (property !== "availabilityRecord") {
-            return Reflect.get(target, property, receiver);
-          }
-          return new Proxy(target.availabilityRecord, {
-            get(delegate, method, delegateReceiver) {
-              if (method !== "findMany") {
-                return Reflect.get(delegate, method, delegateReceiver);
-              }
-              return async (
-                args: import("@repo/database").Prisma.AvailabilityRecordFindManyArgs
-              ) => {
-                const rows = await delegate.findMany(args);
-                if (args.select?.source_last_modified_at === true) {
-                  await afterSnapshotRead();
-                }
-                return rows;
-              };
-            },
-          });
-        },
-      }),
+    referenceDatabase: new Proxy(original.referenceDatabase, {
+      get(target, property, receiver) {
+        if (property !== "$transaction") {
+          return Reflect.get(target, property, receiver);
+        }
+        return <T>(
+          run: (
+            db: import("@repo/database").Prisma.TransactionClient
+          ) => Promise<T>,
+          options: import("@repo/database").TenantTransactionOptions
+        ) =>
+          target
+            .$extends({
+              query: {
+                availabilityRecord: {
+                  async findMany({ args, query }) {
+                    const rows = await query(args);
+                    if (args.select?.source_last_modified_at === true) {
+                      await afterSnapshotRead();
+                    }
+                    return rows;
+                  },
+                },
+              },
+            })
+            .$transaction(run, options);
+      },
+    }),
   };
 });
 vi.mock("@repo/xero", async (importOriginal) => {

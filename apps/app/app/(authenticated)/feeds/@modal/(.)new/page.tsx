@@ -1,11 +1,13 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { normaliseRole } from "@repo/feeds";
 import { FeedCreateForm } from "@/components/feed/feed-create-form";
 import { InterceptingModalShell } from "@/components/modals/intercepting-modal-shell";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
 import { withOrg } from "@/lib/navigation/org-url";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 
 interface NewFeedModalPageProps {
   searchParams: Promise<{ org?: string }>;
@@ -15,13 +17,43 @@ const NewFeedModalPage = async ({ searchParams }: NewFeedModalPageProps) => {
   const { org } = await searchParams;
   const { orgRole } = await auth();
   const role = normaliseRole(orgRole);
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(org);
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
   const canManage =
     role === "admin" ||
     role === "owner" ||
     role === "org:admin" ||
     role === "org:owner";
+  const { organisationId, orgQueryValue, teams, people } = await withTenantDb(
+    clerkOrgId,
+    async (db) => {
+      const context = await resolveActiveOrgPageContext(clerkOrgId, org, db);
+      const scopedOrganisationId = context.organisationId;
+      const [preparedTeams, preparedPeople] = canManage
+        ? ([
+            await db.team.findMany({
+              orderBy: { name: "asc" },
+              select: { id: true, name: true },
+              where: {
+                clerk_org_id: clerkOrgId,
+                organisation_id: scopedOrganisationId,
+              },
+            }),
+            await db.person.findMany({
+              orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
+              select: { first_name: true, id: true, last_name: true },
+              where: {
+                archived_at: null,
+                clerk_org_id: clerkOrgId,
+                is_active: true,
+                organisation_id: scopedOrganisationId,
+              },
+            }),
+          ] as const)
+        : [[], []];
+      return { ...context, people: preparedPeople, teams: preparedTeams };
+    },
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
   if (!canManage) {
     return (
       <InterceptingModalShell size="wide" title="New feed">
@@ -34,23 +66,6 @@ const NewFeedModalPage = async ({ searchParams }: NewFeedModalPageProps) => {
       </InterceptingModalShell>
     );
   }
-  const [teams, people] = await Promise.all([
-    tenantDatabase(clerkOrgId).team.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
-    }),
-    tenantDatabase(clerkOrgId).person.findMany({
-      orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
-      select: { first_name: true, id: true, last_name: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        is_active: true,
-        organisation_id: organisationId,
-      },
-    }),
-  ]);
 
   return (
     <InterceptingModalShell size="wide" title="New feed">

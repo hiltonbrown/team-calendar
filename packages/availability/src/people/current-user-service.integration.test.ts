@@ -1,6 +1,8 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { employment_type, source_system } from "@repo/database/generated/enums";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { TenantContext } from "./current-user-service";
 
@@ -60,11 +62,19 @@ describe("current-user-service integration", () => {
       createPerson(tenantB, "case.match@example.com", "Candidate", "B"),
     ]);
 
-    const result = await ensureCurrentUserPerson(contextFor(tenantA), {
-      clerkUserId: "user_case_match",
-      displayName: "Case Match",
-      email: " case.match@example.com ",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_case_match",
+            displayName: "Case Match",
+            email: " case.match@example.com ",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({ ok: true, value: { id: candidateA.id } });
     await expect(
@@ -88,14 +98,30 @@ describe("current-user-service integration", () => {
       })),
     });
 
-    const accepted = await ensureCurrentUserPerson(contextFor(tenantA), {
-      clerkUserId: "user_ninth",
-      email: "ninth@example.com",
-    });
-    const rejected = await ensureCurrentUserPerson(contextFor(tenantA), {
-      clerkUserId: "user_tenth",
-      email: "tenth@example.com",
-    });
+    const accepted = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_ninth",
+            email: "ninth@example.com",
+          },
+          db
+        )
+    );
+    const rejected = await withTestTenantResult(
+      tenantTestAccount(contextFor(tenantA)),
+      (db) =>
+        ensureCurrentUserPerson(
+          contextFor(tenantA),
+          {
+            clerkUserId: "user_tenth",
+            email: "tenth@example.com",
+          },
+          db
+        )
+    );
 
     expect(accepted.ok).toBe(true);
     expect(rejected).toEqual({
@@ -123,8 +149,12 @@ describe("current-user-service integration", () => {
     };
 
     const results = await Promise.all([
-      ensureCurrentUserPerson(contextFor(tenantA), input),
-      ensureCurrentUserPerson(contextFor(tenantA), input),
+      withTestTenantResult(tenantTestAccount(contextFor(tenantA)), (db) =>
+        ensureCurrentUserPerson(contextFor(tenantA), input, db)
+      ),
+      withTestTenantResult(tenantTestAccount(contextFor(tenantA)), (db) =>
+        ensureCurrentUserPerson(contextFor(tenantA), input, db)
+      ),
     ]);
 
     expect(results.every((result) => result.ok)).toBe(true);

@@ -1,3 +1,63 @@
+const tenantPoolMocks = vi.hoisted(() => ({
+  organisationFindFirst: vi.fn((query: { where: { id?: string } }) =>
+    Promise.resolve(
+      query.where.id === "00000000-0000-4000-8000-000000000001"
+        ? {
+            country_code: "AU",
+            id: "00000000-0000-4000-8000-000000000001",
+            name: "Company A",
+            timezone: "Australia/Brisbane",
+          }
+        : null
+    )
+  ),
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (client: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: tenantPoolMocks.organisationFindFirst,
+          findMany: vi.fn(() =>
+            Promise.resolve([
+              {
+                country_code: "AU",
+                id: "00000000-0000-4000-8000-000000000001",
+                name: "Company A",
+                timezone: "Australia/Brisbane",
+              },
+            ])
+          ),
+        },
+        person: {
+          findFirst: vi.fn(() =>
+            Promise.resolve({
+              id: "person-1",
+              organisation_id: "00000000-0000-4000-8000-000000000001",
+            })
+          ),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/account-companies")
+  >("../../../../../packages/database/src/queries/account-companies")),
+
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/organisations")
+  >("../../../../../packages/database/src/queries/organisations")),
+}));
+vi.mock("@repo/auth/helpers", () => ({
+  requireOrg: () => Promise.resolve("org_1"),
+}));
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +85,7 @@ vi.mock("@/lib/auth/require-page-role", () => ({
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,
@@ -112,7 +173,8 @@ describe("FeedPage", () => {
     expect(screen.getByRole("button", { name: CREATE_PERSONAL })).toBeTruthy();
     expect(screen.queryByRole("button", { name: CREATE_TEAM })).toBeNull();
     expect(mocks.listFeeds).toHaveBeenCalledWith(
-      expect.objectContaining({ filters: { status: ["active", "paused"] } })
+      expect.objectContaining({ filters: { status: ["active", "paused"] } }),
+      expect.any(Object)
     );
   });
 

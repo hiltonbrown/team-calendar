@@ -1,4 +1,6 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -159,10 +161,20 @@ describe("local persistence integration", async () => {
         "@repo/database/queries/xero-sync-cursors"
       );
       expect(
-        await completeXeroInitialSync({
-          ...syncInput(tenantA),
-          requestedAt: requestedAt.toISOString(),
-        })
+        await withTestTenantDb(
+          tenantTestAccount({
+            ...syncInput(tenantA),
+            requestedAt: requestedAt.toISOString(),
+          }),
+          (db) =>
+            completeXeroInitialSync(
+              {
+                ...syncInput(tenantA),
+                requestedAt: requestedAt.toISOString(),
+              },
+              db
+            )
+        )
       ).toBeInstanceOf(Date);
     });
     it("fences old external file and old initial request before database persistence", async () => {

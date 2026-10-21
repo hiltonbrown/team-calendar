@@ -1,3 +1,60 @@
+const tenantPoolMocks = vi.hoisted(() => ({
+  organisationFindFirst: vi.fn((query: { where: { id?: string } }) =>
+    Promise.resolve(
+      query.where.id === "00000000-0000-4000-8000-000000000001"
+        ? {
+            country_code: "AU",
+            id: "00000000-0000-4000-8000-000000000001",
+            name: "Company A",
+            timezone: "Australia/Brisbane",
+          }
+        : null
+    )
+  ),
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: (run: (client: unknown) => Promise<unknown>) =>
+      run({
+        $executeRaw: vi.fn(() => Promise.resolve(1)),
+        $queryRaw: vi.fn(() => Promise.resolve([])),
+        organisation: {
+          findFirst: tenantPoolMocks.organisationFindFirst,
+          findMany: vi.fn(() =>
+            Promise.resolve([
+              {
+                country_code: "AU",
+                id: "00000000-0000-4000-8000-000000000001",
+                name: "Company A",
+                timezone: "Australia/Brisbane",
+              },
+            ])
+          ),
+        },
+        person: {
+          findFirst: vi.fn(() =>
+            Promise.resolve({
+              id: "person-1",
+              organisation_id: "00000000-0000-4000-8000-000000000001",
+            })
+          ),
+        },
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/account-companies")
+  >("../../../../../packages/database/src/queries/account-companies")),
+
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/organisations")
+  >("../../../../../packages/database/src/queries/organisations")),
+}));
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { createElement, Fragment, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,6 +117,7 @@ vi.mock("@/lib/auth/require-page-role", () => ({
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("@repo/design-system/components/ui/button", () => ({
   Button: ({ children }: { children: ReactNode }) =>
@@ -98,7 +156,7 @@ const { default: PlansPage } = await import("./page");
 describe("Plans page server data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
     mocks.currentUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: "person@example.com" }],
       firstName: "Test",
@@ -124,7 +182,7 @@ describe("Plans page server data", () => {
   });
   afterEach(() => cleanup());
   it("offers Connect Xero only for a verified disconnected admin", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
     expect(
       screen.getByRole("link", { name: "Connect Xero to submit leave" })
@@ -134,7 +192,7 @@ describe("Plans page server data", () => {
     ).toBeDefined();
   });
   it("shows cannot-check recovery without a reconnect prompt for an unavailable admin", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       error: { code: "state_unavailable" },
       ok: false,
@@ -163,14 +221,16 @@ describe("Plans page server data", () => {
         email: "person@example.com",
         firstName: "Test",
         lastName: "Person",
-      }
+      },
+      expect.any(Object)
     );
     expect(mocks.listMyRecords).toHaveBeenCalledWith(
       expect.objectContaining({
         clerkOrgId: "org_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
         userId: "user_1",
-      })
+      }),
+      expect.any(Object)
     );
   });
   it("does not render the generic fetch error when person linking conflicts", async () => {
@@ -193,7 +253,7 @@ describe("Plans page server data", () => {
     expect(screen.getByText("Plans client: 0")).toBeDefined();
   });
   it("passes the imported recovery filter through the scoped administrator Plans route", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     render(
       await PlansPage({
         searchParams: Promise.resolve({
@@ -210,7 +270,8 @@ describe("Plans page server data", () => {
         clerkOrgId: "org_1",
         filters: expect.objectContaining({ sourceType: ["xero_leave"] }),
         organisationId: "00000000-0000-4000-8000-000000000001",
-      })
+      }),
+      expect.any(Object)
     );
     expect(mocks.listMyRecords).not.toHaveBeenCalled();
   });

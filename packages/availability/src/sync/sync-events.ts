@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { Inngest } from "inngest";
 import { z } from "zod";
 
@@ -73,6 +74,7 @@ export async function dispatchSyncEvent(
     }
   >
 > {
+  assertNoTenantTransaction("dispatchSyncEvent");
   const parsed = SyncEventSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -131,6 +133,7 @@ export async function dispatchCancelSyncRun(
     }
   >
 > {
+  assertNoTenantTransaction("dispatchCancelSyncRun");
   const parsed = CancelSyncEventSchema.safeParse(input);
   if (!parsed.success) {
     return {

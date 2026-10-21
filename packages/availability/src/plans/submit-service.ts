@@ -1,3 +1,8 @@
+import type { TenantDb } from "@repo/database";
+import {
+  TENANT_READ_TRANSACTION_OPTIONS,
+  withTenantResult,
+} from "@repo/database";
 import "server-only";
 import { createHash } from "node:crypto";
 import type {
@@ -9,6 +14,7 @@ import type {
 import { xeroRecoveryMessage } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
+  assertTenantDb,
   getSubmitOperation,
   hasUnresolvedSubmitOperation,
   markSubmitCompleted,
@@ -16,19 +22,19 @@ import {
   markSubmitOutcomeUnknown,
   markSubmitProviderAccepted,
   releaseSubmitRecoverySideEffects,
+  resolveAccountCompanies,
   scopedTo as scoped,
-  tenantDatabase,
-  tenantTransaction,
+  withTenantDb,
 } from "@repo/database";
 import {
   type AvailabilityRecord,
   Prisma,
 } from "@repo/database/generated/client";
 import type { availability_approval_status } from "@repo/database/generated/enums";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import {
   dispatchNotification,
-  type NotificationDispatchDatabase,
   publishPersistedNotification,
 } from "@repo/notifications";
 import { log } from "@repo/observability/log";
@@ -51,6 +57,7 @@ import {
   prepareXeroWrite as prepareJournaledWrite,
   recordXeroWriteOutcome,
 } from "./write-operation";
+
 export type SubmitServiceError =
   | {
       code: "invalid_state_for_retry";
@@ -124,12 +131,14 @@ export async function submitDraftRecord(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
+  assertNoTenantTransaction("submitDraftRecord");
   return await transitionLocalSubmission(input, "draft", externalWritePort);
 }
 export async function retrySubmission(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
+  assertNoTenantTransaction("retrySubmission");
   return await transitionLocalSubmission(
     input,
     "xero_sync_failed",
@@ -150,7 +159,9 @@ async function transitionLocalSubmission(
       ? "invalid_state_for_submit"
       : "invalid_state_for_retry";
   try {
-    const authorised = await loadAndAuthorise(parsed.data, "manager_allowed");
+    const authorised = await withTenantResult(parsed.data.clerkOrgId, (db) =>
+      loadAndAuthorise(parsed.data, "manager_allowed", db)
+    );
     if (!authorised.ok) {
       return authorised;
     }
@@ -174,20 +185,31 @@ async function transitionLocalSubmission(
       };
     }
     if (
-      await hasUnresolvedSubmitOperation({
-        availabilityRecordId: record.id,
-        clerkOrgId: input.clerkOrgId,
-        organisationId: input.organisationId,
-      })
+      await withTenantDb(
+        {
+          availabilityRecordId: record.id,
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        }.clerkOrgId,
+        (db) =>
+          hasUnresolvedSubmitOperation(
+            {
+              availabilityRecordId: record.id,
+              clerkOrgId: input.clerkOrgId,
+              organisationId: input.organisationId,
+            },
+            db
+          )
+      )
     ) {
       return submissionOutcomeUnknown();
     }
-    const organisation = await tenantDatabase(
-      input.clerkOrgId
-    ).organisation.findFirst({
-      select: { country_code: true },
-      where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
-    });
+    const organisation = await withTenantDb(input.clerkOrgId, (db) =>
+      db.organisation.findFirst({
+        select: { country_code: true },
+        where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
+      })
+    );
     if (organisation?.country_code !== "AU") {
       return {
         error: {
@@ -204,46 +226,43 @@ async function transitionLocalSubmission(
     if (!prepared.ok) {
       return prepared;
     }
-    const notificationId = await tenantTransaction(
-      input.clerkOrgId,
-      async (tx) => {
-        const updated = await tx.availabilityRecord.updateMany({
-          data: {
-            approval_status: "submitted",
-            derived_sequence: { increment: 1 },
-            failed_action: null,
-            submitted_at: new Date(),
-            updated_by_user_id: input.actingUserId,
-            xero_write_error: null,
-            xero_write_error_raw: Prisma.DbNull,
-          },
-          where: {
-            ...scoped(input),
-            approval_status: expectedStatus,
-            archived_at: null,
-            derived_sequence: record.derived_sequence,
-            failed_action:
-              expectedStatus === "xero_sync_failed" ? "submit" : null,
-            id: record.id,
-            source_remote_id: null,
-            ...unclaimedOrExpiredXeroWriteWhere(),
-            ...noUnresolvedSubmitOperationWhere(),
-          },
-        });
-        if (updated.count !== 1) {
-          throw new OptimisticConflictError();
-        }
-        await tx.auditEvent.create({
-          data: auditData(input, "availability_records.submitted", {
-            contractVersion: "au-contract-v1",
-          }),
-        });
-        return await notifyManager(tx, input, record, "leave_submitted", {
-          actionUrl: `/leave-approvals?recordId=${record.id}`,
-          publishRealtime: false,
-        });
+    const notificationId = await withTenantDb(input.clerkOrgId, async (tx) => {
+      const updated = await tx.availabilityRecord.updateMany({
+        data: {
+          approval_status: "submitted",
+          derived_sequence: { increment: 1 },
+          failed_action: null,
+          submitted_at: new Date(),
+          updated_by_user_id: input.actingUserId,
+          xero_write_error: null,
+          xero_write_error_raw: Prisma.DbNull,
+        },
+        where: {
+          ...scoped(input),
+          approval_status: expectedStatus,
+          archived_at: null,
+          derived_sequence: record.derived_sequence,
+          failed_action:
+            expectedStatus === "xero_sync_failed" ? "submit" : null,
+          id: record.id,
+          source_remote_id: null,
+          ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
+        },
+      });
+      if (updated.count !== 1) {
+        throw new OptimisticConflictError();
       }
-    );
+      await tx.auditEvent.create({
+        data: auditData(input, "availability_records.submitted", {
+          contractVersion: "au-contract-v1",
+        }),
+      });
+      return await notifyManager(tx, input, record, "leave_submitted", {
+        actionUrl: `/leave-approvals?recordId=${record.id}`,
+        publishRealtime: false,
+      });
+    });
     if (notificationId) {
       await publishPersistedNotification({
         clerkOrgId: input.clerkOrgId,
@@ -259,7 +278,9 @@ async function transitionLocalSubmission(
       });
     }
     await materialiseSubmitPublication(input);
-    const updated = await loadBareRecord(input);
+    const updated = await withTenantDb(input.clerkOrgId, (db) =>
+      loadBareRecord(input, db)
+    );
     return updated ? { ok: true, value: updated } : recordNotFound();
   } catch (error) {
     return error instanceof OptimisticConflictError
@@ -276,6 +297,7 @@ export async function createLeaveOnApproval(
   externalWritePort: ExternalWritePort,
   retry = false
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
+  assertNoTenantTransaction("createLeaveOnApproval");
   return await performApprovalCreation(input, externalWritePort, {
     actingPersonId: input.actingPersonId,
     failureAuditAction: retry
@@ -293,12 +315,15 @@ export async function createLeaveOnApproval(
 export async function revertToDraft(
   input: RecordActionInput
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
+  assertNoTenantTransaction("revertToDraft");
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return unknownError("Invalid submission request.");
   }
   try {
-    const authorised = await loadAndAuthorise(parsed.data, "manager_allowed");
+    const authorised = await withTenantResult(parsed.data.clerkOrgId, (db) =>
+      loadAndAuthorise(parsed.data, "manager_allowed", db)
+    );
     if (!authorised.ok) {
       return authorised;
     }
@@ -309,15 +334,26 @@ export async function revertToDraft(
       return invalidState("invalid_state_for_revert");
     }
     if (
-      await hasUnresolvedSubmitOperation({
-        availabilityRecordId: authorised.value.id,
-        clerkOrgId: parsed.data.clerkOrgId,
-        organisationId: parsed.data.organisationId,
-      })
+      await withTenantDb(
+        {
+          availabilityRecordId: authorised.value.id,
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        }.clerkOrgId,
+        (db) =>
+          hasUnresolvedSubmitOperation(
+            {
+              availabilityRecordId: authorised.value.id,
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+            },
+            db
+          )
+      )
     ) {
       return submissionOutcomeUnknown();
     }
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await withTenantDb(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "draft",
@@ -345,7 +381,9 @@ export async function revertToDraft(
         ),
       });
     });
-    const updated = await loadBareRecord(parsed.data);
+    const updated = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+      loadBareRecord(parsed.data, db)
+    );
     if (!updated) {
       return recordNotFound();
     }
@@ -363,6 +401,7 @@ export async function withdrawSubmission(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
 ): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
+  assertNoTenantTransaction("withdrawSubmission");
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return unknownError("Invalid submission request.");
@@ -372,7 +411,9 @@ export async function withdrawSubmission(
     | import("@repo/database").OutboundOperationAttemptScope
     | null = null;
   try {
-    const authorised = await loadAndAuthorise(parsed.data, "owner_only");
+    const authorised = await withTenantResult(parsed.data.clerkOrgId, (db) =>
+      loadAndAuthorise(parsed.data, "owner_only", db)
+    );
     if (!authorised.ok) {
       return authorised;
     }
@@ -380,12 +421,24 @@ export async function withdrawSubmission(
     if (
       record.approval_status === "withdrawn" &&
       (
-        await getSubmitOperation({
-          action: "withdraw",
-          availabilityRecordId: record.id,
-          clerkOrgId: input.clerkOrgId,
-          organisationId: input.organisationId,
-        })
+        await withTenantDb(
+          {
+            action: "withdraw",
+            availabilityRecordId: record.id,
+            clerkOrgId: input.clerkOrgId,
+            organisationId: input.organisationId,
+          }.clerkOrgId,
+          (db) =>
+            getSubmitOperation(
+              {
+                action: "withdraw",
+                availabilityRecordId: record.id,
+                clerkOrgId: input.clerkOrgId,
+                organisationId: input.organisationId,
+              },
+              db
+            )
+        )
       )?.status === "completed"
     ) {
       return { ok: true, value: record };
@@ -395,11 +448,22 @@ export async function withdrawSubmission(
     }
     if (
       !record.source_remote_id &&
-      (await hasUnresolvedSubmitOperation({
-        availabilityRecordId: record.id,
-        clerkOrgId: input.clerkOrgId,
-        organisationId: input.organisationId,
-      }))
+      (await withTenantDb(
+        {
+          availabilityRecordId: record.id,
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        }.clerkOrgId,
+        (db) =>
+          hasUnresolvedSubmitOperation(
+            {
+              availabilityRecordId: record.id,
+              clerkOrgId: input.clerkOrgId,
+              organisationId: input.organisationId,
+            },
+            db
+          )
+      ))
     ) {
       return submissionOutcomeUnknown();
     }
@@ -442,15 +506,18 @@ export async function withdrawSubmission(
         organisationId: parsed.data.organisationId,
       };
     }
+    const phaseInput1 = {
+      ...parsed.data,
+      expectedFailedAction: record.failed_action,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: record.approval_status,
+      localAction: "withdraw",
+    } satisfies Parameters<typeof acquireXeroWriteClaim>[0];
     claimedAt = journal?.ok
       ? journal.value.claimedAt
-      : await acquireXeroWriteClaim({
-          ...parsed.data,
-          expectedFailedAction: record.failed_action,
-          expectedSequence: record.derived_sequence,
-          expectedStatus: record.approval_status,
-          localAction: "withdraw",
-        });
+      : await withTenantDb(phaseInput1.clerkOrgId, (db) =>
+          acquireXeroWriteClaim(phaseInput1, db)
+        );
     if (!claimedAt) {
       return invalidState("invalid_state_for_withdraw");
     }
@@ -496,7 +563,7 @@ export async function withdrawSubmission(
         });
       }
     }
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await withTenantDb(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "withdrawn",
@@ -560,7 +627,9 @@ export async function withdrawSubmission(
         actionUrl: `/leave-approvals?recordId=${record.id}`,
       });
     }
-    const updated = await loadBareRecord(parsed.data);
+    const updated = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+      loadBareRecord(parsed.data, db)
+    );
     if (!updated) {
       return recordNotFound();
     }
@@ -570,7 +639,12 @@ export async function withdrawSubmission(
     return { ok: true, value: updated };
   } catch (error) {
     if (claimedAt) {
-      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+      const phaseInput2 = { ...parsed.data, claimedAt } satisfies Parameters<
+        typeof releaseXeroWriteClaim
+      >[0];
+      await withTenantDb(phaseInput2.clerkOrgId, (db) =>
+        releaseXeroWriteClaim(phaseInput2, db)
+      );
     }
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_withdraw");
@@ -599,20 +673,27 @@ async function performApprovalCreation(
   let dispatchStarted = false;
   let attemptGeneration: number | null = null;
   try {
-    record = await loadScopedRecord(parsed.data);
+    record = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+      loadScopedRecord(parsed.data, db)
+    );
     if (!record) {
       return recordNotFound();
     }
-    const actingPerson = await tenantDatabase(
-      input.clerkOrgId
-    ).person.findFirst({
-      select: { id: true },
-      where: {
-        ...scoped(input),
-        archived_at: null,
-        clerk_user_id: input.actingUserId,
-      },
-    });
+    const actingPerson = await withTenantDb(input.clerkOrgId, (db) =>
+      db.person.findFirst({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          clerk_user_id: input.actingUserId,
+          organisation: {
+            archived_at: null,
+            clerk_org_id: input.clerkOrgId,
+            is_active: true,
+          },
+        },
+      })
+    );
     if (!isAdminOrOwner(input.actingOrgRole)) {
       if (
         input.actingOrgRole !== "org:manager" ||
@@ -627,11 +708,14 @@ async function performApprovalCreation(
           ok: false,
         };
       }
-      const ids = await managerScopePersonIds({
+      const phaseInput3 = {
         ...input,
         actingPersonId: actingPerson.id,
         excludeSelf: true,
-      });
+      } satisfies Parameters<typeof managerScopePersonIds>[0];
+      const ids = await withTenantDb(phaseInput3.clerkOrgId, (db) =>
+        managerScopePersonIds(phaseInput3, db)
+      );
       if (!ids.includes(record.person_id)) {
         return {
           error: {
@@ -642,15 +726,28 @@ async function performApprovalCreation(
         };
       }
     }
+    const currentRecordId = record.id;
     if (
       record.approval_status === "approved" &&
       (
-        await getSubmitOperation({
-          action: "approve",
-          availabilityRecordId: record.id,
-          clerkOrgId: input.clerkOrgId,
-          organisationId: input.organisationId,
-        })
+        await withTenantDb(
+          {
+            action: "approve",
+            availabilityRecordId: currentRecordId,
+            clerkOrgId: input.clerkOrgId,
+            organisationId: input.organisationId,
+          }.clerkOrgId,
+          (db) =>
+            getSubmitOperation(
+              {
+                action: "approve",
+                availabilityRecordId: currentRecordId,
+                clerkOrgId: input.clerkOrgId,
+                organisationId: input.organisationId,
+              },
+              db
+            )
+        )
       )?.status === "completed"
     ) {
       return { ok: true, value: record };
@@ -673,12 +770,12 @@ async function performApprovalCreation(
         ok: false,
       };
     }
-    const organisation = await tenantDatabase(
-      input.clerkOrgId
-    ).organisation.findFirst({
-      select: { country_code: true },
-      where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
-    });
+    const organisation = await withTenantDb(input.clerkOrgId, (db) =>
+      db.organisation.findFirst({
+        select: { country_code: true },
+        where: { clerk_org_id: input.clerkOrgId, id: input.organisationId },
+      })
+    );
     if (organisation?.country_code !== "AU") {
       return {
         error: {
@@ -761,8 +858,15 @@ async function performApprovalCreation(
               units: prepared.value.units,
             });
     } catch {
-      await markSubmitOutcomeUnknown(operationAttempt, "transport_exception");
-      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+      await withTenantDb(operationAttempt.clerkOrgId, (db) =>
+        markSubmitOutcomeUnknown(operationAttempt, "transport_exception", db)
+      );
+      const phaseInput4 = { ...parsed.data, claimedAt } satisfies Parameters<
+        typeof releaseXeroWriteClaim
+      >[0];
+      await withTenantDb(phaseInput4.clerkOrgId, (db) =>
+        releaseXeroWriteClaim(phaseInput4, db)
+      );
       claimedAt = null;
       return submissionOutcomeUnknown();
     }
@@ -771,12 +875,17 @@ async function performApprovalCreation(
         !preparedOperation.replayedUnknown &&
         isDefinitiveWriteFailure(submission.error)
       ) {
-        await markSubmitDefinitiveFailure(
-          operationAttempt,
-          submission.error.code
+        await withTenantDb(operationAttempt.clerkOrgId, (db) =>
+          markSubmitDefinitiveFailure(
+            operationAttempt,
+            submission.error.code,
+            db
+          )
         );
       } else {
-        await markSubmitOutcomeUnknown(operationAttempt, submission.error.code);
+        await withTenantDb(operationAttempt.clerkOrgId, (db) =>
+          markSubmitOutcomeUnknown(operationAttempt, submission.error.code, db)
+        );
       }
       return await persistXeroFailure({
         actionUrl: `/plans?recordId=${record.id}`,
@@ -791,9 +900,12 @@ async function performApprovalCreation(
     }
     const accepted =
       preparedOperation.providerAccepted ||
-      (await markSubmitProviderAccepted(
-        operationAttempt,
-        submission.value.remoteId
+      (await withTenantDb(operationAttempt.clerkOrgId, (db) =>
+        markSubmitProviderAccepted(
+          operationAttempt,
+          submission.value.remoteId,
+          db
+        )
       ));
     if (!accepted) {
       return submissionOutcomeUnknown();
@@ -806,16 +918,23 @@ async function performApprovalCreation(
       preparedOperation.actorUserId === parsed.data.actingUserId
         ? (actingPerson?.id ?? null)
         : ((
-            await tenantDatabase(parsed.data.clerkOrgId).person.findFirst({
-              select: { id: true },
-              where: {
-                ...scoped(parsed.data),
-                archived_at: null,
-                clerk_user_id: preparedOperation.actorUserId,
-              },
-            })
+            await withTenantDb(parsed.data.clerkOrgId, (db) =>
+              db.person.findFirst({
+                select: { id: true },
+                where: {
+                  archived_at: null,
+                  clerk_org_id: parsed.data.clerkOrgId,
+                  clerk_user_id: preparedOperation.actorUserId,
+                  organisation: {
+                    archived_at: null,
+                    clerk_org_id: parsed.data.clerkOrgId,
+                    is_active: true,
+                  },
+                },
+              })
+            )
           )?.id ?? null);
-    await tenantTransaction(parsed.data.clerkOrgId, async (tx) => {
+    await withTenantDb(parsed.data.clerkOrgId, async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "approved",
@@ -852,9 +971,14 @@ async function performApprovalCreation(
       });
     });
     claimedAt = null;
-    const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
-      operationAttempt,
-      new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+    const sideEffectClaimedAt = await withTenantDb(
+      operationAttempt.clerkOrgId,
+      (db) =>
+        acquireSubmitRecoverySideEffects(
+          operationAttempt,
+          new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
+          db
+        )
     );
     if (!sideEffectClaimedAt) {
       return submissionOutcomeUnknown();
@@ -881,40 +1005,49 @@ async function performApprovalCreation(
       recordId: record.id,
     });
     if (!sideEffects.ok) {
-      await releaseSubmitRecoverySideEffects(
-        operationAttempt,
-        sideEffectClaimedAt
+      await withTenantDb(operationAttempt.clerkOrgId, (db) =>
+        releaseSubmitRecoverySideEffects(
+          operationAttempt,
+          sideEffectClaimedAt,
+          db
+        )
       );
       return submissionOutcomeUnknown();
     }
     if (
-      !(await markSubmitCompleted(
-        operationAttempt,
-        tenantDatabase(parsed.data.clerkOrgId)
+      !(await withTenantDb(parsed.data.clerkOrgId, (db) =>
+        markSubmitCompleted(operationAttempt, db)
       ))
     ) {
       return submissionOutcomeUnknown();
     }
-    const updated = await loadBareRecord(parsed.data);
+    const updated = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+      loadBareRecord(parsed.data, db)
+    );
     if (!updated) {
       return recordNotFound();
     }
     return { ok: true, value: updated };
   } catch (error) {
     if (record && dispatchStarted && attemptGeneration !== null) {
-      await markSubmitOutcomeUnknown(
-        {
-          action: "approve" as const,
-          attemptGeneration,
-          availabilityRecordId: record.id,
-          clerkOrgId: parsed.data.clerkOrgId,
-          organisationId: parsed.data.organisationId,
-        },
-        "local_persistence_failure"
+      const phaseInput5 = {
+        action: "approve" as const,
+        attemptGeneration,
+        availabilityRecordId: record.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      } satisfies Parameters<typeof markSubmitOutcomeUnknown>[0];
+      await withTenantDb(phaseInput5.clerkOrgId, (db) =>
+        markSubmitOutcomeUnknown(phaseInput5, "local_persistence_failure", db)
       );
     }
     if (claimedAt) {
-      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+      const phaseInput6 = { ...parsed.data, claimedAt } satisfies Parameters<
+        typeof releaseXeroWriteClaim
+      >[0];
+      await withTenantDb(phaseInput6.clerkOrgId, (db) =>
+        releaseXeroWriteClaim(phaseInput6, db)
+      );
     }
     if (error instanceof OptimisticConflictError) {
       return invalidState(options.invalidStateCode);
@@ -964,7 +1097,9 @@ async function prepareXeroWrite(
     SubmitServiceError
   >
 > {
-  const xeroStateResult = await getXeroConnectionStateForScope(input);
+  const xeroStateResult = await withTenantResult(input.clerkOrgId, (db) =>
+    getXeroConnectionStateForScope(input, db)
+  );
   if (!xeroStateResult.ok) {
     return {
       error: {
@@ -1016,14 +1151,17 @@ async function prepareXeroWrite(
   if (!leaveType.ok) {
     return resolutionBlocked(leaveType.error);
   }
-  const duration = await computeWorkingDays({
+  const phaseInput7 = {
     allDay: record.all_day,
     clerkOrgId: input.clerkOrgId,
     endsAt: record.ends_at,
     locationId: record.person.location_id,
     organisationId: input.organisationId,
     startsAt: record.starts_at,
-  });
+  } satisfies Parameters<typeof computeWorkingDays>[0];
+  const duration = await withTenantResult(phaseInput7.clerkOrgId, (db) =>
+    computeWorkingDays(phaseInput7, db)
+  );
   if (!duration.ok) {
     return unknownError(duration.error.message);
   }
@@ -1048,7 +1186,7 @@ async function persistXeroFailure(input: {
   error: ProviderWriteError;
 }): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
   const plainMessage = input.error.userMessage;
-  await tenantTransaction(input.input.clerkOrgId, async (tx) => {
+  await withTenantDb(input.input.clerkOrgId, async (tx) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
         approval_status: input.preserveApproved
@@ -1093,56 +1231,73 @@ async function persistXeroFailure(input: {
     "leave_xero_sync_failed",
     { actionUrl: input.actionUrl }
   );
-  const updated = await loadBareRecord(input.input);
+  const updated = await withTenantDb(input.input.clerkOrgId, (db) =>
+    loadBareRecord(input.input, db)
+  );
   if (!updated) {
     return recordNotFound();
   }
   await materialiseSubmitPublication(input.input);
   return { ok: true, value: updated };
 }
-function loadScopedRecord(input: RecordActionInput) {
-  return tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
-    include: {
-      person: {
-        select: {
-          clerk_user_id: true,
-          email: true,
-          first_name: true,
-          id: true,
-          last_name: true,
-          location_id: true,
-          manager: {
-            select: {
-              clerk_user_id: true,
-              id: true,
+async function loadScopedRecord(input: RecordActionInput, db: TenantDb) {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+    return await client.availabilityRecord.findFirst({
+      include: {
+        person: {
+          select: {
+            clerk_user_id: true,
+            email: true,
+            first_name: true,
+            id: true,
+            last_name: true,
+            location_id: true,
+            manager: {
+              select: {
+                clerk_user_id: true,
+                id: true,
+              },
             },
+            manager_person_id: true,
           },
-          manager_person_id: true,
         },
       },
-    },
-    where: {
-      ...scoped(input),
-      id: input.recordId,
-    },
-  });
+      where: {
+        ...scoped(input),
+        id: input.recordId,
+      },
+    });
+  }
 }
-function loadBareRecord(input: RecordActionInput) {
-  return tenantDatabase(input.clerkOrgId).availabilityRecord.findFirst({
-    where: {
-      ...scoped(input),
-      id: input.recordId,
-    },
-  });
+async function loadBareRecord(input: RecordActionInput, db: TenantDb) {
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+    return await client.availabilityRecord.findFirst({
+      where: {
+        ...scoped(input),
+        id: input.recordId,
+      },
+    });
+  }
 }
 async function materialiseSubmitPublication(
   input: RecordActionInput
 ): Promise<void> {
-  const publication = await materialiseAvailabilityPublication({
+  const phaseInput8 = {
     availabilityRecordId: input.recordId,
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
-  });
+  } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
+  const publication = await withTenantResult(
+    phaseInput8.clerkOrgId,
+    (db) => materialiseAvailabilityPublication(phaseInput8, db),
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
   if (!publication.ok) {
     // Best-effort: the submit/withdraw transition is already persisted. Log the
     // failed feed projection rather than failing the write; it is corrected on
@@ -1157,43 +1312,52 @@ async function materialiseSubmitPublication(
 }
 async function loadAndAuthorise(
   input: RecordActionInput,
-  mode: "manager_allowed" | "owner_only"
+  mode: "manager_allowed" | "owner_only",
+  db: TenantDb
 ): Promise<Result<LoadedRecord, SubmitServiceError>> {
-  const [record, actingPerson] = await Promise.all([
-    loadScopedRecord(input),
-    tenantDatabase(input.clerkOrgId).person.findFirst({
-      select: { id: true },
-      where: {
-        ...scoped(input),
-        archived_at: null,
-        clerk_user_id: input.actingUserId,
-      },
-    }),
-  ]);
-  if (!record) {
-    return recordNotFound();
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const companies = await resolveAccountCompanies(input.clerkOrgId, client);
+    const [record, actingPerson] = [
+      await loadScopedRecord(input, client),
+      await client.person.findFirst({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          clerk_user_id: input.actingUserId,
+          organisation_id: { in: companies.map((company) => company.id) },
+        },
+      }),
+    ];
+    if (!record) {
+      return recordNotFound();
+    }
+    const isOwner = record.person.clerk_user_id === input.actingUserId;
+    const isManager =
+      Boolean(actingPerson) &&
+      record.person.manager_person_id === actingPerson?.id;
+    const isAllowed =
+      isAdminOrOwner(input.actingOrgRole) ||
+      isOwner ||
+      (mode === "manager_allowed" && isManager);
+    if (!isAllowed) {
+      return {
+        error: {
+          code: "not_authorised",
+          message: "You do not have permission to manage this record.",
+        },
+        ok: false,
+      };
+    }
+    return { ok: true, value: record };
   }
-  const isOwner = record.person.clerk_user_id === input.actingUserId;
-  const isManager =
-    Boolean(actingPerson) &&
-    record.person.manager_person_id === actingPerson?.id;
-  const isAllowed =
-    isAdminOrOwner(input.actingOrgRole) ||
-    isOwner ||
-    (mode === "manager_allowed" && isManager);
-  if (!isAllowed) {
-    return {
-      error: {
-        code: "not_authorised",
-        message: "You do not have permission to manage this record.",
-      },
-      ok: false,
-    };
-  }
-  return { ok: true, value: record };
 }
 async function notifyManager(
-  tx: NotificationDispatchDatabase,
+  tx: TenantDb,
   input: RecordActionInput,
   record: LoadedRecord,
   type: "leave_submitted" | "leave_withdrawn",
@@ -1226,8 +1390,8 @@ async function notifyManager(
           : "Leave withdrawn",
       type,
     },
-    tx,
-    { publishRealtime: options.publishRealtime }
+    { publishRealtime: options.publishRealtime },
+    tx
   );
   if (!result.ok) {
     throw new NotificationCreateError();
@@ -1243,12 +1407,8 @@ async function notifyManagerBestEffort(
   }
 ): Promise<void> {
   try {
-    await notifyManager(
-      tenantDatabase(input.clerkOrgId),
-      input,
-      record,
-      type,
-      options
+    await withTenantDb(input.clerkOrgId, (db) =>
+      notifyManager(db, input, record, type, options)
     );
   } catch (error) {
     log.error("Failed to dispatch manager notification", {
@@ -1269,12 +1429,8 @@ async function notifySubmitFailureBestEffort(
   }
 ): Promise<void> {
   try {
-    await notifyOwnerAndManager(
-      tenantDatabase(input.clerkOrgId),
-      input,
-      record,
-      type,
-      options
+    await withTenantDb(input.clerkOrgId, (db) =>
+      notifyOwnerAndManager(db, input, record, type, options)
     );
   } catch (error) {
     log.error("Failed to dispatch failure notification", {
@@ -1287,7 +1443,7 @@ async function notifySubmitFailureBestEffort(
   }
 }
 async function notifyOwnerAndManager(
-  tx: NotificationDispatchDatabase,
+  tx: TenantDb,
   input: RecordActionInput,
   record: LoadedRecord,
   type: "leave_xero_sync_failed",
@@ -1332,6 +1488,7 @@ async function notifyOwnerAndManager(
         title: "Xero sync failed",
         type,
       },
+      {},
       tx
     );
     if (!result.ok) {

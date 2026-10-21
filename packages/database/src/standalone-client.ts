@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import ws from "ws";
 import { PrismaClient } from "../generated/client";
 import { isLocalDatabase } from "./is-local-database";
+import { instrumentTenantAdapter } from "./tenant-driver-timing";
 
 export const createStandaloneDatabaseClient = (
   connectionString: string
@@ -15,5 +16,8 @@ export const createStandaloneDatabaseClient = (
   const adapter = local
     ? new PrismaPg({ connectionString })
     : new PrismaNeon({ connectionString });
-  return new PrismaClient({ adapter });
+  if (process.env.TENANT_QUERY_TIMING !== "1") {
+    return new PrismaClient({ adapter });
+  }
+  return new PrismaClient({ adapter: instrumentTenantAdapter(adapter) });
 };

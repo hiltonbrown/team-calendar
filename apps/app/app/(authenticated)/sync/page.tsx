@@ -1,9 +1,12 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
 import {
   listRuns,
   listTenantSummaries,
   type SyncMonitorRole,
 } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -11,7 +14,7 @@ import {
   PermissionDeniedError,
   requirePageRole,
 } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { SyncRunFiltersSchema } from "./_schemas";
@@ -58,10 +61,6 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     );
   }
 
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(
-      typeof params.org === "string" ? params.org : undefined
-    );
   const parsedFilters = parseFilterParams(params, SyncRunFiltersSchema) ?? {};
   const filters = {
     connectionId: parsedFilters.connectionId,
@@ -75,24 +74,51 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     status: parsedFilters.status,
     triggerType: parsedFilters.triggerType,
   };
-
-  const [summariesResult, runsResult] = await Promise.all([
-    listTenantSummaries({
-      actingRole: role,
-      clerkOrgId,
-      organisationId,
-    }),
-    listRuns({
-      actingRole: role,
-      clerkOrgId,
-      filters,
-      organisationId,
-      pagination: {
-        cursor: parsedFilters.cursor ?? null,
-        pageSize: 50,
+  // Clerk supplied the authenticated account identifier.
+  const accountId = (await requireOrg()) as ClerkOrgId;
+  const { organisationId, orgQueryValue, summariesResult, runsResult } =
+    await withTenantDb(
+      accountId,
+      async (db) => {
+        const {
+          clerkOrgId,
+          organisationId: scopedOrganisationId,
+          orgQueryValue: preparedOrgQueryValue,
+        } = await resolveActiveOrgPageContext(
+          accountId,
+          typeof params.org === "string" ? params.org : undefined,
+          db
+        );
+        const preparedSummariesResult = await listTenantSummaries(
+          {
+            actingRole: role,
+            clerkOrgId,
+            organisationId: scopedOrganisationId,
+          },
+          db
+        );
+        const preparedRunsResult = await listRuns(
+          {
+            actingRole: role,
+            clerkOrgId,
+            filters,
+            organisationId: scopedOrganisationId,
+            pagination: {
+              cursor: parsedFilters.cursor ?? null,
+              pageSize: 50,
+            },
+          },
+          db
+        );
+        return {
+          organisationId: scopedOrganisationId,
+          orgQueryValue: preparedOrgQueryValue,
+          runsResult: preparedRunsResult,
+          summariesResult: preparedSummariesResult,
+        };
       },
-    }),
-  ]);
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
 
   const hasError = !(summariesResult.ok && runsResult.ok);
 

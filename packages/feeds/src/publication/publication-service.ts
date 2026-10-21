@@ -1,8 +1,8 @@
 import "server-only";
 
 import { appError, type Result } from "@repo/core";
-import { tenantTransaction } from "@repo/database";
-import { Prisma } from "@repo/database/generated/client";
+import { assertTenantDb, type TenantDb } from "@repo/database";
+import type { Prisma } from "@repo/database/generated/client";
 import type { availability_privacy_mode } from "@repo/database/generated/enums";
 import { invalidateFeedCachesForPerson } from "../cache/feed-invalidation";
 import {
@@ -27,74 +27,60 @@ type PublicationClient = Pick<
   "availabilityPublication" | "availabilityRecord"
 >;
 
-export async function materialiseAvailabilityPublication(input: {
-  availabilityRecordId: string;
-  clerkOrgId: string;
-  // Invalidate the caches of feeds whose scope includes this record's person. Defaults to
-  // true so single-record callers (manual edits, approval transitions) reflect changes
-  // immediately. Bulk callers (inbound sync, reconcile) pass false and batch their own
-  // rebuilds to avoid per-record cache churn.
-  invalidateCache?: boolean;
-  organisationId: string;
-}): Promise<Result<MaterialisedPublication>> {
-  try {
-    const result: Result<MaterialisedPublication> = await tenantTransaction(
-      input.clerkOrgId,
-      async (tx) => {
-        const record = await tx.availabilityRecord.findFirst({
-          select: recordPublicationSelect,
-          where: {
-            clerk_org_id: input.clerkOrgId,
-            id: input.availabilityRecordId,
-            organisation_id: input.organisationId,
-          },
-        });
-        if (!record) {
-          return {
-            error: appError("not_found", "Availability record not found."),
-            ok: false,
-          };
-        }
+export async function materialiseAvailabilityPublication(
+  input: {
+    availabilityRecordId: string;
+    clerkOrgId: string;
+    // Invalidate the caches of feeds whose scope includes this record's person. Defaults to
+    // true so single-record callers (manual edits, approval transitions) reflect changes
+    // immediately. Bulk callers (inbound sync, reconcile) pass false and batch their own
+    // rebuilds to avoid per-record cache churn.
+    invalidateCache?: boolean;
+    organisationId: string;
+  },
+  db: TenantDb
+): Promise<Result<MaterialisedPublication>> {
+  assertTenantDb(db, input.clerkOrgId);
+  const result: Result<MaterialisedPublication> = await (async () => {
+    assertTenantDb(db, input.clerkOrgId);
+    const tx = db;
 
-        const { changed, publication } = await upsertPublication(tx, record);
-
-        return {
-          ok: true,
-          value: toMaterialisedPublication(publication, {
-            changed,
-            personId: record.person_id,
-          }),
-        };
-      }
-    );
-    if (result.ok && input.invalidateCache !== false) {
-      await invalidateRecordFeedCaches({
-        clerkOrgId: input.clerkOrgId,
-        organisationId: input.organisationId,
-        personId: result.value.personId,
-      });
+    const record = await tx.availabilityRecord.findFirst({
+      select: recordPublicationSelect,
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        id: input.availabilityRecordId,
+        organisation_id: input.organisationId,
+      },
+    });
+    if (!record) {
+      return {
+        error: appError("not_found", "Availability record not found."),
+        ok: false,
+      };
     }
-    return result;
-  } catch {
-    return {
-      error: appError("internal", "Failed to materialise publication."),
-      ok: false,
-    };
-  }
-}
 
-// Cache invalidation is best-effort: the record write has already succeeded and the TTL is
-// the backstop, so a failure here must never turn a successful materialisation into an error.
-async function invalidateRecordFeedCaches(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  personId: string;
-}): Promise<void> {
-  try {
-    await invalidateFeedCachesForPerson(input);
-  } catch {
-    // Swallow: see note above. Stale bodies expire via TTL or the next rebuild.
-  }
+    const { changed, publication } = await upsertPublication(tx, record);
+
+    if (input.invalidateCache !== false) {
+      await invalidateFeedCachesForPerson(
+        {
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+          personId: record.person_id,
+        },
+        tx
+      );
+    }
+    return {
+      ok: true,
+      value: toMaterialisedPublication(publication, {
+        changed,
+        personId: record.person_id,
+      }),
+    };
+  })();
+  return result;
 }
 
 async function upsertPublication(
@@ -106,43 +92,38 @@ async function upsertPublication(
 
   let existing = record.publication;
   if (!existing) {
-    try {
-      const created = await client.availabilityPublication.create({
-        data: {
-          availability_record_id: record.id,
-          clerk_org_id: record.clerk_org_id,
-          organisation_id: record.organisation_id,
-          privacy_mode: published.privacyMode,
-          published_all_day: published.allDay,
-          published_at: publishedAt,
-          published_description: published.description,
-          published_ends_at: published.endsAt,
-          published_sequence: 0,
-          published_starts_at: published.startsAt,
-          published_summary: published.summary,
-          published_uid: published.uid,
-        },
-        select: publicationSelect,
-      });
-      return { changed: true, publication: created };
-    } catch (error) {
-      if (!isUniqueConflict(error)) {
-        throw error;
-      }
-      // A concurrent caller materialised the same record between our read and
-      // this insert. Reload the winning row and fall through to the update
-      // path so materialisation stays idempotent under concurrency.
-      existing = await client.availabilityPublication.findFirst({
-        select: existingPublicationSelect,
-        where: {
-          availability_record_id: record.id,
-          clerk_org_id: record.clerk_org_id,
-          organisation_id: record.organisation_id,
-        },
-      });
-      if (!existing) {
-        throw error;
-      }
+    // The 1:1 `availability_record_id` unique index is the atomic backstop: a
+    // concurrent losing insert is skipped, reloaded and takes the update path.
+    const inserted = await client.availabilityPublication.createMany({
+      data: {
+        availability_record_id: record.id,
+        clerk_org_id: record.clerk_org_id,
+        organisation_id: record.organisation_id,
+        privacy_mode: published.privacyMode,
+        published_all_day: published.allDay,
+        published_at: publishedAt,
+        published_description: published.description,
+        published_ends_at: published.endsAt,
+        published_sequence: 0,
+        published_starts_at: published.startsAt,
+        published_summary: published.summary,
+        published_uid: published.uid,
+      },
+      skipDuplicates: true,
+    });
+    existing = await client.availabilityPublication.findFirst({
+      select: existingPublicationSelect,
+      where: {
+        availability_record_id: record.id,
+        clerk_org_id: record.clerk_org_id,
+        organisation_id: record.organisation_id,
+      },
+    });
+    if (!existing) {
+      throw new Error("Publication was not materialised.");
+    }
+    if (inserted.count === 1) {
+      return { changed: true, publication: existing };
     }
   }
 
@@ -192,13 +173,6 @@ async function upsertPublication(
   });
   return { changed: true, publication: updated };
 }
-
-// The 1:1 `availability_record_id` unique index is the atomic backstop: when two
-// callers materialise the same record concurrently, the losing insert surfaces
-// here as P2002 so we can reload and take the update path instead of failing.
-const isUniqueConflict = (error: unknown): boolean =>
-  error instanceof Prisma.PrismaClientKnownRequestError &&
-  error.code === "P2002";
 
 function projectPublishedRecord(record: RecordRow): {
   allDay: boolean;
@@ -257,6 +231,7 @@ const publicationSelect = {
 } satisfies Prisma.AvailabilityPublicationSelect;
 
 const existingPublicationSelect = {
+  availability_record_id: true,
   id: true,
   privacy_mode: true,
   published_all_day: true,

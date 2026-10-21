@@ -1,12 +1,13 @@
+import type { TenantDb } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { Result } from "@repo/core";
 import {
+  assertTenantDb,
   getScopedXeroConnection,
-  tenantDatabase,
-  tenantTransaction,
+  withTenantDb,
 } from "@repo/database";
-import type { Prisma } from "@repo/database/generated/client";
 import {
   classifyXeroFailure,
   resolveXeroAccess,
@@ -34,8 +35,9 @@ export class XeroSyncRetryError extends Error {
 }
 const bindingTransactions = new AsyncLocalStorage<{
   scope: XeroSyncScope;
-  tx: Prisma.TransactionClient;
-  afterCommit: Array<() => Promise<void>>;
+  tx: TenantDb;
+  afterCommit: Array<(db: TenantDb) => Promise<void>>;
+  afterSends: Array<() => Promise<void>>;
 }>();
 function sameBinding(a: XeroSyncScope, b: XeroSyncScope) {
   return (
@@ -47,7 +49,7 @@ function sameBinding(a: XeroSyncScope, b: XeroSyncScope) {
 /** The comparison and actual batch writes share the disconnect/reconnect lock. */
 export async function withXeroBinding<T>(
   scope: XeroSyncScope,
-  operation: (tx: Prisma.TransactionClient) => Promise<T>
+  operation: (tx: TenantDb) => Promise<T>
 ): Promise<T> {
   const current = bindingTransactions.getStore();
   if (current) {
@@ -56,8 +58,9 @@ export async function withXeroBinding<T>(
     }
     return operation(current.tx);
   }
-  const afterCommit: Array<() => Promise<void>> = [];
-  const result = await tenantTransaction(
+  const afterCommit: Array<(db: TenantDb) => Promise<void>> = [];
+  const afterSends: Array<() => Promise<void>> = [];
+  const result = await withTenantDb(
     scope.clerkOrgId,
     async (tx) => {
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
@@ -90,7 +93,7 @@ export async function withXeroBinding<T>(
         throw new XeroBindingChangedError();
       }
       const committedResult = await bindingTransactions.run(
-        { afterCommit, scope, tx },
+        { afterCommit, afterSends, scope, tx },
         () => operation(tx)
       );
       return committedResult;
@@ -98,7 +101,11 @@ export async function withXeroBinding<T>(
     { maxWait: 10_000, timeout: 30_000 }
   );
   for (const effect of afterCommit) {
-    await withXeroBinding(scope, async () => effect());
+    await withXeroBinding(scope, effect);
+  }
+  for (const send of afterSends) {
+    await withXeroBinding(scope, async () => undefined);
+    await send();
   }
   return result;
 }
@@ -106,25 +113,26 @@ export async function resolveSyncTenant(
   scope: XeroSyncScope,
   capability: string | readonly string[]
 ) {
-  const loaded = await tenantDatabase(
-    scope.clerkOrgId
-  ).xeroConnection.findFirst({
-    select: {
-      approval_state_stale_since: true,
-      id: true,
-      leave_balances_stale_since: true,
-      leave_records_stale_since: true,
-      people_stale_since: true,
-      sync_cursors: { select: { entity_type: true, modified_since: true } },
-      sync_paused_at: true,
-    },
-    where: {
-      clerk_org_id: scope.clerkOrgId,
-      id: scope.connectionId,
-      organisation_id: scope.organisationId,
-      released_at: null,
-    },
-  });
+  assertNoTenantTransaction("resolveSyncTenant");
+  const loaded = await withTenantDb(scope.clerkOrgId, (db) =>
+    db.xeroConnection.findFirst({
+      select: {
+        approval_state_stale_since: true,
+        id: true,
+        leave_balances_stale_since: true,
+        leave_records_stale_since: true,
+        people_stale_since: true,
+        sync_cursors: { select: { entity_type: true, modified_since: true } },
+        sync_paused_at: true,
+      },
+      where: {
+        clerk_org_id: scope.clerkOrgId,
+        id: scope.connectionId,
+        organisation_id: scope.organisationId,
+        released_at: null,
+      },
+    })
+  );
   if (!loaded || loaded.sync_paused_at) {
     throw new XeroBindingChangedError();
   }
@@ -174,19 +182,26 @@ export async function resolveSyncTenant(
   };
 }
 /** Reject stale or forged events before creating a run or touching credentials. */
-export async function isCurrentXeroSyncBinding(scope: XeroSyncScope) {
-  const connection = await tenantDatabase(
-    scope.clerkOrgId
-  ).xeroConnection.findFirst({
-    select: { id: true },
-    where: {
-      clerk_org_id: scope.clerkOrgId,
-      id: scope.connectionId,
-      organisation_id: scope.organisationId,
-      released_at: null,
-    },
-  });
-  return connection !== null;
+export async function isCurrentXeroSyncBinding(
+  scope: XeroSyncScope,
+  db: TenantDb
+) {
+  assertTenantDb(db, scope.clerkOrgId);
+  {
+    assertTenantDb(db, scope.clerkOrgId);
+    const client = db;
+
+    const connection = await client.xeroConnection.findFirst({
+      select: { id: true },
+      where: {
+        clerk_org_id: scope.clerkOrgId,
+        id: scope.connectionId,
+        organisation_id: scope.organisationId,
+        released_at: null,
+      },
+    });
+    return connection !== null;
+  }
 }
 export function syncFailureReason(error: XeroWriteError): string {
   if (error.recoveryReason) {
@@ -204,14 +219,14 @@ export function syncFailureReason(error: XeroWriteError): string {
 /** Publication reads must see committed canonical records, under the same current binding fence. */
 export async function afterXeroBindingCommit(
   scope: XeroSyncScope,
-  effect: () => Promise<void>
+  effect: (db: TenantDb) => Promise<void>
 ) {
   const current = bindingTransactions.getStore();
   if (current && sameBinding(current.scope, scope)) {
     current.afterCommit.push(effect);
     return;
   }
-  await withXeroBinding(scope, async () => effect());
+  await withXeroBinding(scope, effect);
 }
 export function throwRetryableXeroFailure(error: XeroWriteError) {
   const reason = syncFailureReason(error);
@@ -231,4 +246,18 @@ export async function rejectRetryableSyncResult<
     throw new Error("retry_later");
   }
   return result;
+}
+
+/** Validate the current binding in a short scope, then send with no open transaction. */
+export async function afterXeroBindingSend(
+  scope: XeroSyncScope,
+  send: () => Promise<void>
+): Promise<void> {
+  const current = bindingTransactions.getStore();
+  if (current && sameBinding(current.scope, scope)) {
+    current.afterSends.push(send);
+    return;
+  }
+  await withXeroBinding(scope, async () => undefined);
+  await send();
 }

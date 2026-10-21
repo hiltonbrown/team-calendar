@@ -37,7 +37,6 @@ export function RequestInfoModal({
     setMessage(null);
     try {
       const result = await requestMoreInfoAction({
-        organisationId: record.organisationId,
         question: trimmedQuestion,
         recordId: record.id,
       });

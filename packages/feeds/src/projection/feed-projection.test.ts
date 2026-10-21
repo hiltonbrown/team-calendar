@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -63,17 +65,37 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({
+  client: null as Record<string, unknown> | null,
+}));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing feed fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
   const client = {
     availabilityRecord: { findMany: mocks.availabilityRecordFindMany },
     feed: { findFirst: mocks.feedFindFirst },
   };
+  tenantTestState.client = client;
   return {
     loadHolidayResolutionData: mocks.loadHolidayResolutionData,
     resolveAccountCompanies: mocks.companies,
-    TENANT_READ_TRANSACTION_OPTIONS: { maxWait: 10_000, timeout: 30_000 },
-    tenantDatabase: vi.fn(() => client),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) => callback(client)),
+    ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )),
   };
 });
 vi.mock(
@@ -170,18 +192,48 @@ describe("projectFeedEvents", () => {
   });
 
   it("applies privacy transforms in projection and carries publication identity", async () => {
-    const named = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
-    const masked = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "masked",
-    });
-    const privateFeed = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "private",
-    });
+    const named = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
+    const masked = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "masked",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "masked",
+          },
+          db
+        )
+    );
+    const privateFeed = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "private",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "private",
+          },
+          db
+        )
+    );
 
     expect(named.ok && named.value[0]).toMatchObject({
       description: null,
@@ -215,10 +267,20 @@ describe("projectFeedEvents", () => {
         { ...mocks.record, privacy_mode: recordPrivacy },
       ]);
 
-      const result = await projectFeedEvents({
-        ...baseInput,
-        privacyMode: feedPrivacy,
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          ...baseInput,
+          privacyMode: feedPrivacy,
+        }),
+        (db) =>
+          projectFeedEvents(
+            {
+              ...baseInput,
+              privacyMode: feedPrivacy,
+            },
+            db
+          )
+      );
 
       expect(result.ok && result.value[0]).toMatchObject({ location, summary });
     }
@@ -329,10 +391,20 @@ describe("projectFeedEvents", () => {
       })
     );
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -385,10 +457,20 @@ describe("projectFeedEvents", () => {
       },
     ]);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -426,10 +508,20 @@ describe("projectFeedEvents", () => {
     };
     mockFeedRecord(record);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -462,10 +554,20 @@ describe("projectFeedEvents", () => {
     };
     mockFeedRecord(record);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -498,10 +600,20 @@ describe("projectFeedEvents", () => {
     };
     mockFeedRecord(record);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -533,10 +645,20 @@ describe("projectFeedEvents", () => {
     };
     mockFeedRecord(record);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -569,10 +691,20 @@ describe("projectFeedEvents", () => {
     };
     mockFeedRecord(record);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -609,10 +741,20 @@ describe("projectFeedEvents", () => {
       },
     ]);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -653,10 +795,20 @@ describe("projectFeedEvents", () => {
       },
     ]);
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -721,10 +873,20 @@ describe("projectFeedEvents", () => {
       })
     );
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -767,11 +929,22 @@ describe("projectFeedEvents", () => {
       ],
     });
 
-    await projectFeedEvents({
-      ...baseInput,
-      horizonDays: 30,
-      privacyMode: "named",
-    });
+    await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        horizonDays: 30,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            horizonDays: 30,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(mocks.loadHolidayResolutionData).toHaveBeenCalledTimes(1);
     expect(mocks.loadHolidayResolutionData.mock.calls[0]?.[0]).toEqual({
@@ -858,11 +1031,22 @@ describe("projectFeedEvents", () => {
       })
     );
 
-    const result = await projectFeedEvents({
-      ...baseInput,
-      horizonDays: 30,
-      privacyMode: "named",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        horizonDays: 30,
+        privacyMode: "named",
+      }),
+      (db) =>
+        projectFeedEvents(
+          {
+            ...baseInput,
+            horizonDays: 30,
+            privacyMode: "named",
+          },
+          db
+        )
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -950,10 +1134,20 @@ it("projects an account feed with an owned company filter and separate record id
       publication: null,
     },
   ]);
-  const result = await projectFeedEvents({
-    ...baseInput,
-    organisationId: null,
-  });
+  const result = await withTestTenantResult(
+    tenantTestAccount({
+      ...baseInput,
+      organisationId: null,
+    }),
+    (db) =>
+      projectFeedEvents(
+        {
+          ...baseInput,
+          organisationId: null,
+        },
+        db
+      )
+  );
   expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
     expect.objectContaining({
       where: expect.objectContaining({
@@ -973,7 +1167,10 @@ it("projects an account feed with an owned company filter and separate record id
 it("refuses a company feed after its company leaves the active owned set, including manual records", async () => {
   vi.clearAllMocks();
   mocks.companies.mockResolvedValueOnce([]);
-  const result = await projectFeedEvents(baseInput);
+  const result = await withTestTenantResult(
+    tenantTestAccount(baseInput),
+    (db) => projectFeedEvents(baseInput, db)
+  );
   expect(result).toMatchObject({
     error: { code: "feed_not_found" },
     ok: false,

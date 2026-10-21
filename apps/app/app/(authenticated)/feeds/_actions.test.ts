@@ -12,8 +12,10 @@ const mocks = vi.hoisted(() => ({
     feed: {
       findFirst: vi.fn(),
     },
+    organisation: { findFirst: vi.fn() },
   },
   dispatchNotification: vi.fn(),
+  effects: [] as Array<() => Promise<void>>,
   getActiveOrgContext: vi.fn(),
   issueToken: vi.fn(),
   log: {
@@ -58,9 +60,35 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => mocks.database),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  getOrganisationById: async (
+    _account: string,
+    scopedOrganisationId: string
+  ) => {
+    const context = await mocks.getActiveOrgContext(scopedOrganisationId);
+    return context.ok
+      ? { ok: true, value: { id: scopedOrganisationId } }
+      : context;
+  },
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("@repo/observability/log", () => ({
   log: mocks.log,
 }));
@@ -85,7 +113,10 @@ const feedId = "00000000-0000-4000-8000-000000000101";
 describe("feed actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.database.organisation.findFirst.mockResolvedValue({
+      id: organisationId,
+    });
+    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
@@ -116,7 +147,7 @@ describe("feed actions", () => {
   it.each(["org:admin", "org:owner"])(
     "issues a usable URL with authorised %s identity and both tenant scopes",
     async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
       mocks.issueToken.mockResolvedValue({
         ok: true,
         value: { plaintext: "issued_plaintext", tokenId: "token-issued" },
@@ -129,13 +160,16 @@ describe("feed actions", () => {
           tokenId: "token-issued",
         },
       });
-      expect(mocks.issueToken).toHaveBeenCalledWith({
-        actingRole: orgRole.replace("org:", ""),
-        actingUserId: "user_1",
-        clerkOrgId: "org_1",
-        feedId,
-        organisationId,
-      });
+      expect(mocks.issueToken).toHaveBeenCalledWith(
+        {
+          actingRole: orgRole.replace("org:", ""),
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          feedId,
+          organisationId,
+        },
+        expect.any(Object)
+      );
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/feeds");
       expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feeds/${feedId}`);
     }
@@ -144,7 +178,7 @@ describe("feed actions", () => {
   it.each(["org:viewer", "org:manager", null])(
     "denies token issuance to %s without calling the service",
     async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
       expect(await issueTokenAction({ feedId, organisationId })).toMatchObject({
         error: { code: "not_authorised" },
         ok: false,
@@ -155,10 +189,7 @@ describe("feed actions", () => {
   );
 
   it("rejects an inaccessible organisation before token issuance", async () => {
-    mocks.getActiveOrgContext.mockResolvedValue({
-      error: { message: "Organisation is not available" },
-      ok: false,
-    });
+    mocks.database.organisation.findFirst.mockResolvedValueOnce(null);
     expect(await issueTokenAction({ feedId, organisationId })).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
@@ -242,19 +273,23 @@ describe("feed actions", () => {
           organisation_id: organisationId,
         },
       });
-      expect(mocks.dispatchNotification).toHaveBeenCalledWith({
-        actionUrl: `/feeds/${feedId}?org=${organisationId}`,
-        actorUserId: "user_1",
-        body: 'The token for calendar feed "Internal Calendar" has been rotated.',
-        clerkOrgId: "org_1",
-        objectId: feedId,
-        objectType: "feed",
-        organisationId,
-        recipientPersonId: null,
-        recipientUserId: "user_1",
-        title: "Feed token rotated",
-        type: "feed_token_rotated",
-      });
+      expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+        {
+          actionUrl: `/feeds/${feedId}?org=${organisationId}`,
+          actorUserId: "user_1",
+          body: 'The token for calendar feed "Internal Calendar" has been rotated.',
+          clerkOrgId: "org_1",
+          objectId: feedId,
+          objectType: "feed",
+          organisationId,
+          recipientPersonId: null,
+          recipientUserId: "user_1",
+          title: "Feed token rotated",
+          type: "feed_token_rotated",
+        },
+        undefined,
+        expect.any(Object)
+      );
     });
 
     it("falls back to body without name when feed name query fails or returns null", async () => {
@@ -266,7 +301,9 @@ describe("feed actions", () => {
       expect(mocks.dispatchNotification).toHaveBeenCalledWith(
         expect.objectContaining({
           body: "A calendar feed token has been rotated.",
-        })
+        }),
+        undefined,
+        expect.any(Object)
       );
     });
 
@@ -303,7 +340,7 @@ describe("feed actions", () => {
 
   describe("owner self-service", () => {
     beforeEach(() => {
-      mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
     });
 
     it.each([
@@ -343,7 +380,8 @@ describe("feed actions", () => {
           expect.objectContaining({
             actingRole: "viewer",
             actingUserId: "user_1",
-          })
+          }),
+          expect.any(Object)
         );
       }
     );
@@ -366,7 +404,7 @@ describe("feed actions", () => {
     });
 
     it("rejects callers without an organisation role", async () => {
-      mocks.auth.mockResolvedValue({ orgRole: null });
+      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: null });
       expect(
         await createOwnFeedAction({ kind: "personal", organisationId })
       ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
@@ -381,13 +419,16 @@ describe("feed actions", () => {
       expect(
         await createOwnFeedAction({ kind: "team", organisationId })
       ).toEqual({ ok: true, value: { created: true, feedId } });
-      expect(mocks.createOwnFeed).toHaveBeenCalledWith({
-        actingRole: "viewer",
-        actingUserId: "user_1",
-        clerkOrgId: "org_1",
-        kind: "team",
-        organisationId,
-      });
+      expect(mocks.createOwnFeed).toHaveBeenCalledWith(
+        {
+          actingRole: "viewer",
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          kind: "team",
+          organisationId,
+        },
+        expect.any(Object)
+      );
       expect(mocks.analyticsCapture).toHaveBeenCalledWith({
         distinctId: "user_1",
         event: "Personal Feed Created",

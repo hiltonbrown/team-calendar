@@ -1,4 +1,4 @@
-import { tenantDatabase } from "@repo/database";
+import { referenceDatabase } from "@repo/database/tenant-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   database: {
     alternativeContact: { findFirst: vi.fn() },
     auditEvent: { create: vi.fn() },
+    organisation: { findFirst: vi.fn(), findMany: vi.fn() },
     person: { findFirst: vi.fn() },
     xeroConnection: { findFirst: vi.fn() },
   },
@@ -35,21 +36,49 @@ vi.mock("@repo/jobs", () => ({
 vi.mock("@repo/availability", () => ({
   addAlternativeContact: mocks.addAlternativeContact,
   deleteAlternativeContact: mocks.deleteAlternativeContact,
-  dispatchBalanceRefresh: mocks.dispatchBalanceRefresh,
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
   inviteClerkAccessCandidates: mocks.inviteClerkAccessCandidates,
   loadClerkAccessReview: mocks.loadClerkAccessReview,
+  prepareBalanceRefresh: vi.fn(async (input: unknown) => ({
+    ok: true,
+    value: input,
+  })),
+  recordBalanceRefreshDispatch: vi.fn(async () => ({
+    ok: true,
+    value: undefined,
+  })),
   reorderAlternativeContacts: mocks.reorderAlternativeContacts,
+  sendPreparedBalanceRefresh: mocks.dispatchBalanceRefresh,
   setManualLeaveBalance: mocks.setManualLeaveBalance,
   updateAlternativeContact: mocks.updateAlternativeContact,
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: vi.fn(
+      async (executeTransaction: (client: unknown) => Promise<unknown>) =>
+        executeTransaction({
+          $executeRaw: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => []),
+          ...buildTenantTestDatabase(),
+        })
+    ),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<
+    typeof import("../../../../../packages/database/src/queries/account-companies")
+  >("../../../../../packages/database/src/queries/account-companies")),
   scopedQuery: (cOrgId: string, orgId: string) => ({
     clerk_org_id: cOrgId,
     organisation_id: orgId,
   }),
-  tenantDatabase: vi.fn(() => mocks.database),
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
 }));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));
@@ -74,11 +103,17 @@ const userId = "user_456";
 describe("people server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.database.organisation.findFirst.mockResolvedValue({
+      id: organisationId,
+    });
+    mocks.database.organisation.findMany.mockResolvedValue([
+      { id: organisationId, name: "Company A" },
+    ]);
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
       value: { state: "connected" },
     });
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
@@ -135,7 +170,7 @@ describe("people server actions", () => {
       expect(mocks.addAlternativeContact).not.toHaveBeenCalled();
     });
     it("rejects unauthenticated or non-member roles without permission", async () => {
-      mocks.auth.mockResolvedValue({ orgRole: null });
+      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: null });
       const resDelete = await deleteAlternativeContactAction({
         contactId,
         organisationId,
@@ -163,14 +198,18 @@ describe("people server actions", () => {
         organisationId,
         personId,
       });
-      expect(tenantDatabase).toHaveBeenCalledWith(clerkOrgId);
+      expect(referenceDatabase.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.any(Object)
+      );
       expect(mocks.database.person.findFirst).toHaveBeenCalledWith({
+        orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: { id: true },
         where: {
           archived_at: null,
           clerk_org_id: clerkOrgId,
           clerk_user_id: userId,
-          organisation_id: organisationId,
+          organisation_id: { in: [organisationId] },
         },
       });
     });
@@ -194,7 +233,8 @@ describe("people server actions", () => {
           name: "Emergency Contact",
           organisationId,
           personId,
-        })
+        }),
+        expect.any(Object)
       );
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/people");
       expect(mocks.revalidatePath).toHaveBeenCalledWith(`/people/${personId}`);
@@ -256,12 +296,14 @@ describe("people server actions", () => {
           leaveTypeXeroId: "xero-leave-1",
           organisationId,
           personId,
-        })
+        }),
+        expect.any(Object)
       );
     });
     it("loadClerkAccessCandidates requires owner or admin role", async () => {
       mocks.auth.mockResolvedValue({
         has: vi.fn().mockReturnValue(false),
+        orgId: "org_123",
         orgRole: "org:viewer",
       });
       const resWrongRole = await loadClerkAccessCandidates({ organisationId });
@@ -281,6 +323,7 @@ describe("people server actions", () => {
       };
       mocks.auth.mockResolvedValue({
         has: vi.fn().mockReturnValue(true),
+        orgId: "org_123",
         orgRole: "org:admin",
       });
       mocks.clerkClient.mockResolvedValue({ organizations: mockOrganizations });
@@ -330,6 +373,7 @@ describe("people server actions", () => {
       };
       mocks.auth.mockResolvedValue({
         has: vi.fn().mockReturnValue(true),
+        orgId: "org_123",
         orgRole: "org:owner",
       });
       mocks.clerkClient.mockResolvedValue({ organizations: mockOrganizations });

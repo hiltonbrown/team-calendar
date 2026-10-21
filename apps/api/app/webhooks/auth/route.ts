@@ -3,7 +3,8 @@ import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { ensureCurrentUserPerson } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { withTenantDb, withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
@@ -219,6 +220,7 @@ export const handleOrganizationMembershipCreated = async (
   deliveryId: string,
   eventTimestamp: Date
 ): Promise<Response> => {
+  assertNoTenantTransaction("handleOrganizationMembershipCreated");
   const provisioned = await ensurePeopleForMembership(data);
   if (!provisioned) {
     return new Response("Membership provisioning temporarily unavailable", {
@@ -260,20 +262,23 @@ export const handleOrganizationMembershipCreated = async (
 export const handleOrganizationMembershipDeleted = async (
   data: ClerkOrganizationMembershipData
 ): Promise<Response> => {
+  assertNoTenantTransaction("handleOrganizationMembershipDeleted");
   analytics?.capture({
     distinctId: data.public_user_data.user_id,
     event: "Organisation Member Deleted",
   });
 
-  await tenantDatabase(data.organization.id).person.updateMany({
-    data: {
-      clerk_user_id: null,
-    },
-    where: {
-      clerk_org_id: data.organization.id,
-      clerk_user_id: data.public_user_data.user_id,
-    },
-  });
+  await withTenantDb(data.organization.id, (db) =>
+    db.person.updateMany({
+      data: {
+        clerk_user_id: null,
+      },
+      where: {
+        clerk_org_id: data.organization.id,
+        clerk_user_id: data.public_user_data.user_id,
+      },
+    })
+  );
 
   return new Response("Organisation membership deleted", { status: 201 });
 };
@@ -281,43 +286,46 @@ export const handleOrganizationMembershipDeleted = async (
 async function ensurePeopleForMembership(
   data: ClerkOrganizationMembershipData
 ): Promise<boolean> {
-  const organisations = await tenantDatabase(
-    data.organization.id
-  ).organisation.findMany({
-    select: {
-      clerk_org_id: true,
-      id: true,
-    },
-    where: {
-      archived_at: null,
-      clerk_org_id: data.organization.id,
-    },
-  });
+  const organisations = await withTenantDb(data.organization.id, (db) =>
+    db.organisation.findMany({
+      select: {
+        clerk_org_id: true,
+        id: true,
+      },
+      where: {
+        archived_at: null,
+        clerk_org_id: data.organization.id,
+      },
+    })
+  );
 
   const outcomes = await Promise.all(
     organisations.map(async (organisation) => {
       try {
-        const result = await ensureCurrentUserPerson(
-          {
-            clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
-            organisationId: organisation.id as OrganisationId,
-          },
-          {
-            avatarUrl: data.public_user_data.image_url,
-            clerkUserId: data.public_user_data.user_id,
-            displayName:
-              [
-                data.public_user_data.first_name,
-                data.public_user_data.last_name,
-              ]
-                .filter(Boolean)
-                .join(" ") ||
-              data.public_user_data.identifier ||
-              data.public_user_data.user_id,
-            email: data.public_user_data.identifier,
-            firstName: data.public_user_data.first_name,
-            lastName: data.public_user_data.last_name,
-          }
+        const result = await withTenantResult(organisation.clerk_org_id, (db) =>
+          ensureCurrentUserPerson(
+            {
+              clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
+              organisationId: organisation.id as OrganisationId,
+            },
+            {
+              avatarUrl: data.public_user_data.image_url,
+              clerkUserId: data.public_user_data.user_id,
+              displayName:
+                [
+                  data.public_user_data.first_name,
+                  data.public_user_data.last_name,
+                ]
+                  .filter(Boolean)
+                  .join(" ") ||
+                data.public_user_data.identifier ||
+                data.public_user_data.user_id,
+              email: data.public_user_data.identifier,
+              firstName: data.public_user_data.first_name,
+              lastName: data.public_user_data.last_name,
+            },
+            db
+          )
         );
 
         if (!result.ok) {
@@ -357,6 +365,7 @@ const deliveryUuid = (deliveryId: string): string => {
 };
 
 export const POST = async (request: Request): Promise<Response> => {
+  assertNoTenantTransaction("POST");
   if (!env.CLERK_WEBHOOK_SECRET) {
     // Fail closed. A 2xx would tell Clerk the delivery succeeded and stop it
     // retrying, silently dropping membership events that link people to Clerk

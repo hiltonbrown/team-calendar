@@ -1,10 +1,10 @@
 "use server";
 
 import { auth, clerkClient } from "@repo/auth/server";
-import { tenantDatabase } from "@repo/database";
+import { withTenantResult } from "@repo/database";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const UpdateOrgSchema = z.object({
   fiscalYearStart: z.number().int().min(1).max(12),
@@ -23,6 +23,7 @@ type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 export const updateOrg = async (
   input: UpdateOrgInput
 ): Promise<Result<void>> => {
+  assertNoTenantTransaction("updateOrg");
   const { orgId, orgRole } = await auth();
 
   if (!orgId) {
@@ -54,25 +55,34 @@ export const updateOrg = async (
   } = parsed.data;
 
   try {
-    const contextResult = await getActiveOrgContext(organisationId);
-    if (!contextResult.ok) {
-      return { error: contextResult.error.message, ok: false };
-    }
-
-    const updateResult = await tenantDatabase(orgId).organisation.updateMany({
-      data: {
-        fiscal_year_start: fiscalYearStart,
-        locale,
-        name,
-        reporting_unit: reportingUnit,
-        timezone,
-        working_hours_per_day: workingHoursPerDay,
-      },
-      where: { clerk_org_id: orgId, id: organisationId },
-    });
-
-    if (updateResult.count !== 1) {
-      return { error: "Organisation not found", ok: false };
+    const result = await withTenantResult(
+      orgId,
+      async (db): Promise<Result<void>> => {
+        const company = await db.organisation.findFirst({
+          select: { id: true },
+          where: { clerk_org_id: orgId, id: organisationId },
+        });
+        if (!company) {
+          return { error: "Organisation not found", ok: false };
+        }
+        const updated = await db.organisation.updateMany({
+          data: {
+            fiscal_year_start: fiscalYearStart,
+            locale,
+            name,
+            reporting_unit: reportingUnit,
+            timezone,
+            working_hours_per_day: workingHoursPerDay,
+          },
+          where: { clerk_org_id: orgId, id: organisationId },
+        });
+        return updated.count === 1
+          ? { ok: true, value: undefined }
+          : { error: "Organisation not found", ok: false };
+      }
+    );
+    if (!result.ok) {
+      return result;
     }
 
     const clerk = await clerkClient();

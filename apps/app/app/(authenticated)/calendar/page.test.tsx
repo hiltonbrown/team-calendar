@@ -32,30 +32,40 @@ vi.mock("@repo/auth/server", () => ({
 vi.mock("@repo/availability", () => ({
   getCalendarRange: mocks.getCalendarRange,
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
   resolveAccountCompanies: mocks.resolveAccountCompanies,
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn(() => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return {
     location: { findMany: mocks.locationFindMany },
     organisation: { findFirst: mocks.organisationFindFirst },
     person: { findFirst: mocks.personFindFirst },
     team: { findMany: mocks.teamFindMany },
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-  })),
-  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
-    operation({
-      location: { findMany: mocks.locationFindMany },
-      organisation: { findFirst: mocks.organisationFindFirst },
-      team: { findMany: mocks.teamFindMany },
-      xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-    })
-  ),
-}));
+  };
+}
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
+  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("next/navigation", () => ({
   redirect: (href: string) => {
@@ -129,7 +139,8 @@ describe("CalendarPage", () => {
         actingUserId: "user_1",
         clerkOrgId: "org_1",
         companyIds: undefined,
-      })
+      }),
+      expect.any(Object)
     );
     expect(mocks.getCalendarRange.mock.calls[0]?.[0]).not.toHaveProperty(
       "organisationId"
@@ -141,15 +152,17 @@ describe("CalendarPage", () => {
       await Page({ searchParams: Promise.resolve({ companyIds: companyId }) })
     );
     expect(mocks.getCalendarRange).toHaveBeenCalledWith(
-      expect.objectContaining({ companyIds: [companyId] })
+      expect.objectContaining({ companyIds: [companyId] }),
+      expect.any(Object)
     );
   });
-  it("uses viewer default scope my_self", async () => {
+  it("uses the account calendar as the viewer default", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
     expect(mocks.getCalendarRange).toHaveBeenCalledWith(
       expect.objectContaining({
-        scope: { type: "my_self" },
-      })
+        scope: { type: "all_teams" },
+      }),
+      expect.any(Object)
     );
     expect(screen.getByRole("region", { name: "Calendar" })).toBeDefined();
     expect(screen.queryByText("Today in view")).toBeNull();
@@ -161,8 +174,27 @@ describe("CalendarPage", () => {
       expect.objectContaining({
         role: "admin",
         scope: { type: "all_teams" },
-      })
+      }),
+      expect.any(Object)
     );
+  });
+  it("loads connection health with the supported tenant and company filters", async () => {
+    render(await Page({ searchParams: Promise.resolve({}) }));
+    expect(mocks.xeroTenantFindFirst).toHaveBeenCalledWith({
+      select: {
+        last_leave_records_sync_at: true,
+        last_sync_error_message: true,
+        leave_records_stale_since: true,
+        sync_paused_at: true,
+        tenant_name: true,
+      },
+      where: {
+        clerk_org_id: "org_1",
+        organisation_id: "00000000-0000-4000-8000-000000000001",
+        released_at: null,
+      },
+    });
+    expect(screen.getByRole("region", { name: "Calendar" })).toBeDefined();
   });
   it("renders the disconnected Xero banner", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));

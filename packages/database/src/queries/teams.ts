@@ -10,7 +10,7 @@ import {
 import { z } from "zod";
 import type { availability_record_type } from "../../generated/enums";
 import type { Database } from "../system-client";
-import { tenantDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedTo } from "../tenant-query";
 
 interface TenantScope {
@@ -42,15 +42,21 @@ const activePersonFilter = { archived_at: null, is_active: true } as const;
  * headcount (people not archived and marked active).
  */
 export async function listTeamsWithCoverageMinimum(
-  input: TenantScope
+  input: TenantScope,
+  db: TenantDb
 ): Promise<Result<TeamCoverageMinimumRow[]>> {
-  try {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const tenantDb = db;
+
     const scope = scopedTo(input);
-    const teams = await tenantDatabase(input.clerkOrgId).team.findMany({
+    const teams = await tenantDb.team.findMany({
       orderBy: [{ name: "asc" }, { id: "asc" }],
       select: {
         _count: {
-          select: { people: { where: { ...scope, ...activePersonFilter } } },
+          select: {
+            people: { where: { ...scope, ...activePersonFilter } },
+          },
         },
         id: true,
         minimum_available_people: true,
@@ -67,11 +73,6 @@ export async function listTeamsWithCoverageMinimum(
         name: team.name,
       })),
     };
-  } catch {
-    return {
-      error: appError("internal", "Failed to list teams"),
-      ok: false,
-    };
   }
 }
 
@@ -82,9 +83,11 @@ export async function listTeamsWithCoverageMinimum(
  */
 export async function setTeamCoverageMinimum(
   input: TenantScope & { minimum: number | null; teamId: string },
-  client: TeamCoverageMinimumClient = tenantDatabase(input.clerkOrgId)
+  db: TenantDb
 ): Promise<Result<TeamCoverageMinimumChange>> {
-  try {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
     const where = { ...scopedTo(input), id: input.teamId };
     const team = await client.team.findFirst({
       select: { id: true, minimum_available_people: true, name: true },
@@ -108,11 +111,6 @@ export async function setTeamCoverageMinimum(
         teamId: team.id,
         teamName: team.name,
       },
-    };
-  } catch {
-    return {
-      error: appError("internal", "Failed to update team coverage minimum"),
-      ok: false,
     };
   }
 }
@@ -142,15 +140,20 @@ export async function countAwayPeopleByTeamAndDay(
     teamIds: readonly string[];
     timezone: string;
     to: string;
-  }
+  },
+  db: TenantDb
 ): Promise<Result<AwayPeopleByTeamAndDay>> {
-  if (!AwayCountInputSchema.safeParse(input).success) {
-    return {
-      error: appError("bad_request", "Invalid date range"),
-      ok: false,
-    };
-  }
-  try {
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const tenantDb2 = db;
+
+    if (!AwayCountInputSchema.safeParse(input).success) {
+      return {
+        error: appError("bad_request", "Invalid date range"),
+        ok: false,
+      };
+    }
+
     const days = dateKeysBetween(input.from, input.to).map((dateKey) => ({
       dateKey,
       end: zonedStartOfDay(addDaysToDateKey(dateKey, 1), input.timezone),
@@ -171,9 +174,7 @@ export async function countAwayPeopleByTeamAndDay(
     }
     const window = recordQueryWindow(input.from, input.to, input.timezone);
     const scope = scopedTo(input);
-    const records = await tenantDatabase(
-      input.clerkOrgId
-    ).availabilityRecord.findMany({
+    const records = await tenantDb2.availabilityRecord.findMany({
       select: {
         all_day: true,
         ends_at: true,
@@ -221,10 +222,5 @@ export async function countAwayPeopleByTeamAndDay(
       }
     }
     return { ok: true, value: counts };
-  } catch {
-    return {
-      error: appError("internal", "Failed to count people away"),
-      ok: false,
-    };
   }
 }

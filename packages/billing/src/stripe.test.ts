@@ -9,7 +9,16 @@ const mocks = vi.hoisted(() => ({
 const CHECKOUT_IDEMPOTENCY_KEY = /^team-calendar:checkout:[a-f0-9]{64}$/;
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
   PLAN_CATALOGUE: [
     { plan_key: "basic", priceId: "price_basic" },

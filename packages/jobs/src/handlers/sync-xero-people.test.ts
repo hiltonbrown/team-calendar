@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   personUpsert: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
+  scopeDatabase: null as Record<string, unknown> | null,
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -31,7 +32,14 @@ vi.mock("../client", () => ({
     send: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   },
 }));
-vi.mock("@repo/database", () => {
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    // Real scope ownership and effects are exercised against this area's delegate fake.
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ ...mocks.scopeDatabase }),
+  },
+}));
+vi.mock("@repo/database", async () => {
   const exports = {
     database: {
       failedRecord: { create: mocks.failedRecordCreate },
@@ -58,7 +66,7 @@ vi.mock("@repo/database", () => {
     },
     scopedTo: mocks.scopedTo,
   };
-  return {
+  const mockedModule = {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
       ok: true,
@@ -68,13 +76,18 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
   };
+  if (!("$executeRaw" in exports.database)) {
+    Object.assign(exports.database, { $executeRaw: vi.fn(async () => 1) });
+  }
+  if (!("$queryRaw" in exports.database)) {
+    Object.assign(exports.database, { $queryRaw: vi.fn(async () => []) });
+  }
+  mocks.scopeDatabase = exports.database;
+  const core = await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  );
+  return { ...mockedModule, ...core };
 });
 vi.mock("@repo/notifications", () => ({
   publishOrganisationNotificationEvent:

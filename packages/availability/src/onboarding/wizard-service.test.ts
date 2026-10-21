@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WizardInputs } from "./wizard-rules";
 
@@ -8,6 +10,21 @@ const mocks = vi.hoisted(() => ({
   getWelcomeState: vi.fn(),
   loadWizardInputs: vi.fn(),
 }));
+
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));
+vi.mock(
+  "@repo/database",
+  async () =>
+    await vi.importActual<typeof import("@repo/database/tenant-db")>(
+      "@repo/database/tenant-db"
+    )
+);
+
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database/queries/onboarding", () => ({
   advanceOnboardingStep: mocks.advanceOnboardingStep,
@@ -60,7 +77,10 @@ describe("wizard service", () => {
 
   it("refuses members", async () => {
     await expect(
-      loadWizardSnapshot({ ...admin, actingRole: "org:viewer" })
+      withTestTenantResult(
+        tenantTestAccount({ ...admin, actingRole: "org:viewer" }),
+        (db) => loadWizardSnapshot({ ...admin, actingRole: "org:viewer" }, db)
+      )
     ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
     expect(mocks.loadWizardInputs).not.toHaveBeenCalled();
   });
@@ -69,12 +89,15 @@ describe("wizard service", () => {
     mocks.loadWizardInputs
       .mockResolvedValueOnce({ ok: true, value: inputs() })
       .mockResolvedValueOnce({ ok: true, value: inputs({ step: "xero" }) });
-    const result = await advanceWizard(admin, "details");
+    const result = await withTestTenantResult(tenantTestAccount(admin), (db) =>
+      advanceWizard(admin, "details", db)
+    );
     expect(mocks.advanceOnboardingStep).toHaveBeenCalledWith(
       admin.clerkOrgId,
       admin.organisationId,
       "details",
-      "xero"
+      "xero",
+      expect.any(Object)
     );
     expect(result).toMatchObject({ ok: true, value: { step: "xero" } });
   });
@@ -84,7 +107,9 @@ describe("wizard service", () => {
       ok: true,
       value: inputs({ step: "people" }),
     });
-    const result = await advanceWizard(admin, "details");
+    const result = await withTestTenantResult(tenantTestAccount(admin), (db) =>
+      advanceWizard(admin, "details", db)
+    );
     expect(result).toMatchObject({ ok: true, value: { step: "people" } });
     expect(mocks.advanceOnboardingStep).not.toHaveBeenCalled();
   });
@@ -94,11 +119,19 @@ describe("wizard service", () => {
       ok: true,
       value: inputs({ step: "xero" }),
     });
-    await expect(advanceWizard(admin, "people")).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        advanceWizard(admin, "people", db)
+      )
+    ).resolves.toMatchObject({
       error: { code: "stale_step" },
       ok: false,
     });
-    await expect(advanceWizard(admin, "xero")).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        advanceWizard(admin, "xero", db)
+      )
+    ).resolves.toMatchObject({
       error: { code: "step_incomplete" },
       ok: false,
     });
@@ -110,7 +143,11 @@ describe("wizard service", () => {
       ok: true,
       value: inputs({ step: "finish", xeroSkippedAt: done }),
     });
-    await expect(finishWizard(admin, { force: false })).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        finishWizard(admin, { force: false }, db)
+      )
+    ).resolves.toMatchObject({
       ok: true,
       value: { redirectTo: "/calendar" },
     });
@@ -128,11 +165,19 @@ describe("wizard service", () => {
       step: "finish",
     });
     mocks.loadWizardInputs.mockResolvedValue({ ok: true, value: running });
-    await expect(finishWizard(admin, { force: false })).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        finishWizard(admin, { force: false }, db)
+      )
+    ).resolves.toMatchObject({
       error: { code: "step_incomplete" },
       ok: false,
     });
-    await expect(finishWizard(admin, { force: true })).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        finishWizard(admin, { force: true }, db)
+      )
+    ).resolves.toMatchObject({
       ok: true,
     });
     mocks.completeOnboarding.mockClear();
@@ -140,7 +185,11 @@ describe("wizard service", () => {
       ok: true,
       value: { ...running, step: "invites" },
     });
-    await expect(finishWizard(admin, { force: true })).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        finishWizard(admin, { force: true }, db)
+      )
+    ).resolves.toMatchObject({
       error: { code: "stale_step" },
       ok: false,
     });
@@ -152,7 +201,11 @@ describe("wizard service", () => {
       ok: true,
       value: inputs({ completedAt: done, step: "finish" }),
     });
-    await expect(finishWizard(admin, { force: false })).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        finishWizard(admin, { force: false }, db)
+      )
+    ).resolves.toMatchObject({
       ok: true,
     });
     expect(mocks.completeOnboarding).not.toHaveBeenCalled();
@@ -163,7 +216,11 @@ describe("welcome service", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("is never eligible for owners and admins", async () => {
-    await expect(loadWelcomeEligibility(admin)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(admin), (db) =>
+        loadWelcomeEligibility(admin, db)
+      )
+    ).resolves.toEqual({
       ok: true,
       value: { eligible: false, personId: null },
     });
@@ -176,12 +233,20 @@ describe("welcome service", () => {
       ok: true,
       value: { completedAt: null, personId: "p1" },
     });
-    await expect(loadWelcomeEligibility(member)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(member), (db) =>
+        loadWelcomeEligibility(member, db)
+      )
+    ).resolves.toEqual({
       ok: true,
       value: { eligible: true, personId: "p1" },
     });
     mocks.getWelcomeState.mockResolvedValueOnce({ ok: true, value: null });
-    await expect(loadWelcomeEligibility(member)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(member), (db) =>
+        loadWelcomeEligibility(member, db)
+      )
+    ).resolves.toEqual({
       ok: true,
       value: { eligible: false, personId: null },
     });
@@ -189,7 +254,11 @@ describe("welcome service", () => {
       ok: true,
       value: { completedAt: done, personId: "p1" },
     });
-    await expect(loadWelcomeEligibility(member)).resolves.toMatchObject({
+    await expect(
+      withTestTenantResult(tenantTestAccount(member), (db) =>
+        loadWelcomeEligibility(member, db)
+      )
+    ).resolves.toMatchObject({
       value: { eligible: false },
     });
   });
@@ -201,7 +270,11 @@ describe("welcome service", () => {
       value: { completedAt: null, personId: "p1" },
     });
     mocks.completeWelcome.mockResolvedValueOnce({ ok: true, value: undefined });
-    await expect(completeMemberWelcome(member)).resolves.toEqual({
+    await expect(
+      withTestTenantResult(tenantTestAccount(member), (db) =>
+        completeMemberWelcome(member, db)
+      )
+    ).resolves.toEqual({
       ok: true,
       value: undefined,
     });
@@ -209,7 +282,8 @@ describe("welcome service", () => {
       member.clerkOrgId,
       member.organisationId,
       "p1",
-      "user_m"
+      "user_m",
+      expect.any(Object)
     );
   });
 });

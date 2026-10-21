@@ -1,6 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository's .integration.test.ts convention.
 import type { ExternalWritePort, ProviderWriteCertainty } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import {
   afterAll,
   afterEach,
@@ -925,13 +927,26 @@ describe("canonical disconnect isolation", () => {
     const stopping = disconnect();
     await deleting;
     const { acquireXeroWriteClaim } = await import("@repo/availability");
-    const claiming = acquireXeroWriteClaim({
-      clerkOrgId: tenantA.clerkOrgId,
-      expectedSequence: 0,
-      expectedStatus: "approved",
-      organisationId: tenantA.organisationId,
-      recordId: tenantA.availabilityRecordId,
-    });
+    const claiming = withTestTenantDb(
+      tenantTestAccount({
+        clerkOrgId: tenantA.clerkOrgId,
+        expectedSequence: 0,
+        expectedStatus: "approved",
+        organisationId: tenantA.organisationId,
+        recordId: tenantA.availabilityRecordId,
+      }),
+      (db) =>
+        acquireXeroWriteClaim(
+          {
+            clerkOrgId: tenantA.clerkOrgId,
+            expectedSequence: 0,
+            expectedStatus: "approved",
+            organisationId: tenantA.organisationId,
+            recordId: tenantA.availabilityRecordId,
+          },
+          db
+        )
+    );
     resume();
     expect(await stopping).toMatchObject({ ok: true });
     expect(await claiming).toBeNull();

@@ -1,9 +1,12 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
 import {
   getRunDetail,
   listTenantSummaries,
   type SyncMonitorRole,
 } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -11,7 +14,7 @@ import {
   PermissionDeniedError,
   requirePageRole,
 } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 import { SyncRunDetailClient } from "./sync-run-detail-client";
 
@@ -60,21 +63,43 @@ const SyncRunDetailPage = async ({
     );
   }
 
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(org);
-  const [detailResult, summariesResult] = await Promise.all([
-    getRunDetail({
-      actingRole: role,
-      clerkOrgId,
-      organisationId,
-      runId,
-    }),
-    listTenantSummaries({
-      actingRole: role,
-      clerkOrgId,
-      organisationId,
-    }),
-  ]);
+  // Clerk supplied the authenticated account identifier.
+  const accountId = (await requireOrg()) as ClerkOrgId;
+  const { organisationId, orgQueryValue, detailResult, summariesResult } =
+    await withTenantDb(
+      accountId,
+      async (db) => {
+        const {
+          clerkOrgId,
+          organisationId: scopedOrganisationId,
+          orgQueryValue: preparedOrgQueryValue,
+        } = await resolveActiveOrgPageContext(accountId, org, db);
+        const preparedDetailResult = await getRunDetail(
+          {
+            actingRole: role,
+            clerkOrgId,
+            organisationId: scopedOrganisationId,
+            runId,
+          },
+          db
+        );
+        const preparedSummariesResult = await listTenantSummaries(
+          {
+            actingRole: role,
+            clerkOrgId,
+            organisationId: scopedOrganisationId,
+          },
+          db
+        );
+        return {
+          detailResult: preparedDetailResult,
+          organisationId: scopedOrganisationId,
+          orgQueryValue: preparedOrgQueryValue,
+          summariesResult: preparedSummariesResult,
+        };
+      },
+      TENANT_READ_TRANSACTION_OPTIONS
+    );
 
   return (
     <>

@@ -13,11 +13,28 @@ vi.mock("@repo/auth/helpers", () => ({
   currentUser: mocks.currentUser,
   requireOrg: mocks.requireOrg,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => ({
-    organisation: { findFirst: mocks.organisationFindFirst },
-  })),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) =>
+      executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...buildTenantTestDatabase(),
+      }),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return {
+    organisation: { findFirst: mocks.organisationFindFirst },
+  };
+}
 vi.mock("@repo/notifications", () => ({
   pollNotificationStream: mocks.pollNotificationStream,
 }));
@@ -51,16 +68,17 @@ describe("notifications stream route", () => {
     vi.useRealTimers();
   });
 
-  it("rejects missing organisation ids", async () => {
+  it("opens the account stream without a company parameter", async () => {
     const response = await GET(
       new Request("http://api.test/api/notifications/stream")
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
+    await response.body?.cancel();
   });
 
-  it("rejects organisations outside the Clerk org", async () => {
-    mocks.organisationFindFirst.mockResolvedValue(null);
+  it("rejects missing authenticated account context", async () => {
+    mocks.requireOrg.mockRejectedValue(new Error("Not authenticated"));
 
     const response = await GET(
       new Request(
@@ -68,7 +86,22 @@ describe("notifications stream route", () => {
       )
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
+  });
+
+  it("uses the authenticated account rather than account or company query parameters", async () => {
+    const response = await GET(
+      new Request(
+        "http://api.test/api/notifications/stream?clerkOrgId=foreign-account&organisationId=foreign-company"
+      )
+    );
+    expect(response.status).toBe(200);
+    await response.body?.cancel();
+    expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
+      { clerkOrgId: "org_1", userId: "user_1" },
+      expect.any(String)
+    );
+    expect(mocks.organisationFindFirst).not.toHaveBeenCalled();
   });
 
   it("opens an event stream for scoped users", async () => {
@@ -164,7 +197,6 @@ describe("notifications stream route", () => {
       expect.objectContaining({
         clerkOrgId: "org_1",
         consecutiveFailures: 1,
-        organisationId: "00000000-0000-4000-8000-000000000001",
         userId: "user_1",
       })
     );
@@ -184,7 +216,6 @@ describe("notifications stream route", () => {
       expect.objectContaining({
         clerkOrgId: "org_1",
         consecutiveFailures: 3,
-        organisationId: "00000000-0000-4000-8000-000000000001",
         userId: "user_1",
       })
     );
@@ -305,6 +336,8 @@ describe("notifications stream route", () => {
             category: "leave",
             createdAt: new Date().toISOString(),
             notificationId: "notif_1",
+            organisationId: "company-B",
+            organisationName: "Company B",
             title: "Leave Approved",
             type: "leave_request_approved",
             unreadCount: 1,
@@ -339,7 +372,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
       {
-        organisationId: "00000000-0000-4000-8000-000000000001",
+        clerkOrgId: "org_1",
         userId: "user_1",
       },
       "1724500000000-5"
@@ -361,7 +394,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
       {
-        organisationId: "00000000-0000-4000-8000-000000000001",
+        clerkOrgId: "org_1",
         userId: "user_1",
       },
       expect.stringMatching(WALL_CLOCK_FALLBACK_PATTERN)
@@ -383,6 +416,8 @@ describe("notifications stream route", () => {
             category: "leave",
             createdAt: "2026-08-26T10:00:00.000Z",
             notificationId: "notif_99",
+            organisationId: "company-B",
+            organisationName: "Company B",
             title: "Leave Requested",
             type: "leave_request_submitted",
             unreadCount: 3,
@@ -418,7 +453,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(mocks.pollNotificationStream).toHaveBeenLastCalledWith(
       {
-        organisationId: "00000000-0000-4000-8000-000000000001",
+        clerkOrgId: "org_1",
         userId: "user_1",
       },
       "1724500000000-2"

@@ -1,3 +1,4 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   type AnalyticsRole,
@@ -5,8 +6,9 @@ import {
   type DateRangePreset,
   resolveDateRange,
 } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
 import { getAvailabilityRecordLabel } from "@repo/core";
-import { tenantDatabase } from "@repo/database";
+import { withTenantDb } from "@repo/database";
 import {
   Card,
   CardContent,
@@ -21,7 +23,7 @@ import {
   PermissionDeniedError,
   requirePageRole,
 } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 import {
   AnalyticsFilters,
@@ -71,73 +73,93 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
     );
   }
 
-  const { clerkOrgId, organisationId } =
-    await requireActiveOrgPageContext(orgParam);
-  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
-    select: { timezone: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: clerkOrgId,
-      id: organisationId,
-    },
-  });
-  if (!organisation) {
-    redirect("/");
-  }
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const { organisationId, fromParam, toParam, preset, dataResult, personType } =
+    await withTenantDb(clerkOrgId, async (db) => {
+      const { organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+      const preparedOrganisation = await db.organisation.findFirst({
+        select: { timezone: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          id: scopedOrganisationId,
+        },
+      });
+      if (!preparedOrganisation) {
+        redirect("/");
+      }
 
-  const presetParam = Array.isArray(params.preset)
-    ? params.preset[0]
-    : params.preset;
-  const fromParam = Array.isArray(params.from) ? params.from[0] : params.from;
-  const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
-  const personTypeParam = Array.isArray(params.personType)
-    ? params.personType[0]
-    : params.personType;
-  const personType = resolvePersonType(personTypeParam);
-  const validPresets = new Set<DateRangePreset>([
-    "this_month",
-    "last_month",
-    "this_quarter",
-    "last_quarter",
-    "this_year",
-    "last_year",
-    "last_12_months",
-    "custom",
-  ]);
-  const preset: DateRangePreset =
-    presetParam && isDateRangePreset(presetParam, validPresets)
-      ? presetParam
-      : "this_year";
+      const presetParam = Array.isArray(params.preset)
+        ? params.preset[0]
+        : params.preset;
+      const preparedFromParam = Array.isArray(params.from)
+        ? params.from[0]
+        : params.from;
+      const preparedToParam = Array.isArray(params.to)
+        ? params.to[0]
+        : params.to;
+      const personTypeParam = Array.isArray(params.personType)
+        ? params.personType[0]
+        : params.personType;
+      const preparedPersonType = resolvePersonType(personTypeParam);
+      const validPresets = new Set<DateRangePreset>([
+        "this_month",
+        "last_month",
+        "this_quarter",
+        "last_quarter",
+        "this_year",
+        "last_year",
+        "last_12_months",
+        "custom",
+      ]);
+      const preparedPreset: DateRangePreset =
+        presetParam && isDateRangePreset(presetParam, validPresets)
+          ? presetParam
+          : "this_year";
 
-  const rangeResult = resolveDateRange({
-    customEnd: toParam,
-    customStart: fromParam,
-    preset,
-    timezone: organisation.timezone ?? "UTC",
-  });
-  if (!rangeResult.ok) {
-    return (
-      <>
-        <Header organisationId={organisationId} page="Out of Office" />
-        <div className="flex flex-1 flex-col p-6 pt-0">
-          <FetchErrorState entityName="out-of-office records" />
-        </div>
-      </>
-    );
-  }
+      const rangeResult = resolveDateRange({
+        customEnd: preparedToParam,
+        customStart: preparedFromParam,
+        preset: preparedPreset,
+        timezone: preparedOrganisation.timezone ?? "UTC",
+      });
+      if (!rangeResult.ok) {
+        return {
+          dataResult: { error: rangeResult.error, ok: false as const },
+          fromParam: preparedFromParam,
+          organisation: preparedOrganisation,
+          organisationId: scopedOrganisationId,
+          personType: preparedPersonType,
+          preset: preparedPreset,
+          toParam: preparedToParam,
+        };
+      }
+      const preparedDataResult = await aggregateOutOfOffice(
+        {
+          actingUserId: user.id,
+          clerkOrgId,
+          dateRange: rangeResult.value,
+          filters: {
+            includeArchivedPeople: false,
+            personType: preparedPersonType,
+          },
+          organisationId: scopedOrganisationId,
+          role,
+        },
+        db
+      );
 
-  const dataResult = await aggregateOutOfOffice({
-    actingUserId: user.id,
-    clerkOrgId,
-    dateRange: rangeResult.value,
-    filters: {
-      includeArchivedPeople: false,
-      personType,
-    },
-    organisationId,
-    role,
-  });
-
+      return {
+        dataResult: preparedDataResult,
+        fromParam: preparedFromParam,
+        organisation: preparedOrganisation,
+        organisationId: scopedOrganisationId,
+        personType: preparedPersonType,
+        preset: preparedPreset,
+        toParam: preparedToParam,
+      };
+    });
   if (!dataResult.ok) {
     return (
       <>
@@ -148,7 +170,6 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
       </>
     );
   }
-
   const report = dataResult.value;
 
   const donutChartData = report.oooTypeDonut.map((item) => ({

@@ -1,3 +1,4 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   type AnalyticsRole,
@@ -5,7 +6,8 @@ import {
   type DateRangePreset,
   resolveDateRange,
 } from "@repo/availability";
-import { tenantDatabase } from "@repo/database";
+import type { ClerkOrgId } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import {
   Card,
   CardContent,
@@ -20,7 +22,7 @@ import {
   PermissionDeniedError,
   requirePageRole,
 } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 import { AnalyticsFilters } from "../analytics-filters";
 import { ExportCsvButton } from "./export-csv-button";
@@ -70,70 +72,88 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
     );
   }
 
-  const { clerkOrgId, organisationId } =
-    await requireActiveOrgPageContext(orgParam);
-  const organisation = await tenantDatabase(clerkOrgId).organisation.findFirst({
-    select: { timezone: true },
-    where: {
-      archived_at: null,
-      clerk_org_id: clerkOrgId,
-      id: organisationId,
-    },
-  });
-  if (!organisation) {
-    redirect("/");
-  }
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const { organisationId, fromParam, toParam, preset, dataResult } =
+    await withTenantDb(clerkOrgId, async (db) => {
+      const { organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+      const preparedOrganisation = await db.organisation.findFirst({
+        select: { timezone: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          id: scopedOrganisationId,
+        },
+      });
+      if (!preparedOrganisation) {
+        redirect("/");
+      }
 
-  const presetParam = Array.isArray(params.preset)
-    ? params.preset[0]
-    : params.preset;
-  const fromParam = Array.isArray(params.from) ? params.from[0] : params.from;
-  const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
-  const validPresets = new Set<DateRangePreset>([
-    "this_month",
-    "last_month",
-    "this_quarter",
-    "last_quarter",
-    "this_year",
-    "last_year",
-    "last_12_months",
-    "custom",
-  ]);
-  const preset: DateRangePreset =
-    presetParam && isDateRangePreset(presetParam, validPresets)
-      ? presetParam
-      : "this_year";
+      const presetParam = Array.isArray(params.preset)
+        ? params.preset[0]
+        : params.preset;
+      const preparedFromParam = Array.isArray(params.from)
+        ? params.from[0]
+        : params.from;
+      const preparedToParam = Array.isArray(params.to)
+        ? params.to[0]
+        : params.to;
+      const validPresets = new Set<DateRangePreset>([
+        "this_month",
+        "last_month",
+        "this_quarter",
+        "last_quarter",
+        "this_year",
+        "last_year",
+        "last_12_months",
+        "custom",
+      ]);
+      const preparedPreset: DateRangePreset =
+        presetParam && isDateRangePreset(presetParam, validPresets)
+          ? presetParam
+          : "this_year";
 
-  const rangeResult = resolveDateRange({
-    customEnd: toParam,
-    customStart: fromParam,
-    preset,
-    timezone: organisation.timezone ?? "UTC",
-  });
-  if (!rangeResult.ok) {
-    return (
-      <>
-        <Header organisationId={organisationId} page="Leave Reports" />
-        <div className="flex flex-1 flex-col p-6 pt-0">
-          <FetchErrorState entityName="leave reports" />
-        </div>
-      </>
-    );
-  }
+      const rangeResult = resolveDateRange({
+        customEnd: preparedToParam,
+        customStart: preparedFromParam,
+        preset: preparedPreset,
+        timezone: preparedOrganisation.timezone ?? "UTC",
+      });
+      if (!rangeResult.ok) {
+        return {
+          dataResult: { error: rangeResult.error, ok: false as const },
+          fromParam: preparedFromParam,
+          organisation: preparedOrganisation,
+          organisationId: scopedOrganisationId,
+          preset: preparedPreset,
+          toParam: preparedToParam,
+        };
+      }
+      const preparedDataResult = await aggregateLeaveReports(
+        {
+          actingUserId: user.id,
+          clerkOrgId,
+          dateRange: rangeResult.value,
+          filters: {
+            includeArchivedPeople: false,
+            personType: "all",
+          },
+          includePublicHolidays: false,
+          organisationId: scopedOrganisationId,
+          role,
+        },
+        db
+      );
 
-  const dataResult = await aggregateLeaveReports({
-    actingUserId: user.id,
-    clerkOrgId,
-    dateRange: rangeResult.value,
-    filters: {
-      includeArchivedPeople: false,
-      personType: "all",
-    },
-    includePublicHolidays: false,
-    organisationId,
-    role,
-  });
-
+      return {
+        dataResult: preparedDataResult,
+        fromParam: preparedFromParam,
+        organisation: preparedOrganisation,
+        organisationId: scopedOrganisationId,
+        preset: preparedPreset,
+        toParam: preparedToParam,
+      };
+    });
   if (!dataResult.ok) {
     return (
       <>
@@ -144,7 +164,6 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
       </>
     );
   }
-
   const report = dataResult.value;
   const chartData: LeaveDaysByTeamChartItem[] = report.leaveDaysByTeam
     .slice(0, 10)

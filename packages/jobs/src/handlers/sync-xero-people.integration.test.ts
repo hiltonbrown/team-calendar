@@ -1,4 +1,9 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import {
+  withTenantDb as withTestTenantDb,
+  withTenantResult as withTestTenantResult,
+} from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,45 +32,40 @@ vi.mock("@repo/database", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/database")>();
   return {
     ...original,
-    tenantTransaction: (clerkOrgId, operation, options) =>
-      original.tenantTransaction(
+    // Hooks are installed on the registered client itself: a wrapper object
+    // would not be recognised by assertTenantDb.
+    withTenantDb: (clerkOrgId, operation, options) =>
+      original.withTenantDb(
         clerkOrgId,
-        async (tx) =>
-          operation(
-            new Proxy(tx, {
-              get(transaction, delegateName, transactionReceiver) {
-                if (delegateName !== "person") {
-                  return Reflect.get(
-                    transaction,
-                    delegateName,
-                    transactionReceiver
-                  );
-                }
-                return new Proxy(transaction.person, {
-                  get(delegate, method, delegateReceiver) {
-                    if (method === "updateMany") {
-                      return async (
-                        args: import("@repo/database").Prisma.PersonUpdateManyArgs
-                      ) => {
-                        const result = await delegate.updateMany(args);
-                        await afterPersonUpdateMany(args, transaction);
-                        return result;
-                      };
-                    }
-                    if (method !== "upsert") {
-                      return Reflect.get(delegate, method, delegateReceiver);
-                    }
-                    return async (
-                      args: import("@repo/database").Prisma.PersonUpsertArgs
-                    ) => {
-                      await beforePersonUpsert(args);
-                      return delegate.upsert(args);
-                    };
-                  },
-                });
-              },
-            })
-          ),
+        async (tx) => {
+          const { person } = tx;
+          const { updateMany, upsert } = person;
+          Reflect.set(
+            person,
+            "updateMany",
+            async (
+              args: import("@repo/database").Prisma.PersonUpdateManyArgs
+            ) => {
+              const result = await updateMany.call(person, args);
+              await afterPersonUpdateMany(args, tx);
+              return result;
+            }
+          );
+          Reflect.set(
+            person,
+            "upsert",
+            async (args: import("@repo/database").Prisma.PersonUpsertArgs) => {
+              await beforePersonUpsert(args);
+              return upsert.call(person, args);
+            }
+          );
+          try {
+            return await operation(tx);
+          } finally {
+            Reflect.set(person, "updateMany", updateMany);
+            Reflect.set(person, "upsert", upsert);
+          }
+        },
         options
       ),
   };
@@ -372,13 +372,21 @@ describe("local persistence integration", () => {
       };
       const outcomes = await Promise.all(
         Array.from({ length: 12 }, (_, index) =>
-          acquireSyncRun(
-            {
+          withTestTenantDb(
+            tenantTestAccount({
               ...context,
               runId: fixture.id("concurrent-admission-run", index),
-            },
-            "people",
-            new Date()
+            }),
+            (db) =>
+              acquireSyncRun(
+                {
+                  ...context,
+                  runId: fixture.id("concurrent-admission-run", index),
+                },
+                "people",
+                new Date(),
+                db
+              )
           )
         )
       );
@@ -392,7 +400,9 @@ describe("local persistence integration", () => {
       expect(active).toBeDefined();
       const runId = active?.run.id as string;
       expect(
-        await acquireSyncRun({ ...context, runId }, "people", new Date())
+        await withTestTenantDb(tenantTestAccount({ ...context, runId }), (db) =>
+          acquireSyncRun({ ...context, runId }, "people", new Date(), db)
+        )
       ).toEqual({
         kind: "active",
         run: { id: runId },
@@ -406,7 +416,9 @@ describe("local persistence integration", () => {
         },
       });
       expect(
-        await acquireSyncRun({ ...context, runId }, "people", new Date())
+        await withTestTenantDb(tenantTestAccount({ ...context, runId }), (db) =>
+          acquireSyncRun({ ...context, runId }, "people", new Date(), db)
+        )
       ).toMatchObject({
         kind: "terminal",
         run: { id: runId, status: "succeeded" },
@@ -1468,7 +1480,11 @@ describe("local persistence integration", () => {
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
     };
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "connected" },
     });
@@ -1479,7 +1495,11 @@ describe("local persistence integration", () => {
       },
       where: { id: tenantA.authorisationId },
     });
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "reauthorisation_required" },
     });
@@ -1491,7 +1511,11 @@ describe("local persistence integration", () => {
       data: { last_error_code: "client_credentials_invalid" },
       where: { id: tenantA.connectionId },
     });
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "connected" },
     });
@@ -1504,7 +1528,11 @@ describe("local persistence integration", () => {
       },
       where: { id: tenantA.connectionId },
     });
-    expect(await getXeroConnectionState(scope)).toEqual({
+    expect(
+      await withTestTenantResult(tenantTestAccount(scope), (db) =>
+        getXeroConnectionState(scope, db)
+      )
+    ).toEqual({
       ok: true,
       value: { state: "not_connected" },
     });

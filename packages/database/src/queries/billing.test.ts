@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { withTenantDb as withTestTenantDb } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
 import type { AuthoritativeUsageType } from "./billing";
 
 const mocks = vi.hoisted(() => ({
@@ -7,24 +9,40 @@ const mocks = vi.hoisted(() => ({
   organisationCount: vi.fn(),
   personCount: vi.fn(),
   queryRaw: vi.fn(),
+  scopeTransaction: vi.fn(),
   xeroConnectionCount: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({
-    $executeRaw: mocks.executeRaw,
+  referenceDatabase: {
     $queryRaw: mocks.queryRaw,
-    feed: { count: mocks.feedCount },
-    organisation: { count: mocks.organisationCount },
-    person: { count: mocks.personCount },
-    xeroConnection: { count: mocks.xeroConnectionCount },
-  }),
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) => {
+      mocks.scopeTransaction();
+      return await callback({
+        $executeRaw: mocks.executeRaw,
+        $queryRaw: async (
+          strings: TemplateStringsArray,
+          ...values: unknown[]
+        ) =>
+          strings[0]?.includes("set_config")
+            ? []
+            : mocks.queryRaw(strings, ...values),
+        feed: { count: mocks.feedCount },
+        organisation: { count: mocks.organisationCount },
+        person: { count: mocks.personCount },
+        xeroConnection: { count: mocks.xeroConnectionCount },
+      });
+    },
+  },
 }));
 vi.mock("../system-client", () => ({
   systemDatabase: { $executeRaw: mocks.executeRaw, $queryRaw: mocks.queryRaw },
 }));
 const {
   getAuthoritativeUsageCount,
+  getSubscriptionForOrg,
+  getFirstActiveOrganisationIdForClerkOrg,
+  getUsageCounter,
   getFailedStripeEventsForOperators,
   getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg,
@@ -51,13 +69,17 @@ describe("authoritative billing usage", () => {
     async (usageType, mock, count) => {
       mocks[mock].mockResolvedValue(count);
       await expect(
-        getAuthoritativeUsageCount("org_123", usageType)
+        withTestTenantDb(tenantTestAccount("org_123"), (db) =>
+          getAuthoritativeUsageCount("org_123", usageType, db)
+        )
       ).resolves.toBe(count);
     }
   );
   it("counts only active, unarchived people", async () => {
     mocks.personCount.mockResolvedValue(3);
-    await getAuthoritativeUsageCount("org_123", "seats");
+    await withTestTenantDb(tenantTestAccount("org_123"), (db) =>
+      getAuthoritativeUsageCount("org_123", "seats", db)
+    );
     expect(mocks.personCount).toHaveBeenCalledWith({
       where: {
         archived_at: null,
@@ -68,7 +90,9 @@ describe("authoritative billing usage", () => {
   });
   it("counts only active, unarchived feeds", async () => {
     mocks.feedCount.mockResolvedValue(2);
-    await getAuthoritativeUsageCount("org_123", "feeds");
+    await withTestTenantDb(tenantTestAccount("org_123"), (db) =>
+      getAuthoritativeUsageCount("org_123", "feeds", db)
+    );
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: {
         archived_at: null,
@@ -79,7 +103,9 @@ describe("authoritative billing usage", () => {
   });
   it("counts only active, unarchived organisations", async () => {
     mocks.organisationCount.mockResolvedValue(1);
-    await getAuthoritativeUsageCount("org_123", "payroll_entities");
+    await withTestTenantDb(tenantTestAccount("org_123"), (db) =>
+      getAuthoritativeUsageCount("org_123", "payroll_entities", db)
+    );
     expect(mocks.organisationCount).toHaveBeenCalledWith({
       where: {
         archived_at: null,
@@ -90,7 +116,9 @@ describe("authoritative billing usage", () => {
   });
   it("counts only active Xero connections", async () => {
     mocks.xeroConnectionCount.mockResolvedValue(1);
-    await getAuthoritativeUsageCount("org_123", "connections");
+    await withTestTenantDb(tenantTestAccount("org_123"), (db) =>
+      getAuthoritativeUsageCount("org_123", "connections", db)
+    );
     expect(mocks.xeroConnectionCount).toHaveBeenCalledWith({
       where: {
         clerk_org_id: "org_123",
@@ -101,10 +129,8 @@ describe("authoritative billing usage", () => {
   });
   it("takes a transaction-scoped advisory lock using the Clerk Organisation", async () => {
     mocks.queryRaw.mockResolvedValue([{ acquired: "" }]);
-    await lockPlanLimitMutations(
-      // The raw-query mock is the complete surface used by the lock helper.
-      { $queryRaw: mocks.queryRaw } as never,
-      "org_123"
+    await withTenantDb("org_123", (db) =>
+      lockPlanLimitMutations("org_123", db)
     );
     expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
   });
@@ -190,19 +216,116 @@ describe("Stripe event receipt health", () => {
 describe("subscription mirror ordering", () => {
   it("passes an explicit authoritative tie fence into the atomic upsert", async () => {
     mocks.executeRaw.mockResolvedValue(1);
-    await upsertSubscriptionFromWebhook({
-      authoritativeTie: true,
-      cancelAtPeriodEnd: true,
-      clerkOrgId: "org_123",
-      currentPeriodEnd: null,
-      endedAt: new Date("2026-09-19T00:00:00.000Z"),
-      planKey: "basic",
-      status: "canceled",
-      stripeCustomerId: "cus_123",
-      stripeEventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
-      stripeSubscriptionId: "sub_123",
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        authoritativeTie: true,
+        cancelAtPeriodEnd: true,
+        clerkOrgId: "org_123",
+        currentPeriodEnd: null,
+        endedAt: new Date("2026-09-19T00:00:00.000Z"),
+        planKey: "basic",
+        status: "canceled",
+        stripeCustomerId: "cus_123",
+        stripeEventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
+        stripeSubscriptionId: "sub_123",
+      }),
+      (db) =>
+        upsertSubscriptionFromWebhook(
+          {
+            authoritativeTie: true,
+            cancelAtPeriodEnd: true,
+            clerkOrgId: "org_123",
+            currentPeriodEnd: null,
+            endedAt: new Date("2026-09-19T00:00:00.000Z"),
+            planKey: "basic",
+            status: "canceled",
+            stripeCustomerId: "cus_123",
+            stripeEventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
+            stripeSubscriptionId: "sub_123",
+          },
+          db
+        )
+    );
     expect(mocks.executeRaw).toHaveBeenCalledTimes(1);
     expect(mocks.executeRaw.mock.calls[0]).toContain(true);
+  });
+});
+
+const { withTenantDb, TenantMismatchError } = await import("../tenant-db");
+const scopeCases: {
+  name: string;
+  run: (db: import("../tenant-db").TenantDb) => Promise<unknown>;
+}[] = [
+  { name: "subscription", run: (db) => getSubscriptionForOrg("account-A", db) },
+  {
+    name: "active organisation",
+    run: (db) => getFirstActiveOrganisationIdForClerkOrg("account-A", db),
+  },
+  {
+    name: "usage counter",
+    run: (db) => getUsageCounter("account-A", "seats", db),
+  },
+  {
+    name: "authoritative count",
+    run: (db) => getAuthoritativeUsageCount("account-A", "seats", db),
+  },
+  {
+    name: "subscription mirror",
+    run: (db) =>
+      upsertSubscriptionFromWebhook(
+        {
+          cancelAtPeriodEnd: false,
+          clerkOrgId: "account-A",
+          currentPeriodEnd: null,
+          endedAt: null,
+          planKey: "basic",
+          status: "active",
+          stripeCustomerId: "customer-1",
+          stripeEventCreatedAt: new Date("2026-10-01"),
+          stripeSubscriptionId: "subscription-1",
+        },
+        db
+      ),
+  },
+];
+
+describe("billing tenant scope expansion", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.queryRaw.mockResolvedValue([]);
+    mocks.executeRaw.mockResolvedValue(1);
+    mocks.personCount.mockResolvedValue(0);
+  });
+  it.each(scopeCases)("$name reuses an entry-point scope", async ({ run }) => {
+    const independent = await withTenantDb("account-A", (db) => run(db));
+    expect(mocks.scopeTransaction).toHaveBeenCalledTimes(1);
+    mocks.scopeTransaction.mockClear();
+    const shared = await withTenantDb("account-A", async (db) => {
+      const value = await run(db);
+      expect(mocks.scopeTransaction).toHaveBeenCalledTimes(1);
+      return value;
+    });
+    expect(shared).toEqual(independent);
+  });
+  it.each(scopeCases)(
+    "$name rejects a client for another account",
+    async ({ run }) => {
+      await withTenantDb("account-B", async (db) => {
+        await expect(
+          Promise.resolve().then(() => run(db))
+        ).rejects.toBeInstanceOf(TenantMismatchError);
+      });
+    }
+  );
+});
+
+it("plan mutation locks validate and reuse their caller transaction", async () => {
+  mocks.scopeTransaction.mockClear();
+  await withTenantDb("account-A", async (db) => {
+    await lockPlanLimitMutations("account-A", db);
+    expect(mocks.scopeTransaction).toHaveBeenCalledTimes(1);
+    await expect(
+      lockPlanLimitMutations("account-B", db)
+    ).rejects.toBeInstanceOf(TenantMismatchError);
   });
 });

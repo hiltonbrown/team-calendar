@@ -1,12 +1,14 @@
+import { requireOrg } from "@repo/auth/helpers";
 import {
   loadHolidaySettings,
   type ResolvedPublicHoliday,
 } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
 import { toDateOnly } from "@repo/core";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import { scopedQuery, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import {
   HolidaysClient,
   type LocalHolidayGroup,
@@ -29,22 +31,35 @@ const UPCOMING_LIMIT = 8;
 const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
   await requirePageRole("org:admin");
   const { org } = await searchParams;
-  const { clerkOrgId, organisationId } = await requireActiveOrgPageContext(org);
-  const today = new Date();
-  const range = {
-    clerkOrgId,
-    from: toDateOnly(today),
-    organisationId,
-    to: `${today.getUTCFullYear() + 2}-12-31`,
-  };
-  const [settingsResult, locations] = await Promise.all([
-    loadHolidaySettings(range),
-    tenantDatabase(clerkOrgId).location.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-  ]);
+  // Trusted account is discovered before scoped company and settings preparation.
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const { settingsResult, locations, organisationId, range } =
+    await withTenantDb(clerkOrgId, async (db) => {
+      const { organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+      const today = new Date();
+      const preparedRange = {
+        clerkOrgId,
+        from: toDateOnly(today),
+        organisationId: scopedOrganisationId,
+        to: `${today.getUTCFullYear() + 2}-12-31`,
+      };
+      const [preparedSettingsResult, preparedLocations] = [
+        await loadHolidaySettings(preparedRange, undefined, db),
+        await db.location.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+          where: scopedQuery(clerkOrgId, scopedOrganisationId),
+        }),
+      ];
+
+      return {
+        locations: preparedLocations,
+        organisationId: scopedOrganisationId,
+        range: preparedRange,
+        settingsResult: preparedSettingsResult,
+      };
+    });
 
   if (!settingsResult.ok) {
     throw new Error(settingsResult.error.message);

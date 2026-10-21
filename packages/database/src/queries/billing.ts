@@ -2,7 +2,8 @@ import type { LimitType, PlanKey } from "@repo/core";
 import type { Prisma } from "../../generated/client";
 import { getPlanDefinition } from "../seed/plans";
 import { systemDatabase } from "../system-client";
-import { referenceDatabase, tenantDatabase } from "../tenant-client";
+import { referenceDatabase } from "../tenant-client";
+import { assertTenantDb, type TenantDb } from "../tenant-db";
 export type AuthoritativeUsageType =
   | LimitType
   | "connections"
@@ -11,7 +12,6 @@ export type AuthoritativeUsageClient = Pick<
   Prisma.TransactionClient,
   "feed" | "organisation" | "person" | "xeroConnection"
 >;
-type PlanLimitLockClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 export interface SubscriptionMirrorInput {
   authoritativeTie?: boolean;
   cancelAtPeriodEnd: boolean;
@@ -36,11 +36,13 @@ export interface BillingSubscriptionRow {
   stripe_subscription_id: string | null;
 }
 export const getSubscriptionForOrg = async (
-  clerkOrgId: string
+  clerkOrgId: string,
+  db: TenantDb
 ): Promise<BillingSubscriptionRow | null> => {
-  const rows = await tenantDatabase(clerkOrgId).$queryRaw<
-    BillingSubscriptionRow[]
-  >`
+  assertTenantDb(db, clerkOrgId);
+  const tenantDb = db;
+
+  const rows = await tenantDb.$queryRaw<BillingSubscriptionRow[]>`
     SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
     FROM clerk_org_subscriptions
@@ -76,9 +78,13 @@ export const getSubscriptionForStripeSubscription = async (
 export const getSubscriptionByStripeCustomerId =
   getSubscriptionForStripeCustomer;
 export const getFirstActiveOrganisationIdForClerkOrg = async (
-  clerkOrgId: string
+  clerkOrgId: string,
+  db: TenantDb
 ): Promise<string | null> => {
-  const rows = await tenantDatabase(clerkOrgId).$queryRaw<
+  assertTenantDb(db, clerkOrgId);
+  const tenantDb2 = db;
+
+  const rows = await tenantDb2.$queryRaw<
     Array<{
       id: string;
     }>
@@ -116,9 +122,13 @@ export const getPlanFeatures = (planKey: PlanKey) =>
   getPlanDefinition(planKey).features;
 export const getUsageCounter = async (
   clerkOrgId: string,
-  counterType: LimitType
+  counterType: LimitType,
+  db: TenantDb
 ) => {
-  const rows = await tenantDatabase(clerkOrgId).$queryRaw<
+  assertTenantDb(db, clerkOrgId);
+  const tenantDb3 = db;
+
+  const rows = await tenantDb3.$queryRaw<
     Array<{
       current_value: number;
     }>
@@ -133,14 +143,17 @@ export const getUsageCounter = async (
  * Reads the product's authoritative, current usage rather than its asynchronous
  * reporting projection in usage_counters.
  */
-export const getAuthoritativeUsageCount = (
+export const getAuthoritativeUsageCount = async (
   clerkOrgId: string,
   usageType: AuthoritativeUsageType,
-  client: AuthoritativeUsageClient = tenantDatabase(clerkOrgId)
+  db: TenantDb
 ): Promise<number> => {
+  assertTenantDb(db, clerkOrgId);
+  const client = db;
+
   switch (usageType) {
     case "seats":
-      return client.person.count({
+      return await client.person.count({
         where: {
           archived_at: null,
           clerk_org_id: clerkOrgId,
@@ -148,7 +161,7 @@ export const getAuthoritativeUsageCount = (
         },
       });
     case "feeds":
-      return client.feed.count({
+      return await client.feed.count({
         where: {
           archived_at: null,
           clerk_org_id: clerkOrgId,
@@ -157,7 +170,7 @@ export const getAuthoritativeUsageCount = (
       });
     case "organisations":
     case "payroll_entities":
-      return client.organisation.count({
+      return await client.organisation.count({
         where: {
           archived_at: null,
           clerk_org_id: clerkOrgId,
@@ -165,7 +178,7 @@ export const getAuthoritativeUsageCount = (
         },
       });
     case "connections":
-      return client.xeroConnection.count({
+      return await client.xeroConnection.count({
         where: {
           clerk_org_id: clerkOrgId,
           disconnected_at: null,
@@ -174,7 +187,7 @@ export const getAuthoritativeUsageCount = (
       });
     default: {
       const exhaustiveUsageType: never = usageType;
-      return exhaustiveUsageType;
+      return await exhaustiveUsageType;
     }
   }
 };
@@ -184,9 +197,12 @@ export const getAuthoritativeUsageCount = (
  * serialisation because every subsequent count remains tenant-scoped.
  */
 export const lockPlanLimitMutations = async (
-  client: PlanLimitLockClient,
-  clerkOrgId: string
+  clerkOrgId: string,
+  db: TenantDb
 ): Promise<void> => {
+  assertTenantDb(db, clerkOrgId);
+  const client = db;
+
   await client.$queryRaw<
     Array<{
       acquired: string;
@@ -197,9 +213,13 @@ export const lockPlanLimitMutations = async (
     )::text AS acquired
   `;
 };
-export const upsertSubscriptionFromWebhook = (
-  input: SubscriptionMirrorInput
-) => tenantDatabase(input.clerkOrgId).$executeRaw`
+export const upsertSubscriptionFromWebhook = async (
+  input: SubscriptionMirrorInput,
+  db: TenantDb
+) => {
+  assertTenantDb(db, input.clerkOrgId);
+  const tenantDb4 = db;
+  return await tenantDb4.$executeRaw`
     INSERT INTO clerk_org_subscriptions (
       id, clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at,
@@ -224,6 +244,7 @@ export const upsertSubscriptionFromWebhook = (
        OR clerk_org_subscriptions.stripe_event_created_at < EXCLUDED.stripe_event_created_at
        OR (${input.authoritativeTie ?? false} AND clerk_org_subscriptions.stripe_event_created_at = EXCLUDED.stripe_event_created_at)
   `;
+};
 export const isStripeEventProcessed = async (
   eventId: string
 ): Promise<boolean> => {

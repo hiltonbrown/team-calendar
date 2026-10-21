@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -14,25 +16,25 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return { $transaction: mocks.$transaction };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return { $transaction: mocks.$transaction }.$transaction(
-        transactionCallback,
-        options
-      );
-    }
-  ),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...mocks.tx,
+  };
+}
 
 vi.mock("@repo/database/queries/teams", () => ({
   listTeamsWithCoverageMinimum: mocks.listTeamsWithCoverageMinimum,
@@ -94,8 +96,9 @@ describe("updateTeamCoverageMinimum", () => {
   it.each(["manager", "viewer", "employee"])(
     "rejects the %s role without reading or writing",
     async (actingRole) => {
-      const result = await updateTeamCoverageMinimum(
-        buildInput({ actingRole })
+      const result = await withTestTenantResult(
+        tenantTestAccount(buildInput({ actingRole })),
+        (db) => updateTeamCoverageMinimum(buildInput({ actingRole }), db)
       );
 
       expect(result).toMatchObject({
@@ -110,7 +113,10 @@ describe("updateTeamCoverageMinimum", () => {
   it.each([-1, 8, 1.5])(
     "rejects a minimum of %s with the team size in the message",
     async (minimum) => {
-      const result = await updateTeamCoverageMinimum(buildInput({ minimum }));
+      const result = await withTestTenantResult(
+        tenantTestAccount(buildInput({ minimum })),
+        (db) => updateTeamCoverageMinimum(buildInput({ minimum }), db)
+      );
 
       expect(result).toEqual({
         error: {
@@ -129,7 +135,10 @@ describe("updateTeamCoverageMinimum", () => {
       value: [buildTeam({ activePeopleCount: 1 })],
     });
 
-    const result = await updateTeamCoverageMinimum(buildInput({ minimum: 2 }));
+    const result = await withTestTenantResult(
+      tenantTestAccount(buildInput({ minimum: 2 })),
+      (db) => updateTeamCoverageMinimum(buildInput({ minimum: 2 }), db)
+    );
 
     expect(result).toMatchObject({
       error: { message: "Minimum must be between 0 and 1 person." },
@@ -138,16 +147,23 @@ describe("updateTeamCoverageMinimum", () => {
 
   it("accepts the team size itself and zero", async () => {
     await expect(
-      updateTeamCoverageMinimum(buildInput({ minimum: 7 }))
+      withTestTenantResult(
+        tenantTestAccount(buildInput({ minimum: 7 })),
+        (db) => updateTeamCoverageMinimum(buildInput({ minimum: 7 }), db)
+      )
     ).resolves.toMatchObject({ ok: true, value: { minimum: 7 } });
     await expect(
-      updateTeamCoverageMinimum(buildInput({ minimum: 0 }))
+      withTestTenantResult(
+        tenantTestAccount(buildInput({ minimum: 0 })),
+        (db) => updateTeamCoverageMinimum(buildInput({ minimum: 0 }), db)
+      )
     ).resolves.toMatchObject({ ok: true, value: { minimum: 0 } });
   });
 
   it("accepts null to clear the minimum", async () => {
-    const result = await updateTeamCoverageMinimum(
-      buildInput({ minimum: null })
+    const result = await withTestTenantResult(
+      tenantTestAccount(buildInput({ minimum: null })),
+      (db) => updateTeamCoverageMinimum(buildInput({ minimum: null }), db)
     );
 
     expect(result).toEqual({
@@ -156,21 +172,26 @@ describe("updateTeamCoverageMinimum", () => {
     });
     expect(mocks.setTeamCoverageMinimum).toHaveBeenCalledWith(
       expect.objectContaining({ minimum: null }),
-      mocks.tx
+      expect.objectContaining(mocks.tx)
     );
   });
 
   it("updates and writes one audit event inside the same transaction", async () => {
-    const result = await updateTeamCoverageMinimum(buildInput({ minimum: 2 }));
+    const result = await withTestTenantResult(
+      tenantTestAccount(buildInput({ minimum: 2 })),
+      (db) => updateTeamCoverageMinimum(buildInput({ minimum: 2 }), db)
+    );
 
     expect(result).toEqual({
       ok: true,
       value: { minimum: 2, teamName: "Customer support" },
     });
-    expect(mocks.$transaction).toHaveBeenCalledOnce();
+    expect(mocks.setTeamCoverageMinimum.mock.calls[0]?.[1]).toBe(
+      mocks.listTeamsWithCoverageMinimum.mock.calls[0]?.[1]
+    );
     expect(mocks.setTeamCoverageMinimum).toHaveBeenCalledWith(
       { ...scope, minimum: 2, teamId: TEAM_ID },
-      mocks.tx
+      expect.objectContaining(mocks.tx)
     );
     expect(mocks.tx.auditEvent.create).toHaveBeenCalledOnce();
     expect(mocks.tx.auditEvent.create).toHaveBeenCalledWith({
@@ -197,10 +218,14 @@ describe("updateTeamCoverageMinimum", () => {
       value: [],
     });
 
-    const result = await updateTeamCoverageMinimum(buildInput());
+    const result = await withTestTenantResult(
+      tenantTestAccount(buildInput()),
+      (db) => updateTeamCoverageMinimum(buildInput(), db)
+    );
 
     expect(mocks.listTeamsWithCoverageMinimum).toHaveBeenCalledWith(
-      expect.objectContaining(scope)
+      expect.objectContaining(scope),
+      expect.objectContaining(mocks.tx)
     );
     expect(result).toMatchObject({ error: { code: "not_found" }, ok: false });
     expect(mocks.$transaction).not.toHaveBeenCalled();
@@ -212,7 +237,10 @@ describe("updateTeamCoverageMinimum", () => {
       ok: false,
     });
 
-    const result = await updateTeamCoverageMinimum(buildInput());
+    const result = await withTestTenantResult(
+      tenantTestAccount(buildInput()),
+      (db) => updateTeamCoverageMinimum(buildInput(), db)
+    );
 
     expect(result).toMatchObject({ error: { code: "not_found" }, ok: false });
     expect(mocks.tx.auditEvent.create).not.toHaveBeenCalled();
@@ -221,19 +249,28 @@ describe("updateTeamCoverageMinimum", () => {
   it("reports an unknown error when the transaction fails", async () => {
     mocks.tx.auditEvent.create.mockRejectedValueOnce(new Error("down"));
 
-    const result = await updateTeamCoverageMinimum(buildInput());
+    const result = withTestTenantResult(tenantTestAccount(buildInput()), (db) =>
+      updateTeamCoverageMinimum(buildInput(), db)
+    );
 
-    expect(result).toMatchObject({
-      error: { code: "unknown_error" },
-      ok: false,
-    });
+    await expect(result).rejects.toThrow("down");
   });
 
   it("rejects malformed identifiers", async () => {
-    const result = await updateTeamCoverageMinimum({
-      ...buildInput(),
-      teamId: "not-a-uuid",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...buildInput(),
+        teamId: "not-a-uuid",
+      }),
+      (db) =>
+        updateTeamCoverageMinimum(
+          {
+            ...buildInput(),
+            teamId: "not-a-uuid",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "validation_error" },
@@ -253,20 +290,43 @@ describe("listTeamCoverageMinimums", () => {
       value: [buildTeam()],
     });
 
-    const result = await listTeamCoverageMinimums({
-      ...scope,
-      actingRole: "owner",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...scope,
+        actingRole: "owner",
+      }),
+      (db) =>
+        listTeamCoverageMinimums(
+          {
+            ...scope,
+            actingRole: "owner",
+          },
+          db
+        )
+    );
 
     expect(result).toEqual({ ok: true, value: [buildTeam()] });
-    expect(mocks.listTeamsWithCoverageMinimum).toHaveBeenCalledWith(scope);
+    expect(mocks.listTeamsWithCoverageMinimum).toHaveBeenCalledWith(
+      scope,
+      expect.objectContaining(mocks.tx)
+    );
   });
 
   it("rejects other roles", async () => {
-    const result = await listTeamCoverageMinimums({
-      ...scope,
-      actingRole: "manager",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...scope,
+        actingRole: "manager",
+      }),
+      (db) =>
+        listTeamCoverageMinimums(
+          {
+            ...scope,
+            actingRole: "manager",
+          },
+          db
+        )
+    );
 
     expect(result).toMatchObject({
       error: { code: "not_authorised" },

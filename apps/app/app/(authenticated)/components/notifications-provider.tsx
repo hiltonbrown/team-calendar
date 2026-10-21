@@ -6,17 +6,15 @@ import { getPublicApiUrl } from "@/lib/public-api-url";
 
 interface NotificationsProviderProperties {
   children: ReactNode;
-  organisationId: string | null;
+  enabled: boolean;
 }
 
 export const NotificationsProvider = ({
   children,
-  organisationId,
+  enabled,
 }: NotificationsProviderProperties) => {
-  const streamUrl = organisationId
-    ? getPublicApiUrl(
-        `/api/notifications/stream?organisationId=${encodeURIComponent(organisationId)}`
-      )
+  const streamUrl = enabled
+    ? getPublicApiUrl("/api/notifications/stream")
     : null;
 
   return (

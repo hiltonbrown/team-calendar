@@ -2,10 +2,12 @@
 
 import { auth, currentUser } from "@repo/auth/server";
 import { updateSettings } from "@repo/availability";
-import type { Result } from "@repo/core";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { afterTenantCommit, withTenantResult } from "@repo/database";
+import { getOrganisationById } from "@repo/database/queries/organisations";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ActionSchema = z.object({
   organisationId: z.string().uuid(),
@@ -31,41 +33,67 @@ export async function updateFeedDefaultsAction(input: {
     feedsIncludePublicHolidaysDefault?: boolean;
   };
 }): Promise<ActionResult<{ updated: true }>> {
+  assertNoTenantTransaction("updateFeedDefaultsAction");
   const parsed = ActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
-    getActiveOrgContext(parsed.data.organisationId),
-  ]);
+  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   let role: "admin" | "owner" | null = null;
   if (orgRole === "org:owner") {
     role = "owner";
   } else if (orgRole === "org:admin") {
     role = "admin";
   }
-  if (!(role && user && context.ok)) {
+  if (!(orgId && role && user)) {
     return notAuthorised();
   }
 
-  const result = await updateSettings({
-    actingRole: role,
-    actingUserId: user.id,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    patch: parsed.data.patch,
-  });
-  if (!result.ok) {
-    return unknownError(result.error.message);
+  const clerkOrgId = orgId as ClerkOrgId;
+  try {
+    return await withTenantResult(
+      clerkOrgId,
+      async (db): ReturnType<typeof updateFeedDefaultsAction> => {
+        const company = await getOrganisationById(
+          clerkOrgId,
+          parsed.data.organisationId as OrganisationId,
+          db
+        );
+        if (!company.ok) {
+          return notAuthorised();
+        }
+        const result = await updateSettings(
+          {
+            actingRole: role,
+            actingUserId: user.id,
+            clerkOrgId,
+            organisationId: company.value.id,
+            patch: parsed.data.patch,
+          },
+          db
+        );
+        if (!result.ok) {
+          return unknownError(result.error.message);
+        }
+
+        afterTenantCommit(db, () => {
+          revalidatePath("/settings/feeds");
+
+          return Promise.resolve();
+        });
+        afterTenantCommit(db, () => {
+          revalidatePath("/feeds");
+
+          return Promise.resolve();
+        });
+
+        return { ok: true, value: { updated: true } };
+      }
+    );
+  } catch {
+    return unknownError("Failed to save feed defaults.");
   }
-
-  revalidatePath("/settings/feeds");
-  revalidatePath("/feeds");
-
-  return { ok: true, value: { updated: true } };
 }
 
 function notAuthorised(): ActionResult<never> {

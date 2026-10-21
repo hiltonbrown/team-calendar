@@ -1,3 +1,5 @@
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -10,32 +12,28 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   lockActiveScopedXeroConnection: mocks.lockActiveScopedXeroConnection,
   scopedTo: mocks.scopedTo,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
-      $transaction: async (work: (tx: unknown) => unknown) =>
-        work({ availabilityRecord: { updateMany: mocks.updateMany } }),
-      availabilityRecord: { updateMany: mocks.updateMany },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: async (work: (tx: unknown) => unknown) =>
-          work({ availabilityRecord: { updateMany: mocks.updateMany } }),
-        availabilityRecord: { updateMany: mocks.updateMany },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
 }));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{ availabilityRecord: { updateMany: mocks.updateMany } },
+  };
+}
 
 const {
   acquireXeroWriteClaim,
@@ -61,22 +59,50 @@ describe("xero write claim", () => {
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
 
-    const winner = await acquireXeroWriteClaim({
-      ...claimScope,
-      claimedAt: now,
-      expectedFailedAction: null,
-      expectedSequence: 7,
-      expectedStatus: "submitted",
-      now,
-    });
-    const contender = await acquireXeroWriteClaim({
-      ...claimScope,
-      claimedAt: new Date(now.getTime() + 1),
-      expectedFailedAction: null,
-      expectedSequence: 7,
-      expectedStatus: "submitted",
-      now,
-    });
+    const winner = await withTestTenantDb(
+      tenantTestAccount({
+        ...claimScope,
+        claimedAt: now,
+        expectedFailedAction: null,
+        expectedSequence: 7,
+        expectedStatus: "submitted",
+        now,
+      }),
+      (db) =>
+        acquireXeroWriteClaim(
+          {
+            ...claimScope,
+            claimedAt: now,
+            expectedFailedAction: null,
+            expectedSequence: 7,
+            expectedStatus: "submitted",
+            now,
+          },
+          db
+        )
+    );
+    const contender = await withTestTenantDb(
+      tenantTestAccount({
+        ...claimScope,
+        claimedAt: new Date(now.getTime() + 1),
+        expectedFailedAction: null,
+        expectedSequence: 7,
+        expectedStatus: "submitted",
+        now,
+      }),
+      (db) =>
+        acquireXeroWriteClaim(
+          {
+            ...claimScope,
+            claimedAt: new Date(now.getTime() + 1),
+            expectedFailedAction: null,
+            expectedSequence: 7,
+            expectedStatus: "submitted",
+            now,
+          },
+          db
+        )
+    );
 
     expect(winner).toEqual(now);
     expect(contender).toBeNull();
@@ -91,13 +117,26 @@ describe("xero write claim", () => {
   it("scopes acquisition by both tenants, state, retry action, archive and expiry", async () => {
     mocks.updateMany.mockResolvedValue({ count: 1 });
 
-    await acquireXeroWriteClaim({
-      ...claimScope,
-      expectedFailedAction: "approve",
-      expectedSequence: 3,
-      expectedStatus: "xero_sync_failed",
-      now,
-    });
+    await withTestTenantDb(
+      tenantTestAccount({
+        ...claimScope,
+        expectedFailedAction: "approve",
+        expectedSequence: 3,
+        expectedStatus: "xero_sync_failed",
+        now,
+      }),
+      (db) =>
+        acquireXeroWriteClaim(
+          {
+            ...claimScope,
+            expectedFailedAction: "approve",
+            expectedSequence: 3,
+            expectedStatus: "xero_sync_failed",
+            now,
+          },
+          db
+        )
+    );
 
     expect(mocks.updateMany).toHaveBeenCalledWith({
       data: { xero_write_claimed_at: now },
@@ -125,10 +164,20 @@ describe("xero write claim", () => {
     const oldClaim = new Date("2026-09-18T00:00:00.000Z");
     mocks.updateMany.mockResolvedValue({ count: 0 });
 
-    const released = await releaseXeroWriteClaim({
-      ...claimScope,
-      claimedAt: oldClaim,
-    });
+    const released = await withTestTenantDb(
+      tenantTestAccount({
+        ...claimScope,
+        claimedAt: oldClaim,
+      }),
+      (db) =>
+        releaseXeroWriteClaim(
+          {
+            ...claimScope,
+            claimedAt: oldClaim,
+          },
+          db
+        )
+    );
 
     expect(released).toBe(false);
     expect(mocks.updateMany).toHaveBeenCalledWith({

@@ -4,7 +4,17 @@ DO $$ BEGIN
     CREATE ROLE team_calendar_app NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB;
   END IF;
 END $$;
-ALTER ROLE team_calendar_app NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB;
+-- Managed database owners cannot alter SUPERUSER or BYPASSRLS attributes.
+-- Refuse an unsafe existing role instead of requiring superuser privileges.
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_roles
+    WHERE rolname = 'team_calendar_app'
+      AND (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb)
+  ) THEN
+    RAISE EXCEPTION 'team_calendar_app must have no elevated role attributes';
+  END IF;
+END $$;
 GRANT USAGE ON SCHEMA public TO team_calendar_app;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM team_calendar_app;
 GRANT SELECT ON plans, plan_limits TO team_calendar_app;

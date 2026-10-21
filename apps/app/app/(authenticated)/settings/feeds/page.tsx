@@ -1,12 +1,15 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth, currentUser } from "@repo/auth/server";
 import { getSettings } from "@repo/availability";
+import type { ClerkOrgId } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import { Button } from "@repo/design-system/components/ui/button";
 import { getFeedOversightCounts, listFeeds, normaliseRole } from "@repo/feeds";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { withOrg } from "@/lib/navigation/org-url";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import {
   FeedOversightFilterSchema,
@@ -41,8 +44,7 @@ const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
   ]);
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(orgParam);
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
 
   if (!user) {
     throw new Error("User not found.");
@@ -52,26 +54,53 @@ const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
     filterParams,
     FeedOversightFilterSchema
   ) ?? { status: ["active", "paused"] };
-  const actor = {
-    actingRole: normaliseRole(orgRole),
-    actingUserId: user.id,
-    clerkOrgId,
+  const {
+    feedsResult,
+    countsResult,
+    settingsResult,
     organisationId,
-  };
+    orgQueryValue,
+  } = await withTenantDb(clerkOrgId, async (db) => {
+    const {
+      organisationId: scopedOrganisationId,
+      orgQueryValue: preparedOrgQueryValue,
+    } = await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+    const actor = {
+      actingRole: normaliseRole(orgRole),
+      actingUserId: user.id,
+      clerkOrgId,
+      organisationId: scopedOrganisationId,
+    };
 
-  const [feedsResult, countsResult, settingsResult] = await Promise.all([
-    listFeeds({
-      ...actor,
-      filters: {
-        search: filters.search,
-        status: filters.status,
-        type: filters.type,
-      },
-      pagination: { cursor: filters.cursor, pageSize: PAGE_SIZE },
-    }),
-    getFeedOversightCounts(actor),
-    getSettings({ clerkOrgId, organisationId }),
-  ]);
+    const [preparedFeedsResult, preparedCountsResult, preparedSettingsResult] =
+      [
+        await listFeeds(
+          {
+            ...actor,
+            filters: {
+              search: filters.search,
+              status: filters.status,
+              type: filters.type,
+            },
+            pagination: { cursor: filters.cursor, pageSize: PAGE_SIZE },
+          },
+          db
+        ),
+        await getFeedOversightCounts(actor, db),
+        await getSettings(
+          { clerkOrgId, organisationId: scopedOrganisationId },
+          db
+        ),
+      ];
+
+    return {
+      countsResult: preparedCountsResult,
+      feedsResult: preparedFeedsResult,
+      organisationId: scopedOrganisationId,
+      orgQueryValue: preparedOrgQueryValue,
+      settingsResult: preparedSettingsResult,
+    };
+  });
 
   if (!feedsResult.ok) {
     throw new Error(feedsResult.error.message);

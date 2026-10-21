@@ -12,34 +12,34 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   scopedQuery: (clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
   }),
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       auditEvent: { create: mocks.auditCreate },
       person: { findFirst: mocks.personFindFirst },
       xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        auditEvent: { create: mocks.auditCreate },
-        person: { findFirst: mocks.personFindFirst },
-        xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));

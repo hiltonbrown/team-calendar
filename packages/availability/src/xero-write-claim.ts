@@ -1,10 +1,10 @@
 import "server-only";
 
 import {
+  assertTenantDb,
   lockActiveScopedXeroConnection,
   scopedTo as scoped,
-  tenantDatabase,
-  tenantTransaction,
+  type TenantDb,
 } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
@@ -30,55 +30,67 @@ export interface AcquireXeroWriteClaimInput extends ClaimScope {
 }
 
 export async function acquireXeroWriteClaim(
-  input: AcquireXeroWriteClaimInput
+  input: AcquireXeroWriteClaimInput,
+  db: TenantDb
 ): Promise<Date | null> {
-  const now = input.now ?? new Date();
-  const claimedAt = input.claimedAt ?? now;
-  const staleBefore = new Date(now.getTime() - XERO_WRITE_CLAIM_LEASE_MS);
-  return await tenantTransaction(input.clerkOrgId, async (tx) => {
-    const activeConnection = await lockActiveScopedXeroConnection(tx, input);
-    if (!(activeConnection || input.localAction)) {
-      return null;
-    }
-    const result = await tx.availabilityRecord.updateMany({
-      data: { xero_write_claimed_at: claimedAt },
-      where: {
-        ...scoped(input),
-        ...noUnresolvedSubmitOperationWhere(),
-        ...(input.localAction
-          ? { source_remote_id: null, source_type: "team_calendar_leave" }
-          : {}),
-        approval_status: input.expectedStatus,
-        archived_at: null,
-        derived_sequence: input.expectedSequence,
-        ...(input.expectedFailedAction !== undefined && {
-          failed_action: input.expectedFailedAction,
-        }),
-        id: input.recordId,
-        OR: [
-          { xero_write_claimed_at: null },
-          { xero_write_claimed_at: { lt: staleBefore } },
-        ],
-      },
-    });
-    return result.count === 1 ? claimedAt : null;
-  });
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const now = input.now ?? new Date();
+    const claimedAt = input.claimedAt ?? now;
+    const staleBefore = new Date(now.getTime() - XERO_WRITE_CLAIM_LEASE_MS);
+    return await (async (tx: TenantDb) => {
+      const activeConnection = await lockActiveScopedXeroConnection(input, tx);
+      if (!(activeConnection || input.localAction)) {
+        return null;
+      }
+      const result = await tx.availabilityRecord.updateMany({
+        data: { xero_write_claimed_at: claimedAt },
+        where: {
+          ...scoped(input),
+          ...noUnresolvedSubmitOperationWhere(),
+          ...(input.localAction
+            ? { source_remote_id: null, source_type: "team_calendar_leave" }
+            : {}),
+          approval_status: input.expectedStatus,
+          archived_at: null,
+          derived_sequence: input.expectedSequence,
+          ...(input.expectedFailedAction !== undefined && {
+            failed_action: input.expectedFailedAction,
+          }),
+          id: input.recordId,
+          OR: [
+            { xero_write_claimed_at: null },
+            { xero_write_claimed_at: { lt: staleBefore } },
+          ],
+        },
+      });
+      return result.count === 1 ? claimedAt : null;
+    })(client);
+  }
 }
 
 export async function releaseXeroWriteClaim(
-  input: ClaimScope & { claimedAt: Date }
+  input: ClaimScope & { claimedAt: Date },
+  db: TenantDb
 ): Promise<boolean> {
-  const result = await tenantDatabase(
-    input.clerkOrgId
-  ).availabilityRecord.updateMany({
-    data: { xero_write_claimed_at: null },
-    where: {
-      ...scoped(input),
-      id: input.recordId,
-      xero_write_claimed_at: input.claimedAt,
-    },
-  });
-  return result.count === 1;
+  assertTenantDb(db, input.clerkOrgId);
+  {
+    assertTenantDb(db, input.clerkOrgId);
+    const client = db;
+
+    const result = await client.availabilityRecord.updateMany({
+      data: { xero_write_claimed_at: null },
+      where: {
+        ...scoped(input),
+        id: input.recordId,
+        xero_write_claimed_at: input.claimedAt,
+      },
+    });
+    return result.count === 1;
+  }
 }
 
 export function unclaimedOrExpiredXeroWriteWhere(now = new Date()) {

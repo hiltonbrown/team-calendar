@@ -337,6 +337,17 @@ model Organisation {
   @@map("organisations")
 }
 
+model AccountSettings {
+  id                       String   @id @default(uuid()) @db.Uuid
+  clerk_org_id             String   @unique
+  manager_visibility_scope String   @default("direct_reports_only")
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  @@index([clerk_org_id])
+  @@map("account_settings")
+}
+
 model OrganisationSettings {
   id                                    String                    @id @default(uuid()) @db.Uuid
   clerk_org_id                          String
@@ -344,7 +355,6 @@ model OrganisationSettings {
   show_pending_on_calendar              Boolean                   @default(true)
   show_declined_on_approvals            Boolean                   @default(true)
   notify_managers_on_status_change      Boolean                   @default(true)
-  manager_visibility_scope              String                    @default("direct_reports_only")
   default_leave_request_advance_days    Int                       @default(0)
   require_decline_reason                Boolean                   @default(true)
   default_privacy_mode                  availability_privacy_mode @default(named)

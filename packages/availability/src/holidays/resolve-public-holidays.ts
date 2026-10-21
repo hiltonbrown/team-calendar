@@ -10,8 +10,11 @@ import {
   type Result,
   resolvePublicHolidaysFromData,
 } from "@repo/core";
-import type { Prisma } from "@repo/database";
-import { loadHolidayResolutionData } from "@repo/database";
+import {
+  assertTenantDb,
+  loadHolidayResolutionData,
+  type TenantDb,
+} from "@repo/database";
 
 export type {
   HolidayClassification,
@@ -40,31 +43,24 @@ export interface ResolvePublicHolidaysInput {
 /** The public holidays that apply to each location and the organisation level. */
 export async function resolvePublicHolidays(
   input: ResolvePublicHolidaysInput,
-  listReference: ListReferenceHolidays = listReferenceHolidays,
-  client?: Prisma.TransactionClient
+  listReference: ListReferenceHolidays | undefined,
+  db: TenantDb
 ): Promise<Result<ResolvedPublicHoliday[]>> {
-  try {
-    const data = client
-      ? await loadHolidayResolutionData(input, client)
-      : await loadHolidayResolutionData(input);
-    if (!data) {
-      return {
-        error: appError("not_found", "Organisation not found"),
-        ok: false,
-      };
-    }
+  assertTenantDb(db, input.clerkOrgId);
+  const referenceLookup = listReference ?? listReferenceHolidays;
+  const data = await loadHolidayResolutionData(input, db);
+  if (!data) {
     return {
-      ok: true,
-      value: resolvePublicHolidaysFromData(data, listReference, {
-        includeHidden: input.includeHidden,
-      }),
-    };
-  } catch {
-    return {
-      error: appError("internal", "Failed to resolve public holidays"),
+      error: appError("not_found", "Organisation not found"),
       ok: false,
     };
   }
+  return {
+    ok: true,
+    value: resolvePublicHolidaysFromData(data, referenceLookup, {
+      includeHidden: input.includeHidden,
+    }),
+  };
 }
 
 /**
@@ -73,32 +69,28 @@ export async function resolvePublicHolidays(
  */
 export async function loadHolidaySettings(
   input: Omit<ResolvePublicHolidaysInput, "includeHidden">,
-  listReference: ListReferenceHolidays = listReferenceHolidays
+  listReference: ListReferenceHolidays | undefined,
+  db: TenantDb
 ): Promise<
   Result<{
     holidays: ResolvedPublicHoliday[];
     localOptions: Array<{ holidays: LocalHolidayOption[]; locationId: string }>;
   }>
 > {
-  try {
-    const data = await loadHolidayResolutionData(input);
-    if (!data) {
-      return {
-        error: appError("not_found", "Organisation not found"),
-        ok: false,
-      };
-    }
+  assertTenantDb(db, input.clerkOrgId);
+  const referenceLookup = listReference ?? listReferenceHolidays;
+  const data = await loadHolidayResolutionData(input, db);
+  if (!data) {
     return {
-      ok: true,
-      value: {
-        holidays: resolvePublicHolidaysFromData(data, listReference),
-        localOptions: localHolidayOptions(data, listReference),
-      },
-    };
-  } catch {
-    return {
-      error: appError("internal", "Failed to load holiday settings"),
+      error: appError("not_found", "Organisation not found"),
       ok: false,
     };
   }
+  return {
+    ok: true,
+    value: {
+      holidays: resolvePublicHolidaysFromData(data, referenceLookup),
+      localOptions: localHolidayOptions(data, referenceLookup),
+    },
+  };
 }

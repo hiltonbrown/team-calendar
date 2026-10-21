@@ -1,6 +1,7 @@
 "use client";
 import type {
   AvailabilityRecordSummary,
+  ManagerChoice,
   PersonProfile,
 } from "@repo/availability";
 import { xeroRecoveryMessage } from "@repo/core";
@@ -37,9 +38,11 @@ import {
   PeopleProvenanceBadge,
   PeopleStatusChip,
 } from "./people-status-provenance";
+import { PersonManagerPicker } from "./person-manager-picker";
 
 interface PersonProfileContentProps {
   balanceRefreshEnabled: boolean;
+  canAssignManager?: boolean;
   canManageAlternativeContacts: boolean;
   canRefreshBalances: boolean;
   history: {
@@ -47,6 +50,7 @@ interface PersonProfileContentProps {
     records: AvailabilityRecordSummary[];
   };
   initialTab?: PersonProfileTab;
+  managerChoices?: ManagerChoice[];
   organisationId: string;
   orgQueryValue: string | null;
   profile: PersonProfile;
@@ -64,6 +68,8 @@ const tabs: Array<{
 export function PersonProfileContent({
   balanceRefreshEnabled,
   canManageAlternativeContacts,
+  canAssignManager = false,
+  managerChoices = [],
   canRefreshBalances,
   history,
   initialTab = "upcoming",
@@ -150,6 +156,11 @@ export function PersonProfileContent({
             <h3 className="font-semibold text-title-sm">Core fields</h3>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field
+                label="Company"
+                locked={false}
+                value={profile.header.companyName}
+              />
+              <Field
                 label="Email"
                 locked={profile.fieldOwnership.email === "xero"}
                 value={profile.header.email}
@@ -178,15 +189,23 @@ export function PersonProfileContent({
                 locked={false}
                 value={profile.header.team?.name ?? "Unassigned"}
               />
-              <Field
-                label="Manager"
-                locked={false}
-                value={
-                  profile.header.manager
-                    ? `${profile.header.manager.firstName} ${profile.header.manager.lastName}`
-                    : "Unassigned"
-                }
-              />
+              {canAssignManager ? (
+                <PersonManagerPicker
+                  choices={managerChoices}
+                  currentManagerId={profile.header.manager?.id ?? null}
+                  personId={profile.header.id}
+                />
+              ) : (
+                <Field
+                  label="Manager"
+                  locked={false}
+                  value={
+                    profile.header.manager
+                      ? `${profile.header.manager.firstName} ${profile.header.manager.lastName}`
+                      : "Unassigned"
+                  }
+                />
+              )}
               <Field
                 className="sm:col-span-2"
                 label="Status note"

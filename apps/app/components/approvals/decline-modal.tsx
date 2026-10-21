@@ -32,7 +32,9 @@ export function DeclineModal({
   const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const trimmedReason = useMemo(() => reason.trim(), [reason]);
-  const canSubmit = trimmedReason.length >= 3 && trimmedReason.length <= 1000;
+  const canSubmit =
+    trimmedReason.length <= 1000 &&
+    (!record.requireDeclineReason || trimmedReason.length >= 3);
 
   const submit = async () => {
     if (!canSubmit) {
@@ -42,7 +44,6 @@ export function DeclineModal({
     setMessage(null);
     try {
       const result = await declineAction({
-        organisationId: record.organisationId,
         reason: trimmedReason,
         recordId: record.id,
       });
@@ -69,7 +70,6 @@ export function DeclineModal({
     setMessage(null);
     try {
       const result = await retryDeclineAction({
-        organisationId: record.organisationId,
         recordId: record.id,
       });
       if (!result.ok) {
@@ -97,7 +97,6 @@ export function DeclineModal({
     setIsPending(true);
     try {
       const result = await revertApprovalAttemptAction({
-        organisationId: record.organisationId,
         recordId: record.id,
       });
       if (!result.ok) {
@@ -122,7 +121,7 @@ export function DeclineModal({
         <SummaryBlock record={record} />
         <div className="space-y-2">
           <label className="font-medium text-label-lg" htmlFor="decline-reason">
-            Reason
+            Reason{record.requireDeclineReason ? " (required)" : " (optional)"}
           </label>
           <Textarea
             disabled={isPending}

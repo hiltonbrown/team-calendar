@@ -47,6 +47,11 @@ export { Prisma }
  */
 export type Organisation = Prisma.OrganisationModel
 /**
+ * Model AccountSettings
+ * 
+ */
+export type AccountSettings = Prisma.AccountSettingsModel
+/**
  * Model OrganisationSettings
  * 
  */

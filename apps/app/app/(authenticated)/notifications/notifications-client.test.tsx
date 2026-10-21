@@ -118,6 +118,8 @@ describe("NotificationsClient", () => {
             label: "test",
             objectId: null,
             objectType: null,
+            organisationId: "company-A",
+            organisationName: "Company A",
             readAt: null,
             title: "Unread title",
             type: "leave_submitted",
@@ -126,6 +128,7 @@ describe("NotificationsClient", () => {
         notificationTypes={[]}
         organisationId="org-1"
         orgQueryValue={null}
+        preferenceCompanyName="Company A"
         preferences={[]}
         unreadCount={1}
       />
@@ -251,6 +254,8 @@ const notification: NotificationsProps["notifications"][number] = {
   label: "Leave submitted",
   objectId: null,
   objectType: null,
+  organisationId: "00000000-0000-4000-8000-000000000001",
+  organisationName: "Company A",
   readAt: null,
   title: "Unread title",
   type: "leave_submitted",
@@ -295,6 +300,7 @@ const baseProps: NotificationsProps = {
   ],
   organisationId: "00000000-0000-4000-8000-000000000001",
   orgQueryValue: null,
+  preferenceCompanyName: "Company A",
   preferences: [],
   unreadCount: 0,
 };

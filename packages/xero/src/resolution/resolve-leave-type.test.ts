@@ -1,16 +1,41 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   leaveBalanceFindFirst: vi.fn(),
   personFindFirst: vi.fn(),
 }));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({ client: null as object | null }));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("server-only", () => ({}));
+vi.mock("@repo/database", async () => {
+  const actualTenantCore = await vi.importActual<
+    typeof import("@repo/database/tenant-db")
+  >("@repo/database/tenant-db");
+
   const exports = {
     database: {
       leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
       person: { findFirst: mocks.personFindFirst },
     },
   };
+  tenantTestState.client = exports.database;
   return {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
@@ -21,12 +46,8 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
+
+    ...actualTenantCore,
   };
 });
 const { resolveXeroLeaveTypeId } = await import("./resolve-leave-type");
@@ -50,20 +71,42 @@ describe("resolveXeroLeaveTypeId", () => {
     mocks.leaveBalanceFindFirst.mockResolvedValue({
       leave_type_xero_id: "leave-type-1",
     });
-    const result = await resolveXeroLeaveTypeId({
-      personId: "00000000-0000-4000-8000-000000000011",
-      recordType: "annual_leave",
-      xeroConnection,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        personId: "00000000-0000-4000-8000-000000000011",
+        recordType: "annual_leave",
+        xeroConnection,
+      }),
+      (db) =>
+        resolveXeroLeaveTypeId(
+          {
+            personId: "00000000-0000-4000-8000-000000000011",
+            recordType: "annual_leave",
+            xeroConnection,
+          },
+          db
+        )
+    );
     expect(result).toEqual({ ok: true, value: "leave-type-1" });
   });
   it("returns missing_mapping when no balance mapping exists", async () => {
     mocks.leaveBalanceFindFirst.mockResolvedValue(null);
-    const result = await resolveXeroLeaveTypeId({
-      personId: "00000000-0000-4000-8000-000000000011",
-      recordType: "annual_leave",
-      xeroConnection,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        personId: "00000000-0000-4000-8000-000000000011",
+        recordType: "annual_leave",
+        xeroConnection,
+      }),
+      (db) =>
+        resolveXeroLeaveTypeId(
+          {
+            personId: "00000000-0000-4000-8000-000000000011",
+            recordType: "annual_leave",
+            xeroConnection,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("missing_mapping");
@@ -71,11 +114,22 @@ describe("resolveXeroLeaveTypeId", () => {
   });
   it("rejects cross-tenant people", async () => {
     mocks.personFindFirst.mockResolvedValue(null);
-    const result = await resolveXeroLeaveTypeId({
-      personId: "00000000-0000-4000-8000-000000000011",
-      recordType: "annual_leave",
-      xeroConnection,
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        personId: "00000000-0000-4000-8000-000000000011",
+        recordType: "annual_leave",
+        xeroConnection,
+      }),
+      (db) =>
+        resolveXeroLeaveTypeId(
+          {
+            personId: "00000000-0000-4000-8000-000000000011",
+            recordType: "annual_leave",
+            xeroConnection,
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("person_not_in_tenant");

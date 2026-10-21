@@ -30,6 +30,7 @@ import {
   useTransition,
 } from "react";
 import { EmptyState } from "@/components/states/empty-state";
+import { withOrg } from "@/lib/navigation/org-url";
 import {
   markAllAsReadAction,
   markAsReadAction,
@@ -48,6 +49,8 @@ interface ClientNotification {
   label: string;
   objectId: string | null;
   objectType: string | null;
+  organisationId: string;
+  organisationName: string;
   readAt: string | null;
   title: string;
   type: string;
@@ -71,6 +74,7 @@ interface NotificationsClientProps {
   notificationTypes: NotificationTypeConfig[];
   organisationId: string;
   orgQueryValue: string | null;
+  preferenceCompanyName: string;
   preferences: NotificationPreferenceRow[];
   unreadCount: number;
 }
@@ -123,6 +127,7 @@ export function NotificationsClient({
   organisationId,
   orgQueryValue,
   preferences,
+  preferenceCompanyName,
   unreadCount: initialUnreadCount,
 }: NotificationsClientProps) {
   const router = useRouter();
@@ -152,6 +157,8 @@ export function NotificationsClient({
               label: event.payload.type.replaceAll("_", " "),
               objectId: null,
               objectType: null,
+              organisationId: event.payload.organisationId,
+              organisationName: event.payload.organisationName,
               readAt: null,
               title: event.payload.title,
               type: event.payload.type,
@@ -202,7 +209,7 @@ export function NotificationsClient({
 
   const markAll = () => {
     startTransition(async () => {
-      const result = await markAllAsReadAction({ organisationId });
+      const result = await markAllAsReadAction();
       if (!result.ok) {
         toast.error(result.error.message);
         return;
@@ -223,7 +230,6 @@ export function NotificationsClient({
       if (item.isUnread) {
         const result = await markAsReadAction({
           notificationId: item.id,
-          organisationId,
         });
         if (!result.ok) {
           toast.error(result.error.message);
@@ -244,7 +250,7 @@ export function NotificationsClient({
         );
       }
       if (navigate && item.actionUrl) {
-        router.push(item.actionUrl);
+        router.push(withOrg(item.actionUrl, item.organisationId));
       }
     });
   };
@@ -255,8 +261,7 @@ export function NotificationsClient({
     filters.category.length > 0;
   let subtitle = "You are up to date.";
   if (filters.tab === "preferences") {
-    subtitle =
-      "Choose how you receive notifications. At least one channel must stay enabled.";
+    subtitle = `Choose how you receive notifications for ${preferenceCompanyName}. At least one channel must stay enabled.`;
   } else if (unreadCount > 0) {
     subtitle = `${unreadCount} unread`;
   }
@@ -415,7 +420,7 @@ export function NotificationsClient({
                         className="mt-2 text-label-md text-muted-foreground"
                         title={formatFullDate(item.createdAt)}
                       >
-                        {relativeTime(item.createdAt)}
+                        {item.organisationName} · {relativeTime(item.createdAt)}
                       </p>
                     </button>
                   </div>

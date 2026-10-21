@@ -1,9 +1,12 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SyncRunStatus, SyncRunType } from "./sync-monitor-service";
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   auditFindMany: vi.fn(),
+  dispatchCancelSyncRun: vi.fn(),
   dispatchSyncEvent: vi.fn(),
   failedRecordCount: vi.fn(),
   failedRecordFindFirst: vi.fn(),
@@ -18,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   syncRunFindFirst: vi.fn(),
   syncRunFindMany: vi.fn(),
   syncRunGroupBy: vi.fn(),
+  syncRunUpdate: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
   xeroTenantFindMany: vi.fn(),
 }));
@@ -25,14 +29,26 @@ vi.mock("server-only", () => ({}));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.state,
 }));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   getScopedXeroAuthorisationMetadata: mocks.metadata,
   scopedTo: mocks.scopedTo,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       $transaction: vi.fn((callback) =>
         callback({
           auditEvent: { create: mocks.auditCreate },
@@ -49,49 +65,17 @@ vi.mock("@repo/database", () => ({
         findFirst: mocks.syncRunFindFirst,
         findMany: mocks.syncRunFindMany,
         groupBy: mocks.syncRunGroupBy,
+        update: mocks.syncRunUpdate,
       },
       xeroConnection: {
         findFirst: mocks.xeroTenantFindFirst,
         findMany: mocks.xeroTenantFindMany,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        $transaction: vi.fn((callback) =>
-          callback({
-            auditEvent: { create: mocks.auditCreate },
-            failedRecord: { findFirst: mocks.failedRecordFindFirst },
-          })
-        ),
-        auditEvent: {
-          create: mocks.auditCreate,
-          findMany: mocks.auditFindMany,
-        },
-        failedRecord: {
-          count: mocks.failedRecordCount,
-          findFirst: mocks.failedRecordFindFirst,
-          findMany: mocks.failedRecordFindMany,
-        },
-        syncRun: {
-          findFirst: mocks.syncRunFindFirst,
-          findMany: mocks.syncRunFindMany,
-          groupBy: mocks.syncRunGroupBy,
-        },
-        xeroConnection: {
-          findFirst: mocks.xeroTenantFindFirst,
-          findMany: mocks.xeroTenantFindMany,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("./sync-events", () => ({
-  dispatchCancelSyncRun: vi.fn(),
+  dispatchCancelSyncRun: mocks.dispatchCancelSyncRun,
   dispatchSyncEvent: mocks.dispatchSyncEvent,
   getRegisteredSyncEventName: mocks.getRegisteredSyncEventName,
   syncEventNames: {
@@ -104,6 +88,8 @@ vi.mock("./sync-events", () => ({
 }));
 const {
   dispatchManualSync,
+  cancelRun,
+  sendPreparedManualSync,
   getRedactedFailedRecordPayload,
   getRunDetail,
   listTenantSummaries,
@@ -190,6 +176,72 @@ function mockSummaryRuns(runs: ReturnType<typeof completedRunFixture>[]): void {
   );
 }
 describe("sync-monitor-service", () => {
+  it("keeps the cancellation flag committed when the cancel event cannot queue", async () => {
+    const runId = "00000000-0000-4000-8000-000000000002";
+    let cancellationRequested = false;
+    mocks.syncRunFindFirst.mockResolvedValueOnce({ id: runId });
+    mocks.syncRunUpdate.mockImplementationOnce(async () => {
+      cancellationRequested = true;
+      return await { id: runId };
+    });
+    mocks.dispatchCancelSyncRun.mockImplementationOnce(async () => {
+      expect(cancellationRequested).toBe(true);
+      return await {
+        error: { code: "dispatch_failed", message: "Unavailable" },
+        ok: false,
+      };
+    });
+    await expect(cancelRun({ ...baseInput, runId })).resolves.toEqual({
+      ok: true,
+      value: { cancellationRequested: true, eventQueued: false },
+    });
+    expect(cancellationRequested).toBe(true);
+    expect(mocks.auditCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "sync.cancel_requested",
+          payload: expect.objectContaining({ eventQueued: false }),
+        }),
+      })
+    );
+  });
+  it("keeps the cancellation flag when its later audit phase fails", async () => {
+    const runId = "00000000-0000-4000-8000-000000000002";
+    let cancellationRequested = false;
+    mocks.syncRunFindFirst.mockResolvedValueOnce({ id: runId });
+    mocks.syncRunUpdate.mockImplementationOnce(async () => {
+      cancellationRequested = true;
+      return await { id: runId };
+    });
+    mocks.dispatchCancelSyncRun.mockResolvedValueOnce({ ok: true, value: {} });
+    mocks.auditCreate.mockRejectedValueOnce(new Error("Audit unavailable"));
+    await expect(cancelRun({ ...baseInput, runId })).resolves.toMatchObject({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    expect(cancellationRequested).toBe(true);
+  });
+  it("preserves the manual sync send error without writing a success audit", async () => {
+    mocks.dispatchSyncEvent.mockResolvedValueOnce({
+      error: { code: "dispatch_failed", message: "Queue unavailable" },
+      ok: false,
+    });
+    await expect(
+      sendPreparedManualSync({
+        eventName: "availability.sync.people",
+        input: {
+          ...baseInput,
+          connectionId: "00000000-0000-4000-8000-000000000003",
+          runType: "people",
+        },
+        kind: "send",
+      })
+    ).resolves.toEqual({
+      error: { code: "dispatch_failed", message: "Queue unavailable" },
+      ok: false,
+    });
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -201,15 +253,20 @@ describe("sync-monitor-service", () => {
         tenant_name: "Metadata company",
       },
     ]);
-    await listTenantSummaries(baseInput);
+    await withTestTenantResult(tenantTestAccount(baseInput), (db) =>
+      listTenantSummaries(baseInput, db)
+    );
     expect(mocks.xeroTenantFindMany).toHaveBeenCalledWith(
       expect.not.objectContaining({ include: expect.anything() })
     );
-    expect(mocks.metadata).toHaveBeenCalledWith({
-      clerkOrgId: baseInput.clerkOrgId,
-      connectionId: "tenant_metadata",
-      organisationId: baseInput.organisationId,
-    });
+    expect(mocks.metadata).toHaveBeenCalledWith(
+      {
+        clerkOrgId: baseInput.clerkOrgId,
+        connectionId: "tenant_metadata",
+        organisationId: baseInput.organisationId,
+      },
+      expect.any(Object)
+    );
   });
   beforeEach(() => {
     vi.clearAllMocks();
@@ -294,7 +351,10 @@ describe("sync-monitor-service", () => {
           source_remote_id: null,
         },
       ]);
-      const result = await getRunDetail({ ...baseInput, runId });
+      const result = await withTestTenantResult(
+        tenantTestAccount({ ...baseInput, runId }),
+        (db) => getRunDetail({ ...baseInput, runId }, db)
+      );
       expect(result).toMatchObject({
         ok: true,
         value: {
@@ -323,10 +383,20 @@ describe("sync-monitor-service", () => {
       xero_connection_id: "tenant_1",
       xero_tenant: { id: "tenant_1", tenant_name: "Acme Payroll" },
     });
-    const result = await getRunDetail({
-      ...baseInput,
-      runId: "00000000-0000-4000-8000-000000000021",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        runId: "00000000-0000-4000-8000-000000000021",
+      }),
+      (db) =>
+        getRunDetail(
+          {
+            ...baseInput,
+            runId: "00000000-0000-4000-8000-000000000021",
+          },
+          db
+        )
+    );
     expect(result.ok).toBe(true);
     expect(mocks.failedRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -351,11 +421,22 @@ describe("sync-monitor-service", () => {
       id: "00000000-0000-4000-8000-000000000031",
       raw_payload: { access_token: "secret", safe: "visible" },
     });
-    const result = await getRedactedFailedRecordPayload({
-      ...baseInput,
-      failureId: "00000000-0000-4000-8000-000000000031",
-      runId: "00000000-0000-4000-8000-000000000021",
-    });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...baseInput,
+        failureId: "00000000-0000-4000-8000-000000000031",
+        runId: "00000000-0000-4000-8000-000000000021",
+      }),
+      (db) =>
+        getRedactedFailedRecordPayload(
+          {
+            ...baseInput,
+            failureId: "00000000-0000-4000-8000-000000000031",
+            runId: "00000000-0000-4000-8000-000000000021",
+          },
+          db
+        )
+    );
     expect(mocks.failedRecordFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -373,7 +454,10 @@ describe("sync-monitor-service", () => {
     expect(mocks.auditCreate).toHaveBeenCalledOnce();
   });
   it("includes syncPausedAt in tenant summaries", async () => {
-    const result = await listTenantSummaries(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => listTenantSummaries(baseInput, db)
+    );
     expect(result).toMatchObject({
       ok: true,
       value: [
@@ -420,7 +504,10 @@ describe("sync-monitor-service", () => {
       },
     ]);
     try {
-      const result = await listTenantSummaries(baseInput);
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => listTenantSummaries(baseInput, db)
+      );
       const since = new Date("2026-03-21T12:00:00.000Z");
       expect(mocks.syncRunGroupBy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -494,7 +581,10 @@ describe("sync-monitor-service", () => {
         xero_connection_id: "tenant_1",
       },
     ]);
-    const result = await listTenantSummaries(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => listTenantSummaries(baseInput, db)
+    );
     expect(result).toMatchObject({
       ok: true,
       value: [
@@ -570,7 +660,10 @@ describe("sync-monitor-service", () => {
         xero_connection_id: "tenant_1",
       },
     ]);
-    const result = await listTenantSummaries(baseInput);
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseInput),
+      (db) => listTenantSummaries(baseInput, db)
+    );
     expect(result).toMatchObject({
       ok: true,
       value: [

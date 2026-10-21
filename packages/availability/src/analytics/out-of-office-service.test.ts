@@ -1,3 +1,5 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -11,35 +13,33 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       availabilityRecord: { findMany: mocks.availabilityFindMany },
       person: {
         findFirst: mocks.personFindFirst,
         findMany: mocks.personFindMany,
       },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        availabilityRecord: { findMany: mocks.availabilityFindMany },
-        person: {
-          findFirst: mocks.personFindFirst,
-          findMany: mocks.personFindMany,
-        },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 
 const { aggregateOutOfOffice, listOutOfOfficeRecordsForDrilldown } =
   await import("./out-of-office-service");
@@ -106,18 +106,36 @@ describe("out of office service", () => {
 
   describe("aggregateOutOfOffice", () => {
     it("aggregates approved manual records only with fixed maths", async () => {
-      const result = await aggregateOutOfOffice({
-        actingUserId: "user_1",
-        clerkOrgId: "org_1",
-        dateRange: {
-          end: new Date("2026-05-09T00:00:00.000Z"),
-          label: "May",
-          start: new Date("2026-05-04T00:00:00.000Z"),
-        },
-        filters: { includeArchivedPeople: false, personType: "all" },
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        role: "admin",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          dateRange: {
+            end: new Date("2026-05-09T00:00:00.000Z"),
+            label: "May",
+            start: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          filters: { includeArchivedPeople: false, personType: "all" },
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          role: "admin",
+        }),
+        (db) =>
+          aggregateOutOfOffice(
+            {
+              actingUserId: "user_1",
+              clerkOrgId: "org_1",
+              dateRange: {
+                end: new Date("2026-05-09T00:00:00.000Z"),
+                label: "May",
+                start: new Date("2026-05-04T00:00:00.000Z"),
+              },
+              filters: { includeArchivedPeople: false, personType: "all" },
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              role: "admin",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       if (result.ok) {
@@ -167,18 +185,36 @@ describe("out of office service", () => {
     });
 
     it("issues aggregate query with select rather than include and omits audit columns", async () => {
-      const result = await aggregateOutOfOffice({
-        actingUserId: "user_1",
-        clerkOrgId: "org_1",
-        dateRange: {
-          end: new Date("2026-05-09T00:00:00.000Z"),
-          label: "May",
-          start: new Date("2026-05-04T00:00:00.000Z"),
-        },
-        filters: { includeArchivedPeople: false, personType: "all" },
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        role: "admin",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          dateRange: {
+            end: new Date("2026-05-09T00:00:00.000Z"),
+            label: "May",
+            start: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          filters: { includeArchivedPeople: false, personType: "all" },
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          role: "admin",
+        }),
+        (db) =>
+          aggregateOutOfOffice(
+            {
+              actingUserId: "user_1",
+              clerkOrgId: "org_1",
+              dateRange: {
+                end: new Date("2026-05-09T00:00:00.000Z"),
+                label: "May",
+                start: new Date("2026-05-04T00:00:00.000Z"),
+              },
+              filters: { includeArchivedPeople: false, personType: "all" },
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              role: "admin",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       expect(mocks.availabilityFindMany).toHaveBeenCalledTimes(1);
@@ -192,19 +228,38 @@ describe("out of office service", () => {
 
   describe("listOutOfOfficeRecordsForDrilldown", () => {
     it("issues drilldown query with take and the same projection omitting audit columns", async () => {
-      const result = await listOutOfOfficeRecordsForDrilldown({
-        actingUserId: "user_1",
-        clerkOrgId: "org_1",
-        dateRange: {
-          end: new Date("2026-05-09T00:00:00.000Z"),
-          label: "May",
-          start: new Date("2026-05-04T00:00:00.000Z"),
-        },
-        filters: { includeArchivedPeople: false, personType: "all" },
-        organisationId: "00000000-0000-4000-8000-000000000001",
-        pageSize: 50,
-        role: "admin",
-      });
+      const result = await withTestTenantResult(
+        tenantTestAccount({
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          dateRange: {
+            end: new Date("2026-05-09T00:00:00.000Z"),
+            label: "May",
+            start: new Date("2026-05-04T00:00:00.000Z"),
+          },
+          filters: { includeArchivedPeople: false, personType: "all" },
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          pageSize: 50,
+          role: "admin",
+        }),
+        (db) =>
+          listOutOfOfficeRecordsForDrilldown(
+            {
+              actingUserId: "user_1",
+              clerkOrgId: "org_1",
+              dateRange: {
+                end: new Date("2026-05-09T00:00:00.000Z"),
+                label: "May",
+                start: new Date("2026-05-04T00:00:00.000Z"),
+              },
+              filters: { includeArchivedPeople: false, personType: "all" },
+              organisationId: "00000000-0000-4000-8000-000000000001",
+              pageSize: 50,
+              role: "admin",
+            },
+            db
+          )
+      );
 
       expect(result.ok).toBe(true);
       if (result.ok) {

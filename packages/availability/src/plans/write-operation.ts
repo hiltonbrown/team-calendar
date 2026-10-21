@@ -17,9 +17,10 @@ import {
   type PreparedSubmitOperation,
   prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects,
-  tenantDatabase,
+  withTenantDb,
 } from "@repo/database";
 import type { availability_approval_status } from "@repo/database/generated/enums";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import {
   releaseXeroWriteClaim,
   XERO_WRITE_CLAIM_LEASE_MS,
@@ -57,6 +58,7 @@ export async function prepareXeroWrite(
   input: PrepareXeroWriteInput,
   port: ExternalWritePort
 ): Promise<Result<PreparedSubmitOperation, ProviderWriteError>> {
+  assertNoTenantTransaction("prepareXeroWrite");
   const descriptor = await port.prepareLeaveMutation({
     action: input.remoteId ? input.action : "create",
     clerkOrgId: input.clerkOrgId,
@@ -108,27 +110,43 @@ export async function prepareXeroWrite(
   if (
     !(
       prepared.providerAccepted ||
-      (await markSubmitDispatchStarted(
+      (await withTenantDb(
         {
           action: input.action,
           attemptGeneration: prepared.attemptGeneration,
           availabilityRecordId: input.recordId,
           clerkOrgId: input.clerkOrgId,
           organisationId: input.organisationId,
-        },
-        prepared.mutation
+        }.clerkOrgId,
+        (db) =>
+          markSubmitDispatchStarted(
+            {
+              action: input.action,
+              attemptGeneration: prepared.attemptGeneration,
+              availabilityRecordId: input.recordId,
+              clerkOrgId: input.clerkOrgId,
+              organisationId: input.organisationId,
+            },
+            prepared.mutation,
+            db
+          )
       ))
     )
   ) {
     if (prepared.replayedUnknown) {
-      await markSubmitOutcomeUnknown(attempt, "replay_not_dispatched");
+      await withTenantDb(attempt.clerkOrgId, (db) =>
+        markSubmitOutcomeUnknown(attempt, "replay_not_dispatched", db)
+      );
     }
-    await releaseXeroWriteClaim({
+    const phaseInput1 = {
       claimedAt: prepared.claimedAt,
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
       recordId: input.recordId,
-    });
+    } satisfies Parameters<typeof releaseXeroWriteClaim>[0];
+    await withTenantDb(phaseInput1.clerkOrgId, (db) =>
+      releaseXeroWriteClaim(phaseInput1, db)
+    );
     return { error: unknownOutcome, ok: false };
   }
   return { ok: true, value: prepared };
@@ -139,16 +157,27 @@ export async function recordXeroWriteOutcome(
   remoteId?: string,
   preserveUncertainty = false
 ): Promise<boolean> {
+  assertNoTenantTransaction("recordXeroWriteOutcome");
   if (outcome.ok) {
-    return remoteId ? await markSubmitProviderAccepted(scope, remoteId) : false;
+    return remoteId
+      ? await withTenantDb(scope.clerkOrgId, (db) =>
+          markSubmitProviderAccepted(scope, remoteId, db)
+        )
+      : false;
   }
   const { error } = outcome;
   if (preserveUncertainty) {
-    return await markSubmitOutcomeUnknown(scope, error.code);
+    return await withTenantDb(scope.clerkOrgId, (db) =>
+      markSubmitOutcomeUnknown(scope, error.code, db)
+    );
   }
   return isDefinitiveWriteFailure(error)
-    ? await markSubmitDefinitiveFailure(scope, error.code)
-    : await markSubmitOutcomeUnknown(scope, error.code);
+    ? await withTenantDb(scope.clerkOrgId, (db) =>
+        markSubmitDefinitiveFailure(scope, error.code, db)
+      )
+    : await withTenantDb(scope.clerkOrgId, (db) =>
+        markSubmitOutcomeUnknown(scope, error.code, db)
+      );
 }
 
 export const isDefinitiveWriteFailure = (error: ProviderWriteError): boolean =>
@@ -176,9 +205,13 @@ export async function completeXeroWriteSideEffects(input: {
   recipient: { clerkUserId: string; personId: string } | null;
   manager: { clerkUserId: string; personId: string } | null;
 }): Promise<boolean> {
-  const claimedAt = await acquireSubmitRecoverySideEffects(
-    input.attempt,
-    new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+  assertNoTenantTransaction("completeXeroWriteSideEffects");
+  const claimedAt = await withTenantDb(input.attempt.clerkOrgId, (db) =>
+    acquireSubmitRecoverySideEffects(
+      input.attempt,
+      new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
+      db
+    )
   );
   if (!claimedAt) {
     return false;
@@ -191,12 +224,13 @@ export async function completeXeroWriteSideEffects(input: {
     notifyManager: input.attempt.action === "withdraw",
   });
   if (!outcome.ok) {
-    await releaseSubmitRecoverySideEffects(input.attempt, claimedAt);
+    await withTenantDb(input.attempt.clerkOrgId, (db) =>
+      releaseSubmitRecoverySideEffects(input.attempt, claimedAt, db)
+    );
     return false;
   }
-  return await markSubmitCompleted(
-    input.attempt,
-    tenantDatabase(input.clerkOrgId)
+  return await withTenantDb(input.clerkOrgId, (db) =>
+    markSubmitCompleted(input.attempt, db)
   );
 }
 

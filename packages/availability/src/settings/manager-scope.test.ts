@@ -1,96 +1,118 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TenantDb } from "@repo/database";
+import type { Prisma } from "@repo/database/generated/client";
+import { withTenantDb as withTestTenantDb } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
+import { beforeEach, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  findMany: vi.fn(),
-  getSettings: vi.fn(),
+const state = vi.hoisted(() => ({
+  companies: vi.fn(),
+  people: vi.fn(),
+  settings: vi.fn(),
+  transaction: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return { person: { findMany: mocks.findMany } };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return { person: { findMany: mocks.findMany } }.$transaction(
-        transactionCallback,
-        options
-      );
-    }
-  ),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: { $transaction: state.transaction },
 }));
-vi.mock("./organisation-settings-service", () => ({
-  getSettings: mocks.getSettings,
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual("@repo/database/tenant-db")),
+  getAccountSettings: state.settings,
+  resolveAccountCompanies: state.companies,
 }));
 
-const { managerScopePersonIds } = await import("./manager-scope");
+import { TenantMismatchError, withTenantDb } from "@repo/database";
+import { managerScopePersonIds } from "./manager-scope";
 
-const input = {
-  actingPersonId: "00000000-0000-4000-8000-000000000001",
-  clerkOrgId: "org_1",
-  organisationId: "00000000-0000-4000-8000-000000000002",
-};
-const directReportId = "00000000-0000-4000-8000-000000000003";
-const transitiveReportId = "00000000-0000-4000-8000-000000000004";
-
-describe("managerScopePersonIds", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.getSettings.mockResolvedValue({
-      ok: true,
-      value: { managerVisibilityScope: "direct_reports_only" },
-    });
-    mocks.findMany.mockResolvedValue([
-      { id: input.actingPersonId, manager_person_id: null },
-      { id: directReportId, manager_person_id: input.actingPersonId },
-      { id: transitiveReportId, manager_person_id: directReportId },
-    ]);
+const input = { actingPersonId: "manager-A", clerkOrgId: "account-A" };
+beforeEach(() => {
+  vi.clearAllMocks();
+  state.companies.mockResolvedValue([{ id: "company-A" }, { id: "company-B" }]);
+  state.settings.mockResolvedValue({
+    manager_visibility_scope: "direct_reports_only",
   });
-
-  it("includes the actor by default", async () => {
-    await expect(managerScopePersonIds(input)).resolves.toEqual([
-      input.actingPersonId,
-      directReportId,
-    ]);
-    expect(mocks.findMany).toHaveBeenCalledWith({
-      orderBy: { id: "asc" },
-      select: { id: true, manager_person_id: true },
+  state.people.mockResolvedValue([
+    { id: input.actingPersonId, manager_person_id: null },
+    { id: "report-B", manager_person_id: input.actingPersonId },
+    { id: "indirect-B", manager_person_id: "report-B" },
+  ]);
+  state.transaction.mockImplementation(
+    async (fn: (db: Prisma.TransactionClient) => Promise<unknown>) => {
+      // Substitute the pool with the delegates reached by the manager-scope query.
+      return await fn({
+        $queryRaw: async () => [],
+        person: { findMany: state.people },
+      } as unknown as Prisma.TransactionClient);
+    }
+  );
+});
+test("direct reports span every owned company", async () => {
+  expect(
+    await withTestTenantDb(tenantTestAccount(input), (db) =>
+      managerScopePersonIds(input, db)
+    )
+  ).toEqual([input.actingPersonId, "report-B"]);
+  expect(state.people).toHaveBeenCalledWith(
+    expect.objectContaining({
       where: {
         archived_at: null,
         clerk_org_id: input.clerkOrgId,
-        organisation_id: input.organisationId,
+        organisation_id: { in: ["company-A", "company-B"] },
       },
-    });
+    })
+  );
+});
+test("account setting includes indirect reports across companies", async () => {
+  state.settings.mockResolvedValue({
+    manager_visibility_scope: "all_team_leave",
   });
-
-  it("excludes the actor while retaining direct reports", async () => {
-    await expect(
-      managerScopePersonIds({ ...input, excludeSelf: true })
-    ).resolves.toEqual([directReportId]);
+  expect(
+    await withTestTenantDb(
+      tenantTestAccount({ ...input, excludeSelf: true }),
+      (db) => managerScopePersonIds({ ...input, excludeSelf: true }, db)
+    )
+  ).toEqual(["report-B", "indirect-B"]);
+});
+test("a foreign or archived acting person is never returned", async () => {
+  expect(
+    await withTestTenantDb(
+      tenantTestAccount({ ...input, actingPersonId: "foreign-manager" }),
+      (db) =>
+        managerScopePersonIds(
+          { ...input, actingPersonId: "foreign-manager" },
+          db
+        )
+    )
+  ).toEqual([]);
+});
+test("caller-owned scope is reused and forwarded", async () => {
+  await withTenantDb(input.clerkOrgId, async (db) => {
+    await managerScopePersonIds(input, db);
+    expect(state.settings).toHaveBeenCalledWith(input.clerkOrgId, db);
+    expect(state.companies).toHaveBeenCalledWith(input.clerkOrgId, db);
   });
-
-  it("excludes the actor while retaining transitive reports", async () => {
-    mocks.getSettings.mockResolvedValue({
-      ok: true,
-      value: { managerVisibilityScope: "all_team_leave" },
-    });
-
-    await expect(
-      managerScopePersonIds({ ...input, excludeSelf: true })
-    ).resolves.toEqual([directReportId, transitiveReportId]);
+  expect(state.transaction).toHaveBeenCalledOnce();
+});
+test("wrong-account scope fails before reading settings or people", async () => {
+  await expect(
+    withTenantDb("account-B", (db: TenantDb) =>
+      managerScopePersonIds(input, db)
+    )
+  ).rejects.toBeInstanceOf(TenantMismatchError);
+  expect(state.settings).not.toHaveBeenCalled();
+  expect(state.people).not.toHaveBeenCalled();
+});
+test("cyclic hierarchies terminate without including the manager as a report", async () => {
+  state.settings.mockResolvedValue({
+    manager_visibility_scope: "all_team_leave",
   });
-
-  it("returns no people when settings cannot be read and self is excluded", async () => {
-    mocks.getSettings.mockResolvedValue({ error: {}, ok: false });
-
-    await expect(
-      managerScopePersonIds({ ...input, excludeSelf: true })
-    ).resolves.toEqual([]);
-  });
+  state.people.mockResolvedValue([
+    { id: input.actingPersonId, manager_person_id: "report-B" },
+    { id: "report-B", manager_person_id: input.actingPersonId },
+  ]);
+  expect(
+    await withTestTenantDb(
+      tenantTestAccount({ ...input, excludeSelf: true }),
+      (db) => managerScopePersonIds({ ...input, excludeSelf: true }, db)
+    )
+  ).toEqual(["report-B"]);
 });

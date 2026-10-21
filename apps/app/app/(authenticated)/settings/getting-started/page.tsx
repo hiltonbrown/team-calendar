@@ -1,8 +1,11 @@
+import { requireOrg } from "@repo/auth/helpers";
+import type { ClerkOrgId } from "@repo/core";
+import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { loadOnboardingState } from "@/lib/server/load-onboarding-state";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { SettingsSectionHeader } from "../components/settings-section-header";
 
 export const metadata: Metadata = {
@@ -20,12 +23,22 @@ const GettingStartedSettingsPage = async ({
   await requirePageRole("org:admin");
 
   const { org } = await searchParams;
-  const { clerkOrgId, organisationId, orgQueryValue } =
-    await requireActiveOrgPageContext(org);
-  const onboarding = await loadOnboardingState({
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const { onboarding, orgQueryValue } = await withTenantDb(
     clerkOrgId,
-    organisationId,
-  });
+    async (db) => {
+      const { organisationId, orgQueryValue: preparedOrgQueryValue } =
+        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+      const preparedOnboarding = await loadOnboardingState(
+        { clerkOrgId, organisationId },
+        db
+      );
+      return {
+        onboarding: preparedOnboarding,
+        orgQueryValue: preparedOrgQueryValue,
+      };
+    }
+  );
 
   return (
     <div className="space-y-6">

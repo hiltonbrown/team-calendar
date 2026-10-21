@@ -1,3 +1,8 @@
+import { withTenantResult as withTestTenantResult } from "../tenant-db";
+import { tenantTestAccount } from "../test-fixtures/tenant-scope";
+
+vi.mock("server-only", () => ({}));
+
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,11 +15,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../tenant-client", () => ({
-  tenantDatabase: () => ({
-    auditEvent: {
-      findMany: mocks.findMany,
-    },
-  }),
+  referenceDatabase: {
+    $transaction: async (callback: (db: unknown) => Promise<unknown>) =>
+      callback({
+        $queryRaw: async () => [],
+        auditEvent: { findMany: mocks.findMany },
+      }),
+  },
 }));
 
 vi.mock("../tenant-query", () => ({
@@ -56,10 +63,15 @@ describe("listRecentSupportSubmissionAudits", () => {
       },
     ]);
 
-    const result = await listRecentSupportSubmissionAudits(
-      tenant.clerkOrgId,
-      tenant.organisationId,
-      5
+    const result = await withTestTenantResult(
+      tenantTestAccount(tenant.clerkOrgId),
+      (db) =>
+        listRecentSupportSubmissionAudits(
+          tenant.clerkOrgId,
+          tenant.organisationId,
+          5,
+          db
+        )
     );
 
     expect(mocks.findMany).toHaveBeenCalledWith({
@@ -119,9 +131,15 @@ describe("listRecentSupportSubmissionAudits", () => {
       },
     ]);
 
-    const result = await listRecentSupportSubmissionAudits(
-      tenant.clerkOrgId,
-      tenant.organisationId
+    const result = await withTestTenantResult(
+      tenantTestAccount(tenant.clerkOrgId),
+      (db) =>
+        listRecentSupportSubmissionAudits(
+          tenant.clerkOrgId,
+          tenant.organisationId,
+          undefined,
+          db
+        )
     );
 
     expect(result).toEqual({

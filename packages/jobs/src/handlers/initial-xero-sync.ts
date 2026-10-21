@@ -1,3 +1,4 @@
+import { withTenantDb } from "@repo/database";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
@@ -5,6 +6,7 @@ import {
   completeXeroInitialSync,
   ensureXeroInitialSyncRequested,
 } from "@repo/database/queries/xero-sync-cursors";
+import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
@@ -43,15 +45,23 @@ function successfulPhase<T extends { status: string }>(
   }
   return result.value;
 }
-async function executeInitialSync(
+export async function executeInitialSync(
   input: InitialXeroSyncInput,
   runStep: RunStep
 ): Promise<InitialXeroSyncResult | { status: "ignored" }> {
-  if (!(await isCurrentXeroSyncBinding(input))) {
+  assertNoTenantTransaction("executeInitialSync");
+  if (
+    !(await withTenantDb(input.clerkOrgId, (db) =>
+      isCurrentXeroSyncBinding(input, db)
+    ))
+  ) {
     return { status: "ignored" };
   }
   const requestedAt =
-    input.requestedAt ?? (await ensureXeroInitialSyncRequested(input));
+    input.requestedAt ??
+    (await withTenantDb(input.clerkOrgId, (db) =>
+      ensureXeroInitialSyncRequested(input, db)
+    ));
   if (!requestedAt) {
     throw new Error("Initial Xero import request is no longer active.");
   }
@@ -78,15 +88,23 @@ async function executeInitialSync(
     leaveBalances.push(result);
     hasMore = result.hasMore === true;
   }
-  const completedAt = await runStep("complete-initial-import", async () => {
-    const completed = await completeXeroInitialSync({ ...input, requestedAt });
-    if (!completed) {
-      throw new Error("Initial Xero import request changed.");
-    }
-    await captureInitialSyncCompleted(input);
-    return completed;
-  });
+  const completedAt = await runStep("complete-initial-import", () =>
+    completeInitialSyncPhase({ ...input, requestedAt })
+  );
   return { completedAt, leaveBalances, leaveRecords, people };
+}
+export async function completeInitialSyncPhase(
+  input: Parameters<typeof completeXeroInitialSync>[0]
+): Promise<Date> {
+  assertNoTenantTransaction("completeInitialSyncPhase");
+  const completed = await withTenantDb(input.clerkOrgId, (db) =>
+    completeXeroInitialSync(input, db)
+  );
+  if (!completed) {
+    throw new Error("Initial Xero import request changed.");
+  }
+  await captureInitialSyncCompleted(input);
+  return completed;
 }
 export const initialXeroSyncFunction: InngestFunction.Any =
   inngest.createFunction(
@@ -111,6 +129,7 @@ export async function initialXeroSync(
 ): Promise<
   Result<InitialXeroSyncResult | { status: "ignored" }, InitialXeroSyncError>
 > {
+  assertNoTenantTransaction("initialXeroSync");
   const parsed = InputSchema.safeParse(input);
   if (!parsed.success) {
     return {

@@ -24,12 +24,26 @@ vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
 }));
-vi.mock("@repo/database", () => ({
-  tenantDatabase: vi.fn(() => mocks.database),
-  tenantTransaction: vi.fn((_clerkOrgId, operation) =>
-    mocks.database.$transaction(operation)
-  ),
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: vi.fn(
+      async (executeTransaction: (client: unknown) => Promise<unknown>) =>
+        executeTransaction({
+          $executeRaw: vi.fn(async () => 1),
+          $queryRaw: vi.fn(async () => []),
+          ...buildTenantTestDatabase(),
+        })
+    ),
+  },
 }));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+}));
+function buildTenantTestDatabase() {
+  return mocks.database;
+}
 vi.mock("@repo/next-config/keys", () => ({
   keys: mocks.coreKeys,
 }));
@@ -68,7 +82,7 @@ describe("xero settings integration server actions", () => {
   });
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: "admin@example.com" }],
       firstName: "Admin",
@@ -88,8 +102,8 @@ describe("xero settings integration server actions", () => {
       id: connectionId,
     });
     mocks.database.auditEvent.create.mockResolvedValue({});
-    mocks.transaction.auditEvent.create.mockResolvedValue({});
-    mocks.transaction.xeroConnection.updateMany.mockResolvedValue({ count: 1 });
+    mocks.database.auditEvent.create.mockResolvedValue({});
+    mocks.database.xeroConnection.updateMany.mockResolvedValue({ count: 1 });
     mocks.database.$transaction.mockImplementation((operation) =>
       operation(mocks.transaction)
     );
@@ -124,8 +138,8 @@ describe("xero settings integration server actions", () => {
   );
   it("refuses company removal if the owner is downgraded during the request", async () => {
     mocks.auth
-      .mockResolvedValueOnce({ orgRole: "org:owner" })
-      .mockResolvedValueOnce({ orgRole: "org:admin" });
+      .mockResolvedValueOnce({ orgId: "org_123", orgRole: "org:owner" })
+      .mockResolvedValueOnce({ orgId: "org_123", orgRole: "org:admin" });
     const result = await removeCompanyAction({
       confirmationText: orgName,
       connectionId,
@@ -149,7 +163,7 @@ describe("xero settings integration server actions", () => {
     expect(mocks.getActiveOrgContext).not.toHaveBeenCalled();
   });
   it("delegates confirmed company removal only for an owner", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:owner" });
+    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:owner" });
     mocks.removeXeroCompany.mockResolvedValue({
       ok: true,
       value: { connectionId, organisationId, state: "removed" },
@@ -192,7 +206,7 @@ describe("xero settings integration server actions", () => {
     it.each(["org:manager", "org:viewer", "org:member", null])(
       "rejects role %s without calling the disconnect service",
       async (orgRole) => {
-        mocks.auth.mockResolvedValue({ orgRole });
+        mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
         const resDisconnect = await disconnectXeroAction({
           confirmationText: orgName,
           connectionId,
@@ -210,10 +224,7 @@ describe("xero settings integration server actions", () => {
       }
     );
     it("rejects an organisation outside the active Clerk account without calling the service", async () => {
-      mocks.getActiveOrgContext.mockResolvedValue({
-        error: { code: "not_found" },
-        ok: false,
-      });
+      mocks.database.organisation.findFirst.mockResolvedValue(null);
       const result = await disconnectXeroAction({
         confirmationText: orgName,
         connectionId,
@@ -221,7 +232,11 @@ describe("xero settings integration server actions", () => {
         organisationId,
       });
       expect(result.ok).toBe(false);
-      expect(mocks.database.organisation.findFirst).not.toHaveBeenCalled();
+      expect(mocks.database.organisation.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { clerk_org_id: clerkOrgId, id: organisationId },
+        })
+      );
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
     });
     it("rejects malformed inputs for actions", async () => {
@@ -333,7 +348,7 @@ describe("xero settings integration server actions", () => {
     it.each(["org:owner", "org:admin"])(
       "allows %s to confirm disconnect using the existing trimmed organisation name",
       async (orgRole) => {
-        mocks.auth.mockResolvedValue({ orgRole });
+        mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
         const result = await disconnectXeroAction({
           confirmationText: ` ${orgName} `,
           connectionId,
@@ -445,7 +460,7 @@ describe("xero settings integration server actions", () => {
         organisationId,
       });
       expect(resPause.ok).toBe(true);
-      expect(mocks.transaction.xeroConnection.updateMany).toHaveBeenCalledWith({
+      expect(mocks.database.xeroConnection.updateMany).toHaveBeenCalledWith({
         data: { sync_paused_at: expect.any(Date) },
         where: {
           clerk_org_id: clerkOrgId,
@@ -458,7 +473,7 @@ describe("xero settings integration server actions", () => {
         organisationId,
       });
       expect(resResume.ok).toBe(true);
-      expect(mocks.transaction.xeroConnection.updateMany).toHaveBeenCalledWith({
+      expect(mocks.database.xeroConnection.updateMany).toHaveBeenCalledWith({
         data: { sync_paused_at: null },
         where: {
           clerk_org_id: clerkOrgId,
@@ -466,9 +481,11 @@ describe("xero settings integration server actions", () => {
           organisation_id: organisationId,
         },
       });
-      expect(mocks.database.$transaction).toHaveBeenCalledTimes(2);
-      expect(mocks.transaction.auditEvent.create).toHaveBeenCalledTimes(2);
-      expect(mocks.database.xeroConnection.updateMany).not.toHaveBeenCalled();
+      const { referenceDatabase } = await import(
+        "@repo/database/tenant-client"
+      );
+      expect(referenceDatabase.$transaction).toHaveBeenCalledTimes(2);
+      expect(mocks.database.auditEvent.create).toHaveBeenCalledTimes(2);
     });
     it.each([
       ["pause", pauseTenantSyncAction],
@@ -476,7 +493,7 @@ describe("xero settings integration server actions", () => {
     ])(
       "does not audit or claim success when %s targets another tenant",
       async (_name, action) => {
-        mocks.transaction.xeroConnection.updateMany.mockResolvedValue({
+        mocks.database.xeroConnection.updateMany.mockResolvedValue({
           count: 0,
         });
         const result = await action({ connectionId, organisationId });
@@ -487,9 +504,7 @@ describe("xero settings integration server actions", () => {
           },
           ok: false,
         });
-        expect(
-          mocks.transaction.xeroConnection.updateMany
-        ).toHaveBeenCalledWith(
+        expect(mocks.database.xeroConnection.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: {
               clerk_org_id: clerkOrgId,
@@ -498,7 +513,7 @@ describe("xero settings integration server actions", () => {
             },
           })
         );
-        expect(mocks.transaction.auditEvent.create).not.toHaveBeenCalled();
+        expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
         expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
         expect(mocks.revalidatePath).not.toHaveBeenCalled();
       }
@@ -511,7 +526,7 @@ describe("Xero mutation role ordering", () => {
   it.each(["org:manager", "org:viewer"])(
     "rejects %s before validating input or resolving companies",
     async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
       mocks.getActiveOrgContext.mockClear();
       for (const action of [
         connectXeroAction,
@@ -531,7 +546,7 @@ describe("Xero mutation role ordering", () => {
     }
   );
   it("refuses company removal to admins before reading input", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
     const result = await removeCompanyAction({
       confirmationText: "",
       connectionId: "invalid",

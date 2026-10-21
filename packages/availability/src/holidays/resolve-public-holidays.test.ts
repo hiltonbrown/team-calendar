@@ -1,7 +1,10 @@
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual("@repo/database/tenant-db")),
   loadHolidayResolutionData: vi.fn(),
 }));
 
@@ -42,9 +45,14 @@ describe("resolvePublicHolidays", () => {
       to: "2026-12-31",
     });
 
-    const result = await resolvePublicHolidays(range, () => []);
+    const result = await withTestTenantResult(tenantTestAccount(range), (db) =>
+      resolvePublicHolidays(range, () => [], db)
+    );
 
-    expect(loadHolidayResolutionData).toHaveBeenCalledWith(range);
+    expect(loadHolidayResolutionData).toHaveBeenCalledWith(
+      range,
+      expect.any(Object)
+    );
     expect(result).toMatchObject({
       ok: true,
       value: [{ key: "custom:c-1", locationId: null, name: "Founders Day" }],
@@ -53,7 +61,11 @@ describe("resolvePublicHolidays", () => {
 
   it("returns not_found when the organisation is outside the tenant", async () => {
     vi.mocked(loadHolidayResolutionData).mockResolvedValue(null);
-    expect(await resolvePublicHolidays(range)).toMatchObject({
+    expect(
+      await withTestTenantResult(tenantTestAccount(range), (db) =>
+        resolvePublicHolidays(range, undefined, db)
+      )
+    ).toMatchObject({
       error: { code: "not_found" },
       ok: false,
     });
@@ -61,10 +73,11 @@ describe("resolvePublicHolidays", () => {
 
   it("returns an internal error when loading fails", async () => {
     vi.mocked(loadHolidayResolutionData).mockRejectedValue(new Error("down"));
-    expect(await resolvePublicHolidays(range)).toMatchObject({
-      error: { code: "internal" },
-      ok: false,
-    });
+    await expect(
+      withTestTenantResult(tenantTestAccount(range), (db) =>
+        resolvePublicHolidays(range, undefined, db)
+      )
+    ).rejects.toThrow("down");
   });
 });
 
@@ -79,18 +92,24 @@ describe("loadHolidaySettings", () => {
       to: "2026-12-31",
     });
 
-    const result = await loadHolidaySettings(range, () => [
-      {
-        area: "Brisbane",
-        country: "AU",
-        date: "2026-08-12",
-        id: "au-qld-2026-08-12-royal-queensland-show",
-        kind: "local",
-        name: "Royal Queensland Show",
-        region: "QLD",
-        startsAt: null,
-      },
-    ]);
+    const result = await withTestTenantResult(tenantTestAccount(range), (db) =>
+      loadHolidaySettings(
+        range,
+        () => [
+          {
+            area: "Brisbane",
+            country: "AU",
+            date: "2026-08-12",
+            id: "au-qld-2026-08-12-royal-queensland-show",
+            kind: "local",
+            name: "Royal Queensland Show",
+            region: "QLD",
+            startsAt: null,
+          },
+        ],
+        db
+      )
+    );
 
     expect(loadHolidayResolutionData).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({
@@ -109,9 +128,20 @@ describe("loadHolidaySettings", () => {
 
   it("returns not_found when the organisation is outside the tenant", async () => {
     vi.mocked(loadHolidayResolutionData).mockResolvedValue(null);
-    expect(await loadHolidaySettings(range)).toMatchObject({
+    expect(
+      await withTestTenantResult(tenantTestAccount(range), (db) =>
+        loadHolidaySettings(range, undefined, db)
+      )
+    ).toMatchObject({
       error: { code: "not_found" },
       ok: false,
     });
   });
 });
+
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run({ $queryRaw: vi.fn(async () => []) }),
+  },
+}));

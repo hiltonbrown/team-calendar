@@ -1,5 +1,7 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { Prisma } from "@repo/database/generated/client";
+import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
+import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -215,37 +217,34 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}), { virtual: true });
-vi.mock("@repo/database", () => ({
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (run: (db: unknown) => Promise<unknown>) =>
+      run(buildTestDatabase()),
+  },
+}));
+vi.mock("@repo/database", async () => ({
+  ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
+    "@repo/database/tenant-db"
+  )),
+
   scopedQuery: mocks.scopedQuery,
-  tenantDatabase: vi.fn((accountId: string) => {
-    if (!accountId) {
-      throw new Error("Missing tenant context");
-    }
-    return {
+}));
+function buildTestDatabase() {
+  // Selected delegates are fakes; scope ownership and commit effects use the real wrapper.
+  return {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    ...{
       availabilityRecord: {
         create: mocks.availabilityCreate,
         findFirst: mocks.availabilityFindFirst,
         update: mocks.availabilityUpdate,
       },
       person: { findFirst: mocks.personFindFirst },
-    };
-  }),
-  tenantTransaction: vi.fn(
-    (accountId: string, transactionCallback: unknown, options?: unknown) => {
-      if (!accountId) {
-        throw new Error("Missing tenant context");
-      }
-      return {
-        availabilityRecord: {
-          create: mocks.availabilityCreate,
-          findFirst: mocks.availabilityFindFirst,
-          update: mocks.availabilityUpdate,
-        },
-        person: { findFirst: mocks.personFindFirst },
-      }.$transaction(transactionCallback, options);
-    }
-  ),
-}));
+    },
+  };
+}
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
@@ -327,15 +326,13 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("rejects a second identical manual record before insert", async () => {
-    const first = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
-    const duplicate = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const duplicate = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
 
     expect(first.ok).toBe(true);
@@ -356,10 +353,9 @@ describe("createManualAvailability duplicate guard", () => {
       ok: false,
     });
 
-    const result = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
 
     expect(result.ok).toBe(true);
@@ -371,29 +367,43 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("accepts non-duplicates with a different person, type, or window", async () => {
-    const first = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
-    const differentPerson = await createManualAvailability(
-      baseTenant,
-      { ...baseInput, personId: otherPersonId },
-      adminActor
+    const differentPerson = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          { ...baseInput, personId: otherPersonId },
+          adminActor,
+          db
+        )
     );
-    const differentType = await createManualAvailability(
-      baseTenant,
-      { ...baseInput, recordType: "training" },
-      adminActor
+    const differentType = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          { ...baseInput, recordType: "training" },
+          adminActor,
+          db
+        )
     );
-    const differentWindow = await createManualAvailability(
-      baseTenant,
-      {
-        ...baseInput,
-        endsAt: new Date("2026-05-13T00:00:00.000Z"),
-        startsAt: new Date("2026-05-11T00:00:00.000Z"),
-      },
-      adminActor
+    const differentWindow = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          {
+            ...baseInput,
+            endsAt: new Date("2026-05-13T00:00:00.000Z"),
+            startsAt: new Date("2026-05-11T00:00:00.000Z"),
+          },
+          adminActor,
+          db
+        )
     );
 
     expect(first.ok).toBe(true);
@@ -404,15 +414,13 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("allows an identical manual record in a different organisation scope", async () => {
-    const first = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
-    const scopedDuplicate = await createManualAvailability(
-      otherTenant,
-      baseInput,
-      adminActor
+    const scopedDuplicate = await withTestTenantResult(
+      tenantTestAccount(otherTenant),
+      (db) => createManualAvailability(otherTenant, baseInput, adminActor, db)
     );
 
     expect(first.ok).toBe(true);
@@ -431,10 +439,9 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("ignores archived manual records when guarding duplicates", async () => {
-    const first = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     expect(first.ok).toBe(true);
 
@@ -445,10 +452,9 @@ describe("createManualAvailability duplicate guard", () => {
     }
     created.archived_at = new Date("2026-05-09T00:00:00.000Z");
 
-    const recreated = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const recreated = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
 
     expect(recreated.ok).toBe(true);
@@ -461,30 +467,39 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("rejects updating a record to match another active record", async () => {
-    const first = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
-    const second = await createManualAvailability(
-      baseTenant,
-      {
-        ...baseInput,
-        endsAt: new Date("2026-05-22T00:00:00.000Z"),
-        startsAt: new Date("2026-05-20T00:00:00.000Z"),
-      },
-      adminActor
+    const second = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          {
+            ...baseInput,
+            endsAt: new Date("2026-05-22T00:00:00.000Z"),
+            startsAt: new Date("2026-05-20T00:00:00.000Z"),
+          },
+          adminActor,
+          db
+        )
     );
     expect(first.ok).toBe(true);
     if (!second.ok) {
       throw new Error("Expected the second record to be created");
     }
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      second.value.id,
-      basePatchInput,
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          second.value.id,
+          basePatchInput,
+          adminActor,
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -499,24 +514,28 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("allows updating a record to a window no active record uses", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      {
-        ...basePatchInput,
-        endsAt: new Date("2026-05-13T00:00:00.000Z"),
-        startsAt: new Date("2026-05-11T00:00:00.000Z"),
-      },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          {
+            ...basePatchInput,
+            endsAt: new Date("2026-05-13T00:00:00.000Z"),
+            startsAt: new Date("2026-05-11T00:00:00.000Z"),
+          },
+          adminActor,
+          db
+        )
     );
 
     expect(result.ok).toBe(true);
@@ -525,27 +544,37 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("updates only the title and preserves private non-default fields", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      {
-        ...baseInput,
-        allDay: false,
-        contactability: "unavailable",
-        includeInFeed: false,
-        preferredContactMethod: "Signal",
-        privacyMode: "private",
-      },
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          {
+            ...baseInput,
+            allDay: false,
+            contactability: "unavailable",
+            includeInFeed: false,
+            preferredContactMethod: "Signal",
+            privacyMode: "private",
+          },
+          adminActor,
+          db
+        )
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      { title: "Changed" },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          { title: "Changed" },
+          adminActor,
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -580,10 +609,9 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("does not update a source-mismatched record", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
@@ -595,11 +623,16 @@ describe("createManualAvailability duplicate guard", () => {
     stored.source_type = "xero";
     vi.clearAllMocks();
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      { title: "Changed" },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          { title: "Changed" },
+          adminActor,
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -610,21 +643,25 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("does not update a record from another tenant", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
     vi.clearAllMocks();
 
-    const result = await updateManualAvailability(
-      otherTenant,
-      created.value.id,
-      { title: "Changed" },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(otherTenant),
+      (db) =>
+        updateManualAvailability(
+          otherTenant,
+          created.value.id,
+          { title: "Changed" },
+          adminActor,
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -635,21 +672,25 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("denies an actor who cannot manage the record", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
     vi.clearAllMocks();
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      { title: "Changed" },
-      { orgRole: "org:viewer", userId: "user_outsider" }
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          { title: "Changed" },
+          { orgRole: "org:viewer", userId: "user_outsider" },
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -660,21 +701,25 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("rejects person reassignment", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
     vi.clearAllMocks();
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      { personId: otherPersonId },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          { personId: otherPersonId },
+          adminActor,
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -685,21 +730,25 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("rejects a partial update whose merged interval is inverted", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
     vi.clearAllMocks();
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      { startsAt: new Date("2026-05-13T00:00:00.000Z") },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          { startsAt: new Date("2026-05-13T00:00:00.000Z") },
+          adminActor,
+          db
+        )
     );
 
     expect(result).toMatchObject({
@@ -710,25 +759,35 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("clears nullable optional text fields", async () => {
-    const created = await createManualAvailability(
-      baseTenant,
-      { ...baseInput, preferredContactMethod: "Signal" },
-      adminActor
+    const created = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          { ...baseInput, preferredContactMethod: "Signal" },
+          adminActor,
+          db
+        )
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
     }
     vi.clearAllMocks();
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      created.value.id,
-      {
-        notesInternal: null,
-        preferredContactMethod: null,
-        workingLocation: null,
-      },
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          created.value.id,
+          {
+            notesInternal: null,
+            preferredContactMethod: null,
+            workingLocation: null,
+          },
+          adminActor,
+          db
+        )
     );
 
     expect(result.ok).toBe(true);
@@ -744,19 +803,23 @@ describe("createManualAvailability duplicate guard", () => {
   });
 
   it("ignores archived records when guarding updates", async () => {
-    const first = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const first = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
-    const second = await createManualAvailability(
-      baseTenant,
-      {
-        ...baseInput,
-        endsAt: new Date("2026-05-22T00:00:00.000Z"),
-        startsAt: new Date("2026-05-20T00:00:00.000Z"),
-      },
-      adminActor
+    const second = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        createManualAvailability(
+          baseTenant,
+          {
+            ...baseInput,
+            endsAt: new Date("2026-05-22T00:00:00.000Z"),
+            startsAt: new Date("2026-05-20T00:00:00.000Z"),
+          },
+          adminActor,
+          db
+        )
     );
     expect(first.ok).toBe(true);
     if (!second.ok) {
@@ -770,11 +833,16 @@ describe("createManualAvailability duplicate guard", () => {
     }
     archived.archived_at = new Date("2026-05-09T00:00:00.000Z");
 
-    const result = await updateManualAvailability(
-      baseTenant,
-      second.value.id,
-      basePatchInput,
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) =>
+        updateManualAvailability(
+          baseTenant,
+          second.value.id,
+          basePatchInput,
+          adminActor,
+          db
+        )
     );
 
     expect(result.ok).toBe(true);
@@ -789,10 +857,9 @@ describe("createManualAvailability duplicate guard", () => {
       });
     });
 
-    const result = await createManualAvailability(
-      baseTenant,
-      baseInput,
-      adminActor
+    const result = await withTestTenantResult(
+      tenantTestAccount(baseTenant),
+      (db) => createManualAvailability(baseTenant, baseInput, adminActor, db)
     );
 
     expect(result).toMatchObject({

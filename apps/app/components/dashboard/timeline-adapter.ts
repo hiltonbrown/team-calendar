@@ -36,8 +36,8 @@ const PRIVATE_LABEL = "Unavailable";
 
 const CORNER_LABELS: Record<TimelineRole, string> = {
   admin: "All teams",
-  employee: "Me",
-  manager: "My team",
+  employee: "All teams",
+  manager: "All teams",
 };
 
 interface TimelineAdapterOptions {
@@ -142,9 +142,9 @@ function secondaryLine(
   role: TimelineRole
 ): string | null {
   if (role !== "admin") {
-    return row.jobTitle;
+    return [row.companyName, row.jobTitle].filter(Boolean).join(", ") || null;
   }
-  const parts = [row.teamName, row.locationName].filter(
+  const parts = [row.companyName, row.teamName, row.locationName].filter(
     (part): part is string => Boolean(part)
   );
   return parts.length > 0 ? parts.join(", ") : null;

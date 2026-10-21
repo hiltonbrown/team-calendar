@@ -1,13 +1,15 @@
+import { requireOrg } from "@repo/auth/helpers";
 import { auth } from "@repo/auth/server";
 import {
   type ResolvedPublicHoliday,
   resolvePublicHolidays,
 } from "@repo/availability";
-import { scopedQuery, tenantDatabase } from "@repo/database";
+import type { ClerkOrgId } from "@repo/core";
+import { scopedQuery, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { requirePageRole } from "@/lib/auth/require-page-role";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
+import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { PublicHolidayFilterSchema } from "./_schemas";
@@ -33,26 +35,43 @@ const PublicHolidaysPage = async ({
   const orgParam = Array.isArray(org) ? org[0] : org;
   const { orgRole } = await auth();
   const canManage = orgRole === "org:admin" || orgRole === "org:owner";
-  const { clerkOrgId, organisationId } =
-    await requireActiveOrgPageContext(orgParam);
+  // Clerk account discovery finishes before the read scope.
+  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
   const filters =
     parseFilterParams(filterParams, PublicHolidayFilterSchema) ??
     PublicHolidayFilterSchema.parse({});
 
-  const [holidaysResult, locations] = await Promise.all([
-    resolvePublicHolidays({
-      clerkOrgId,
-      from: `${filters.year}-01-01`,
-      includeHidden: true,
-      organisationId,
-      to: `${filters.year}-12-31`,
-    }),
-    tenantDatabase(clerkOrgId).location.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-  ]);
+  const { holidaysResult, locations, organisationId } = await withTenantDb(
+    clerkOrgId,
+    async (db) => {
+      const { organisationId: scopedOrganisationId } =
+        await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+      const [preparedHolidaysResult, preparedLocations] = [
+        await resolvePublicHolidays(
+          {
+            clerkOrgId,
+            from: `${filters.year}-01-01`,
+            includeHidden: true,
+            organisationId: scopedOrganisationId,
+            to: `${filters.year}-12-31`,
+          },
+          undefined,
+          db
+        ),
+        await db.location.findMany({
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+          where: scopedQuery(clerkOrgId, scopedOrganisationId),
+        }),
+      ];
+
+      return {
+        holidaysResult: preparedHolidaysResult,
+        locations: preparedLocations,
+        organisationId: scopedOrganisationId,
+      };
+    }
+  );
 
   if (!holidaysResult.ok) {
     return (

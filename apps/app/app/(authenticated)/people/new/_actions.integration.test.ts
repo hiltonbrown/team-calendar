@@ -6,7 +6,6 @@ vi.mock("server-only", () => ({}));
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
-  getActiveOrgContext: vi.fn(),
   redirect: vi.fn(),
   revalidatePath: vi.fn(),
 }));
@@ -15,9 +14,6 @@ vi.mock("@repo/auth/server", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/auth/server")>();
   return { ...original, auth: mocks.auth };
 });
-vi.mock("@/lib/server/get-active-org-context", () => ({
-  getActiveOrgContext: mocks.getActiveOrgContext,
-}));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
@@ -35,11 +31,7 @@ const { systemDatabase: database } = await import("@repo/database");
 describe("manual person plan-limit enforcement", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
-    mocks.getActiveOrgContext.mockResolvedValue({
-      ok: true,
-      value: { clerkOrgId, organisationId },
-    });
+    mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole: "org:admin" });
     await cleanTestData();
     await database.organisation.create({
       data: {

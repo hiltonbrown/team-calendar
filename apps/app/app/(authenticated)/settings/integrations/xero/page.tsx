@@ -1,6 +1,6 @@
 import { auth, withinLimit } from "@repo/auth/server";
 import { getXeroConnectionStateForScope } from "@repo/availability";
-import { tenantDatabase } from "@repo/database";
+import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { organisationWithConnectionSelect } from "../_connection-view";
@@ -15,40 +15,55 @@ export default async function XeroPage() {
   if (!orgId) {
     throw new Error("Organisation context is required.");
   }
-  const organisations = await tenantDatabase(orgId).organisation.findMany({
-    orderBy: [{ created_at: "asc" }, { name: "asc" }],
-    select: organisationWithConnectionSelect,
-    where: {
-      archived_at: null,
-      clerk_org_id: orgId,
-    },
-  });
-  const withState = await Promise.all(
-    organisations.map(async (organisation) => {
-      const result = await getXeroConnectionStateForScope({
-        clerkOrgId: orgId,
-        organisationId: organisation.id,
-      });
-      const xeroConnectionState: import("@repo/core").XeroConnectionDisplayState =
-        result.ok ? result.value.state : "unavailable";
-      return { ...organisation, xeroConnectionState };
-    })
-  );
-  const allowance = await withinLimit(
+  const { withState, payrollEntityAllowance } = await withTenantDb(
     orgId,
-    organisations[0]?.id ?? "",
-    "payroll_entities"
-  );
-  const payrollEntityAllowance = allowance.ok
-    ? {
-        limit: allowance.value.limit === -1 ? null : allowance.value.limit,
-        remaining:
-          allowance.value.limit === -1
-            ? null
-            : Math.max(0, allowance.value.limit - allowance.value.current),
-        used: allowance.value.current,
+    async (db) => {
+      const organisations = await db.organisation.findMany({
+        orderBy: [{ created_at: "asc" }, { name: "asc" }],
+        select: organisationWithConnectionSelect,
+        where: {
+          archived_at: null,
+          clerk_org_id: orgId,
+        },
+      });
+      const preparedWithState: Array<
+        (typeof organisations)[number] & {
+          xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
+        }
+      > = [];
+      for (const organisation of organisations) {
+        const result = await getXeroConnectionStateForScope(
+          { clerkOrgId: orgId, organisationId: organisation.id },
+          db
+        );
+        const xeroConnectionState: import("@repo/core").XeroConnectionDisplayState =
+          result.ok ? result.value.state : "unavailable";
+        preparedWithState.push({ ...organisation, xeroConnectionState });
       }
-    : null;
+      const allowance = await withinLimit(
+        orgId,
+        organisations[0]?.id ?? "",
+        "payroll_entities",
+        db
+      );
+      const preparedPayrollEntityAllowance = allowance.ok
+        ? {
+            limit: allowance.value.limit === -1 ? null : allowance.value.limit,
+            remaining:
+              allowance.value.limit === -1
+                ? null
+                : Math.max(0, allowance.value.limit - allowance.value.current),
+            used: allowance.value.current,
+          }
+        : null;
+
+      return {
+        payrollEntityAllowance: preparedPayrollEntityAllowance,
+        withState: preparedWithState,
+      };
+    },
+    TENANT_READ_TRANSACTION_OPTIONS
+  );
   return (
     <XeroClient
       actingRole={orgRole === "org:owner" ? "owner" : "admin"}

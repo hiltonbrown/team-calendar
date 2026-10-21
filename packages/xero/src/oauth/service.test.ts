@@ -36,12 +36,34 @@ const feedMock = vi.hoisted(() => ({ ensureDefaultCalendarFeed: vi.fn() }));
 const availabilityMock = vi.hoisted(() => ({}));
 const lockMock = vi.hoisted(() => ({ grant: vi.fn() }));
 const identityMock = vi.hoisted(() => ({ verify: vi.fn() }));
-vi.mock("@repo/database", () => {
+const tenantTestState = vi.hoisted(() => ({ client: null as object | null }));
+vi.mock("@repo/database/tenant-client", () => ({
+  referenceDatabase: {
+    $transaction: async (
+      executeTransaction: (client: unknown) => Promise<unknown>
+    ) => {
+      if (!tenantTestState.client) {
+        throw new Error("Missing fixture delegates");
+      }
+      return await executeTransaction({
+        $executeRaw: vi.fn(async () => 1),
+        $queryRaw: vi.fn(async () => []),
+        ...tenantTestState.client,
+      });
+    },
+  },
+}));
+vi.mock("@repo/database", async () => {
+  const actualTenantCore = await vi.importActual<
+    typeof import("@repo/database/tenant-db")
+  >("@repo/database/tenant-db");
+
   const exports = {
     database: dbMock,
     lockXeroAuthorisation: vi.fn(),
     withXeroGrantLock: lockMock.grant,
   };
+  tenantTestState.client = exports.database;
   return {
     ...exports,
     getScopedXeroConnection: vi.fn(async (bindingScope) => ({
@@ -52,12 +74,8 @@ vi.mock("@repo/database", () => {
       },
     })),
     systemDatabase: exports.database,
-    tenantDatabase: vi.fn(() => exports.database),
-    tenantTransaction: vi.fn((_clerkOrgId, callback) =>
-      "$transaction" in exports.database
-        ? exports.database.$transaction(callback)
-        : callback(exports.database)
-    ),
+
+    ...actualTenantCore,
   };
 });
 vi.mock("@repo/database/queries/xero-connections", () => ({

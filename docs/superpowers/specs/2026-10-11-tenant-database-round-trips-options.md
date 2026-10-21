@@ -1,6 +1,6 @@
 # Tenant database round trips: options
 
-Status: open for decision
+Status: decided; Option B with phased carve-outs
 Date: 11 October 2026
 Context: review finding 9 on PR #139 (multi-company tenancy with row-level security)
 
@@ -8,9 +8,9 @@ Context: review finding 9 on PR #139 (multi-company tenancy with row-level secur
 
 Every `tenantDatabase(clerkOrgId)` query now costs four database statements instead of one. On local PostgreSQL that makes a single query about 2.3 times slower; on Neon the penalty scales with network round-trip time and has not been measured.
 
-Recommendation: measure on a Neon preview branch first (Option H). If the overhead is material, combine Option A (cheap local wins) with Option C, an opt-in request-scoped tenant transaction for sequential, query-heavy paths. Parallel fan-out reads stay on the current per-query model. Reject Options D, E and G because they weaken or cannot preserve the row-level security guarantees. Keep Option F in reserve for the public ICS feed endpoint only.
+Decision (12 October 2026): adopt Option B with the carve-outs in the [implementation plan](../plans/2026-10-12-tenant-transaction-per-request.md). Entry points open `withTenantDb` or `withTenantResult`; services require `TenantDb` and reuse it explicitly. Provider calls, streaming lookups, independently committed write phases and catch-and-continue batches retain their registered boundaries. Fan-out requires measured approval. Neon performance, restricted-role integration and preview acceptance remain pending; local statement counts below describe the original baseline.
 
-## Current design
+## Design before the request-transaction change
 
 `packages/database/src/tenant-client.ts` provides two entry points:
 
