@@ -189,9 +189,9 @@ export const RecurrenceFields = ({
 
               {rule.unit === "week" && (
                 <div className="flex flex-col gap-2">
-                  <Label className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider">
+                  <span className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider">
                     Weekdays
-                  </Label>
+                  </span>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
                     {WEEKDAY_OPTIONS.map((weekday) => {
                       const active = rule.weekdays.includes(weekday.value);

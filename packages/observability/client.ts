@@ -22,9 +22,6 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
     debug: false,
     dsn: keys().NEXT_PUBLIC_SENTRY_DSN,
 
-    // Enable logging
-    enableLogs: true,
-
     // You can remove this option if you're not planning to use the Sentry Session Replay feature:
     integrations: [
       Sentry.replayIntegration({

@@ -3,7 +3,6 @@
 import type { AlternativeContactSnapshot } from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
 import { Input } from "@repo/design-system/components/ui/input";
-import { Label } from "@repo/design-system/components/ui/label";
 import { Textarea } from "@repo/design-system/components/ui/textarea";
 import {
   ArrowDownIcon,
@@ -461,9 +460,9 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <Label className="mb-2 block text-label-md text-muted-foreground uppercase tracking-wider">
+      <span className="mb-2 block text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
-      </Label>
+      </span>
       {children}
     </div>
   );

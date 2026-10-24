@@ -101,6 +101,9 @@ Keep one-off task evidence in that task's review, not here.
 - Describe external provider controls as required configuration until concrete
   provider evidence identifies the account, access list, rule and delivery
   result. Repository intent does not prove a mailbox or dashboard rule exists.
+- When bumping monorepo dependencies, keep root `overrides` aligned with the
+  workspace updates, pin `@biomejs/biome` to match Ultracite's schema
+  requirements, and remove deprecated options such as Sentry's `enableLogs`.
 
 ## Data integrity and evidence
 

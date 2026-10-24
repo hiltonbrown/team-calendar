@@ -17,7 +17,6 @@ import {
   DialogTitle,
 } from "@repo/design-system/components/ui/dialog";
 import { Input } from "@repo/design-system/components/ui/input";
-import { Label } from "@repo/design-system/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -955,9 +954,9 @@ function FilterField({
 }) {
   return (
     <div className={className}>
-      <Label className="mb-2 block text-label-md text-muted-foreground uppercase tracking-wider">
+      <span className="mb-2 block text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
-      </Label>
+      </span>
       {children}
     </div>
   );

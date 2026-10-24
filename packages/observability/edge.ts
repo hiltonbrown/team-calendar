@@ -22,9 +22,6 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
     debug: false,
     dsn: keys().NEXT_PUBLIC_SENTRY_DSN,
 
-    // Enable logging
-    enableLogs: true,
-
     // Integrations for console logging
     integrations: [],
 

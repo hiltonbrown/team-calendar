@@ -1,5 +1,17 @@
 # Current work
 
+## Upgrade Next.js and all packages
+
+- [x] Step 1: Update dependencies across monorepo using npm-check-updates and update root overrides/package.json
+- [x] Step 2: Run `bun install` and regenerate Prisma client
+- [x] Step 3: Run `bun run check` and fix any lint/format errors
+- [x] Step 4: Run `bun run typecheck` and fix any TypeScript compilation issues
+- [x] Step 5: Run `bun run test` and fix any unit test or runtime errors
+- [x] Step 6: Run `bun run build` and fix any production build errors
+- [x] Step 7: Final verification of all gates and document review
+
+Review: All dependencies updated to their latest available versions across the monorepo, including Next.js 16.4.3, React 19.3.1, Turbo 2.11.10, Vitest 5.0.5, Zod 4.6.7, Prisma 7.10.1, and Sentry 11.9.0. Fixed Sentry v11 options in `@repo/observability`, fixed Biome accessibility label lint errors in `recurrence-fields.tsx`, `people-client.tsx`, and `alternative-contacts-panel.tsx`, and declared root devDependencies for release scripts. All gates verified: `bun run check` PASS (1,325 files), `bun run typecheck` PASS (19 tasks), `bun run test` PASS (18 tasks, 158 app files / 998 tests), `bun run build` PASS (all apps compiled and static routes generated).
+
 ## Code scanning alerts (plan `docs/superpowers/plans/2026-10-21-code-scanning-alerts.md`)
 
 - [x] Task 1: remove redundant `aud` refine in identity.ts with audience regression tests (alert #30).
