@@ -1,7 +1,7 @@
 "use server";
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type ApprovalListItem,
   type ApprovalRole,
@@ -16,7 +16,7 @@ import {
   revertApprovalAttempt,
   sendPreparedApprovalSync,
 } from "@repo/availability";
-import type { ClerkOrgId, Result } from "@repo/core";
+import type { AccountId, Result } from "@repo/core";
 import {
   afterTenantCommit,
   assertTenantDb,
@@ -77,13 +77,13 @@ export async function approveAction(input: {
     }
     if (result.value.approvedAt) {
       try {
-        const first = await withTenantDb(context.value.clerkOrgId, (db) =>
+        const first = await withTenantDb(context.value.accountId, (db) =>
           db.availabilityRecord.findFirst({
             orderBy: { approved_at: "asc" },
             select: { approved_at: true },
             where: {
+              account_id: context.value.accountId,
               approved_at: { not: null },
-              clerk_org_id: context.value.clerkOrgId,
               organisation_id: context.value.organisationId,
             },
           })
@@ -93,10 +93,10 @@ export async function approveAction(input: {
           return approvalValue(result.value);
         }
         const event = createActivationEvent({
-          deduplicationKey: `${context.value.clerkOrgId}:${context.value.organisationId}`,
+          deduplicationKey: `${context.value.accountId}:${context.value.organisationId}`,
           name: "First Leave Approved",
           occurredAt: first.approved_at,
-          subjectId: context.value.clerkOrgId,
+          subjectId: context.value.accountId,
         });
         analytics?.capture({
           distinctId: event.distinctId,
@@ -157,7 +157,7 @@ export async function requestMoreInfoAction(input: {
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const context = await loadRecordActionContext(
         actor.value,
         parsed.data.recordId,
@@ -270,16 +270,16 @@ async function dispatchAccountApprovalSync(
     return actor;
   }
   try {
-    const prepared = await withTenantDb(actor.value.clerkOrgId, async (db) => {
+    const prepared = await withTenantDb(actor.value.accountId, async (db) => {
       const companies = await resolveAccountCompanies(
-        actor.value.clerkOrgId,
+        actor.value.accountId,
         db
       );
       const connections = await db.xeroConnection.findMany({
         select: { organisation_id: true },
         where: {
+          account_id: actor.value.accountId,
           archived_at: null,
-          clerk_org_id: actor.value.clerkOrgId,
           organisation_id: { in: companies.map((company) => company.id) },
           released_at: null,
           sync_paused_at: null,
@@ -338,8 +338,8 @@ async function dispatchAccountApprovalSync(
   }
 }
 interface ApprovalActor {
+  accountId: AccountId;
   actingUserId: string;
-  clerkOrgId: ClerkOrgId;
   role: ApprovalRole;
 }
 interface RecordActionContext extends ApprovalActor {
@@ -350,15 +350,34 @@ interface RecordActionContext extends ApprovalActor {
 async function authenticatedApprovalActor(
   adminOnly = false
 ): Promise<ApprovalActionResult<ApprovalActor>> {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  const role = effectiveRole(orgRole);
-  if (!(orgId && user && role) || (adminOnly && role === "manager")) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const role = effectiveRole(sessionRole);
+  if (
+    !(sessionAccountId && user && role) ||
+    (adminOnly && role === "manager")
+  ) {
     return notAuthorised();
   }
   // Clerk supplied this authenticated account before SQL preparation.
   return {
     ok: true,
-    value: { actingUserId: user.id, clerkOrgId: orgId as ClerkOrgId, role },
+    value: {
+      accountId: sessionAccountId as AccountId,
+      actingUserId: user.id,
+      role,
+    },
   };
 }
 async function loadRecordActionContext(
@@ -366,14 +385,14 @@ async function loadRecordActionContext(
   recordId: string,
   db: TenantDb
 ): Promise<ApprovalActionResult<RecordActionContext>> {
-  assertTenantDb(db, actor.clerkOrgId);
-  const companies = await resolveAccountCompanies(actor.clerkOrgId, db);
+  assertTenantDb(db, actor.accountId);
+  const companies = await resolveAccountCompanies(actor.accountId, db);
   const companyIds = companies.map((company) => company.id);
   const record = await db.availabilityRecord.findFirst({
     select: { organisation_id: true, person_id: true },
     where: {
+      account_id: actor.accountId,
       archived_at: null,
-      clerk_org_id: actor.clerkOrgId,
       id: recordId,
       organisation_id: { in: companyIds },
     },
@@ -382,7 +401,7 @@ async function loadRecordActionContext(
     return notAuthorised();
   }
   const person = await resolveApprovalActingPerson(
-    actor.clerkOrgId,
+    actor.accountId,
     actor.actingUserId,
     companyIds,
     db
@@ -393,8 +412,8 @@ async function loadRecordActionContext(
     }
     const managed = await managerScopePersonIds(
       {
+        accountId: actor.accountId,
         actingPersonId: person.id,
-        clerkOrgId: actor.clerkOrgId,
         excludeSelf: true,
       },
       db
@@ -425,7 +444,7 @@ async function resolveRecordActionContext(input: {
     return actor;
   }
   try {
-    return await withTenantDb(actor.value.clerkOrgId, (db) =>
+    return await withTenantDb(actor.value.accountId, (db) =>
       loadRecordActionContext(actor.value, parsed.data.recordId, db)
     );
   } catch {
@@ -439,13 +458,13 @@ async function resolveRecordActionContext(input: {
   }
 }
 function effectiveRole(role: string | null | undefined): ApprovalRole | null {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
-  if (role === "org:manager") {
+  if (role === "manager") {
     return "manager";
   }
   return null;

@@ -1,11 +1,12 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getSession } from "@repo/auth/server";
 import {
   getXeroConnectionStateForScope,
   listPeople,
   selectCalendarCompanies,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import {
   resolveAccountCompanies,
   TENANT_READ_TRANSACTION_OPTIONS,
@@ -14,7 +15,7 @@ import {
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { PeopleFilterSchema } from "./_schemas";
@@ -27,14 +28,19 @@ interface PeoplePageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ people: ["read"] });
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
   // The account comes from Clerk before database preparation.
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
-  const { orgRole, userId } = await auth();
-  const canIncludeArchived = orgRole === "org:admin" || orgRole === "org:owner";
+  const accountId = (await requireAccount()) as AccountId;
+  const { role: sessionRole, userId } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  const canIncludeArchived = can(sessionRole, { people: ["manage"] });
   const parsedFilters = parseFilterParams(filterParams, PeopleFilterSchema) ?? {
     includeArchived: false,
     pageSize: 50,
@@ -47,11 +53,11 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
     includeArchived: canIncludeArchived ? parsedFilters.includeArchived : false,
   };
   let peopleRole: "admin" | "manager" | "owner" | "viewer" = "viewer";
-  if (orgRole === "org:admin") {
+  if (sessionRole === "admin") {
     peopleRole = "admin";
-  } else if (orgRole === "org:manager") {
+  } else if (sessionRole === "manager") {
     peopleRole = "manager";
-  } else if (orgRole === "org:owner") {
+  } else if (sessionRole === "owner") {
     peopleRole = "owner";
   }
   const {
@@ -65,9 +71,9 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
     companies,
     companyIds,
   } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
-      const preparedCompanies = await resolveAccountCompanies(clerkOrgId, db);
+      const preparedCompanies = await resolveAccountCompanies(accountId, db);
       if (!preparedCompanies.length) {
         redirect("/onboarding");
       }
@@ -92,19 +98,19 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
             orderBy: [{ created_at: "asc" }, { id: "asc" }],
             select: { id: true },
             where: {
+              account_id: accountId,
               archived_at: null,
-              clerk_org_id: clerkOrgId,
-              clerk_user_id: userId,
               organisation_id: {
                 in: preparedCompanies.map((company) => company.id),
               },
+              user_id: userId,
             },
           })
         : null;
       const preparedPeopleResult = await listPeople(
         {
+          accountId,
           actingPersonId: actingPerson?.id,
-          clerkOrgId,
           companyIds: preparedCompanyIds,
           filters,
           pagination: { cursor: filters.cursor, pageSize: filters.pageSize },
@@ -116,7 +122,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
         orderBy: { name: "asc" },
         select: { id: true, name: true },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: { in: selectedIds },
         },
       });
@@ -124,7 +130,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
         orderBy: { name: "asc" },
         select: { id: true, name: true },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: { in: selectedIds },
         },
       });
@@ -133,7 +139,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
           ? await db.xeroConnection.findFirst({
               select: { id: true },
               where: {
-                clerk_org_id: clerkOrgId,
+                account_id: accountId,
                 organisation_id: scopedOrganisationId,
                 released_at: null,
               },
@@ -142,7 +148,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
       const preparedXeroStateResult =
         selectedIds.length === 1
           ? await getXeroConnectionStateForScope(
-              { clerkOrgId, organisationId: scopedOrganisationId },
+              { accountId, organisationId: scopedOrganisationId },
               db
             )
           : { ok: true as const, value: { state: "not_connected" as const } };
@@ -180,7 +186,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <PeopleClient
           canIncludeArchived={canIncludeArchived}
-          canManageClerkAccess={canIncludeArchived && orgQueryValue !== null}
+          canManageAccountAccess={canIncludeArchived && orgQueryValue !== null}
           companies={companies}
           companyIds={companyIds}
           connectionId={connectionId}

@@ -87,7 +87,7 @@ Keep one-off task evidence in that task's review, not here.
   account) as a product expansion to deliver, and confirm plan limits before
   planning around existing entitlements.
 - Compose tenant-scoped database access with
-  `scopedQuery(clerkOrgId, organisationId)`. Include both identifiers in update
+  `scopedQuery(accountId, organisationId)`. Include both identifiers in update
   and delete filters, even when the record ID is unique.
 - Apply the absent-not-empty rule to optional environment variables with format
   validation, not to unrelated Prisma or Zod defaults.
@@ -160,6 +160,8 @@ Keep one-off task evidence in that task's review, not here.
   otherwise.
 
 ## Working with the operator
+
+- The configured remote Neon database is the owner's development database. An explicit request to verify integration and RLS authorises completing its migration/runtime-role setup and guarded owned-fixture run; a localhost-only guard rejection is a runner issue to resolve, not the end of verification. Do not reclassify it as production or request the same authority again.
 
 - Keep verification within the user's current scope. Update affected fixtures
   before broad checks, reuse passing results that remain valid, and rerun only

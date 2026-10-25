@@ -1,7 +1,7 @@
 "use server";
 
-import { requireOrg, requireRole } from "@repo/auth/helpers";
-import { currentUser } from "@repo/auth/server";
+import { hasPermission, requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser } from "@repo/auth/server";
 import {
   addCustomHoliday,
   deleteCustomHoliday,
@@ -10,7 +10,7 @@ import {
   setLocalHolidayEnabled,
   setPublicHolidayClassification,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -20,8 +20,8 @@ import { z } from "zod";
 type ActionResult<T> = { ok: true; value: T } | { error: string; ok: false };
 
 interface AdminContext {
+  accountId: AccountId;
   actingUserId: string;
-  clerkOrgId: ClerkOrgId;
   organisationId: OrganisationId;
   role: "admin" | "owner";
 }
@@ -30,26 +30,26 @@ async function resolveAdminContext(
   organisationId: string
 ): Promise<ActionResult<AdminContext>> {
   let role: "admin" | "owner" | null = null;
-  if (await requireRole("org:owner")) {
+  if (await hasPermission({ ownership: ["manage"] })) {
     role = "owner";
-  } else if (await requireRole("org:admin")) {
+  } else if (await hasPermission({ settings: ["update"] })) {
     role = "admin";
   }
   if (!role) {
     return { error: "Permission denied", ok: false };
   }
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     return { error: "You need to sign in again.", ok: false };
   }
   // Authentication completes before the action owns its SQL scope.
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const accountId = (await requireAccount()) as AccountId;
 
   return {
     ok: true,
     value: {
+      accountId,
       actingUserId: user.id,
-      clerkOrgId,
       organisationId: organisationId as OrganisationId,
       role,
     },
@@ -90,10 +90,10 @@ export async function addCustomHolidayAction(
   }
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof addCustomHolidayAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           db
         );
@@ -102,8 +102,8 @@ export async function addCustomHolidayAction(
         }
         const result = await addCustomHoliday(
           {
+            accountId: context.value.accountId,
             appliesToAllJurisdictions: parsed.data.appliesToAllJurisdictions,
-            clerkOrgId: context.value.clerkOrgId,
             countryCode: parsed.data.countryCode,
             date: parsed.data.date,
             name: parsed.data.name,
@@ -152,10 +152,10 @@ export async function deleteCustomHolidayAction(
   }
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof deleteCustomHolidayAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           db
         );
@@ -163,7 +163,7 @@ export async function deleteCustomHolidayAction(
           return { error: company.error.message, ok: false };
         }
         const result = await deleteCustomHoliday(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           parsed.data.holidayId,
           db
@@ -218,10 +218,10 @@ export async function hideHolidayAction(
   }
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof hideHolidayAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           db
         );
@@ -230,9 +230,9 @@ export async function hideHolidayAction(
         }
         const result = await hidePublicHoliday(
           {
+            accountId: context.value.accountId,
             actingRole: context.value.role,
             actingUserId: context.value.actingUserId,
-            clerkOrgId: context.value.clerkOrgId,
             holidayKey: parsed.data.holidayKey,
             locationId: null,
             organisationId: context.value.organisationId,
@@ -274,10 +274,10 @@ export async function restoreHolidayAction(
   }
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof restoreHolidayAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           db
         );
@@ -286,9 +286,9 @@ export async function restoreHolidayAction(
         }
         const result = await restorePublicHoliday(
           {
+            accountId: context.value.accountId,
             actingRole: context.value.role,
             actingUserId: context.value.actingUserId,
-            clerkOrgId: context.value.clerkOrgId,
             holidayKey: parsed.data.holidayKey,
             locationId: parsed.data.locationId,
             organisationId: context.value.organisationId,
@@ -330,10 +330,10 @@ export async function setHolidayClassificationAction(
   }
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof setHolidayClassificationAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           db
         );
@@ -342,10 +342,10 @@ export async function setHolidayClassificationAction(
         }
         const result = await setPublicHolidayClassification(
           {
+            accountId: context.value.accountId,
             actingRole: context.value.role,
             actingUserId: context.value.actingUserId,
             classification: parsed.data.classification,
-            clerkOrgId: context.value.clerkOrgId,
             holidayKey: parsed.data.holidayKey,
             locationId: parsed.data.locationId,
             organisationId: context.value.organisationId,
@@ -391,10 +391,10 @@ export async function setLocalHolidayEnabledAction(
   }
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof setLocalHolidayEnabledAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId,
+          context.value.accountId,
           context.value.organisationId,
           db
         );
@@ -403,9 +403,9 @@ export async function setLocalHolidayEnabledAction(
         }
         const result = await setLocalHolidayEnabled(
           {
+            accountId: context.value.accountId,
             actingRole: context.value.role,
             actingUserId: context.value.actingUserId,
-            clerkOrgId: context.value.clerkOrgId,
             enabled: parsed.data.enabled,
             holidayKey: parsed.data.holidayKey,
             locationId: parsed.data.locationId,

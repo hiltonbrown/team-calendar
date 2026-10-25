@@ -1,11 +1,11 @@
-import { auth, currentUser, requireOrg } from "@repo/auth/helpers";
+import { getCurrentUser, getSession, requireAccount } from "@repo/auth/helpers";
 import {
   archiveManualAvailability,
   updateManualAvailability,
 } from "@repo/availability";
 import type {
+  AccountId,
   AvailabilityRecordId,
-  ClerkOrgId,
   OrganisationId,
   Result,
 } from "@repo/core";
@@ -55,9 +55,9 @@ export async function PATCH(
       );
     }
     // Get authenticated user and organisation
-    let clerkOrgId: string;
+    let accountId: string;
     try {
-      clerkOrgId = await requireOrg();
+      accountId = await requireAccount();
     } catch {
       return Response.json(
         {
@@ -68,7 +68,7 @@ export async function PATCH(
       );
     }
     // Get current user
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return Response.json(
         {
@@ -105,17 +105,22 @@ export async function PATCH(
       );
     }
     const { organisationId, ...patch } = parseResult.data;
-    // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId and recordId are validated by Zod UUID schemas
-    const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
+    // Safe branded cast: accountId is verified by Clerk requireAccount(), organisationId and recordId are validated by Zod UUID schemas
+    const scopedAccountId = accountId as AccountId;
     const scopedOrgId = organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
-    const authResult = await auth();
+    const authResult = (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
     const prepared = await withTenantResult(
-      scopedClerkOrgId,
+      scopedAccountId,
       async (db): Promise<Result<HttpDescriptor, HttpDescriptor>> => {
         // Validate organisation exists
         const orgResult = await getOrganisationById(
-          scopedClerkOrgId,
+          scopedAccountId,
           scopedOrgId,
           db
         );
@@ -129,12 +134,12 @@ export async function PATCH(
         const updateResult = await (() =>
           updateManualAvailability(
             {
-              clerkOrgId: scopedClerkOrgId,
+              accountId: scopedAccountId,
               organisationId: scopedOrgId,
             },
             scopedRecordId,
             patch,
-            { orgRole: authResult.orgRole, userId: user.id },
+            { role: authResult.role, userId: user.id },
             db
           ))();
         if (!updateResult.ok) {
@@ -209,9 +214,9 @@ export async function DELETE(
       );
     }
     // Get authenticated user and organisation
-    let clerkOrgId: string;
+    let accountId: string;
     try {
-      clerkOrgId = await requireOrg();
+      accountId = await requireAccount();
     } catch {
       return Response.json(
         {
@@ -222,7 +227,7 @@ export async function DELETE(
       );
     }
     // Get current user
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return Response.json(
         {
@@ -259,17 +264,22 @@ export async function DELETE(
       );
     }
     const { data } = parseResult;
-    // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId and recordId are validated by Zod UUID schemas
-    const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
+    // Safe branded cast: accountId is verified by Clerk requireAccount(), organisationId and recordId are validated by Zod UUID schemas
+    const scopedAccountId = accountId as AccountId;
     const scopedOrgId = data.organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
-    const authResult = await auth();
+    const authResult = (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
     const prepared = await withTenantResult(
-      scopedClerkOrgId,
+      scopedAccountId,
       async (db): Promise<Result<HttpDescriptor, HttpDescriptor>> => {
         // Validate organisation exists
         const orgResult = await getOrganisationById(
-          scopedClerkOrgId,
+          scopedAccountId,
           scopedOrgId,
           db
         );
@@ -281,7 +291,7 @@ export async function DELETE(
         }
         // Get record to verify it exists and is editable
         const recordResult = await getAvailabilityRecordById(
-          scopedClerkOrgId,
+          scopedAccountId,
           scopedOrgId,
           scopedRecordId,
           db
@@ -310,11 +320,11 @@ export async function DELETE(
         const deleteResult = await (() =>
           archiveManualAvailability(
             {
-              clerkOrgId: scopedClerkOrgId,
+              accountId: scopedAccountId,
               organisationId: scopedOrgId,
             },
             scopedRecordId,
-            { orgRole: authResult.orgRole, userId: user.id },
+            { role: authResult.role, userId: user.id },
             db
           ))();
         if (!deleteResult.ok) {

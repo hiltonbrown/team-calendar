@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
  * Contract pinned from reconcile-xero-approval-state.ts:
- * input requires clerkOrgId, organisationId, connectionId, optional triggerType
+ * input requires accountId, organisationId, connectionId, optional triggerType
  * scheduled/manual/webhook defaulting to manual, and optional nullable
  * triggeredByUserId. Access uses the canonical resolveXeroAccess through
  * resolveSyncTenant. Regional provider status reads are mocked, while scoped
@@ -51,22 +51,22 @@ describe("local persistence integration", async () => {
     "./reconcile-xero-approval-state"
   );
   const tenantA = {
-    authorisationId: fixture.id("authorisation", 0),
-    clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+    accountId: fixture.tenants[0]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 0),
     connectionId: fixture.id("connection", 0),
     organisationId: fixture.tenants[0]?.organisationId as string,
     personId: fixture.id("person", 0),
     xeroEmployeeId: fixture.id("employee", 0),
   } as const;
   const tenantB = {
-    authorisationId: fixture.id("authorisation", 1),
-    clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+    accountId: fixture.tenants[1]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 1),
     connectionId: fixture.id("connection", 1),
     organisationId: fixture.tenants[1]?.organisationId as string,
     personId: fixture.id("person", 1),
     xeroEmployeeId: fixture.id("employee", 1),
   } as const;
-  const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
+  const testAccountIds = [tenantA.accountId, tenantB.accountId] as const;
   const testAuthorisationIds = [
     tenantA.authorisationId,
     tenantB.authorisationId,
@@ -113,7 +113,7 @@ describe("local persistence integration", async () => {
       expect(updated?.approved_at).toEqual(fixtureDate(-14));
       const auditEvents = await database.auditEvent.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           resource_id: record.id,
         },
@@ -124,7 +124,7 @@ describe("local persistence integration", async () => {
       );
       const ownerNotification = await database.notification.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           object_id: record.id,
           organisation_id: tenantA.organisationId,
           type: "leave_approved",
@@ -163,7 +163,7 @@ describe("local persistence integration", async () => {
       });
       const auditEvent = await database.auditEvent.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           resource_id: record.id,
         },
@@ -173,7 +173,7 @@ describe("local persistence integration", async () => {
       );
       const ownerNotification = await database.notification.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           object_id: record.id,
           organisation_id: tenantA.organisationId,
           type: "leave_declined",
@@ -257,7 +257,7 @@ describe("local persistence integration", async () => {
       expect(updated?.xero_approval_checked_at).toBeInstanceOf(Date);
       const failedRecord = await database.failedRecord.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: leaveApplicationId("missing"),
         },
@@ -265,7 +265,7 @@ describe("local persistence integration", async () => {
       expect(failedRecord).toBeNull();
       const auditEvent = await database.auditEvent.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           resource_id: record.id,
         },
@@ -309,7 +309,7 @@ describe("local persistence integration", async () => {
       });
       const failedRecords = await database.failedRecord.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -364,7 +364,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.failedRecord.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
           },
         })
@@ -442,7 +442,7 @@ describe("local persistence integration", async () => {
       expect(mockFetchLeaveApplicationStatusForRegion).not.toHaveBeenCalled();
       const records = await database.availabilityRecord.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: { in: [historical.id, local.id] },
           organisation_id: tenantA.organisationId,
         },
@@ -459,7 +459,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.auditEvent.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             resource_id: { in: [historical.id, local.id] },
           },
@@ -472,11 +472,11 @@ describe("local persistence integration", async () => {
       const now = new Date();
       const count = 505;
       const recordsData = Array.from({ length: count }, (_, i) => ({
+        account_id: tenantA.accountId,
         all_day: true,
         approval_status: "submitted" as const,
-        clerk_org_id: tenantA.clerkOrgId,
         contactability: "unavailable" as const,
-        derived_uid_key: `${tenantA.clerkOrgId}-leave-fairness-${i}`,
+        derived_uid_key: `${tenantA.accountId}-leave-fairness-${i}`,
         ends_at: new Date(now.getTime() + 86_400_000),
         id: `bb100000-0000-4000-8000-${String(i).padStart(12, "0")}`,
         organisation_id: tenantA.organisationId,
@@ -508,7 +508,7 @@ describe("local persistence integration", async () => {
       // Run 1 processed 500 records; 5 records remain with xero_approval_checked_at: null
       const uncheckedAfterRun1 = await database.availabilityRecord.count({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           xero_approval_checked_at: null,
         },
@@ -526,7 +526,7 @@ describe("local persistence integration", async () => {
       // After run 2, all 505 records have been checked at least once
       const uncheckedAfterRun2 = await database.availabilityRecord.count({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           xero_approval_checked_at: null,
         },
@@ -569,7 +569,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.failedRecord.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
           },
         })
@@ -622,8 +622,7 @@ describe("local persistence integration", async () => {
       await setupTenant(tenantA, "NZ");
       await database.person.upsert({
         create: {
-          clerk_org_id: tenantA.clerkOrgId,
-          clerk_user_id: ownerUserId(tenantA),
+          account_id: tenantA.accountId,
           email: `${tenantA.personId}@example.com`,
           employment_type: "employee",
           first_name: "Pat",
@@ -632,11 +631,11 @@ describe("local persistence integration", async () => {
           organisation_id: tenantA.organisationId,
           source_person_key: "manual-key",
           source_system: "MANUAL",
+          user_id: ownerUserId(tenantA),
           xero_employee_id: null,
         },
         update: {
-          clerk_org_id: tenantA.clerkOrgId,
-          clerk_user_id: ownerUserId(tenantA),
+          account_id: tenantA.accountId,
           email: `${tenantA.personId}@example.com`,
           employment_type: "employee",
           first_name: "Pat",
@@ -644,6 +643,7 @@ describe("local persistence integration", async () => {
           organisation_id: tenantA.organisationId,
           source_person_key: "manual-key",
           source_system: "MANUAL",
+          user_id: ownerUserId(tenantA),
           xero_employee_id: null,
         },
         where: { id: tenantA.personId },
@@ -679,7 +679,7 @@ describe("local persistence integration", async () => {
       expect(updated?.xero_approval_checked_at).toBeInstanceOf(Date);
       const failedRecord = await database.failedRecord.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: leaveApplicationId("missing-emp"),
         },
@@ -706,15 +706,15 @@ describe("local persistence integration", async () => {
   ) {
     await database.organisation.upsert({
       create: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         country_code: region,
         id: tenant.organisationId,
-        name: `Test Org ${tenant.clerkOrgId}`,
+        name: `Test Org ${tenant.accountId}`,
       },
       update: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         country_code: region,
-        name: `Test Org ${tenant.clerkOrgId}`,
+        name: `Test Org ${tenant.accountId}`,
       },
       where: { id: tenant.organisationId },
     });
@@ -748,7 +748,7 @@ describe("local persistence integration", async () => {
       where: { id: tenant.authorisationId },
     });
     const connection = {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: tenant.organisationId,
       payroll_region: region,
       remote_connection_id: `remote-${tenant.connectionId}`,
@@ -766,8 +766,7 @@ describe("local persistence integration", async () => {
   async function setupPerson(tenant: TestTenant) {
     await database.person.upsert({
       create: {
-        clerk_org_id: tenant.clerkOrgId,
-        clerk_user_id: ownerUserId(tenant),
+        account_id: tenant.accountId,
         email: `${tenant.personId}@example.com`,
         employment_type: "employee",
         first_name: "Pat",
@@ -776,11 +775,11 @@ describe("local persistence integration", async () => {
         organisation_id: tenant.organisationId,
         source_person_key: tenant.xeroEmployeeId,
         source_system: "XERO",
+        user_id: ownerUserId(tenant),
         xero_employee_id: tenant.xeroEmployeeId,
       },
       update: {
-        clerk_org_id: tenant.clerkOrgId,
-        clerk_user_id: ownerUserId(tenant),
+        account_id: tenant.accountId,
         email: `${tenant.personId}@example.com`,
         employment_type: "employee",
         first_name: "Pat",
@@ -788,6 +787,7 @@ describe("local persistence integration", async () => {
         organisation_id: tenant.organisationId,
         source_person_key: tenant.xeroEmployeeId,
         source_system: "XERO",
+        user_id: ownerUserId(tenant),
         xero_employee_id: tenant.xeroEmployeeId,
       },
       where: { id: tenant.personId },
@@ -807,11 +807,11 @@ describe("local persistence integration", async () => {
   ) {
     return await database.availabilityRecord.create({
       data: {
+        account_id: tenant.accountId,
         all_day: true,
         approval_status: input.approvalStatus ?? "submitted",
-        clerk_org_id: tenant.clerkOrgId,
         contactability: "unavailable",
-        derived_uid_key: `${tenant.clerkOrgId}-${input.sourceRemoteId ?? input.id}`,
+        derived_uid_key: `${tenant.accountId}-${input.sourceRemoteId ?? input.id}`,
         ends_at: input.endsAt ?? fixtureDate(8),
         failed_action: input.failedAction ?? null,
         id: input.id,
@@ -835,7 +835,7 @@ describe("local persistence integration", async () => {
     return await database.syncRun.findFirst({
       orderBy: { started_at: "desc" },
       where: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         organisation_id: tenant.organisationId,
         run_type: "approval_state_reconciliation",
       },
@@ -843,7 +843,7 @@ describe("local persistence integration", async () => {
   }
   function reconcileInput(tenant: TestTenant) {
     return {
-      clerkOrgId: tenant.clerkOrgId,
+      accountId: tenant.accountId,
       connectionId: tenant.connectionId,
       organisationId: tenant.organisationId,
       triggeredByUserId: triggerUserId(tenant),
@@ -887,10 +887,10 @@ describe("local persistence integration", async () => {
     | "unknown_error"
     | "validation_error";
   function ownerUserId(tenant: TestTenant) {
-    return `user_${tenant.clerkOrgId}_owner`;
+    return `user_${tenant.accountId}_owner`;
   }
   function triggerUserId(tenant: TestTenant) {
-    return `user_${tenant.clerkOrgId}_trigger`;
+    return `user_${tenant.accountId}_trigger`;
   }
   function recordId(suffix: string) {
     return `a3000000-0000-4000-8000-000000000${suffix}`;
@@ -902,7 +902,7 @@ describe("local persistence integration", async () => {
     return "xero-leave-shared";
   }
   async function cleanTestData() {
-    const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
+    const scope = { account_id: { in: [...testAccountIds] } };
     await database.notificationEmailQueue.deleteMany({ where: scope });
     await database.notification.deleteMany({ where: scope });
     await database.failedRecord.deleteMany({ where: scope });

@@ -3,16 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   checkSupportRateLimit: vi.fn(),
   createSupportGitHubIssue: vi.fn(),
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
   getOrganisationById: vi.fn(),
   logError: vi.fn(),
   persistSupportSubmissionAudit: vi.fn(),
-  requireOrg: vi.fn(),
+  requireAccount: vi.fn(),
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
-  currentUser: mocks.currentUser,
-  requireOrg: mocks.requireOrg,
+  getCurrentUser: mocks.getCurrentUser,
+  requireAccount: mocks.requireAccount,
 }));
 
 vi.mock("@repo/database/queries/organisations", () => ({
@@ -45,19 +45,18 @@ describe("support GitHub issue route", () => {
     vi.unstubAllEnvs();
     vi.stubEnv("NODE_ENV", "test");
 
-    mocks.requireOrg.mockResolvedValue("org_clerk_123");
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "alex@example.com" }],
-      firstName: "Alex",
+    mocks.requireAccount.mockResolvedValue("org_account_123");
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "alex@example.com",
       fullName: "Alex Example",
       id: "user_123",
-      lastName: "Example",
+      name: "Alex Example",
     });
     mocks.checkSupportRateLimit.mockResolvedValue({ allowed: true });
     mocks.getOrganisationById.mockResolvedValue({
       ok: true,
       value: {
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         id: "00000000-0000-4000-8000-000000000001",
         name: "Team Calendar Dev Organisation",
       },
@@ -104,12 +103,12 @@ describe("support GitHub issue route", () => {
     });
 
     expect(mocks.getOrganisationById).toHaveBeenCalledWith(
-      "org_clerk_123",
+      "org_account_123",
       "00000000-0000-4000-8000-000000000001",
       expect.any(Object)
     );
     expect(mocks.createSupportGitHubIssue).toHaveBeenCalledWith({
-      clerk_org_id: "org_clerk_123",
+      account_id: "org_account_123",
       current_route:
         "/support?org=00000000-0000-4000-8000-000000000001&tab=form",
       environment: "test",
@@ -126,8 +125,8 @@ describe("support GitHub issue route", () => {
     });
     expect(mocks.persistSupportSubmissionAudit).toHaveBeenCalledWith(
       {
+        accountId: "org_account_123",
         category: "support",
-        clerkOrgId: "org_clerk_123",
         issueNumber: 123,
         issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
         labelAssignmentSucceeded: true,
@@ -167,8 +166,8 @@ describe("support GitHub issue route", () => {
     expect(mocks.createSupportGitHubIssue).not.toHaveBeenCalled();
   });
 
-  it("returns unauthorised when Clerk org auth is missing", async () => {
-    mocks.requireOrg.mockRejectedValue(new Error("missing org"));
+  it("returns unauthorised when Clerk org getSession is missing", async () => {
+    mocks.requireAccount.mockRejectedValue(new Error("missing org"));
 
     const response = await POST(
       new Request("http://api.test/api/support/github-issue", {
@@ -195,7 +194,7 @@ describe("support GitHub issue route", () => {
   });
 
   it("returns unauthorised when the current user cannot be resolved", async () => {
-    mocks.currentUser.mockResolvedValue(null);
+    mocks.getCurrentUser.mockResolvedValue(null);
 
     const response = await POST(
       new Request("http://api.test/api/support/github-issue", {
@@ -253,7 +252,7 @@ describe("support GitHub issue route", () => {
       ok: false,
     });
     expect(mocks.checkSupportRateLimit).toHaveBeenCalledWith({
-      clerkOrgId: "org_clerk_123",
+      accountId: "org_account_123",
       userId: "user_123",
     });
     expect(mocks.getOrganisationById).not.toHaveBeenCalled();
@@ -352,7 +351,7 @@ describe("support GitHub issue route", () => {
     expect(mocks.logError).toHaveBeenCalledWith(
       "Failed to resolve support organisation context",
       {
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         organisationId: "00000000-0000-4000-8000-000000000001",
       }
     );
@@ -412,7 +411,7 @@ describe("support GitHub issue route", () => {
     expect(response.status).toBe(200);
     expect(mocks.getOrganisationById).not.toHaveBeenCalled();
     expect(mocks.createSupportGitHubIssue).toHaveBeenCalledWith({
-      clerk_org_id: "org_clerk_123",
+      account_id: "org_account_123",
       current_route: "/support",
       environment: "test",
       organisation_id: undefined,
@@ -463,7 +462,7 @@ describe("support GitHub issue route", () => {
     expect(mocks.logError).toHaveBeenCalledWith(
       "Failed to persist support submission audit event",
       {
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         error: {
           code: "internal",
           message: "Failed to persist the support audit event.",

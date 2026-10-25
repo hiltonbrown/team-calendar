@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
   logError: vi.fn(),
   logWarn: vi.fn(),
   organisationFindFirst: vi.fn(),
   pollNotificationStream: vi.fn(),
-  requireOrg: vi.fn(),
+  requireAccount: vi.fn(),
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
-  currentUser: mocks.currentUser,
-  requireOrg: mocks.requireOrg,
+  getCurrentUser: mocks.getCurrentUser,
+  requireAccount: mocks.requireAccount,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -55,8 +55,8 @@ describe("notifications stream route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireOrg.mockResolvedValue("org_1");
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
+    mocks.requireAccount.mockResolvedValue("org_1");
     mocks.organisationFindFirst.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000001",
     });
@@ -78,7 +78,7 @@ describe("notifications stream route", () => {
   });
 
   it("rejects missing authenticated account context", async () => {
-    mocks.requireOrg.mockRejectedValue(new Error("Not authenticated"));
+    mocks.requireAccount.mockRejectedValue(new Error("Not authenticated"));
 
     const response = await GET(
       new Request(
@@ -92,13 +92,13 @@ describe("notifications stream route", () => {
   it("uses the authenticated account rather than account or company query parameters", async () => {
     const response = await GET(
       new Request(
-        "http://api.test/api/notifications/stream?clerkOrgId=foreign-account&organisationId=foreign-company"
+        "http://api.test/api/notifications/stream?accountId=foreign-account&organisationId=foreign-company"
       )
     );
     expect(response.status).toBe(200);
     await response.body?.cancel();
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
-      { clerkOrgId: "org_1", userId: "user_1" },
+      { accountId: "org_1", userId: "user_1" },
       expect.any(String)
     );
     expect(mocks.organisationFindFirst).not.toHaveBeenCalled();
@@ -195,7 +195,7 @@ describe("notifications stream route", () => {
     expect(mocks.logWarn).toHaveBeenCalledWith(
       "Notification stream poll failed",
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         consecutiveFailures: 1,
         userId: "user_1",
       })
@@ -214,7 +214,7 @@ describe("notifications stream route", () => {
     expect(mocks.logError).toHaveBeenCalledWith(
       "Notification stream closing after consecutive poll failures",
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         consecutiveFailures: 3,
         userId: "user_1",
       })
@@ -372,7 +372,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         userId: "user_1",
       },
       "1724500000000-5"
@@ -394,7 +394,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         userId: "user_1",
       },
       expect.stringMatching(WALL_CLOCK_FALLBACK_PATTERN)
@@ -453,7 +453,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(mocks.pollNotificationStream).toHaveBeenLastCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         userId: "user_1",
       },
       "1724500000000-2"

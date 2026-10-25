@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { deriveAvailabilityUidKey } from "./availability-uid";
 
 const baseInput = {
-  clerkOrgId: "org_uid",
+  accountId: "org_uid",
   endsAt: new Date("2026-05-08T00:00:00.000Z"),
   organisationId: "30000000-0000-4000-8000-000000000001",
   personId: "40000000-0000-4000-8000-000000000001",
@@ -17,7 +17,7 @@ const baseInput = {
 describe("deriveAvailabilityUidKey", () => {
   it("matches the PRODUCT UID formula exactly", () => {
     const formula = [
-      baseInput.clerkOrgId,
+      baseInput.accountId,
       baseInput.organisationId,
       baseInput.personId,
       baseInput.sourceType,

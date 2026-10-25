@@ -98,9 +98,9 @@ const SecurityPage = () => (
             services also enforce their own scope.
           </Control>
           <Control title="Tenant and organisation scope">
-            A Clerk Organisation is the top-level tenant boundary. Data access
-            applies both the Clerk organisation ID and the selected payroll
-            organisation where required.
+            An Account is the top-level tenant boundary. Data access applies
+            both the Account ID and the selected payroll organisation where
+            required.
           </Control>
           <Control title="Role boundaries">
             Owners and admins administer configuration. Managers are limited to
@@ -165,8 +165,8 @@ const SecurityPage = () => (
             authenticated Xero integration.
           </FlowStep>
           <FlowStep title="Team Calendar tenant boundary">
-            Canonical records are processed within Clerk organisation and
-            payroll organisation scope.
+            Canonical records are processed within Account and payroll
+            organisation scope.
           </FlowStep>
           <FlowStep title="Encrypted token and primary data storage">
             Primary records are stored in Neon PostgreSQL. Xero OAuth tokens

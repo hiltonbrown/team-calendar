@@ -23,7 +23,7 @@ const writeManifest = (overrides: Record<string, unknown> = {}) => {
       candidateSha: "80ac9f7",
       durableManifestConfirmed: true,
       namespace: `release:run:${runId}`,
-      owned: { clerkOrgIds: [], globalKeys: [], organisationIds: [] },
+      owned: { accountIds: [], globalKeys: [], organisationIds: [] },
       pausedConsumers: {
         "rebuild-feed-cache": false,
         "reconcile-feed-publications": false,

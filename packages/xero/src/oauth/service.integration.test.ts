@@ -12,6 +12,45 @@ import {
 } from "vitest";
 
 vi.mock("server-only", () => ({}));
+const companyCreation = vi.hoisted(() => {
+  const organisationIds: string[] = [];
+  return { index: 0, organisationIds };
+});
+vi.mock(
+  "@repo/availability/src/companies/create-company",
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import("@repo/availability/src/companies/create-company")
+      >();
+    return {
+      ...original,
+      createCompany: (
+        input: Parameters<typeof original.createCompany>[0],
+        tx: Parameters<typeof original.createCompany>[1]
+      ) => {
+        const id = companyCreation.organisationIds[companyCreation.index];
+        if (!id) {
+          throw new Error("Missing reserved company creation fixture slot");
+        }
+        companyCreation.index += 1;
+        // Keep the real helper and database write; reserve its generated ID so
+        // interrupted Add-company flows remain inside manifest cleanup ownership.
+        return original.createCompany(input, {
+          organisation: new Proxy(tx.organisation, {
+            get(target, property, receiver) {
+              if (property !== "create") {
+                return Reflect.get(target, property, receiver);
+              }
+              return (args: Parameters<typeof target.create>[0]) =>
+                target.create({ ...args, data: { ...args.data, id } });
+            },
+          }),
+        });
+      },
+    };
+  }
+);
 const feeds = vi.hoisted(() => ({
   ensureDefaultCalendarFeed: vi.fn(),
   invalidateAccountFeedCaches: vi.fn(),
@@ -35,6 +74,10 @@ const allocation = allocateLiveTestFixture(
 );
 const primary = requireTenant(0);
 const secondary = requireTenant(1);
+const siblingOrganisationId = requireTenant(2).organisationId;
+companyCreation.organisationIds.push(
+  ...allocation.tenants.slice(2).map((tenant) => tenant.organisationId)
+);
 function requireTenant(index: number) {
   const slot = allocation.tenants[index];
   if (!slot) {
@@ -51,7 +94,7 @@ const fixture = {
   sessionId: allocation.id("session"),
 };
 const ownedScopes = {
-  clerk_org_id: { in: allocation.tenants.map((t) => t.clerkOrgId) },
+  account_id: { in: allocation.tenants.map((t) => t.accountId) },
 };
 const ownedGrants = [
   fixture.authorisationId,
@@ -79,6 +122,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await clean();
+  companyCreation.index = 0;
   vi.resetAllMocks();
   // resetAllMocks clears factory values, so feed results are restored here.
   feeds.ensureDefaultCalendarFeed.mockResolvedValue({ ok: true, value: {} });
@@ -115,7 +159,7 @@ async function clean() {
   await database.xeroConnection.deleteMany({ where: ownedScopes });
   await database.person.deleteMany({ where: ownedScopes });
   await database.organisation.deleteMany({ where: ownedScopes });
-  await database.clerkOrgSubscription.deleteMany({ where: ownedScopes });
+  await database.accountSubscription.deleteMany({ where: ownedScopes });
   await database.planLimit.deleteMany({ where: { plan_id: premiumPlanId } });
   await database.plan.deleteMany({ where: { id: premiumPlanId } });
 
@@ -176,7 +220,7 @@ async function grant(
 async function organisation(slot = primary) {
   return await database.organisation.create({
     data: {
-      clerk_org_id: slot.clerkOrgId,
+      account_id: slot.accountId,
       country_code: "AU",
       id: slot.organisationId,
       name: "Owned OAuth integration payroll",
@@ -188,7 +232,7 @@ async function connection() {
   await grant();
   return database.xeroConnection.create({
     data: {
-      clerk_org_id: fixture.clerkOrgId,
+      account_id: fixture.accountId,
       id: fixture.connectionId,
       organisation_id: fixture.organisationId,
       payroll_region: "AU",
@@ -200,7 +244,7 @@ async function connection() {
   });
 }
 const scope = () => ({
-  clerkOrgId: fixture.clerkOrgId,
+  accountId: fixture.accountId,
   connectionId: fixture.connectionId,
   organisationId: fixture.organisationId,
 });
@@ -236,6 +280,7 @@ async function selection(
   }
   return database.xeroOAuthSession.create({
     data: {
+      account_id: fixture.accountId,
       available_tenants_json: {
         tenants: [
           {
@@ -245,7 +290,6 @@ async function selection(
           },
         ],
       },
-      clerk_org_id: fixture.clerkOrgId,
       created_by_user_id: "user_integration_1",
       expires_at: new Date(Date.now() + 600_000),
       id: fixture.sessionId,
@@ -281,7 +325,7 @@ function stubPayroll(externalId = fixture.externalId, country = "AU") {
 }
 function select(externalId = fixture.externalId) {
   return service.completeXeroTenantSelection({
-    clerkOrgId: fixture.clerkOrgId,
+    accountId: fixture.accountId,
     organisationId: fixture.organisationId,
     sessionId: fixture.sessionId,
     tenantId: externalId,
@@ -296,19 +340,18 @@ function versionTwo() {
 }
 
 describe("canonical OAuth persistence", () => {
-  it("connects an existing payroll organisation for all Clerk members while keeping provider identity and credentials canonical", async () => {
+  it("connects an existing payroll organisation for all Account members while keeping provider identity and credentials canonical", async () => {
     const adminUserId = "user_integration_admin_a";
     const memberUserId = "user_integration_member_b";
     const existing = await organisation();
     await organisation({
       ...primary,
-      organisationId: allocation.id("sibling-organisation"),
+      organisationId: siblingOrganisationId,
     });
     await grant(new Date(Date.now() + 1_800_000));
     await database.person.createMany({
       data: [adminUserId, memberUserId].map((userId, index) => ({
-        clerk_org_id: fixture.clerkOrgId,
-        clerk_user_id: userId,
+        account_id: fixture.accountId,
         email: `${allocation.key("shared-access", index)}@example.test`,
         employment_type: "employee",
         first_name: index === 0 ? "Admin" : "Member",
@@ -316,6 +359,7 @@ describe("canonical OAuth persistence", () => {
         last_name: "Integration",
         organisation_id: fixture.organisationId,
         source_system: "MANUAL",
+        user_id: userId,
       })),
     });
     const payroll = stubPayroll();
@@ -324,7 +368,7 @@ describe("canonical OAuth persistence", () => {
     );
     vi.stubGlobal("fetch", provider);
     const started = await service.buildXeroOAuthStartUrl({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       organisationId: existing.id,
       userId: adminUserId,
     });
@@ -333,14 +377,14 @@ describe("canonical OAuth persistence", () => {
     }
     const pending = await database.xeroOAuthSession.findFirstOrThrow({
       where: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         created_by_user_id: adminUserId,
         status: "pending",
       },
     });
     expect(pending.organisation_id).toBe(existing.id);
     const callback = {
-      authenticatedClerkOrgId: fixture.clerkOrgId,
+      authenticatedAccountId: fixture.accountId,
       authenticatedUserId: adminUserId,
       code: "admin-owned-code",
       nonce: started.value.nonce,
@@ -370,18 +414,18 @@ describe("canonical OAuth persistence", () => {
     const { connectionId } = completed.value.connected;
     const member = await database.person.findFirstOrThrow({
       where: {
-        clerk_org_id: fixture.clerkOrgId,
-        clerk_user_id: memberUserId,
+        account_id: fixture.accountId,
         organisation_id: existing.id,
+        user_id: memberUserId,
       },
     });
-    // Member B supplies their own tenant scope; the connector's Clerk identity
+    // Member B supplies their own tenant scope; the connector's user identity
     // is required only for the OAuth callback, never for payroll access.
     provider.mockClear();
     identity.verify.mockClear();
     expect(
       await canonical.resolveXeroAccess({
-        clerkOrgId: member.clerk_org_id,
+        accountId: member.account_id,
         connectionId,
         organisationId: member.organisation_id,
       })
@@ -391,16 +435,16 @@ describe("canonical OAuth persistence", () => {
     });
     expect(
       await canonical.resolveXeroAccess({
-        clerkOrgId: secondary.clerkOrgId,
+        accountId: secondary.accountId,
         connectionId,
         organisationId: existing.id,
       })
     ).toMatchObject({ ok: false });
     expect(
       await canonical.resolveXeroAccess({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         connectionId,
-        organisationId: allocation.id("sibling-organisation"),
+        organisationId: siblingOrganisationId,
       })
     ).toMatchObject({ ok: false });
     expect(provider).not.toHaveBeenCalled();
@@ -431,11 +475,11 @@ describe("canonical OAuth persistence", () => {
     expect(tokenText(authorisation, "refresh")).toBe("new-refresh-token");
     const people = await database.person.findMany({
       where: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         organisation_id: existing.id,
       },
     });
-    expect(people.map((person) => person.clerk_user_id).sort()).toEqual(
+    expect(people.map((person) => person.user_id).sort()).toEqual(
       [adminUserId, memberUserId].sort()
     );
     for (const row of [connected, session, ...people]) {
@@ -457,15 +501,15 @@ describe("canonical OAuth persistence", () => {
     expect(await database.organisation.count({ where: ownedScopes })).toBe(2);
     await database.person.deleteMany({
       where: {
-        clerk_org_id: fixture.clerkOrgId,
-        clerk_user_id: adminUserId,
+        account_id: fixture.accountId,
         organisation_id: existing.id,
+        user_id: adminUserId,
       },
     });
     await database.xeroOAuthSession.delete({ where: { id: pending.id } });
     expect(
       await canonical.resolveXeroAccess({
-        clerkOrgId: member.clerk_org_id,
+        accountId: member.account_id,
         connectionId,
         organisationId: member.organisation_id,
       })
@@ -476,11 +520,11 @@ describe("canonical OAuth persistence", () => {
     expect(provider).not.toHaveBeenCalled();
     expect(identity.verify).not.toHaveBeenCalled();
   });
-  it("requires an initiating Clerk user for OAuth", async () => {
+  it("requires an initiating user for OAuth", async () => {
     await organisation();
     expect(
       await service.buildXeroOAuthStartUrl({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: fixture.organisationId,
       })
     ).toMatchObject({ ok: false });
@@ -490,20 +534,20 @@ describe("canonical OAuth persistence", () => {
   });
   it("starts Add company without an existing organisation", async () => {
     const started = await service.buildXeroOAuthStartUrl({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       userId: "user_integration_1",
     });
     expect(started.ok).toBe(true);
     expect(
       await database.xeroOAuthSession.findFirst({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toMatchObject({ organisation_id: null, status: "pending" });
   });
   it("connects three selected files with one shared grant and replays without duplicates", async () => {
-    await database.clerkOrgSubscription.create({
+    await database.accountSubscription.create({
       data: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         plan_key: await premiumPlan(),
         status: "active",
       },
@@ -532,7 +576,7 @@ describe("canonical OAuth persistence", () => {
     );
     vi.stubGlobal("fetch", provider);
     const input = {
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       sessionId: fixture.sessionId,
       tenantIds: tenants.map((tenant) => tenant.tenantId),
       timezone: "Australia/Perth",
@@ -551,17 +595,17 @@ describe("canonical OAuth persistence", () => {
     });
     expect(
       await database.organisation.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(3);
     expect(
       await database.organisation.findMany({
         select: { timezone: true },
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toEqual(tenants.map(() => ({ timezone: "Australia/Perth" })));
     const connections = await database.xeroConnection.findMany({
-      where: { clerk_org_id: fixture.clerkOrgId },
+      where: { account_id: fixture.accountId },
     });
     expect(connections.map((binding) => binding.xero_authorisation_id)).toEqual(
       new Array(3).fill(fixture.authorisationId)
@@ -574,11 +618,11 @@ describe("canonical OAuth persistence", () => {
     expect(await service.completeXeroTenantSelection(input)).toEqual(first);
     expect(
       await database.organisation.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(3);
     expect(
-      await database.feed.count({ where: { clerk_org_id: fixture.clerkOrgId } })
+      await database.feed.count({ where: { account_id: fixture.accountId } })
     ).toBe(0);
   });
   it("keeps a successful company when another selection exceeds Basic's allowance", async () => {
@@ -608,7 +652,7 @@ describe("canonical OAuth persistence", () => {
     );
     expect(
       await service.completeXeroTenantSelection({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         sessionId: fixture.sessionId,
         tenantIds: tenants.map((tenant) => tenant.tenantId),
         timezone: "Australia/Perth",
@@ -625,17 +669,17 @@ describe("canonical OAuth persistence", () => {
     });
     expect(
       await database.organisation.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(1);
     expect(
       await database.xeroConnection.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(1);
     expect(
       await database.auditEvent.count({
-        where: { action: "xero_connected", clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId, action: "xero_connected" },
       })
     ).toBe(1);
   });
@@ -649,7 +693,7 @@ describe("canonical OAuth persistence", () => {
     }));
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: secondary.clerkOrgId,
+        account_id: secondary.accountId,
         organisation_id: secondary.organisationId,
         payroll_region: "AU",
         remote_connection_id: tenants[0]?.connectionId,
@@ -675,7 +719,7 @@ describe("canonical OAuth persistence", () => {
       )
     );
     const result = await service.completeXeroTenantSelection({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       sessionId: fixture.sessionId,
       tenantIds: tenants.map((tenant) => tenant.tenantId),
       timezone: "Australia/Perth",
@@ -696,10 +740,10 @@ describe("canonical OAuth persistence", () => {
         ],
       },
     });
-    expect(JSON.stringify(result)).not.toContain(secondary.clerkOrgId);
+    expect(JSON.stringify(result)).not.toContain(secondary.accountId);
     expect(
       await database.organisation.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(1);
   });
@@ -716,7 +760,7 @@ describe("canonical OAuth persistence", () => {
     });
     await database.xeroOAuthSession.create({
       data: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         created_by_user_id: "user_integration_1",
         expires_at: new Date(Date.now() + 600_000),
         id: allocation.id("surviving-session"),
@@ -728,7 +772,7 @@ describe("canonical OAuth persistence", () => {
     stubPayroll();
     expect(
       await service.completeXeroTenantSelection({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         sessionId: fixture.sessionId,
         tenantIds: [fixture.externalId],
         timezone: "Australia/Perth",
@@ -749,7 +793,7 @@ describe("canonical OAuth persistence", () => {
     });
     expect(
       await database.organisation.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(1);
     expect(
@@ -814,7 +858,7 @@ describe("canonical OAuth persistence", () => {
       })
     );
     const pending = service.completeXeroTenantSelection({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       sessionId: fixture.sessionId,
       tenantIds: [fixture.externalId],
       timezone: "Australia/Perth",
@@ -847,20 +891,20 @@ describe("canonical OAuth persistence", () => {
         await organisation(secondary);
         await database.xeroConnection.update({
           data: {
-            clerk_org_id: secondary.clerkOrgId,
+            account_id: secondary.accountId,
             organisation_id: secondary.organisationId,
           },
           where: { id: fixture.connectionId },
         });
-        await database.clerkOrgSubscription.create({
+        await database.accountSubscription.create({
           data: {
-            clerk_org_id: fixture.clerkOrgId,
+            account_id: fixture.accountId,
             plan_key: await premiumPlan(),
             status: "active",
           },
         });
         removedScope = {
-          clerkOrgId: secondary.clerkOrgId,
+          accountId: secondary.accountId,
           connectionId: fixture.connectionId,
           organisationId: secondary.organisationId,
         };
@@ -911,7 +955,7 @@ describe("canonical OAuth persistence", () => {
         })
       );
       const pending = service.completeXeroTenantSelection({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         sessionId: fixture.sessionId,
         tenantIds: [fixture.externalId],
         timezone: "Australia/Perth",
@@ -940,7 +984,7 @@ describe("canonical OAuth persistence", () => {
       });
       expect(
         await database.organisation.count({
-          where: { clerk_org_id: fixture.clerkOrgId },
+          where: { account_id: fixture.accountId },
         })
       ).toBe(1);
       expect(
@@ -950,7 +994,7 @@ describe("canonical OAuth persistence", () => {
       ).toMatchObject({ archived_at: expect.any(Date), is_active: false });
       expect(
         await database.xeroConnection.count({
-          where: { clerk_org_id: fixture.clerkOrgId, released_at: null },
+          where: { account_id: fixture.accountId, released_at: null },
         })
       ).toBe(0);
     }
@@ -959,13 +1003,13 @@ describe("canonical OAuth persistence", () => {
     await organisation();
     const sibling = await organisation({
       ...primary,
-      organisationId: allocation.id("sibling-organisation"),
+      organisationId: siblingOrganisationId,
     });
     await selection();
     const provider = stubPayroll();
     expect(
       await service.completeXeroTenantSelection({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: sibling.id,
         sessionId: fixture.sessionId,
         tenantId: fixture.externalId,
@@ -986,7 +1030,7 @@ describe("canonical OAuth persistence", () => {
   it("rejects a callback after the persisted OAuth session expires before token exchange", async () => {
     await organisation();
     const started = await service.buildXeroOAuthStartUrl({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       organisationId: fixture.organisationId,
       userId: "user_integration_1",
     });
@@ -1001,7 +1045,7 @@ describe("canonical OAuth persistence", () => {
     vi.stubGlobal("fetch", provider);
     expect(
       await service.completeXeroOAuth({
-        authenticatedClerkOrgId: fixture.clerkOrgId,
+        authenticatedAccountId: fixture.accountId,
         authenticatedUserId: "user_integration_1",
         code: "expired-session-code",
         nonce: started.value.nonce,
@@ -1060,11 +1104,11 @@ describe("canonical OAuth persistence", () => {
     await connection();
     const sibling = await organisation({
       ...primary,
-      organisationId: allocation.id("refresh-sibling"),
+      organisationId: siblingOrganisationId,
     });
     const second = await database.xeroConnection.create({
       data: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         organisation_id: sibling.id,
         payroll_region: "AU",
         remote_connection_id: allocation.id("refresh-remote"),
@@ -1079,7 +1123,7 @@ describe("canonical OAuth persistence", () => {
         canonical.resolveXeroAccess(
           index % 2
             ? {
-                clerkOrgId: fixture.clerkOrgId,
+                accountId: fixture.accountId,
                 connectionId: second.id,
                 organisationId: sibling.id,
               }
@@ -1211,7 +1255,7 @@ describe("canonical OAuth persistence", () => {
     await organisation(secondary);
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: secondary.clerkOrgId,
+        account_id: secondary.accountId,
         organisation_id: secondary.organisationId,
         payroll_region: "AU",
         remote_connection_id: allocation.id("remote", 1),
@@ -1231,7 +1275,7 @@ describe("canonical OAuth persistence", () => {
     });
     expect(
       await canonical.resolveXeroAccess({
-        clerkOrgId: secondary.clerkOrgId,
+        accountId: secondary.accountId,
         organisationId: secondary.organisationId,
       })
     ).toMatchObject({ error: { code: "reauthorisation_required" }, ok: false });
@@ -1288,14 +1332,14 @@ describe("canonical OAuth persistence", () => {
     await database.xeroConnection.updateMany({
       data: { sync_paused_at: new Date() },
       where: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         id: fixture.connectionId,
         organisation_id: fixture.organisationId,
       },
     });
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: secondary.clerkOrgId,
+        account_id: secondary.accountId,
         organisation_id: secondary.organisationId,
         payroll_region: "AU",
         remote_connection_id: allocation.id("remote", 1),
@@ -1353,7 +1397,7 @@ describe("canonical OAuth persistence", () => {
     await organisation(secondary);
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: secondary.clerkOrgId,
+        account_id: secondary.accountId,
         organisation_id: secondary.organisationId,
         payroll_region: "AU",
         remote_connection_id: allocation.id("remote", 1),
@@ -1405,7 +1449,7 @@ describe("canonical OAuth persistence", () => {
     );
     vi.stubGlobal("fetch", provider);
     const start = await service.buildXeroOAuthStartUrl({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       organisationId: fixture.organisationId,
       userId: "user_integration_1",
     });
@@ -1413,7 +1457,7 @@ describe("canonical OAuth persistence", () => {
       throw new Error("Expected protected OAuth start");
     }
     const callback = service.completeXeroOAuth({
-      authenticatedClerkOrgId: fixture.clerkOrgId,
+      authenticatedAccountId: fixture.accountId,
       authenticatedUserId: "user_integration_1",
       code: "owned-code",
       nonce: start.value.nonce,
@@ -1445,19 +1489,19 @@ describe("canonical OAuth persistence", () => {
     ).toBe(1);
     expect(
       await canonical.resolveXeroAccess({
-        clerkOrgId: secondary.clerkOrgId,
+        accountId: secondary.accountId,
         organisationId: secondary.organisationId,
       })
     ).toMatchObject({ ok: true, value: { accessToken: "new-access-token" } });
   });
-  it("scopes refresh access to both Clerk account and payroll organisation", async () => {
+  it("scopes refresh access to both Account and payroll organisation", async () => {
     await connection();
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     expect(
       await canonical.resolveXeroAccess({
         ...scope(),
-        clerkOrgId: secondary.clerkOrgId,
+        accountId: secondary.accountId,
       })
     ).toMatchObject({ ok: false });
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -1640,7 +1684,7 @@ describe("canonical OAuth persistence", () => {
     });
     const person = await database.person.create({
       data: {
-        clerk_org_id: fixture.clerkOrgId,
+        account_id: fixture.accountId,
         email: `${allocation.key("preserved-person")}@example.test`,
         employment_type: "employee",
         first_name: "Preserved",
@@ -1686,7 +1730,7 @@ describe("canonical OAuth persistence", () => {
       )
     );
     const started = await service.buildXeroOAuthStartUrl({
-      clerkOrgId: fixture.clerkOrgId,
+      accountId: fixture.accountId,
       organisationId: fixture.organisationId,
       userId: "reconnect_admin_b",
     });
@@ -1695,7 +1739,7 @@ describe("canonical OAuth persistence", () => {
     }
     expect(
       await service.completeXeroOAuth({
-        authenticatedClerkOrgId: fixture.clerkOrgId,
+        authenticatedAccountId: fixture.accountId,
         authenticatedUserId: "reconnect_admin_b",
         code: "later-admin-code",
         nonce: started.value.nonce,
@@ -1759,7 +1803,7 @@ describe("canonical OAuth persistence", () => {
     await grant(new Date(Date.now() + 1_800_000));
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: secondary.clerkOrgId,
+        account_id: secondary.accountId,
         organisation_id: secondary.organisationId,
         payroll_region: "AU",
         remote_connection_id: fixture.remoteId,
@@ -1774,7 +1818,7 @@ describe("canonical OAuth persistence", () => {
     });
     expect(
       await database.organisation.count({
-        where: { clerk_org_id: fixture.clerkOrgId },
+        where: { account_id: fixture.accountId },
       })
     ).toBe(0);
     expect(
@@ -1803,7 +1847,7 @@ describe("canonical OAuth persistence", () => {
         )
       );
       const started = await service.buildXeroOAuthStartUrl({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: fixture.organisationId,
         userId: "user_integration_1",
       });
@@ -1812,7 +1856,7 @@ describe("canonical OAuth persistence", () => {
       }
       expect(
         await service.completeXeroOAuth({
-          authenticatedClerkOrgId: fixture.clerkOrgId,
+          authenticatedAccountId: fixture.accountId,
           authenticatedUserId: "user_integration_1",
           code: "owned-code",
           nonce: started.value.nonce,
@@ -1821,7 +1865,7 @@ describe("canonical OAuth persistence", () => {
         })
       ).toMatchObject({ error: { code: "tenant_not_found" }, ok: false });
       const closed = await database.xeroOAuthSession.findFirstOrThrow({
-        where: { clerk_org_id: fixture.clerkOrgId, status: "cancelled" },
+        where: { account_id: fixture.accountId, status: "cancelled" },
       });
       expect(closed.xero_authorisation_id).toBe(fixture.authorisationId);
       await service.purgeClosedXeroOAuthSessions();
@@ -1839,8 +1883,7 @@ describe("canonical OAuth persistence", () => {
       await connection();
       await database.person.create({
         data: {
-          clerk_org_id: fixture.clerkOrgId,
-          clerk_user_id: "user_integration_admin_a",
+          account_id: fixture.accountId,
           email: `${allocation.key("former-admin")}@example.test`,
           employment_type: "employee",
           first_name: "Former",
@@ -1848,6 +1891,7 @@ describe("canonical OAuth persistence", () => {
           last_name: "Admin",
           organisation_id: fixture.organisationId,
           source_system: "MANUAL",
+          user_id: "user_integration_admin_a",
         },
       });
       await database.person.deleteMany({ where: ownedScopes });
@@ -1901,7 +1945,7 @@ describe("canonical OAuth persistence", () => {
       });
       vi.stubGlobal("fetch", provider);
       const started = await service.buildXeroOAuthStartUrl({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: fixture.organisationId,
         userId: adminUserId,
       });
@@ -1910,7 +1954,7 @@ describe("canonical OAuth persistence", () => {
       }
       expect(
         await service.completeXeroOAuth({
-          authenticatedClerkOrgId: fixture.clerkOrgId,
+          authenticatedAccountId: fixture.accountId,
           authenticatedUserId: adminUserId,
           code: "replacement-authoriser-code",
           nonce: started.value.nonce,
@@ -1988,7 +2032,7 @@ describe("canonical OAuth persistence", () => {
         where: { id: fixture.authorisationId },
       });
       const started = await service.buildXeroOAuthStartUrl({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: fixture.organisationId,
         userId: "user_integration_admin_b",
       });
@@ -1996,7 +2040,7 @@ describe("canonical OAuth persistence", () => {
         throw new Error("Expected administrator reconnect start");
       }
       const callback = {
-        authenticatedClerkOrgId: fixture.clerkOrgId,
+        authenticatedAccountId: fixture.accountId,
         authenticatedUserId: "user_integration_admin_b",
         nonce: started.value.nonce,
         state:
@@ -2047,6 +2091,7 @@ describe("canonical OAuth persistence", () => {
     const competingSessionId = allocation.id("competing-reconnect-session");
     await database.xeroOAuthSession.create({
       data: {
+        account_id: fixture.accountId,
         available_tenants_json: {
           tenants: [
             {
@@ -2056,7 +2101,6 @@ describe("canonical OAuth persistence", () => {
             },
           ],
         },
-        clerk_org_id: fixture.clerkOrgId,
         created_by_user_id: "user_integration_admin_b",
         expires_at: new Date(Date.now() + 600_000),
         id: competingSessionId,
@@ -2097,7 +2141,7 @@ describe("canonical OAuth persistence", () => {
     const results = await Promise.all([
       select(),
       service.completeXeroTenantSelection({
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: fixture.organisationId,
         sessionId: competingSessionId,
         tenantId: fixture.externalId,
@@ -2141,7 +2185,15 @@ describe("canonical OAuth persistence", () => {
     status: "active" | "reconnect_required";
   }>)(
     "replaces an old link without using its credentials with $status status, expired grant $expired and sibling usage $hasSibling",
-    async ({ expired, hasSibling, status }) => {
+    async ({
+      expired,
+      hasSibling,
+      status,
+    }: {
+      expired: boolean;
+      hasSibling: boolean;
+      status: "active" | "reconnect_required";
+    }) => {
       await connection();
       await database.xeroConnection.update({
         data: { status },
@@ -2159,7 +2211,7 @@ describe("canonical OAuth persistence", () => {
         await organisation(secondary);
         await database.xeroConnection.create({
           data: {
-            clerk_org_id: secondary.clerkOrgId,
+            account_id: secondary.accountId,
             organisation_id: secondary.organisationId,
             payroll_region: "AU",
             remote_connection_id: allocation.id("remote", 1),
@@ -2243,7 +2295,7 @@ describe("canonical OAuth persistence", () => {
         expect(
           await database.xeroConnection.findFirstOrThrow({
             where: {
-              clerk_org_id: secondary.clerkOrgId,
+              account_id: secondary.accountId,
               organisation_id: secondary.organisationId,
             },
           })
@@ -2262,21 +2314,21 @@ describe("canonical OAuth persistence", () => {
     await database.xeroOAuthSession.createMany({
       data: [
         {
-          clerk_org_id: fixture.clerkOrgId,
+          account_id: fixture.accountId,
           expires_at: new Date(now.getTime() - 1),
           id: allocation.id("expired-session"),
           return_to: "/calendar",
           status: "pending",
         },
         {
-          clerk_org_id: fixture.clerkOrgId,
+          account_id: fixture.accountId,
           expires_at: new Date(now.getTime() + 60_000),
           id: allocation.id("completed-session"),
           return_to: "/calendar",
           status: "completed",
         },
         {
-          clerk_org_id: fixture.clerkOrgId,
+          account_id: fixture.accountId,
           expires_at: new Date(now.getTime() + 60_000),
           id: allocation.id("cancelled-session"),
           return_to: "/calendar",

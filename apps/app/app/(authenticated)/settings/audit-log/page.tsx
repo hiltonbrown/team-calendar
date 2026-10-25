@@ -1,14 +1,14 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type AuditEventDetail,
   getAuditEventDetail,
   listAuditLogEvents,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { AuditLogClient } from "./audit-log-client";
 
@@ -22,16 +22,24 @@ interface AuditLogPageProps {
 }
 
 const AuditLogPage = async ({ searchParams }: AuditLogPageProps) => {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ audit: ["read"] });
 
-  const [{ orgRole }, user, params] = await Promise.all([
-    auth(),
-    currentUser(),
+  const [{ role: sessionRole }, user, params] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
     searchParams,
   ]);
   const org = firstValue(params.org);
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
-  const role = orgRole === "org:owner" ? "owner" : "admin";
+  const accountId = (await requireAccount()) as AccountId;
+  const role = sessionRole === "owner" ? "owner" : "admin";
 
   if (!user) {
     throw new Error("User not found.");
@@ -46,15 +54,15 @@ const AuditLogPage = async ({ searchParams }: AuditLogPageProps) => {
   const cursor = firstValue(params.cursor);
 
   const { listResult, details, organisationId } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const { organisationId: scopedOrganisationId } =
-        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+        await resolveActiveOrgPageContext(accountId, org, db);
       const preparedListResult = await listAuditLogEvents(
         {
+          accountId,
           actingRole: role,
           actingUserId: user.id,
-          clerkOrgId,
           filters,
           organisationId: scopedOrganisationId,
           pagination: { cursor, pageSize: 50 },
@@ -76,9 +84,9 @@ const AuditLogPage = async ({ searchParams }: AuditLogPageProps) => {
         detailResults.push(
           await getAuditEventDetail(
             {
+              accountId,
               actingRole: role,
               actingUserId: user.id,
-              clerkOrgId,
               eventId,
               organisationId: scopedOrganisationId,
             },

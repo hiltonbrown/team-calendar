@@ -1,6 +1,8 @@
 "use server";
 
-import { auth } from "@repo/auth/server";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getSession } from "@repo/auth/server";
 import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revokeAllFeedTokens } from "@repo/feeds";
@@ -23,11 +25,17 @@ export const revokeAllTokens = async (
     return { error: "Invalid organisation", ok: false };
   }
 
-  const { orgId, orgRole } = await auth();
-  if (!orgId) {
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
+  if (!sessionAccountId) {
     return { error: "Not authenticated", ok: false };
   }
-  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+  if (!can(sessionRole, { settings: ["update"] })) {
     return {
       error: "You do not have permission to revoke feed tokens",
       ok: false,
@@ -35,11 +43,11 @@ export const revokeAllTokens = async (
   }
 
   return withTenantResult(
-    orgId,
+    sessionAccountId,
     async (db): Promise<Result<{ revokedCount: number }>> => {
       const company = await db.organisation.findFirst({
         select: { id: true },
-        where: { clerk_org_id: orgId, id: parsed.data.organisationId },
+        where: { account_id: sessionAccountId, id: parsed.data.organisationId },
       });
       if (!company) {
         return {
@@ -49,7 +57,7 @@ export const revokeAllTokens = async (
       }
       const result = await revokeAllFeedTokens(
         {
-          clerkOrgId: orgId,
+          accountId: sessionAccountId,
           organisationId: company.id,
         },
         db

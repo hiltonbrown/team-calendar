@@ -1,3 +1,4 @@
+import { providerMembershipRoleFixture } from "@repo/auth/testing";
 import { referenceDatabase } from "@repo/database/tenant-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -85,20 +86,20 @@ function membershipFixture() {
       last_name: "Person",
       user_id: "user_1",
     },
-    role: "org:owner",
+    role: providerMembershipRoleFixture("owner"),
   } as Parameters<typeof handleOrganizationMembershipCreated>[0];
 }
 
-describe("Clerk organisation membership webhook handling", () => {
+describe("Account membership webhook handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.organisationFindMany.mockResolvedValue([
       {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "00000000-0000-4000-8000-000000000001",
       },
       {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "00000000-0000-4000-8000-000000000002",
       },
     ]);
@@ -124,27 +125,25 @@ describe("Clerk organisation membership webhook handling", () => {
     );
     expect(mocks.organisationFindMany).toHaveBeenCalledWith({
       select: {
-        clerk_org_id: true,
+        account_id: true,
         id: true,
       },
       where: {
+        account_id: "org_1",
         archived_at: null,
-        clerk_org_id: "org_1",
       },
     });
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledTimes(2);
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
       },
       {
         avatarUrl: "https://img.clerk.com/user.png",
-        clerkUserId: "user_1",
         displayName: "Test Person",
         email: "person@example.com",
-        firstName: "Test",
-        lastName: "Person",
+        userId: "user_1",
       },
       expect.any(Object)
     );
@@ -252,7 +251,7 @@ describe("Clerk organisation membership webhook handling", () => {
     expect(deliveredUuids[0]).toMatch(uuidV5Pattern);
   });
 
-  it("clears clerk_user_id on membership deletion without deleting people", async () => {
+  it("clears user_id on membership deletion without deleting people", async () => {
     const response = await handleOrganizationMembershipDeleted(
       membershipFixture()
     );
@@ -260,11 +259,11 @@ describe("Clerk organisation membership webhook handling", () => {
     expect(response.status).toBe(201);
     expect(mocks.personUpdateMany).toHaveBeenCalledWith({
       data: {
-        clerk_user_id: null,
+        user_id: null,
       },
       where: {
-        clerk_org_id: "org_1",
-        clerk_user_id: "user_1",
+        account_id: "org_1",
+        user_id: "user_1",
       },
     });
   });
@@ -330,7 +329,7 @@ describe("Clerk webhook payload validation", () => {
   it("uses the verified Svix delivery identity for membership activation", async () => {
     mocks.organisationFindMany.mockResolvedValue([
       {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "00000000-0000-4000-8000-000000000001",
       },
     ]);

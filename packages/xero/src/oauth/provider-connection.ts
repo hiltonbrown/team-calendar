@@ -38,11 +38,11 @@ export async function verifyXeroProviderConnection(
   }
   try {
     const scope = {
-      clerkOrgId: context.clerk_org_id,
+      accountId: context.account_id,
       connectionId: context.id,
       organisationId: context.organisation_id,
     };
-    const scoped = await withTenantResult(scope.clerkOrgId, (db) =>
+    const scoped = await withTenantResult(scope.accountId, (db) =>
       getScopedXeroConnection(scope, db)
     );
     if (!scoped.ok) {

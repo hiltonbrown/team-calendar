@@ -1,10 +1,10 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { isOnboardingAdmin, loadWelcomeEligibility } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { type TenantDb, withTenantDb } from "@repo/database";
 import { getOnboardingRecord } from "@repo/database/queries/onboarding";
-import { listOrganisationsByClerkOrg } from "@repo/database/queries/organisations";
+import { listOrganisationsByAccount } from "@repo/database/queries/organisations";
 import {
   SidebarInset,
   SidebarProvider,
@@ -22,36 +22,41 @@ interface AppLayoutProperties {
 }
 
 const AppLayout = async ({ children }: AppLayoutProperties) => {
-  const user = await currentUser();
-  const { orgRole, redirectToSignIn } = await auth();
+  const user = await getCurrentUser();
+  const { role: sessionRole } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
   const pathname = (await headers()).get("x-pathname") ?? "/";
   const betaFeature = process.env.SHOW_BETA_FEATURE === "true";
 
   if (!user) {
-    return redirectToSignIn();
+    return redirect("/sign-in");
   }
 
-  let clerkOrgId: ClerkOrgId | null = null;
+  let accountId: AccountId | null = null;
   try {
-    // requireOrg guarantees this string is the active Clerk Organisation ID.
-    clerkOrgId = (await requireOrg()) as ClerkOrgId;
+    // requireAccount guarantees this string is the active Account ID.
+    accountId = (await requireAccount()) as AccountId;
   } catch {
-    clerkOrgId = null;
+    accountId = null;
   }
   let firstRunRedirect: "/onboarding" | "/welcome" | null = null;
-  if (clerkOrgId) {
-    const account = clerkOrgId;
+  if (accountId) {
+    const account = accountId;
     try {
       const prepared = await withTenantDb(account, async (db) => {
-        const organisations = await listOrganisationsByClerkOrg(account, db);
+        const organisations = await listOrganisationsByAccount(account, db);
         const scopedOrganisationId = organisations.ok
           ? (organisations.value[0]?.id ?? null)
           : null;
         const preparedFirstRunRedirect = await resolveFirstRunRedirect(
           {
-            clerkOrgId: account,
+            accountId: account,
             organisationId: scopedOrganisationId,
-            orgRole,
+            role: sessionRole,
             userId: user.id,
           },
           pathname,
@@ -73,7 +78,7 @@ const AppLayout = async ({ children }: AppLayoutProperties) => {
   }
 
   return (
-    <NotificationsProvider enabled={clerkOrgId !== null} key={clerkOrgId}>
+    <NotificationsProvider enabled={accountId !== null} key={accountId}>
       <a
         className="fixed top-3 left-3 z-50 -translate-y-24 rounded-xl bg-primary px-4 py-2 font-medium text-primary-foreground transition-transform focus:translate-y-0"
         href="#main-content"
@@ -109,20 +114,20 @@ const AppLayout = async ({ children }: AppLayoutProperties) => {
 // members see the welcome once. Lookups only run for the role that needs them.
 async function resolveFirstRunRedirect(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: string | null;
-    orgRole: string | null | undefined;
+    role: string | null | undefined;
     userId: string;
   },
   pathname: string,
   db: TenantDb
 ): Promise<"/onboarding" | "/welcome" | null> {
-  const isAdmin = isOnboardingAdmin(input.orgRole);
+  const isAdmin = isOnboardingAdmin(input.role);
   let wizardCompleted = false;
   let welcomeEligible = false;
   if (isAdmin && input.organisationId) {
     const record = await getOnboardingRecord(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       db
     );
@@ -131,8 +136,8 @@ async function resolveFirstRunRedirect(
   } else if (!isAdmin && input.organisationId) {
     const eligibility = await loadWelcomeEligibility(
       {
-        actingRole: input.orgRole,
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
+        actingRole: input.role,
         organisationId: input.organisationId,
         userId: input.userId,
       },
@@ -141,8 +146,8 @@ async function resolveFirstRunRedirect(
     welcomeEligible = eligibility.ok && eligibility.value.eligible;
   }
   return resolveOnboardingRedirect({
-    orgRole: input.orgRole,
     pathname,
+    role: input.role,
     welcomeEligible,
     wizardCompleted,
   });

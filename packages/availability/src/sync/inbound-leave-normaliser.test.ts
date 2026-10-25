@@ -10,8 +10,8 @@ describe("inbound leave normaliser", () => {
     const stableSourceKey = "xero-stable-source-key";
 
     const normalised = normaliseInboundLeaveRecord({
+      accountId: "org_1",
       approvalStatus: "approved",
-      clerkOrgId: "org_1",
       endsAt,
       organisationId: "30000000-0000-4000-8000-000000000001",
       personId: "40000000-0000-4000-8000-000000000001",
@@ -42,8 +42,8 @@ describe("inbound leave normaliser", () => {
 
   it("keeps hash generation stable when raw payload key order changes", () => {
     const base = {
+      accountId: "org_1",
       approvalStatus: "submitted" as const,
-      clerkOrgId: "org_1",
       endsAt: new Date("2026-05-08T00:00:00.000Z"),
       organisationId: "30000000-0000-4000-8000-000000000001",
       personId: "40000000-0000-4000-8000-000000000001",

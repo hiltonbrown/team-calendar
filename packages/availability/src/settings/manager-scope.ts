@@ -9,25 +9,25 @@ import {
 export async function managerScopePersonIds(
   input: {
     actingPersonId: string;
-    clerkOrgId: string;
+    accountId: string;
     excludeSelf?: boolean;
   },
   db: TenantDb
 ): Promise<string[]> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tenantDb = db;
 
     const companyIds = (
-      await resolveAccountCompanies(input.clerkOrgId, tenantDb)
+      await resolveAccountCompanies(input.accountId, tenantDb)
     ).map((company) => company.id);
-    const settings = await getAccountSettings(input.clerkOrgId, tenantDb);
+    const settings = await getAccountSettings(input.accountId, tenantDb);
     const people = await tenantDb.person.findMany({
       orderBy: { id: "asc" },
       select: { id: true, manager_person_id: true },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         organisation_id: { in: companyIds },
       },
     });

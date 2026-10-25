@@ -2,28 +2,110 @@
   "name": "@repo/auth",
   "version": "0.0.0",
   "private": true,
+  "exports": {
+    "./accounts": {
+      "types": "./accounts.ts",
+      "default": "./accounts.ts"
+    },
+    "./client": {
+      "types": "./client.ts",
+      "default": "./client.ts"
+    },
+    "./components/auth-form-frame": {
+      "types": "./components/auth-form-frame.tsx",
+      "default": "./components/auth-form-frame.tsx"
+    },
+    "./components/choose-organization-task": {
+      "types": "./components/choose-organization-task.tsx",
+      "default": "./components/choose-organization-task.tsx"
+    },
+    "./components/embedded-auth-appearance": {
+      "types": "./components/embedded-auth-appearance.ts",
+      "default": "./components/embedded-auth-appearance.ts"
+    },
+    "./components/sign-in": {
+      "types": "./components/sign-in.tsx",
+      "default": "./components/sign-in.tsx"
+    },
+    "./components/sign-up": {
+      "types": "./components/sign-up.tsx",
+      "default": "./components/sign-up.tsx"
+    },
+    "./helpers": {
+      "types": "./helpers.ts",
+      "default": "./helpers.ts"
+    },
+    "./keys": {
+      "types": "./keys.ts",
+      "default": "./keys.ts"
+    },
+    "./permissions": {
+      "types": "./permissions.ts",
+      "default": "./permissions.ts"
+    },
+    "./provider": {
+      "types": "./provider.tsx",
+      "default": "./provider.tsx"
+    },
+    "./proxy": {
+      "types": "./proxy.ts",
+      "default": "./proxy.ts"
+    },
+    "./server": {
+      "types": "./server.ts",
+      "default": "./server.ts"
+    },
+    "./testing": {
+      "types": "./testing.ts",
+      "default": "./testing.ts"
+    },
+    "./testing/playwright": {
+      "types": "./testing/playwright.ts",
+      "default": "./testing/playwright.ts"
+    },
+    "./transport": {
+      "types": "./transport.ts",
+      "default": "./transport.ts"
+    },
+    "./route": {
+      "types": "./route.ts",
+      "default": "./route.ts"
+    },
+    "./context": {
+      "types": "./context.ts",
+      "default": "./context.ts"
+    }
+  },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "test": "NODE_ENV=test vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@better-auth/infra": "0.4.22",
     "@clerk/nextjs": "^7.9.20",
     "@clerk/themes": "^2.4.57",
     "@repo/core": "*",
     "@repo/database": "*",
+    "@repo/email": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
+    "better-auth": "1.7.12",
     "next-themes": "^0.4.6",
     "react": "19.3.1",
     "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.50",
+    "@playwright/test": "1.64.1",
     "@repo/typescript-config": "*",
     "@types/node": "^26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
+  },
+  "peerDependencies": {
+    "next": "16.4.3"
   }
 }

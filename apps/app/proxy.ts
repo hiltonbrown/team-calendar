@@ -30,6 +30,8 @@ export const isPublicAppRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/csp-report",
+  "/api/auth/(.*)",
+  "/api/auth-context",
   "/__clerk(.*)",
 ]);
 
@@ -126,9 +128,9 @@ export function handleProxyWithNonce(request: NextRequest): NextResponse {
   return response;
 }
 
-export default authMiddleware(async (auth, request) => {
+export default authMiddleware(async (context, request) => {
   if (!isPublicAppRoute(request)) {
-    await auth.protect();
+    await context.requireAuthentication();
   }
   return handleProxyWithNonce(request);
 });

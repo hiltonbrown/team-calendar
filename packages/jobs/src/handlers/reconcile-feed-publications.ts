@@ -19,7 +19,7 @@ const BATCH_SIZE = 100;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 1000;
 const ReconcileFeedPublicationsInputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.uuid().optional(),
   organisationId: z.string().uuid(),
 });
@@ -90,7 +90,7 @@ async function reconcileFeedPublicationsInternal(
       const records: Array<{
         id: string;
         person_id: string;
-      }> = await withTenantDb(context.clerkOrgId, (db) =>
+      }> = await withTenantDb(context.accountId, (db) =>
         db.availabilityRecord.findMany({
           cursor: cursor ? { id: cursor } : undefined,
           orderBy: { id: "asc" },
@@ -98,7 +98,7 @@ async function reconcileFeedPublicationsInternal(
           skip: cursor ? 1 : 0,
           take: PAGE_SIZE,
           where: {
-            clerk_org_id: context.clerkOrgId,
+            account_id: context.accountId,
             organisation_id: context.organisationId,
           },
         })
@@ -128,7 +128,7 @@ async function reconcileFeedPublicationsInternal(
     }
     if (pages >= MAX_PAGES) {
       log.error("Reached MAX_PAGES limit while reconciling feed publications", {
-        clerkOrgId: context.clerkOrgId,
+        accountId: context.accountId,
         organisationId: context.organisationId,
         pageSize: PAGE_SIZE,
         pages,
@@ -136,11 +136,11 @@ async function reconcileFeedPublicationsInternal(
     }
     if (changedPersonIds.size > 0) {
       const rebuildInput = {
-        clerkOrgId: context.clerkOrgId,
+        accountId: context.accountId,
         organisationId: context.organisationId,
         personIds: [...changedPersonIds],
       };
-      const feeds = await withTenantDb(context.clerkOrgId, (db) =>
+      const feeds = await withTenantDb(context.accountId, (db) =>
         prepareFeedRebuilds(rebuildInput, db)
       );
       const sent = await sendPreparedFeedRebuilds(context, feeds);
@@ -165,12 +165,12 @@ export async function prepareFeedRebuilds(
   input: Parameters<typeof feedIdsForPeople>[0],
   db: TenantDb
 ): Promise<Awaited<ReturnType<typeof feedIdsForPeople>>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await feedIdsForPeople(input, db);
 }
 
 export async function sendPreparedFeedRebuilds(
-  context: { clerkOrgId: string; organisationId: string },
+  context: { accountId: string; organisationId: string },
   feeds: Awaited<ReturnType<typeof feedIdsForPeople>>
 ): Promise<Result<{ feedsQueued: number }, ReconcileFeedPublicationsError>> {
   assertNoTenantTransaction("sendPreparedFeedRebuilds");
@@ -178,7 +178,7 @@ export async function sendPreparedFeedRebuilds(
     await inngest.send(
       feeds.map((feed) => ({
         data: {
-          clerkOrgId: context.clerkOrgId,
+          accountId: context.accountId,
           feedId: feed.id,
           organisationId: feed.organisationId,
           reason: "publication_reconciled",
@@ -201,7 +201,7 @@ export async function sendPreparedFeedRebuilds(
 
 export async function reconcileOne(
   context: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   },
   record: {
@@ -216,21 +216,21 @@ export async function reconcileOne(
   // Skip cache invalidation per record; we batch one rebuild per affected feed below.
   try {
     const phaseInput1 = {
+      accountId: context.accountId,
       availabilityRecordId: record.id,
-      clerkOrgId: context.clerkOrgId,
       invalidateCache: false,
       organisationId: context.organisationId,
     } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
     const result = await withTenantResult(
-      phaseInput1.clerkOrgId,
+      phaseInput1.accountId,
       (db) => materialiseAvailabilityPublication(phaseInput1, db),
       TENANT_READ_TRANSACTION_OPTIONS
     );
     if (!result.ok) {
       counts.failed += 1;
       log.error("Failed to reconcile availability publication", {
+        accountId: context.accountId,
         availabilityRecordId: record.id,
-        clerkOrgId: context.clerkOrgId,
         error: result.error.message,
         organisationId: context.organisationId,
       });
@@ -246,8 +246,8 @@ export async function reconcileOne(
   } catch (error) {
     counts.failed += 1;
     log.error("Unhandled error reconciling availability publication", {
+      accountId: context.accountId,
       availabilityRecordId: record.id,
-      clerkOrgId: context.clerkOrgId,
       error,
       organisationId: context.organisationId,
     });

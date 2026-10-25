@@ -1,6 +1,7 @@
+import { type AuthRole, hasPermission } from "@repo/auth/permissions";
 import { log } from "@repo/observability/log";
 import "server-only";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import {
   assertTenantDb,
   resolveAccountCompanies,
@@ -31,7 +32,7 @@ import {
   type FieldOwnership,
   fieldOwnershipForPerson,
 } from "./field-ownership";
-export type PeopleRole = "admin" | "manager" | "owner" | "viewer";
+export type PeopleRole = AuthRole;
 export type PeopleServiceError =
   | {
       code: "not_authorised";
@@ -210,8 +211,8 @@ const PaginationSchema = z
   })
   .default({ pageSize: 50 });
 const ListPeopleSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
-  clerkOrgId: z.string().min(1),
   companyIds: z.array(z.string().uuid()).optional(),
   filters: FiltersSchema,
   organisationId: z.string().uuid().optional(),
@@ -219,16 +220,16 @@ const ListPeopleSchema = z.object({
   role: RoleSchema.default("viewer"),
 });
 const PersonProfileSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
   role: RoleSchema,
 });
 const HistorySchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
-  clerkOrgId: z.string().min(1),
   cursor: z.string().nullable().optional(),
   organisationId: z.string().uuid(),
   pageSize: z.number().int().min(1).max(100).default(25),
@@ -238,19 +239,19 @@ const HistorySchema = z.object({
 export async function canAccessPerson(
   input: {
     actingPersonId?: null | string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
     role: PeopleRole;
   },
   db: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    if (input.role === "owner" || input.role === "admin") {
+    if (hasPermission(input.role, { people: ["manage"] })) {
       return true;
     }
     if (!input.actingPersonId) {
@@ -261,8 +262,8 @@ export async function canAccessPerson(
     }
     const visiblePersonIds = await managerScopePersonIds(
       {
+        accountId: input.accountId,
         actingPersonId: input.actingPersonId,
-        clerkOrgId: input.clerkOrgId,
       },
       client
     );
@@ -270,7 +271,7 @@ export async function canAccessPerson(
   }
 }
 const UpcomingSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   horizonDays: z.number().int().min(1).max(90).default(30),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
@@ -278,7 +279,7 @@ const UpcomingSchema = z.object({
 export async function listPeople(
   input: {
     actingPersonId?: null | string;
-    clerkOrgId: string;
+    accountId: string;
     filters?: Partial<PeopleFilters>;
     organisationId?: string;
     companyIds?: string[];
@@ -296,7 +297,7 @@ export async function listPeople(
     PeopleServiceError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = ListPeopleSchema.safeParse({
     ...input,
     filters: input.filters ?? {},
@@ -306,18 +307,18 @@ export async function listPeople(
     return validationError(parsed.error);
   }
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    const { clerkOrgId, filters, pagination } = parsed.data;
-    const companies = await resolveAccountCompanies(clerkOrgId, client);
+    const { accountId, filters, pagination } = parsed.data;
+    const companies = await resolveAccountCompanies(accountId, client);
     const selection = selectDirectoryCompanies(parsed.data, companies);
     if (!selection.ok) {
       return selection;
     }
     const selectedCompanies = selection.value;
     const scoped = {
-      clerk_org_id: clerkOrgId,
+      account_id: accountId,
       organisation_id: {
         in: selectedCompanies.map((company) => company.id),
       },
@@ -336,8 +337,8 @@ export async function listPeople(
     const at = new Date();
     const statusWhere = await directoryStatusWhere(
       {
+        accountId,
         at,
-        clerkOrgId,
         companies: selectedCompanies,
         statuses: filters.status ?? [],
       },
@@ -380,8 +381,8 @@ export async function listPeople(
     for (const company of selectedCompanies) {
       const statuses = await computeCurrentStatusForPeople(
         {
+          accountId,
           at,
-          clerkOrgId,
           organisationId: company.id,
           people: pageRows
             .filter((person) => person.organisation_id === company.id)
@@ -422,7 +423,7 @@ function buildPeopleWhere({
 }: {
   filters: PeopleFilters;
   scoped: {
-    clerk_org_id: string;
+    account_id: string;
     organisation_id: { in: string[] };
   };
   visiblePersonIds: null | string[];
@@ -513,7 +514,7 @@ const LOCAL_RUNGS: Array<{
 async function buildCurrentStatusWhere(
   input: {
     at: Date;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     statuses: NonNullable<DirectoryInput["filters"]["status"]>;
   },
@@ -523,7 +524,7 @@ async function buildCurrentStatusWhere(
     return null;
   }
   const scoped = scopedQuery(
-    input.clerkOrgId as ClerkOrgId,
+    input.accountId as AccountId,
     input.organisationId as OrganisationId
   );
   const active = (
@@ -545,8 +546,8 @@ async function buildCurrentStatusWhere(
   });
   const holidayApplicability = await computePublicHolidayApplicability(
     {
+      accountId: input.accountId,
       at: input.at,
-      clerkOrgId: input.clerkOrgId,
       locationIds: locations.map(({ id }) => id),
       organisationId: input.organisationId,
     },
@@ -637,16 +638,16 @@ export async function getPersonProfile(
   input: {
     actingPersonId?: null | string;
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
     role: PeopleRole;
   },
   db: TenantDb
 ): Promise<Result<PersonProfile, PeopleServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = PersonProfileSchema.safeParse(input);
@@ -660,7 +661,7 @@ export async function getPersonProfile(
       return notAuthorised();
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const person = await client.person.findFirst({
@@ -683,8 +684,8 @@ export async function getPersonProfile(
     ] = [
       await computeCurrentStatus(
         {
+          accountId: parsed.data.accountId,
           at: new Date(),
-          clerkOrgId: parsed.data.clerkOrgId,
           locationId: person.location_id,
           organisationId: parsed.data.organisationId,
           personId: person.id,
@@ -693,7 +694,7 @@ export async function getPersonProfile(
       ),
       await listUpcomingRecords(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           horizonDays: 30,
           organisationId: parsed.data.organisationId,
           personId: person.id,
@@ -717,7 +718,7 @@ export async function getPersonProfile(
       }),
       await getXeroConnectionStateForScope(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           organisationId: parsed.data.organisationId,
         },
         client
@@ -770,7 +771,7 @@ export async function getPersonProfile(
 export async function listHistoryPage(
   input: {
     actingPersonId?: null | string;
-    clerkOrgId: string;
+    accountId: string;
     cursor?: null | string;
     organisationId: string;
     pageSize?: number;
@@ -787,9 +788,9 @@ export async function listHistoryPage(
     PeopleServiceError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = HistorySchema.safeParse(input);
@@ -800,7 +801,7 @@ export async function listHistoryPage(
       return notAuthorised();
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const person = await client.person.findFirst({
@@ -835,7 +836,7 @@ export async function listHistoryPage(
 }
 export async function listUpcomingRecords(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     horizonDays?: number;
     organisationId: string;
     personId: string;
@@ -849,9 +850,9 @@ export async function listUpcomingRecords(
     PeopleServiceError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = UpcomingSchema.safeParse(input);
@@ -859,7 +860,7 @@ export async function listUpcomingRecords(
       return validationError(parsed.error);
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const person = await client.person.findFirst({
@@ -1191,23 +1192,23 @@ function maxDate(values: Array<Date | null>): Date | null {
 }
 async function personNotFound(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<Result<never, PeopleServiceError>> {
   const exists = await db.person.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { clerk_org_id: input.clerkOrgId, id: input.personId },
+    select: { account_id: true, organisation_id: true },
+    where: { account_id: input.accountId, id: input.personId },
   });
   if (
     exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
+    (exists.account_id !== input.accountId ||
       exists.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.personId,
       resourceType: "person",
@@ -1282,7 +1283,7 @@ async function directoryVisibility(
     return notAuthorised();
   }
   const value = await managerScopePersonIds(
-    { actingPersonId: input.actingPersonId, clerkOrgId: input.clerkOrgId },
+    { accountId: input.accountId, actingPersonId: input.actingPersonId },
     db
   );
   return { ok: true, value };
@@ -1290,7 +1291,7 @@ async function directoryVisibility(
 async function directoryStatusWhere(
   input: {
     at: Date;
-    clerkOrgId: string;
+    accountId: string;
     companies: DirectoryCompanies;
     statuses: NonNullable<DirectoryInput["filters"]["status"]>;
   },
@@ -1303,8 +1304,8 @@ async function directoryStatusWhere(
   for (const company of input.companies) {
     const branch = await buildCurrentStatusWhere(
       {
+        accountId: input.accountId,
         at: input.at,
-        clerkOrgId: input.clerkOrgId,
         organisationId: company.id,
         statuses: input.statuses,
       },

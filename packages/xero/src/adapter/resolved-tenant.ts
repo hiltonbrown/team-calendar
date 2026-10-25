@@ -6,7 +6,7 @@ type ResolvedAccess = Extract<AccessResult, { ok: true }>["value"];
 
 export function toResolvedXeroConnection(
   scope: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     capability?: string | readonly string[];
   },
@@ -14,8 +14,8 @@ export function toResolvedXeroConnection(
 ): XeroAccessContext {
   return {
     accessToken: access.accessToken,
+    account_id: scope.accountId,
     capability: scope.capability,
-    clerk_org_id: scope.clerkOrgId,
     deadline: access.deadline,
     id: access.connectionId,
     organisation_id: scope.organisationId,

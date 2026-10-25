@@ -55,7 +55,7 @@ vi.mock("@repo/database", async () => ({
   >("../../../../../../packages/database/src/queries/organisations")),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_1"),
+  requireAccount: () => Promise.resolve("org_1"),
 }));
 
 import { cleanup, render } from "@testing-library/react";
@@ -63,20 +63,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import FeedDetailPage from "./page";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   detail: vi.fn(),
   feedDetail: vi.fn(),
+  getSession: vi.fn(),
   preview: vi.fn(),
 }));
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const feedId = "00000000-0000-4000-8000-000000000101";
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: async () => ({ id: "user_1" }),
+  getCurrentUser: async () => ({ id: "user_1" }),
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/feeds", () => ({
   getFeedDetail: mocks.detail,
-  normaliseRole: (role: string) => role.replace("org:", ""),
+  normaliseRole: (role: string) => role,
   previewFeed: mocks.preview,
 }));
 vi.mock("next/navigation", () => ({
@@ -86,7 +86,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   resolveActiveOrgPageContext: async () => ({
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     organisationId: "00000000-0000-4000-8000-000000000001",
   }),
 }));
@@ -107,7 +107,7 @@ const pageInput = () => ({
 describe("Feed detail full page preview loading", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "viewer" });
     mocks.detail.mockResolvedValue({
       ok: true,
       value: { id: feedId, isOwnedByActor: false, privacyMode: "named" },
@@ -115,10 +115,10 @@ describe("Feed detail full page preview loading", () => {
   });
   afterEach(cleanup);
 
-  it.each(["org:viewer", "org:manager"])(
+  it.each(["viewer", "manager"])(
     "passes preview errors separately to the presentation for %s",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       mocks.preview.mockResolvedValue({
         error: {
           code: "unknown_error",
@@ -137,9 +137,9 @@ describe("Feed detail full page preview loading", () => {
       );
       expect(mocks.preview).toHaveBeenCalledWith(
         {
-          actingRole: orgRole.replace("org:", ""),
+          accountId: "org_1",
+          actingRole: role,
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           feedId,
           horizonDays: 30,
           organisationId,
@@ -159,7 +159,7 @@ describe("Feed detail full page preview loading", () => {
   });
 
   it("retains per-mode failure information alongside successful administrator previews", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
     mocks.preview.mockImplementation(async ({ privacyMode }) =>
       privacyMode === "masked"
         ? { error: { message: "Masked preview unavailable" }, ok: false }

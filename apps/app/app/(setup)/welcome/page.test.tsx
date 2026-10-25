@@ -55,16 +55,16 @@ vi.mock("@repo/database", async () => ({
   >("../../../../../packages/database/src/queries/organisations")),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_1"),
+  requireAccount: () => Promise.resolve("org_1"),
 }));
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
   getPersonProfile: vi.fn(),
+  getSession: vi.fn(),
   listFeeds: vi.fn(),
   loadWelcomeEligibility: vi.fn(),
   redirect: vi.fn((path: string) => {
@@ -74,8 +74,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   getPersonProfile: mocks.getPersonProfile,
@@ -144,10 +144,10 @@ async function renderPage(params: Record<string, string> = {}) {
 
 describe("WelcomePage", () => {
   beforeEach(() => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
-    mocks.currentUser.mockResolvedValue({ id: "user_m" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "viewer" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_m" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
       orgQueryValue: null,
     });

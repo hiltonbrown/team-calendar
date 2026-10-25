@@ -35,7 +35,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
   "people",
 ]);
 const SyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -50,7 +50,7 @@ const SyncEventSchema = z.object({
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
 });
 const CancelSyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
   runId: z.string().uuid(),
 });
@@ -99,7 +99,7 @@ export async function dispatchSyncEvent(
     const runId = parsed.data.runId ?? randomUUID();
     const sent = await inngest.send({
       data: {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
         organisationId: parsed.data.organisationId,
         personId: parsed.data.personId,

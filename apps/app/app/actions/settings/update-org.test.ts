@@ -1,17 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  clerkClient: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getSession: vi.fn(),
   revalidatePath: vi.fn(),
+  updateAccount: vi.fn(),
   updateMany: vi.fn(),
-  updateOrganization: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  clerkClient: mocks.clerkClient,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -62,21 +60,17 @@ const validInput = {
 describe("updateOrg", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:viewer",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "viewer",
     });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: "org_1", organisationId },
+      value: { accountId: "org_1", organisationId },
     });
     mocks.updateMany.mockResolvedValue({ count: 1 });
-    mocks.clerkClient.mockResolvedValue({
-      organizations: {
-        updateOrganization: mocks.updateOrganization,
-      },
-    });
-    mocks.updateOrganization.mockResolvedValue({});
+
+    mocks.updateAccount.mockResolvedValue({});
   });
 
   it("rejects viewers before touching the database or Clerk", async () => {
@@ -85,13 +79,12 @@ describe("updateOrg", () => {
     expect(result.ok).toBe(false);
     expect(mocks.getActiveOrgContext).not.toHaveBeenCalled();
     expect(mocks.updateMany).not.toHaveBeenCalled();
-    expect(mocks.clerkClient).not.toHaveBeenCalled();
   });
 
   it("allows admins to update organisation settings", async () => {
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "admin",
     });
 
     const result = await updateOrg(validInput);
@@ -106,22 +99,31 @@ describe("updateOrg", () => {
         timezone: "Australia/Sydney",
         working_hours_per_day: 7.6,
       },
-      where: { clerk_org_id: "org_1", id: organisationId },
+      where: { account_id: "org_1", id: organisationId },
     });
-    expect(mocks.updateOrganization).toHaveBeenCalled();
+    expect(mocks.updateAccount).toHaveBeenCalled();
   });
 
   it("bails out before updating Clerk when no organisation row matches", async () => {
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "admin",
     });
     mocks.updateMany.mockResolvedValue({ count: 0 });
 
     const result = await updateOrg(validInput);
 
     expect(result.ok).toBe(false);
-    expect(mocks.clerkClient).not.toHaveBeenCalled();
-    expect(mocks.updateOrganization).not.toHaveBeenCalled();
+
+    expect(mocks.updateAccount).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("@repo/auth/accounts", () => ({
+  accountDirectory: {
+    inviteMembers: vi.fn(),
+    listInvitations: vi.fn(),
+    listMembers: vi.fn(),
+  },
+  updateAccount: mocks.updateAccount,
+}));

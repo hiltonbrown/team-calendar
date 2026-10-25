@@ -14,8 +14,8 @@ const mocks = vi.hoisted(() => ({
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
   scopeDatabase: null as Record<string, unknown> | null,
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   syncRunCreate: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock("../client", () => ({
     send: mocks.inngestSend,
   },
 }));
-vi.mock("@repo/auth/server", () => ({ clerkClient: vi.fn() }));
+vi.mock("@repo/auth/accounts", () => ({ listAccountMembers: vi.fn() }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     // Real scope ownership and effects are exercised against this area's delegate fake.
@@ -132,7 +132,7 @@ vi.mock("@repo/xero", async () => ({
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
   toResolvedXeroConnection: (scope, value) => ({
     ...value,
-    clerk_org_id: scope.clerkOrgId,
+    account_id: scope.accountId,
     id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
@@ -142,14 +142,14 @@ vi.mock("@repo/xero", async () => ({
 const { reconcileXeroApprovalState } = await import(
   "./reconcile-xero-approval-state"
 );
-const CLERK_ORG_ID = "org_reconciliation_guard";
+const ACCOUNT_ID = "org_reconciliation_guard";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
 const XERO_CONNECTION_ID = "20000000-0000-4000-8000-000000000001";
 const RECORD_ID = "80000000-0000-4000-8000-000000000001";
 function input() {
   return {
-    clerkOrgId: CLERK_ORG_ID,
+    accountId: ACCOUNT_ID,
     connectionId: XERO_CONNECTION_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -162,10 +162,10 @@ function record() {
     failed_action: null,
     id: RECORD_ID,
     person: {
-      clerk_user_id: "user_record_owner",
       first_name: "Ada",
       id: "70000000-0000-4000-8000-000000000001",
       last_name: "Lovelace",
+      user_id: "user_record_owner",
       xero_employee_id: "xero-employee-1",
     },
     record_type: "annual_leave",
@@ -231,7 +231,7 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           OR: expect.arrayContaining([{ xero_write_claimed_at: null }]),
           organisation_id: ORGANISATION_ID,
         }),
@@ -258,8 +258,8 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           approval_status: "submitted",
-          clerk_org_id: CLERK_ORG_ID,
           derived_sequence: 4,
           organisation_id: ORGANISATION_ID,
         }),
@@ -601,7 +601,7 @@ describe("reconcile Xero approval state bounding", () => {
           xero_approval_checked_at: expect.any(Date),
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: RECORD_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -781,7 +781,7 @@ describe("reconcile Xero approval state bounding", () => {
           xero_approval_checked_at: expect.any(Date),
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: RECORD_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -835,11 +835,11 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         include: {
           person: {
             select: {
-              clerk_user_id: true,
               first_name: true,
               id: true,
               last_name: true,
-              manager: { select: { clerk_user_id: true, id: true } },
+              manager: { select: { id: true, user_id: true } },
+              user_id: true,
               xero_employee_id: true,
             },
           },
@@ -938,7 +938,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
           xero_approval_checked_at: expect.any(Date),
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: RECORD_ID,
           organisation_id: ORGANISATION_ID,
         }),

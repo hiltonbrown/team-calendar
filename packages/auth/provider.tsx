@@ -3,15 +3,19 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { useTheme } from "next-themes";
-import type { ComponentProps } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
-type AuthProviderProperties = ComponentProps<typeof ClerkProvider> & {
+interface AuthProviderProperties {
+  afterSignOutUrl?: string;
+  children: ReactNode;
+  helpUrl?: string;
   privacyUrl?: string;
   termsUrl?: string;
-  helpUrl?: string;
-};
+}
 
-type AuthAppearance = NonNullable<AuthProviderProperties["appearance"]>;
+type AuthAppearance = NonNullable<
+  ComponentProps<typeof ClerkProvider>["appearance"]
+>;
 
 export const chooseOrganizationTaskUrl = "/session-tasks/choose-organization";
 
@@ -21,7 +25,6 @@ export const AuthProvider = ({
   helpUrl,
   ...properties
 }: AuthProviderProperties) => {
-  const { taskUrls, ...clerkProperties } = properties;
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const theme: AuthAppearance["theme"] = isDark ? dark : undefined;
@@ -67,14 +70,13 @@ export const AuthProvider = ({
     privacyPageUrl: privacyUrl,
     termsPageUrl: termsUrl,
   };
-  const sessionTaskUrls: NonNullable<AuthProviderProperties["taskUrls"]> = {
+  const sessionTaskUrls = {
     "choose-organization": chooseOrganizationTaskUrl,
-    ...taskUrls,
   };
 
   return (
     <ClerkProvider
-      {...clerkProperties}
+      {...properties}
       appearance={{ elements, options, theme, variables }}
       taskUrls={sessionTaskUrls}
     />

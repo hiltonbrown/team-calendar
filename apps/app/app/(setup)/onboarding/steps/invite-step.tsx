@@ -22,12 +22,12 @@ import {
 } from "../_actions";
 import { ActionError, StepHeading } from "./step-heading";
 
-type InviteRole = "org:admin" | "org:manager" | "org:viewer";
+type InviteRole = "admin" | "manager" | "viewer";
 
 const ROLE_OPTIONS: { label: string; value: InviteRole }[] = [
-  { label: "Admin", value: "org:admin" },
-  { label: "Manager", value: "org:manager" },
-  { label: "Viewer", value: "org:viewer" },
+  { label: "Admin", value: "admin" },
+  { label: "Manager", value: "manager" },
+  { label: "Viewer", value: "viewer" },
 ];
 
 interface InviteRow {
@@ -43,7 +43,7 @@ function rowsFromRoster(roster: RosterPerson[]): InviteRow[] {
     email: person.email,
     key: person.id,
     name: person.name,
-    role: person.hasDirectReports ? "org:manager" : "org:viewer",
+    role: person.hasDirectReports ? "manager" : "viewer",
     selected: true,
   }));
 }
@@ -55,7 +55,7 @@ function manualRow(): InviteRow {
     email: "",
     key: `manual-${manualRowCount}`,
     name: null,
-    role: "org:viewer",
+    role: "viewer",
     selected: true,
   };
 }

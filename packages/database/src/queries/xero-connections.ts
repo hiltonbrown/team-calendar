@@ -5,12 +5,12 @@ import type { Prisma } from "../../generated/client";
 import { systemDatabase } from "../system-client";
 import { assertNoTenantTransaction } from "../tenant-guard";
 export interface XeroScope {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }
 export function xeroScope(input: XeroScope) {
   return {
-    clerk_org_id: input.clerkOrgId,
+    account_id: input.accountId,
     organisation_id: input.organisationId,
   };
 }
@@ -33,7 +33,7 @@ export async function getScopedXeroConnection(
   >
 > {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tx = db;
 
     const connection = await tx.xeroConnection.findFirst({
@@ -74,7 +74,7 @@ export async function markScopedXeroConnectionReconnectRequired(
     }
 ): Promise<boolean> {
   assertNoTenantTransaction("markScopedXeroConnectionReconnectRequired");
-  const found = await withTenantDb(input.clerkOrgId, (db) =>
+  const found = await withTenantDb(input.accountId, (db) =>
     hasScopedXeroReconnectTarget(input, db)
   );
   if (!found) {
@@ -109,7 +109,7 @@ export async function hasScopedXeroReconnectTarget(
   input: XeroScope & { connectionId: string },
   db: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const connection = await db.xeroConnection.findFirst({
     select: { id: true },
     where: { ...xeroScope(input), id: input.connectionId, released_at: null },
@@ -123,7 +123,7 @@ export async function getScopedXeroAuthorisationMetadata(
   db: TenantDb
 ): Promise<{ status: string; last_refreshed_at: Date | null } | null> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const connection = await client.xeroConnection.findFirst({

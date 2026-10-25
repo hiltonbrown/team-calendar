@@ -1,7 +1,9 @@
 "use server";
 
-import { auth } from "@repo/auth/server";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getSession } from "@repo/auth/server";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -40,18 +42,24 @@ export async function createManualPersonAction(input: {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const { orgId, orgRole } = await auth();
-  if (!orgId || (orgRole !== "org:admin" && orgRole !== "org:owner")) {
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
+  if (!(sessionAccountId && can(sessionRole, { people: ["manage"] }))) {
     return notAuthorised();
   }
 
-  // Trusted Clerk account, and company UUID validated in the same SQL scope.
-  const clerkOrgId = orgId as ClerkOrgId;
+  // Trusted Account, and company UUID validated in the same SQL scope.
+  const accountId = sessionAccountId as AccountId;
   let created: ActionResult<{ personId: string }>;
   try {
-    created = await withTenantResult(clerkOrgId, async (db) => {
+    created = await withTenantResult(accountId, async (db) => {
       const company = await getOrganisationById(
-        clerkOrgId,
+        accountId,
         parsed.data.organisationId as OrganisationId,
         db
       );
@@ -61,7 +69,7 @@ export async function createManualPersonAction(input: {
       const result = await createManualPerson(
         {
           ...parsed.data,
-          clerkOrgId,
+          accountId,
           organisationId: company.value.id as OrganisationId,
         },
         db

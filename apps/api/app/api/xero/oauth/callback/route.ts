@@ -1,5 +1,6 @@
-import { requireRole } from "@repo/auth/helpers";
-import { auth } from "@repo/auth/server";
+import { hasPermission } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getSession } from "@repo/auth/server";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import {
@@ -75,17 +76,22 @@ export async function GET(request: Request) {
       )
     );
   }
-  const session = await auth();
-  if (!(session.orgId && session.userId)) {
+  const session = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  if (!(session.accountId && session.userId)) {
     return clearNonce(
       NextResponse.json({ error: "Not authenticated." }, { status: 401 })
     );
   }
   const [admin, owner] = await Promise.all([
-    requireRole("org:admin"),
-    requireRole("org:owner"),
+    hasPermission({ xero: ["connect"] }),
+    hasPermission({ ownership: ["manage"] }),
   ]);
-  if (!hasCallbackPrivilege(session.orgRole, admin, owner)) {
+  if (!hasCallbackPrivilege(session.role, admin, owner)) {
     return clearNonce(
       NextResponse.json(
         { error: "Only admins and owners can connect Xero." },
@@ -121,7 +127,7 @@ export async function GET(request: Request) {
     .map((cookie) => cookie.trim().split("=", 2))
     .find(([name]) => name === "xero_oauth_nonce")?.[1];
   const callback = {
-    authenticatedClerkOrgId: session.orgId,
+    authenticatedAccountId: session.accountId,
     authenticatedUserId: session.userId,
     nonce: nonce ?? null,
     state,
@@ -137,13 +143,13 @@ export async function GET(request: Request) {
   }
   if ("connected" in result.value && result.value.connected) {
     await captureXeroConnected({
-      clerkOrgId: session.orgId,
+      accountId: session.accountId,
       connectionId: result.value.connected.connectionId,
       organisationId: result.value.connected.organisationId,
     });
     try {
       await dispatchInitialXeroSync({
-        clerkOrgId: session.orgId,
+        accountId: session.accountId,
         connectionId: result.value.connected.connectionId,
         organisationId: result.value.connected.organisationId,
         triggeredByUserId: session.userId,
@@ -164,5 +170,5 @@ function hasCallbackPrivilege(
   admin: boolean,
   owner: boolean
 ): boolean {
-  return (admin || owner) && (role === "org:admin" || role === "org:owner");
+  return (admin || owner) && can(role, { xero: ["manage"] });
 }

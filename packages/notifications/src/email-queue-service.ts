@@ -20,9 +20,9 @@ export interface SendQueuedNotificationEmailsSummary {
 }
 
 const QueueSchema = z.object({
+  accountId: z.string().min(1),
   actionUrl: z.string().nullable().optional(),
   body: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   emailTemplate: z.string().min(1),
   notificationId: z.string().uuid().nullable().optional(),
   notificationType: z.string().min(1),
@@ -42,7 +42,7 @@ export async function enqueueNotificationEmail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof enqueueNotificationEmail> => {
@@ -56,9 +56,9 @@ export async function enqueueNotificationEmail(
     );
     const row = await client.notificationEmailQueue.create({
       data: {
+        account_id: parsed.data.accountId,
         action_url: parsed.data.actionUrl ?? null,
         body: parsed.data.body,
-        clerk_org_id: parsed.data.clerkOrgId,
         email_template: parsed.data.emailTemplate,
         merge_data: {
           actionUrl: parsed.data.actionUrl ?? null,
@@ -77,13 +77,13 @@ export async function enqueueNotificationEmail(
     return { ok: true, value: { queued: true, queueId: row.id } };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
 
 export async function sendQueuedNotificationEmails(
-  clerkOrgId: string
+  accountId: string
 ): Promise<
   Result<SendQueuedNotificationEmailsSummary, EmailQueueServiceError>
 > {
@@ -99,11 +99,11 @@ export async function sendQueuedNotificationEmails(
   }
 
   try {
-    const rows = await withTenantDb(clerkOrgId, (db) =>
+    const rows = await withTenantDb(accountId, (db) =>
       db.notificationEmailQueue.findMany({
         orderBy: { queued_at: "asc" },
         take: 50,
-        where: { clerk_org_id: clerkOrgId, status: "queued" },
+        where: { account_id: accountId, status: "queued" },
       })
     );
     const summary = { failed: 0, processed: rows.length, sent: 0 };
@@ -120,14 +120,14 @@ export async function sendQueuedNotificationEmails(
         });
 
         if (result.ok) {
-          await withTenantDb(clerkOrgId, (db) =>
+          await withTenantDb(accountId, (db) =>
             db.notificationEmailQueue.update({
               data: {
                 attempts: { increment: 1 },
                 sent_at: new Date(),
                 status: "sent",
               },
-              where: { clerk_org_id: clerkOrgId, id: row.id },
+              where: { account_id: accountId, id: row.id },
             })
           );
           summary.sent += 1;
@@ -135,7 +135,7 @@ export async function sendQueuedNotificationEmails(
         }
 
         summary.failed += 1;
-        await updateFailedEmail(clerkOrgId, row.id, row.attempts, result.error);
+        await updateFailedEmail(accountId, row.id, row.attempts, result.error);
       } catch (error) {
         summary.failed += 1;
         const message =
@@ -146,7 +146,7 @@ export async function sendQueuedNotificationEmails(
           error,
           queueId: row.id,
         });
-        await updateFailedEmail(clerkOrgId, row.id, row.attempts, message);
+        await updateFailedEmail(accountId, row.id, row.attempts, message);
       }
     }
 
@@ -168,20 +168,20 @@ function hasConfiguredEmailTransport(): boolean {
 }
 
 async function updateFailedEmail(
-  clerkOrgId: string,
+  accountId: string,
   id: string,
   attempts: number,
   error: string
 ): Promise<void> {
   const nextAttempts = attempts + 1;
-  await withTenantDb(clerkOrgId, (db) =>
+  await withTenantDb(accountId, (db) =>
     db.notificationEmailQueue.update({
       data: {
         attempts: { increment: 1 },
         last_error: error,
         status: nextAttempts >= 5 ? "failed" : "queued",
       },
-      where: { clerk_org_id: clerkOrgId, id },
+      where: { account_id: accountId, id },
     })
   );
 }

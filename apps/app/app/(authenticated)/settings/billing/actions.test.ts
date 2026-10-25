@@ -5,11 +5,11 @@ const mocks = vi.hoisted(() => ({
   createPortalSession: vi.fn(),
   redirect: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -25,15 +25,15 @@ vi.mock("next/navigation", () => ({
 
 const { startCheckout, startPortal } = await import("./actions");
 
-const clerkOrgId = "org_1";
+const accountId = "org_1";
 const redirectUrl = "https://stripe.example/session";
 
 describe("billing actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
-    mocks.requirePageRole.mockResolvedValue(undefined);
-    mocks.requireActiveOrgPageContext.mockResolvedValue({ clerkOrgId });
+    mocks.requirePagePermission.mockResolvedValue(undefined);
+    mocks.requireActiveOrgPageContext.mockResolvedValue({ accountId });
     mocks.createCheckoutSession.mockResolvedValue({
       ok: true,
       value: redirectUrl,
@@ -67,7 +67,9 @@ describe("billing actions", () => {
 
   describe("startCheckout", () => {
     it("does not create a checkout session or redirect when unauthorised", async () => {
-      mocks.requirePageRole.mockRejectedValue(new Error("Permission denied"));
+      mocks.requirePagePermission.mockRejectedValue(
+        new Error("Permission denied")
+      );
 
       await expect(startCheckout("basic")).rejects.toThrow("Permission denied");
 
@@ -76,7 +78,9 @@ describe("billing actions", () => {
     });
 
     it("does not resolve organisation context when the role gate rejects", async () => {
-      mocks.requirePageRole.mockRejectedValue(new Error("Permission denied"));
+      mocks.requirePagePermission.mockRejectedValue(
+        new Error("Permission denied")
+      );
 
       await expect(startCheckout("basic")).rejects.toThrow("Permission denied");
 
@@ -86,9 +90,11 @@ describe("billing actions", () => {
     it("redirects to Stripe after the role gate permits checkout", async () => {
       await expect(startCheckout("premium")).rejects.toThrow("NEXT_REDIRECT");
 
-      expect(mocks.requirePageRole).toHaveBeenCalledWith("org:admin");
+      expect(mocks.requirePagePermission).toHaveBeenCalledWith({
+        billing: ["checkout"],
+      });
       expect(mocks.createCheckoutSession).toHaveBeenCalledWith(
-        clerkOrgId,
+        accountId,
         "premium"
       );
       expect(mocks.redirect).toHaveBeenCalledWith(redirectUrl);
@@ -110,7 +116,9 @@ describe("billing actions", () => {
 
   describe("startPortal", () => {
     it("does not create a portal session or redirect when unauthorised", async () => {
-      mocks.requirePageRole.mockRejectedValue(new Error("Permission denied"));
+      mocks.requirePagePermission.mockRejectedValue(
+        new Error("Permission denied")
+      );
 
       await expect(startPortal()).rejects.toThrow("Permission denied");
 
@@ -119,7 +127,9 @@ describe("billing actions", () => {
     });
 
     it("does not resolve organisation context when the role gate rejects", async () => {
-      mocks.requirePageRole.mockRejectedValue(new Error("Permission denied"));
+      mocks.requirePagePermission.mockRejectedValue(
+        new Error("Permission denied")
+      );
 
       await expect(startPortal()).rejects.toThrow("Permission denied");
 
@@ -129,8 +139,10 @@ describe("billing actions", () => {
     it("redirects to Stripe after the role gate permits portal access", async () => {
       await expect(startPortal()).rejects.toThrow("NEXT_REDIRECT");
 
-      expect(mocks.requirePageRole).toHaveBeenCalledWith("org:admin");
-      expect(mocks.createPortalSession).toHaveBeenCalledWith(clerkOrgId);
+      expect(mocks.requirePagePermission).toHaveBeenCalledWith({
+        billing: ["portal"],
+      });
+      expect(mocks.createPortalSession).toHaveBeenCalledWith(accountId);
       expect(mocks.redirect).toHaveBeenCalledWith(redirectUrl);
     });
 

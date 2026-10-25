@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => ({
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
   scopeDatabase: null as Record<string, unknown> | null,
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   syncRunCreate: vi.fn(),
@@ -130,7 +130,7 @@ vi.mock("@repo/xero", async () => ({
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
   toResolvedXeroConnection: (scope, value) => ({
     ...value,
-    clerk_org_id: scope.clerkOrgId,
+    account_id: scope.accountId,
     id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
@@ -139,7 +139,7 @@ vi.mock("@repo/xero", async () => ({
   toValidatedLeaveBalanceRawPayload: mocks.toValidatedLeaveBalanceRawPayload,
 }));
 const { syncXeroLeaveBalances } = await import("./sync-xero-leave-balances");
-const CLERK_ORG_ID = "org_balances_lifecycle";
+const ACCOUNT_ID = "org_balances_lifecycle";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
 const XERO_CONNECTION_ID = "20000000-0000-4000-8000-000000000001";
@@ -157,7 +157,7 @@ function expectRosterUnchanged() {
 }
 function input() {
   return {
-    clerkOrgId: CLERK_ORG_ID,
+    accountId: ACCOUNT_ID,
     connectionId: XERO_CONNECTION_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -213,7 +213,7 @@ describe("leave balances sync run lifecycle", () => {
     expect(mocks.syncRunFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           organisation_id: ORGANISATION_ID,
           run_type: "leave_balances",
           status: "running",
@@ -518,8 +518,8 @@ describe("leave balances sync run lifecycle", () => {
         orderBy: { id: "asc" },
         take: 41,
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           archived_at: null,
-          clerk_org_id: CLERK_ORG_ID,
           organisation_id: ORGANISATION_ID,
           xero_employee_id: { not: null },
         }),
@@ -539,8 +539,8 @@ describe("leave balances sync run lifecycle", () => {
           balance_next_person_id: people[39]?.id,
         }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: null,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -554,7 +554,7 @@ describe("leave balances sync run lifecycle", () => {
           leave_balances_stale_since: expect.any(Date),
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -607,8 +607,8 @@ describe("leave balances sync run lifecycle", () => {
           balance_next_person_id: people[39]?.id,
         }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: cursorPersonId,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -721,8 +721,8 @@ describe("leave balances sync run lifecycle", () => {
       expect.objectContaining({
         data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: cursorPersonId,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -760,8 +760,8 @@ describe("leave balances sync run lifecycle", () => {
       expect.objectContaining({
         data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: cursorPersonId,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -1082,8 +1082,8 @@ describe("leave balances sync run lifecycle", () => {
           balance_next_person_id: people[39]?.id,
         }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: null,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -1150,8 +1150,8 @@ describe("leave balances sync run lifecycle", () => {
           balance_next_person_id: people[39]?.id,
         }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: null,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -1275,8 +1275,8 @@ describe("leave balances sync run lifecycle", () => {
       expect.objectContaining({
         data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           balance_next_person_id: null,
-          clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
           organisation_id: ORGANISATION_ID,
         }),

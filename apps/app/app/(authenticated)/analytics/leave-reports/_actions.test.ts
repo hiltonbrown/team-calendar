@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     organisation: { findFirst: vi.fn() },
   },
   exportAnalyticsToCsv: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   listLeaveReportRecordsForDrilldown: vi.fn(),
   resolveDateRange: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   exportAnalyticsToCsv: mocks.exportAnalyticsToCsv,
@@ -48,17 +48,17 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 const { exportLeaveReportsCsvAction } = await import("./_actions");
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 
 describe("analytics leave-reports server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.database.organisation.findFirst.mockResolvedValue({
       timezone: "UTC",
@@ -80,7 +80,7 @@ describe("analytics leave-reports server actions", () => {
 
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
 
       const result = await exportLeaveReportsCsvAction({
         organisationId,
@@ -97,7 +97,10 @@ describe("analytics leave-reports server actions", () => {
     });
 
     it("rejects non-manager/admin/owner roles", async () => {
-      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:viewer" });
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "viewer",
+      });
 
       const result = await exportLeaveReportsCsvAction({
         organisationId,
@@ -119,7 +122,7 @@ describe("analytics leave-reports server actions", () => {
       }
     });
 
-    it("scopes organisation lookup to clerk_org_id and organisation_id", async () => {
+    it("scopes organisation lookup to account_id and organisation_id", async () => {
       await exportLeaveReportsCsvAction({
         organisationId,
         preset: "this_year",
@@ -128,8 +131,8 @@ describe("analytics leave-reports server actions", () => {
       expect(mocks.database.organisation.findFirst).toHaveBeenCalledWith({
         select: { timezone: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       });
@@ -152,8 +155,8 @@ describe("analytics leave-reports server actions", () => {
       });
       expect(mocks.listLeaveReportRecordsForDrilldown).toHaveBeenCalledWith(
         expect.objectContaining({
+          accountId,
           actingUserId: userId,
-          clerkOrgId,
           organisationId,
           role: "admin",
         }),

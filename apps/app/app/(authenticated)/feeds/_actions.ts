@@ -1,8 +1,9 @@
 "use server";
 
 import { analytics } from "@repo/analytics/server";
-import { auth, currentUser } from "@repo/auth/server";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import {
   afterTenantCommit,
   type TenantDb,
@@ -72,9 +73,9 @@ export async function createFeedAction(input: CreateFeedActionInput): Promise<
     createFeed,
     {
       ...parsed.data,
+      accountId: context.value.accountId,
       actingRole: context.value.role,
       actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
     },
     true
@@ -110,9 +111,9 @@ export async function updateFeedAction(
     updateFeed,
     {
       ...parsed.data,
+      accountId: context.value.accountId,
       actingRole: context.value.role,
       actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
     },
     true
@@ -167,9 +168,9 @@ export async function createOwnFeedAction(
     context.value,
     createOwnFeed,
     {
+      accountId: context.value.accountId,
       actingRole: context.value.role,
       actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
       kind: parsed.data.kind,
       organisationId: context.value.organisationId,
     },
@@ -207,9 +208,9 @@ export async function issueTokenAction(
   }
   const result = await runFeedWrite(context.value, issueToken, {
     ...parsed.data,
+    accountId: context.value.accountId,
     actingRole: context.value.role,
     actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
     organisationId: context.value.organisationId,
   });
   if (!result.ok) {
@@ -238,9 +239,9 @@ export async function rotateTokenAction(
   }
   const result = await runFeedWrite(context.value, rotateToken, {
     ...parsed.data,
+    accountId: context.value.accountId,
     actingRole: context.value.role,
     actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
     organisationId: context.value.organisationId,
   });
   if (!result.ok) {
@@ -250,13 +251,13 @@ export async function rotateTokenAction(
   // Fetch feed name cheaply to include in notification body
   let feedName: string | null = null;
   try {
-    const feed = await withTenantDb(context.value.clerkOrgId, (db) =>
+    const feed = await withTenantDb(context.value.accountId, (db) =>
       db.feed.findFirst({
         select: { name: true },
         where: {
-          // Both tenant keys: one Clerk Organisation can own several Organisation
-          // rows (one per Xero file), so clerk_org_id alone spans payroll entities.
-          clerk_org_id: context.value.clerkOrgId,
+          // Both tenant keys: one Account can own several Organisation
+          // rows (one per Xero file), so account_id alone spans payroll entities.
+          account_id: context.value.accountId,
           id: parsed.data.feedId,
           organisation_id: context.value.organisationId,
         },
@@ -282,10 +283,10 @@ export async function rotateTokenAction(
 
   try {
     const phaseInput1 = {
+      accountId: context.value.accountId,
       actionUrl,
       actorUserId: context.value.userId,
       body,
-      clerkOrgId: context.value.clerkOrgId,
       objectId: parsed.data.feedId,
       objectType: "feed",
       organisationId: context.value.organisationId,
@@ -294,9 +295,8 @@ export async function rotateTokenAction(
       title: "Feed token rotated",
       type: "feed_token_rotated",
     } satisfies Parameters<typeof dispatchNotification>[0];
-    const dispatchResult = await withTenantResult(
-      phaseInput1.clerkOrgId,
-      (db) => dispatchNotification(phaseInput1, undefined, db)
+    const dispatchResult = await withTenantResult(phaseInput1.accountId, (db) =>
+      dispatchNotification(phaseInput1, undefined, db)
     );
 
     if (!dispatchResult.ok) {
@@ -338,9 +338,9 @@ export async function revokeTokenAction(
   }
   const result = await runFeedWrite(context.value, revokeToken, {
     ...parsed.data,
+    accountId: context.value.accountId,
     actingRole: context.value.role,
     actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
     organisationId: context.value.organisationId,
   });
   if (!result.ok) {
@@ -370,9 +370,9 @@ async function command(
     service,
     {
       ...parsed.data,
+      accountId: context.value.accountId,
       actingRole: context.value.role,
       actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
     },
     true
@@ -384,7 +384,7 @@ async function command(
 }
 
 type ActorContext = FeedActionResult<{
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   role: string;
   userId: string;
@@ -403,14 +403,24 @@ async function resolveActorContext(
   organisationId: string,
   options: { requireAdmin: boolean }
 ): Promise<ActorContext> {
-  const [{ orgRole, orgId }, user] = await Promise.all([auth(), currentUser()]);
-  const role = normaliseRole(orgRole);
-  const isAdmin =
-    role === "admin" ||
-    role === "owner" ||
-    role === "org:admin" ||
-    role === "org:owner";
-  if (!(user && orgRole && orgId && (isAdmin || !options.requireAdmin))) {
+  const [{ role: sessionRole, accountId: sessionAccountId }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const role = normaliseRole(sessionRole);
+  const isAdmin = can(role, { feeds: ["manageAll"] });
+  if (
+    !(user && role && sessionAccountId && (isAdmin || !options.requireAdmin))
+  ) {
     return {
       error: {
         code: "not_authorised",
@@ -422,7 +432,7 @@ async function resolveActorContext(
   return {
     ok: true,
     value: {
-      clerkOrgId: orgId,
+      accountId: sessionAccountId,
       organisationId,
       role,
       userId: user.id,
@@ -455,7 +465,7 @@ function validationError(message?: string): FeedActionResult<never> {
 
 async function runFeedWrite<T>(
   actor: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     role: string;
     userId: string;
@@ -466,11 +476,11 @@ async function runFeedWrite<T>(
 ): Promise<FeedActionResult<T>> {
   try {
     return await withTenantResult(
-      actor.clerkOrgId,
+      actor.accountId,
       async (db): Promise<FeedActionResult<T>> => {
-        // The IDs come from Clerk auth and validated action schemas; query ownership is checked in this scope.
+        // The IDs come from Clerk getSession and validated action schemas; query ownership is checked in this scope.
         const company = await getOrganisationById(
-          actor.clerkOrgId as ClerkOrgId,
+          actor.accountId as AccountId,
           actor.organisationId as OrganisationId,
           db
         );

@@ -2,9 +2,9 @@ import type { Prisma } from "@repo/database/generated/client";
 import { beforeEach, expect, test, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  auth: vi.fn(),
   create: vi.fn(),
   failCreate: false,
+  getSession: vi.fn(),
   open: false,
   revalidate: vi.fn(),
   submit: vi.fn(),
@@ -22,13 +22,13 @@ vi.mock("@repo/database", async () => ({
   resolveAccountCompanies: async () => companies,
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: state.auth,
-  currentUser: async () => {
+  getCurrentUser: async () => {
     if (state.open) {
       throw new Error("Clerk ran inside transaction");
     }
     return await { id: "staff-B" };
   },
+  getSession: state.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   archiveRecord: vi.fn(),
@@ -81,11 +81,11 @@ beforeEach(() => {
   state.open = false;
   state.writes = 0;
   state.failCreate = false;
-  state.auth.mockImplementation(async () => {
+  state.getSession.mockImplementation(async () => {
     if (state.open) {
       throw new Error("Auth ran inside transaction");
     }
-    return await { orgId: "account-A", orgRole: "org:viewer" };
+    return await { accountId: "account-A", role: "viewer" };
   });
   state.revalidate.mockImplementation(() => {
     expect(state.open).toBe(false);
@@ -115,7 +115,7 @@ beforeEach(() => {
     }
   );
   state.create.mockImplementation(async (query, db) => {
-    assertTenantDb(db, query.clerkOrgId);
+    assertTenantDb(db, query.accountId);
     expect(state.open).toBe(true);
     state.writes += 1;
     return (await state.failCreate)
@@ -144,7 +144,7 @@ beforeEach(() => {
 test("B-employed creation derives B and reuses one request Result scope", async () => {
   expect((await createRecordAction(input)).ok).toBe(true);
   expect(state.create.mock.calls[0]?.[0]).toMatchObject({
-    clerkOrgId: "account-A",
+    accountId: "account-A",
     organisationId: companyB,
     personId,
   });
@@ -187,5 +187,5 @@ test("Clerk action guard rejects an enclosing SQL scope before authentication", 
   await expect(
     withTenantDb("account-A", () => createRecordAction(input))
   ).rejects.toBeInstanceOf(TenantPhaseError);
-  expect(state.auth).not.toHaveBeenCalled();
+  expect(state.getSession).not.toHaveBeenCalled();
 });

@@ -43,8 +43,8 @@ const { completeMemberWelcome, loadWelcomeEligibility } = await import(
 
 const done = new Date("2026-10-09T00:00:00.000Z");
 const admin = {
-  actingRole: "org:admin",
-  clerkOrgId: "org_1",
+  accountId: "org_1",
+  actingRole: "admin",
   organisationId: "00000000-0000-4000-8000-000000000001",
   userId: "user_admin",
 };
@@ -78,8 +78,8 @@ describe("wizard service", () => {
   it("refuses members", async () => {
     await expect(
       withTestTenantResult(
-        tenantTestAccount({ ...admin, actingRole: "org:viewer" }),
-        (db) => loadWizardSnapshot({ ...admin, actingRole: "org:viewer" }, db)
+        tenantTestAccount({ ...admin, actingRole: "viewer" }),
+        (db) => loadWizardSnapshot({ ...admin, actingRole: "viewer" }, db)
       )
     ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
     expect(mocks.loadWizardInputs).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe("wizard service", () => {
       advanceWizard(admin, "details", db)
     );
     expect(mocks.advanceOnboardingStep).toHaveBeenCalledWith(
-      admin.clerkOrgId,
+      admin.accountId,
       admin.organisationId,
       "details",
       "xero",
@@ -228,7 +228,7 @@ describe("welcome service", () => {
   });
 
   it("is eligible only for a linked member who has not finished it", async () => {
-    const member = { ...admin, actingRole: "org:viewer", userId: "user_m" };
+    const member = { ...admin, actingRole: "viewer", userId: "user_m" };
     mocks.getWelcomeState.mockResolvedValueOnce({
       ok: true,
       value: { completedAt: null, personId: "p1" },
@@ -264,7 +264,7 @@ describe("welcome service", () => {
   });
 
   it("completes the welcome for the member's own person only", async () => {
-    const member = { ...admin, actingRole: "org:viewer", userId: "user_m" };
+    const member = { ...admin, actingRole: "viewer", userId: "user_m" };
     mocks.getWelcomeState.mockResolvedValueOnce({
       ok: true,
       value: { completedAt: null, personId: "p1" },
@@ -279,7 +279,7 @@ describe("welcome service", () => {
       value: undefined,
     });
     expect(mocks.completeWelcome).toHaveBeenCalledWith(
-      member.clerkOrgId,
+      member.accountId,
       member.organisationId,
       "p1",
       "user_m",

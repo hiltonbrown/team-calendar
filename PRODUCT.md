@@ -136,29 +136,29 @@ Slack notifications, Teams integration, HTML calendar views, and additional prov
 
 ## Tenancy model
 
-Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
+Team Calendar uses **Accounts** as the top-level tenant boundary. There is no custom `workspaces` database table.
 
 Multi-entity groups are a supported capability, not the primary case. The typical customer is a single small business (one Account, one payroll entity). The model below also supports a business that grows into several payroll entities under one Account. Nothing in this section changes with buyer size; the invariants hold in both cases.
 
 | Concept | Role |
 |---|---|
-| Clerk Organisation | Top-level tenant boundary; billing anchor. Identified by Clerk's `org_id` (stored as `clerk_org_id`). One Clerk Organisation = one country code. |
-| Organisation | Legal or payroll entity within a Clerk Organisation (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns at most one XeroConnection and its own People. Account feeds span the account; company feeds may retain a company scope. |
+| Account | Top-level tenant boundary; billing anchor. Identified by Clerk's `org_id` (stored as `account_id`). One Account = one country code. |
+| Organisation | Legal or payroll entity within a Account (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns at most one XeroConnection and its own People. Account feeds span the account; company feeds may retain a company scope. |
 | XeroConnection | One per Organisation. Contains both tenancy keys, external tenant and remote connection IDs, payroll region, status and sync health/progress; references its canonical authorisation. |
 | XeroAuthorisation | One per verified Xero user and provider app. Sole AES-256-GCM encrypted token owner; may support several scoped connections. |
 | User | Authenticated identity via Clerk. Managed entirely by Clerk; no local users table. |
-| Membership | User-to-Clerk-Organisation relationship. Managed entirely by Clerk; no custom membership table. |
+| Membership | User-to-Account relationship. Managed entirely by Clerk; no custom membership table. |
 | Team | Grouping of people within an Organisation. |
 | Location | Work location within an Organisation; used for feed scoping and timezone/holiday handling. |
 
 ### Key invariants
 
-- One Clerk Organisation maps to exactly one country code. A Clerk Organisation will never span AU, NZ, and UK simultaneously. This is enforced at the application layer, not via a database constraint.
+- One Account maps to exactly one country code. A Account will never span AU, NZ, and UK simultaneously. This is enforced at the application layer, not via a database constraint.
 - One Organisation owns at most one XeroConnection (`UNIQUE` on `organisation_id`).
 - Every active XeroConnection references a canonical XeroAuthorisation; one verified grant may support multiple scoped connections.
-- A Clerk Organisation with multiple payroll entities (e.g. two AU Xero files) has multiple Organisation rows, each with its own scoped XeroConnection.
-- Billing, plan limits, and usage are enforced at the Clerk Organisation level.
-- **All database queries must filter by `clerk_org_id`**, sourced from `auth().orgId` in server context, and run through the restricted tenant client. PostgreSQL RLS also checks account and company ownership.
+- A Account with multiple payroll entities (e.g. two AU Xero files) has multiple Organisation rows, each with its own scoped XeroConnection.
+- Billing, plan limits, and usage are enforced at the Account level.
+- **All database queries must filter by `account_id`**, sourced from `(await getSession())?.accountId` in server context, and run through the restricted tenant client. PostgreSQL RLS also checks account and company ownership.
 - An unreleased Xero tenant has exactly one account owner, including while disconnected. Disconnect retains ownership. Owner-confirmed Remove company releases ownership after confirmed remote deletion and archives the company and Xero-owned history.
 - Starter allows one payroll company, Premium up to five, and Enterprise unlimited. Creation checks the current account entitlement under an account-level transaction lock.
 - Calendars default to all active companies in the account. A company filter validates against the server-resolved owned set; unknown company IDs are validation errors. Each record uses its source company's settings and acting-user Person.
@@ -166,22 +166,22 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 
 ### Auth integration
 
-- Personal Accounts are disabled in the Clerk dashboard. Every user must belong to at least one Clerk Organisation.
-- Company selectors choose a payroll Organisation inside the current account on company-scoped pages. The calendar company filter defaults to all companies. This differs from switching the top-level Clerk account; Clerk membership and role checks remain the account boundary.
-- Roles are defined once as custom roles in the Clerk dashboard and apply across all Clerk Organisations.
-- The `auth()` helper (server) and `useAuth()` / `useOrganization()` hooks (client) provide `orgId` and role context.
-- For background fetches (Inngest jobs, API routes not initiated from the active tab), call `getToken()` and pass the result in the `Authorization` header. Do not rely on the session cookie alone in background contexts.
+- Personal Accounts are disabled in the Clerk dashboard. Every user must belong to at least one Account.
+- Company selectors choose a payroll Organisation inside the current account on company-scoped pages. The calendar company filter defaults to all companies. This differs from switching the top-level Account; Clerk membership and role checks remain the account boundary.
+- Roles are defined once as custom roles in the Clerk dashboard and apply across all Accounts.
+- `packages/auth` exposes neutral session/user DTOs and helpers (`getSession`, `requireAccount`, `requireAccountResult`, `getAccountId`, `requireRole`, `hasPermission`, `hasRoleResult`, `getCurrentUser`). Clerk SDK calls and role translation stay inside its adapter. Client consumers use `useSession` and `AccountUserMenu`; account operations use the neutral account directory.
+- Inngest and background jobs carry explicit account and user context and never read sessions. Session-backed server-to-API calls obtain bearer headers through `@repo/auth/transport`.
 
 ### Roles
 
 | Role | Scope |
 |---|---|
-| owner | Full Clerk Organisation access |
-| admin | Manage all payroll companies in the current Clerk account |
+| owner | Full Account access |
+| admin | Manage all payroll companies in the current Account |
 | manager | Team and direct-report access |
-| viewer | Read-only filtered access |
+| viewer | Filtered reads and own-record self-service |
 
-Permission checks use `auth().has({ role: 'org:admin' })` or the `has()` helper from `packages/auth`. No custom roles or permissions tables are required.
+The four application roles are `owner`, `admin`, `manager` and `viewer`. `packages/auth/permissions.ts` defines their permission statements and grants. Role helpers use exact matching; permission checks use `hasPermission`, together with existing ownership, reporting, company, privacy and state constraints. Unknown roles fail closed. No custom roles or permissions tables are required while Clerk remains active.
 
 ---
 
@@ -197,7 +197,7 @@ team-calendar/
 │  └─ email/                  # notification templates (dev preview only; not deployed) (port 3003)
 ├─ packages/
 │  ├─ database/               # Prisma schema, migrations, queries
-│  ├─ auth/                   # Clerk helpers, requireOrg(), requireRole(), getOrgId()
+│  ├─ auth/                   # Clerk helpers, requireAccount(), requireRole(), getAccountId()
 │  ├─ design-system/          # shared UI components (shadcn/ui, Tailwind)
 │  ├─ core/                   # shared types, enums, Result pattern, utilities
 │  ├─ xero/                   # Xero OAuth, tenant sync, region mapping, write operations
@@ -262,12 +262,12 @@ React Email template development environment for transactional notification emai
 
 ### `packages/auth`
 
-Provides Clerk auth helpers and organisation-scoping utilities used across `apps/app` and `apps/api`.
+Provides provider-neutral authentication and account-scoping utilities used across `apps/app` and `apps/api`, backed by a Clerk adapter.
 
-- `requireOrg()`: reads `auth().orgId`; throws if absent.
-- `requireRole(role)`: reads `auth().has({ role })`; returns a 403 Result if the check fails.
-- `getOrgId()`: returns the current `clerk_org_id` for use in database queries.
-- Re-exports Clerk's `auth()`, `currentUser()`, `useAuth()`, `useOrganization()`, `useOrganizationList()`.
+- `requireAccount()`: returns the active account ID or throws when unauthenticated or no account is selected.
+- `requireRole(role)`: returns a boolean for an exact neutral role match. `hasRoleResult(role)` preserves the unauthorised `Result` for missing identity or active account.
+- `getAccountId()`: returns the current `account_id` for use in database queries.
+- `getSession()` and `getCurrentUser()` project safe, provider-neutral DTOs. `hasPermission(request)` checks the central permission matrix. SDK exports stay private to `packages/auth`.
 - Contains no custom membership or role tables.
 
 ### `packages/xero`
@@ -321,7 +321,7 @@ Turns canonical availability into stable ICS output via `ical-generator`. Handle
 
 ### `packages/jobs`
 
-Inngest job definitions and scheduling: tenant sync scheduling, feed rebuild scheduling, nightly reconciliation, dead-letter handling. Jobs carry `clerk_org_id` and `organisation_id` in their event payloads.
+Inngest job definitions and scheduling: tenant sync scheduling, feed rebuild scheduling, nightly reconciliation, dead-letter handling. Jobs carry `account_id` and `organisation_id` in their event payloads.
 
 ### `packages/notifications`
 
@@ -330,7 +330,7 @@ In-app notification creation, SSE delivery via `apps/api`, notification preferen
 ### `packages/core`
 
 - `Result<T, E>` type
-- Branded ID types (`ClerkOrgId`, `OrganisationId`, `PersonId`, `XeroTenantId`, etc.)
+- Branded ID types (`AccountId`, `OrganisationId`, `PersonId`, `XeroTenantId`, etc.)
 - Shared enums
 - Date and timezone utilities
 - Error types
@@ -368,7 +368,7 @@ NotificationPreference
 AuditEvent
 Plan
 PlanLimit
-ClerkOrgSubscription
+AccountSubscription
 UsageCounter
 ```
 
@@ -380,13 +380,13 @@ The full Prisma schema is the authoritative reference and lives at `packages/dat
 
 ### Tenant isolation
 
-Every tenant-scoped table carries `clerk_org_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. Application filters and PostgreSQL RLS both enforce this boundary. Tenant clients use `DATABASE_APP_URL`, a non-owner role, and transaction-local `app.clerk_org_id`; missing context denies access. `DATABASE_URL` is reserved for migrations and narrowly allowlisted system discovery/grant operations.
+Every tenant-scoped table carries `account_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. Application filters and PostgreSQL RLS both enforce this boundary. Tenant clients use `DATABASE_APP_URL`, a non-owner role, and transaction-local `app.account_id`; missing context denies access. `DATABASE_URL` is reserved for migrations and narrowly allowlisted system discovery/grant operations.
 
-The join tables `feed_tokens`, `feed_scopes`, and `availability_publications` now carry their own `clerk_org_id` column for direct tenant isolation.
+The join tables `feed_tokens`, `feed_scopes`, and `availability_publications` now carry their own `account_id` column for direct tenant isolation.
 
 ### `organisations`
 
-Legal or payroll entity within a Clerk Organisation. One Clerk Organisation may have multiple rows (e.g. Acme Restaurants, Acme Hotels). `country_code` is uniform across all rows sharing a `clerk_org_id` (app-layer invariant, not a DB constraint).
+Legal or payroll entity within a Account. One Account may have multiple rows (e.g. Acme Restaurants, Acme Hotels). `country_code` is uniform across all rows sharing a `account_id` (app-layer invariant, not a DB constraint).
 
 ### `teams`
 
@@ -430,7 +430,7 @@ Core table. Holds both Xero-synced leave and manual availability entries. Unique
 
 ### `availability_publications`
 
-Materialised publishing state per AvailabilityRecord. Decouples raw data from what was actually emitted in a feed. `published_sequence` increments on material change. Carries `clerk_org_id` for direct tenant isolation.
+Materialised publishing state per AvailabilityRecord. Decouples raw data from what was actually emitted in a feed. `published_sequence` increments on material change. Carries `account_id` for direct tenant isolation.
 
 ### `leave_balances`
 
@@ -456,7 +456,7 @@ Per-organisation choices about any holiday key: `setting` is `hidden`, `working`
 
 ### `notifications`
 
-In-app notifications delivered via SSE. Per-user, per-Clerk-Organisation. SSE connections must not leak across `clerk_org_id` boundaries.
+In-app notifications delivered via SSE. Per-user, per-Account. SSE connections must not leak across `account_id` boundaries.
 
 ### `notification_preferences`
 
@@ -464,15 +464,15 @@ Per-user, per-Organisation opt-in settings. Defaults: `in_app_enabled = true`, `
 
 ### `feeds`
 
-ICS calendar feeds. `organisation_id` is nullable: a null value means the feed spans all Organisations within the Clerk Org. Unique on `(clerk_org_id, slug)`.
+ICS calendar feeds. `organisation_id` is nullable: a null value means the feed spans all Organisations within the Account. Unique on `(account_id, slug)`.
 
 ### `feed_scopes`
 
-Normalised scope rules per feed. Each row is one include rule. Carries `clerk_org_id` for direct tenant isolation; `organisation_id` is nullable for account feeds. Account self/team rules follow the same Clerk user across company Person rows.
+Normalised scope rules per feed. Each row is one include rule. Carries `account_id` for direct tenant isolation; `organisation_id` is nullable for account feeds. Account self/team rules follow the same user across company Person rows.
 
 ### `feed_tokens`
 
-Signed, revocable tokens. `token_hash` stores per-token signing material; the plaintext bearer token is reconstructed only after feed visibility checks and is never persisted. Existing legacy random tokens remain valid through hash lookup. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 404 without a cached body. Carries `clerk_org_id` for direct tenant isolation and nullable `organisation_id` for account feeds. Default feed, token, scope and publication identities migrate in place, preserving active URLs.
+Signed, revocable tokens. `token_hash` stores per-token signing material; the plaintext bearer token is reconstructed only after feed visibility checks and is never persisted. Existing legacy random tokens remain valid through hash lookup. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 404 without a cached body. Carries `account_id` for direct tenant isolation and nullable `organisation_id` for account feeds. Default feed, token, scope and publication identities migrate in place, preserving active URLs.
 
 #### Calendar feed URL presentation
 
@@ -492,11 +492,11 @@ Dead-letter table for individual record failures within a sync run.
 
 ### `audit_events`
 
-Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level events (e.g. OAuth connection changes). `old_values_json` / `new_values_json` are arbitrary entity snapshots.
+Full lifecycle audit log. `organisation_id` is nullable to cover Account-level events (e.g. OAuth connection changes). `old_values_json` / `new_values_json` are arbitrary entity snapshots.
 
 ### Billing tables
 
-`plans` (unique on `key`), `plan_limits` (unique on `(plan_id, limit_type)`), `clerk_org_subscriptions` (unique on `clerk_org_id`; relates to `plans` via `plan_key` to `plans.key`), `usage_counters` (unique on `(clerk_org_id, metric_key, period_start, period_end)`).
+`plans` (unique on `key`), `plan_limits` (unique on `(plan_id, limit_type)`), `account_subscriptions` (unique on `account_id`; relates to `plans` via `plan_key` to `plans.key`), `usage_counters` (unique on `(account_id, metric_key, period_start, period_end)`).
 
 ---
 
@@ -516,15 +516,15 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 | `public_holidays` | `(organisation_id, source, source_remote_id)` |
 | `public_holiday_preferences` | `(organisation_id, holiday_key, location_id)` |
 | `notification_preferences` | `(user_id, organisation_id, notification_type)` |
-| `feeds` | `(clerk_org_id, slug)` |
+| `feeds` | `(account_id, slug)` |
 | `plans` | `key` |
 | `plan_limits` | `(plan_id, limit_type)` |
-| `clerk_org_subscriptions` | `clerk_org_id` |
-| `usage_counters` | `(clerk_org_id, metric_key, period_start, period_end)` |
+| `account_subscriptions` | `account_id` |
+| `usage_counters` | `(account_id, metric_key, period_start, period_end)` |
 
 ### Key indexes
 
-- `clerk_org_id` on every tenant-scoped table
+- `account_id` on every tenant-scoped table
 - `availability_records(person_id, starts_at, ends_at)`
 - `availability_records(organisation_id, publish_status, include_in_feed)`
 - `availability_records(source_type, source_last_modified_at)`
@@ -544,7 +544,7 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 
 ```text
 uid = sha256(
-  clerk_org_id + "|" +
+  account_id + "|" +
   organisation_id + "|" +
   person_id + "|" +
   source_type + "|" +
@@ -633,7 +633,7 @@ customer control or manual server action.
 | `rebuild-feed-cache` | Internal | Regenerate cached ICS feed bodies in Vercel KV |
 | `reconcile-xero-approval-state` | Bidirectional | Detect and resolve approval state drift |
 
-All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Never rely on session context inside a job handler.
+All jobs carry `account_id` and `organisation_id` in their event payloads. Never rely on session context inside a job handler.
 
 ### Outbound write operations
 
@@ -749,21 +749,21 @@ Revoked or expired tokens return `410 Gone`.
 
 ## Security
 
-- Clerk Organisation isolation on every query (filter by `clerk_org_id`).
-- Organisation scoping on all data access (filter by `organisation_id` within the Clerk Org).
+- Account isolation on every query (filter by `account_id`).
+- Organisation scoping on all data access (filter by `organisation_id` within the Account).
 - Clerk auth on all authenticated routes.
 - Xero OAuth tokens encrypted at rest using AES-256-GCM. The encryption key is stored in `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded). Tokens are never stored in plaintext.
 - Feed tokens signed and revocable; plaintext never persisted. The complete active subscribe URL is intentionally returned to authorised viewers. Revoked and expired tokens return 404 without a cached body.
 - Audit logs for all admin actions.
 - No Xero tokens, internal feed token hashes, signing material, or raw payloads are exposed to the client.
 - No secrets in client bundles.
-- SSE connections are per-user and per-Clerk-Organisation. Must not deliver notifications across `clerk_org_id` boundaries.
+- SSE connections are per-user and per-Account. Must not deliver notifications across `account_id` boundaries.
 
 ---
 
 ## Build order
 
-1. Organisation, people, team, location schema and seed data (keyed by `clerk_org_id`)
+1. Organisation, people, team, location schema and seed data (keyed by `account_id`)
 2. Xero OAuth and tenant persistence (scoped XeroConnection + canonical XeroAuthorisation)
 3. Xero employee sync (AU, NZ, UK)
 4. Xero leave inbound normalisation into `availability_records`
@@ -793,7 +793,7 @@ Each step produces a deployable, testable vertical slice.
 - No custom membership or role tables; managed entirely by Clerk.
 - One Organisation owns at most one XeroConnection (unique on `organisation_id`).
 - An active XeroConnection references its canonical verified XeroAuthorisation; connection and session rows contain no credentials.
-- `clerk_org_id` must be present on every query that touches tenant data.
+- `account_id` must be present on every query that touches tenant data.
 - Stable ICS UIDs derived from business identity, not provider IDs alone.
 - Result pattern for service-layer errors.
 - Co-located tests from the first slice.
@@ -801,13 +801,13 @@ Each step produces a deployable, testable vertical slice.
 - No em dashes anywhere.
 - Outbound Xero writes are synchronous. No background queuing of approval state.
 - Leave balances displayed in the UI are always sourced from the `leave_balances` table. Never calculated by Team Calendar.
-- SSE connections are per-user and per-Clerk-Organisation. Must not leak across organisation boundaries.
+- SSE connections are per-user and per-Account. Must not leak across organisation boundaries.
 - Notification preferences default to in-app enabled, email enabled for all types.
 - Xero write errors are surfaced to the user in plain language. Raw error payloads stored in `xero_write_error_raw` for admin audit only; never displayed to employees.
 - Xero OAuth tokens are encrypted at rest using AES-256-GCM. The `XERO_TOKEN_ENCRYPTION_KEY` environment variable must be present and validated on startup in `packages/xero`. An absent or malformed key must prevent the application from starting, not fail silently at token access time.
 - The `AvailabilityRecord` unique constraint `(organisation_id, source_type, source_remote_id)` is NULL-distinct in PostgreSQL. Application-layer guards in `packages/availability` must prevent duplicate manual records (`source_remote_id IS NULL`). Tests must assert this guard is enforced.
 
-`xero_authorisations` deliberately has no tenancy keys because one verified provider grant can support several payroll organisations. Every customer-facing resolution first selects `XeroConnection` using both `clerk_org_id` and `organisation_id`. The grant is the only persisted credential owner; there are no mirrors, legacy fallbacks, backfills, or parallel lifecycle structures.
+`xero_authorisations` deliberately has no tenancy keys because one verified provider grant can support several payroll organisations. Every customer-facing resolution first selects `XeroConnection` using both `account_id` and `organisation_id`. The grant is the only persisted credential owner; there are no mirrors, legacy fallbacks, backfills, or parallel lifecycle structures.
 
 
 ### Xero disconnection lifecycle
@@ -843,7 +843,7 @@ with no activity heuristics, separate remote-cleanup worker or management token.
 
 ### Account-wide visibility and request transactions
 
-Every role sees approved leave from all active companies in its Clerk account, with existing private and masked-record rules applied. Dashboard and People default to all companies and offer a company filter. People retains its role permissions across companies. Owners and admins use one combined approval queue; managers approve their reports in any owned company. Owners and admins can assign or clear a manager from any owned company on the People profile.
+Every role sees approved leave from all active companies in its Account, with existing private and masked-record rules applied. Dashboard and People default to all companies and offer a company filter. People retains its role permissions across companies. Owners and admins use one combined approval queue; managers approve their reports in any owned company. Owners and admins can assign or clear a manager from any owned company on the People profile.
 
 Manager visibility is stored in `account_settings`: `direct_reports_only` or `all_team_leave`. Decline reasons, declined-request visibility, notification preferences and privacy defaults remain company settings. Leave creation, submission, approval and Xero writes derive the company from the person or record, with each company's connection and settings. The notification inbox and live delivery cover the account; preference edits are company-specific.
 
@@ -853,7 +853,7 @@ Authenticated entry points open `withTenantDb` or `withTenantResult`, pass the r
 
 | Identifier | Boundary and use |
 |---|---|
-| `clerk_org_id` | Customer account, membership, roles, billing and RLS context |
+| `account_id` | Customer account, membership, roles, billing and RLS context |
 | `organisation_id` / company ID | Internal payroll company; settings, people and canonical records |
 | `xero_tenant_id` | External Xero file; one unreleased owner globally |
 | `remote_connection_id` | Exact provider connection deleted before local disconnect or release |

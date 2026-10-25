@@ -13,7 +13,7 @@ export class XeroSyncRunFencedError extends Error {
   }
 }
 export interface AcquireSyncRunInput {
-  clerkOrgId: string;
+  accountId: string;
   connectionId: string;
   organisationId: string;
   runId?: string;
@@ -207,15 +207,15 @@ export async function acquireSyncRun(
   startedAt: Date,
   db: TenantDb
 ): Promise<AcquireRunResult> {
-  assertTenantDb(db, context.clerkOrgId);
+  assertTenantDb(db, context.accountId);
   {
-    assertTenantDb(db, context.clerkOrgId);
+    assertTenantDb(db, context.accountId);
     const tx = db;
 
     await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
     // Share the existing connection lock with batch persistence and teardown;
     // the competing-run check and admission must be one atomic operation.
-    await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${context.connectionId}::uuid AND clerk_org_id = ${context.clerkOrgId} AND organisation_id = ${context.organisationId}::uuid FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${context.connectionId}::uuid AND account_id = ${context.accountId} AND organisation_id = ${context.organisationId}::uuid FOR UPDATE`;
     return await acquireSyncRunLocked(context, runType, startedAt, tx);
   }
 }
@@ -265,14 +265,14 @@ async function acquireSyncRunLocked(
  */
 export async function assertRunActive(
   context: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   },
   runId: string,
   db: TenantDb
 ): Promise<void> {
   {
-    assertTenantDb(db, context.clerkOrgId);
+    assertTenantDb(db, context.accountId);
     const client = db;
 
     const runState = await client.syncRun.findFirst({
@@ -286,15 +286,15 @@ export async function assertRunActive(
 }
 export async function isRunCancelled(
   context: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   },
   runId: string,
   db: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(db, context.clerkOrgId);
+  assertTenantDb(db, context.accountId);
   {
-    assertTenantDb(db, context.clerkOrgId);
+    assertTenantDb(db, context.accountId);
     const client = db;
 
     const runState = await client.syncRun.findFirst({

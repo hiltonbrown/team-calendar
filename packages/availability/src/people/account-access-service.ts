@@ -1,7 +1,12 @@
+import type {
+  AccountDirectory,
+  AccountInvitation,
+  AccountMember,
+} from "@repo/auth/accounts";
 import {
+  type AccountId,
   type AppError,
   appError,
-  type ClerkOrgId,
   type OrganisationId,
   type Result,
 } from "@repo/core";
@@ -11,39 +16,39 @@ import { log } from "@repo/observability/log";
 import { noemailFallbackDomain } from "@repo/seo/branding";
 import { z } from "zod";
 
-export type ClerkAccessState =
+export type AccountAccessState =
   | "linkable"
   | "invitable"
   | "already_invited"
   | "member"
   | "conflict";
 
-export type ClerkAccessConflictReason =
+export type AccountAccessConflictReason =
   | "duplicate_email"
   | "fallback_email"
   | "invalid_email"
-  | "clerk_user_conflict"
+  | "user_conflict"
   | "no_email";
 
-export interface ClerkAccessCandidateView {
-  conflictReason: ClerkAccessConflictReason | null;
+export interface AccountAccessCandidateView {
+  conflictReason: AccountAccessConflictReason | null;
   email: string | null;
   id: string;
   name: string;
-  state: ClerkAccessState;
+  state: AccountAccessState;
 }
 
-export interface ClerkAccessReviewResult {
+export interface AccountAccessReviewResult {
   alreadyInvitedCount: number;
   candidateCount: number;
-  candidates: ClerkAccessCandidateView[];
+  candidates: AccountAccessCandidateView[];
   conflictCount: number;
   invitableCount: number;
   linkableCount: number;
   memberCount: number;
 }
 
-export interface ClerkInvitationDispatchResult {
+export interface AccountInvitationDispatchResult {
   alreadyInvitedCount: number;
   candidateCount: number;
   conflictCount: number;
@@ -53,62 +58,12 @@ export interface ClerkInvitationDispatchResult {
   succeededCount: number;
 }
 
-export type ClerkAccessServiceError =
+export type AccountAccessServiceError =
   | AppError
   | { code: "not_authorised"; message: string }
   | { code: "validation_error"; message: string }
   | { code: "conflict"; message: string }
   | { code: "provider_error"; message: string };
-
-export interface ClerkMembershipResource {
-  id: string;
-  publicUserData?: {
-    firstName?: string | null;
-    identifier?: string | null;
-    lastName?: string | null;
-    userId: string;
-  } | null;
-  role?: string;
-  userId?: string;
-}
-
-export interface ClerkInvitationResource {
-  emailAddress: string;
-  id: string;
-  role?: string;
-  status?: string;
-}
-
-export interface ClerkOrganizationsApi {
-  createOrganizationInvitationBulk: (
-    organizationId: string,
-    invitations: Array<{
-      emailAddress: string;
-      inviterUserId?: string;
-      role: "org:admin" | "org:member" | "org:viewer" | string;
-    }>
-  ) => Promise<{
-    data: ClerkInvitationResource[];
-    totalCount: number;
-  }>;
-  getOrganizationInvitationList: (params: {
-    limit?: number;
-    offset?: number;
-    organizationId: string;
-    status?: Array<"pending" | "accepted" | "revoked">;
-  }) => Promise<{
-    data: ClerkInvitationResource[];
-    totalCount: number;
-  }>;
-  getOrganizationMembershipList: (params: {
-    limit?: number;
-    offset?: number;
-    organizationId: string;
-  }) => Promise<{
-    data: ClerkMembershipResource[];
-    totalCount: number;
-  }>;
-}
 
 const EmailSchema = z.string().trim().email();
 
@@ -141,21 +96,21 @@ export function isValidEmail(email: string | null | undefined): boolean {
   return EmailSchema.safeParse(email.trim()).success;
 }
 
-export async function fetchAllClerkMemberships(
-  clerkOrganizations: ClerkOrganizationsApi,
-  organizationId: string
-): Promise<ClerkMembershipResource[]> {
-  assertNoTenantTransaction("fetchAllClerkMemberships");
-  const memberships: ClerkMembershipResource[] = [];
+export async function fetchAllAccountMembers(
+  accountDirectory: AccountDirectory,
+  accountId: string
+): Promise<AccountMember[]> {
+  assertNoTenantTransaction("fetchAllAccountMembers");
+  const memberships: AccountMember[] = [];
   const limit = 100;
   let offset = 0;
   let hasMore = true;
 
   while (hasMore) {
-    const page = await clerkOrganizations.getOrganizationMembershipList({
+    const page = await accountDirectory.listMembers({
+      accountId,
       limit,
       offset,
-      organizationId,
     });
     memberships.push(...page.data);
     offset += page.data.length;
@@ -167,21 +122,21 @@ export async function fetchAllClerkMemberships(
   return memberships;
 }
 
-export async function fetchAllClerkPendingInvitations(
-  clerkOrganizations: ClerkOrganizationsApi,
-  organizationId: string
-): Promise<ClerkInvitationResource[]> {
-  assertNoTenantTransaction("fetchAllClerkPendingInvitations");
-  const invitations: ClerkInvitationResource[] = [];
+export async function fetchAllPendingAccountInvitations(
+  accountDirectory: AccountDirectory,
+  accountId: string
+): Promise<AccountInvitation[]> {
+  assertNoTenantTransaction("fetchAllPendingAccountInvitations");
+  const invitations: AccountInvitation[] = [];
   const limit = 100;
   let offset = 0;
   let hasMore = true;
 
   while (hasMore) {
-    const page = await clerkOrganizations.getOrganizationInvitationList({
+    const page = await accountDirectory.listInvitations({
+      accountId,
       limit,
       offset,
-      organizationId,
       status: ["pending"],
     });
     invitations.push(...page.data);
@@ -196,73 +151,70 @@ export async function fetchAllClerkPendingInvitations(
 
 interface RawPerson {
   archived_at: Date | null;
-  clerk_user_id: string | null;
   email: string | null;
   first_name: string | null;
   id: string;
   is_active: boolean;
   last_name: string | null;
   source_system: string;
+  user_id: string | null;
 }
 
 interface EvaluatedPerson {
-  candidateView: ClerkAccessCandidateView;
-  clerkUserIdToLink: string | null;
+  candidateView: AccountAccessCandidateView;
   normalizedEmail: string | null;
   person: RawPerson;
+  userIdToLink: string | null;
 }
 
 interface EvaluationContext {
-  clerkMembersByEmail: Map<string, ClerkMembershipResource[]>;
-  clerkUserIdsLinkedLocally: Set<string>;
   localEmailCounts: Map<string, number>;
+  membersByEmail: Map<string, AccountMember[]>;
   pendingInvitationEmails: Set<string>;
+  userIdsLinkedLocally: Set<string>;
 }
 
 function buildEvaluationContext(
   people: RawPerson[],
-  memberships: ClerkMembershipResource[],
-  pendingInvitations: ClerkInvitationResource[]
+  memberships: AccountMember[],
+  pendingInvitations: AccountInvitation[]
 ): EvaluationContext {
   const localEmailCounts = new Map<string, number>();
-  const clerkUserIdsLinkedLocally = new Set<string>();
+  const userIdsLinkedLocally = new Set<string>();
 
   for (const person of people) {
     const norm = normalizeEmail(person.email);
     if (norm) {
       localEmailCounts.set(norm, (localEmailCounts.get(norm) ?? 0) + 1);
     }
-    if (person.clerk_user_id) {
-      clerkUserIdsLinkedLocally.add(person.clerk_user_id);
+    if (person.user_id) {
+      userIdsLinkedLocally.add(person.user_id);
     }
   }
 
-  const clerkMembersByEmail = new Map<string, ClerkMembershipResource[]>();
+  const membersByEmail = new Map<string, AccountMember[]>();
   for (const member of memberships) {
-    const email = normalizeEmail(
-      member.publicUserData?.identifier ??
-        (member as { emailAddress?: string }).emailAddress
-    );
+    const email = normalizeEmail(member.email);
     if (email && isValidEmail(email)) {
-      const existing = clerkMembersByEmail.get(email) ?? [];
+      const existing = membersByEmail.get(email) ?? [];
       existing.push(member);
-      clerkMembersByEmail.set(email, existing);
+      membersByEmail.set(email, existing);
     }
   }
 
   const pendingInvitationEmails = new Set<string>();
   for (const invitation of pendingInvitations) {
-    const norm = normalizeEmail(invitation.emailAddress);
+    const norm = normalizeEmail(invitation.email);
     if (norm) {
       pendingInvitationEmails.add(norm);
     }
   }
 
   return {
-    clerkMembersByEmail,
-    clerkUserIdsLinkedLocally,
     localEmailCounts,
+    membersByEmail,
     pendingInvitationEmails,
+    userIdsLinkedLocally,
   };
 }
 
@@ -274,7 +226,7 @@ function evaluateSinglePerson(
   const name = rawName.length > 0 ? rawName : "Unnamed";
   const normalizedEmail = normalizeEmail(person.email);
 
-  if (person.clerk_user_id) {
+  if (person.user_id) {
     return {
       candidateView: {
         conflictReason: null,
@@ -283,9 +235,9 @@ function evaluateSinglePerson(
         name,
         state: "member",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
@@ -298,9 +250,9 @@ function evaluateSinglePerson(
         name,
         state: "conflict",
       },
-      clerkUserIdToLink: null,
       normalizedEmail: null,
       person,
+      userIdToLink: null,
     };
   }
 
@@ -313,9 +265,9 @@ function evaluateSinglePerson(
         name,
         state: "conflict",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
@@ -328,9 +280,9 @@ function evaluateSinglePerson(
         name,
         state: "conflict",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
@@ -344,49 +296,44 @@ function evaluateSinglePerson(
         name,
         state: "conflict",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
-  const matchingClerkMembers =
-    context.clerkMembersByEmail.get(normalizedEmail) ?? [];
-  if (matchingClerkMembers.length > 1) {
+  const matchingMembers = context.membersByEmail.get(normalizedEmail) ?? [];
+  if (matchingMembers.length > 1) {
     return {
       candidateView: {
-        conflictReason: "clerk_user_conflict",
+        conflictReason: "user_conflict",
         email: normalizedEmail,
         id: person.id,
         name,
         state: "conflict",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
-  if (matchingClerkMembers.length === 1) {
-    const [matchingMember] = matchingClerkMembers;
-    const matchingUserId =
-      matchingMember.publicUserData?.userId ?? matchingMember.userId;
+  if (matchingMembers.length === 1) {
+    const [matchingMember] = matchingMembers;
+    const matchingUserId = matchingMember.userId;
 
-    if (
-      !matchingUserId ||
-      context.clerkUserIdsLinkedLocally.has(matchingUserId)
-    ) {
+    if (!matchingUserId || context.userIdsLinkedLocally.has(matchingUserId)) {
       return {
         candidateView: {
-          conflictReason: "clerk_user_conflict",
+          conflictReason: "user_conflict",
           email: normalizedEmail,
           id: person.id,
           name,
           state: "conflict",
         },
-        clerkUserIdToLink: null,
         normalizedEmail,
         person,
+        userIdToLink: null,
       };
     }
 
@@ -398,9 +345,9 @@ function evaluateSinglePerson(
         name,
         state: "linkable",
       },
-      clerkUserIdToLink: matchingUserId,
       normalizedEmail,
       person,
+      userIdToLink: matchingUserId,
     };
   }
 
@@ -413,9 +360,9 @@ function evaluateSinglePerson(
         name,
         state: "already_invited",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
@@ -428,9 +375,9 @@ function evaluateSinglePerson(
         name,
         state: "invitable",
       },
-      clerkUserIdToLink: null,
       normalizedEmail,
       person,
+      userIdToLink: null,
     };
   }
 
@@ -442,43 +389,43 @@ function evaluateSinglePerson(
       name,
       state: "conflict",
     },
-    clerkUserIdToLink: null,
     normalizedEmail,
     person,
+    userIdToLink: null,
   };
 }
 
-async function evaluateAllPeopleAndClerkAccess(params: {
-  clerkOrgId: ClerkOrgId;
-  clerkOrganizations: ClerkOrganizationsApi;
+async function evaluateAllPeopleAndAccountAccess(params: {
+  accountId: AccountId;
+  accountDirectory: AccountDirectory;
   organisationId: OrganisationId;
-}): Promise<Result<EvaluatedPerson[], ClerkAccessServiceError>> {
-  const { clerkOrgId, clerkOrganizations, organisationId } = params;
+}): Promise<Result<EvaluatedPerson[], AccountAccessServiceError>> {
+  const { accountId, accountDirectory, organisationId } = params;
 
   try {
-    const people = await withTenantDb(clerkOrgId, (db) =>
+    const people = await withTenantDb(accountId, (db) =>
       db.person.findMany({
         orderBy: [{ first_name: "asc" }, { last_name: "asc" }, { id: "asc" }],
         select: {
           archived_at: true,
-          clerk_user_id: true,
           email: true,
           first_name: true,
           id: true,
           is_active: true,
           last_name: true,
           source_system: true,
+          user_id: true,
         },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           organisation_id: organisationId,
         },
       })
     );
     const [memberships, pendingInvitations] = await Promise.all([
-      fetchAllClerkMemberships(clerkOrganizations, clerkOrgId),
-      fetchAllClerkPendingInvitations(clerkOrganizations, clerkOrgId),
+      fetchAllAccountMembers(accountDirectory, accountId),
+      fetchAllPendingAccountInvitations(accountDirectory, accountId),
     ]);
 
     const context = buildEvaluationContext(
@@ -493,8 +440,8 @@ async function evaluateAllPeopleAndClerkAccess(params: {
 
     return { ok: true, value: evaluated };
   } catch (error) {
-    log.error("clerk_access.evaluation_failed", {
-      clerkOrgId,
+    log.error("account_access.evaluation_failed", {
+      accountId,
       error: error instanceof Error ? error.message : String(error),
       organisationId,
     });
@@ -503,20 +450,20 @@ async function evaluateAllPeopleAndClerkAccess(params: {
         "internal",
         error instanceof Error
           ? error.message
-          : "Failed to evaluate Clerk access."
+          : "Failed to evaluate Account access."
       ),
       ok: false,
     };
   }
 }
 
-export async function loadClerkAccessReview(params: {
-  clerkOrgId: ClerkOrgId;
-  clerkOrganizations: ClerkOrganizationsApi;
+export async function loadAccountAccessReview(params: {
+  accountId: AccountId;
+  accountDirectory: AccountDirectory;
   organisationId: OrganisationId;
-}): Promise<Result<ClerkAccessReviewResult, ClerkAccessServiceError>> {
-  assertNoTenantTransaction("loadClerkAccessReview");
-  const evaluatedResult = await evaluateAllPeopleAndClerkAccess(params);
+}): Promise<Result<AccountAccessReviewResult, AccountAccessServiceError>> {
+  assertNoTenantTransaction("loadAccountAccessReview");
+  const evaluatedResult = await evaluateAllPeopleAndAccountAccess(params);
   if (!evaluatedResult.ok) {
     return evaluatedResult;
   }
@@ -566,43 +513,43 @@ export async function loadClerkAccessReview(params: {
   };
 }
 
-export async function reconcileClerkAccessLinks(params: {
-  clerkOrgId: ClerkOrgId;
-  clerkOrganizations: ClerkOrganizationsApi;
+export async function reconcileAccountAccessLinks(params: {
+  accountId: AccountId;
+  accountDirectory: AccountDirectory;
   organisationId: OrganisationId;
 }): Promise<
   Result<
     { linkedCount: number; linkedPersonIds: string[] },
-    ClerkAccessServiceError
+    AccountAccessServiceError
   >
 > {
-  assertNoTenantTransaction("reconcileClerkAccessLinks");
-  const { clerkOrgId, organisationId } = params;
-  const evaluatedResult = await evaluateAllPeopleAndClerkAccess(params);
+  assertNoTenantTransaction("reconcileAccountAccessLinks");
+  const { accountId, organisationId } = params;
+  const evaluatedResult = await evaluateAllPeopleAndAccountAccess(params);
   if (!evaluatedResult.ok) {
     return evaluatedResult;
   }
 
   const linkable = evaluatedResult.value.filter(
-    (e) => e.candidateView.state === "linkable" && e.clerkUserIdToLink !== null
+    (e) => e.candidateView.state === "linkable" && e.userIdToLink !== null
   );
 
   const linkedPersonIds: string[] = [];
 
   for (const item of linkable) {
     const { email } = item.person;
-    if (item.clerkUserIdToLink && email) {
-      const linked = await withTenantDb(clerkOrgId, async (db) => {
-        await lockPlanLimitMutations(clerkOrgId, db);
+    if (item.userIdToLink && email) {
+      const linked = await withTenantDb(accountId, async (db) => {
+        await lockPlanLimitMutations(accountId, db);
         return db.person.updateMany({
-          data: { clerk_user_id: item.clerkUserIdToLink },
+          data: { user_id: item.userIdToLink },
           where: {
+            account_id: accountId,
             archived_at: null,
-            clerk_org_id: clerkOrgId,
-            clerk_user_id: null,
             email,
             id: item.person.id,
             organisation_id: organisationId,
+            user_id: null,
           },
         });
       });
@@ -649,8 +596,8 @@ function isTransientError(error: unknown): boolean {
 }
 
 async function dispatchBatchWithRetry(
-  clerkOrganizations: ClerkOrganizationsApi,
-  clerkOrgId: string,
+  accountDirectory: AccountDirectory,
+  accountId: string,
   batch: Array<{ email: string; personId: string }>,
   inviterUserId: string
 ): Promise<{ error?: unknown; success: boolean }> {
@@ -660,14 +607,14 @@ async function dispatchBatchWithRetry(
   while (attempt < maxAttempts) {
     attempt += 1;
     try {
-      await clerkOrganizations.createOrganizationInvitationBulk(
-        clerkOrgId,
-        batch.map((item) => ({
-          emailAddress: item.email,
+      await accountDirectory.inviteMembers({
+        accountId,
+        invitations: batch.map((item) => ({
+          email: item.email,
           inviterUserId,
-          role: "org:viewer",
-        }))
-      );
+          role: "viewer",
+        })),
+      });
       return { success: true };
     } catch (error) {
       const isTransient = isTransientError(error);
@@ -681,26 +628,28 @@ async function dispatchBatchWithRetry(
   return { success: false };
 }
 
-export async function inviteClerkAccessCandidates(params: {
+export async function inviteAccountAccessCandidates(params: {
   candidatePersonIds?: string[];
-  clerkOrgId: ClerkOrgId;
-  clerkOrganizations: ClerkOrganizationsApi;
+  accountId: AccountId;
+  accountDirectory: AccountDirectory;
   inviterUserId: string;
   organisationId: OrganisationId;
-}): Promise<Result<ClerkInvitationDispatchResult, ClerkAccessServiceError>> {
-  assertNoTenantTransaction("inviteClerkAccessCandidates");
+}): Promise<
+  Result<AccountInvitationDispatchResult, AccountAccessServiceError>
+> {
+  assertNoTenantTransaction("inviteAccountAccessCandidates");
   const {
     candidatePersonIds,
-    clerkOrgId,
-    clerkOrganizations,
+    accountId,
+    accountDirectory,
     inviterUserId,
     organisationId,
   } = params;
 
   // 1. Reconcile one-to-one links first
-  const linkResult = await reconcileClerkAccessLinks({
-    clerkOrganizations,
-    clerkOrgId,
+  const linkResult = await reconcileAccountAccessLinks({
+    accountDirectory,
+    accountId,
     organisationId,
   });
   if (!linkResult.ok) {
@@ -709,9 +658,9 @@ export async function inviteClerkAccessCandidates(params: {
   const { linkedCount } = linkResult.value;
 
   // 2. Re-evaluate people after linking
-  const evaluatedResult = await evaluateAllPeopleAndClerkAccess({
-    clerkOrganizations,
-    clerkOrgId,
+  const evaluatedResult = await evaluateAllPeopleAndAccountAccess({
+    accountDirectory,
+    accountId,
     organisationId,
   });
   if (!evaluatedResult.ok) {
@@ -764,8 +713,8 @@ export async function inviteClerkAccessCandidates(params: {
     }
 
     const batchResult = await dispatchBatchWithRetry(
-      clerkOrganizations,
-      clerkOrgId,
+      accountDirectory,
+      accountId,
       batch,
       inviterUserId
     );
@@ -773,10 +722,10 @@ export async function inviteClerkAccessCandidates(params: {
     if (batchResult.success) {
       succeededCount += batch.length;
     } else {
-      log.warn("clerk_access.batch_invitation_failed", {
+      log.warn("account_access.batch_invitation_failed", {
+        accountId,
         batchIndex,
         batchSize: batch.length,
-        clerkOrgId,
         error:
           batchResult.error instanceof Error
             ? batchResult.error.message

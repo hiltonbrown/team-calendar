@@ -38,11 +38,11 @@ const db = new PrismaClient({ adapter });
 
 try {
   const summary = await seedDevelopmentData(db, {
-    clerkOrgId: process.env.SEED_CLERK_ORG_ID,
+    accountId: process.env.SEED_ACCOUNT_ID,
   });
 
   process.stdout.write(
-    `Seeded development data for clerk_org_id "${summary.clerkOrgId}": ` +
+    `Seeded development data for account_id "${summary.accountId}": ` +
       `${summary.organisations} organisations, ${summary.teams} teams, ` +
       `${summary.locations} locations, ${summary.people} people.\n`
   );

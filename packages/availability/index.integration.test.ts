@@ -32,7 +32,7 @@ vi.mock("@repo/database/tenant-client", async (importOriginal) => {
   };
 });
 
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
   withTenantDb as withTestTenantDb,
@@ -61,7 +61,7 @@ const {
   computeCurrentStatusForPeople,
   createManualAvailability,
   ensureCurrentUserPerson,
-  ensureOrganisationForClerk,
+  ensureOrganisationForAccount,
   listAvailabilityRecords,
   listPeople,
   listTeamRecordsPage,
@@ -72,7 +72,7 @@ const {
 } = await import("./index");
 const { systemDatabase: database } = await import("@repo/database");
 interface TenantFixture {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   personId: string;
 }
@@ -84,14 +84,14 @@ const tenantB: TenantFixture = {
   ...tenantSlotB,
   personId: fixture.id("person", 1),
 };
-if (!(tenantA.clerkOrgId && tenantB.clerkOrgId && provisioningTenant)) {
+if (!(tenantA.accountId && tenantB.accountId && provisioningTenant)) {
   throw new Error("Availability live fixture tenants were not allocated");
 }
-const provisioningClerkOrgId = provisioningTenant.clerkOrgId;
-const testClerkOrgIds = [
-  tenantA.clerkOrgId,
-  tenantB.clerkOrgId,
-  provisioningClerkOrgId,
+const provisioningAccountId = provisioningTenant.accountId;
+const testAccountIds = [
+  tenantA.accountId,
+  tenantB.accountId,
+  provisioningAccountId,
 ];
 const inputFor = (tenant: TenantFixture) => ({
   allDay: true,
@@ -121,16 +121,16 @@ const patchInput = {
 const createTenant = async (tenant: TenantFixture) => {
   await database.organisation.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       country_code: "AU",
       id: tenant.organisationId,
-      name: `Manual availability ${tenant.clerkOrgId}`,
+      name: `Manual availability ${tenant.accountId}`,
     },
   });
   await database.person.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
-      email: `${tenant.clerkOrgId}@example.com`,
+      account_id: tenant.accountId,
+      email: `${tenant.accountId}@example.com`,
       employment_type: "employee",
       first_name: "Manual",
       id: tenant.personId,
@@ -144,60 +144,60 @@ const createTenant = async (tenant: TenantFixture) => {
 };
 const cleanTestData = async () => {
   await database.xeroPersonMatch.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.syncRun.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.xeroConnection.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.outboundOperation.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.availabilityPublication.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.availabilityRecord.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.person.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.auditEvent.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.feedToken.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.feedScope.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.feed.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.publicHolidayPreference.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.publicHoliday.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.location.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.organisation.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
 };
 const contextFor = (tenant: TenantFixture): TenantContext => ({
   // Test fixture IDs are fixed strings that match the branded runtime shape.
-  clerkOrgId: tenant.clerkOrgId as ClerkOrgId,
+  accountId: tenant.accountId as AccountId,
   organisationId: tenant.organisationId as OrganisationId,
 });
 const createProvisioningOrganisation = () =>
   database.organisation.create({
     data: {
-      clerk_org_id: provisioningTenant.clerkOrgId,
+      account_id: provisioningTenant.accountId,
       country_code: "AU",
       id: provisioningTenant.organisationId,
       name: "Provisioning fixture",
@@ -217,7 +217,7 @@ afterAll(async () => {
   await cleanTestData();
   await expect(
     database.organisation.count({
-      where: { clerk_org_id: { in: testClerkOrgIds } },
+      where: { account_id: { in: testAccountIds } },
     })
   ).resolves.toBe(0);
   await database.$disconnect();
@@ -230,7 +230,7 @@ describe("manual availability services", () => {
         createManualAvailability(
           contextFor(tenantA),
           inputFor(tenantA),
-          { orgRole: "org:admin", userId: "user_test" },
+          { role: "admin", userId: "user_test" },
           db
         )
     );
@@ -270,7 +270,7 @@ describe("manual availability services", () => {
             ...inputFor(tenantA),
             endsAt: new Date("2026-05-09T00:00:00.000Z"),
           },
-          { orgRole: "org:admin", userId: "user_test" },
+          { role: "admin", userId: "user_test" },
           db
         )
       )
@@ -283,7 +283,7 @@ describe("manual availability services", () => {
         createManualAvailability(
           contextFor(tenantA),
           { ...inputFor(tenantA), personId: tenantB.personId },
-          { orgRole: "org:admin", userId: "user_test" },
+          { role: "admin", userId: "user_test" },
           db
         )
       )
@@ -293,7 +293,7 @@ describe("manual availability services", () => {
     });
   });
   test("preserves creation UID and advances material publication while saving edited Brisbane slot instants", async () => {
-    const actor = { orgRole: "org:admin", userId: "user_admin" };
+    const actor = { role: "admin", userId: "user_admin" };
     const startsAt = new Date("2026-10-02T23:00:00.000Z");
     const endsAt = new Date("2026-10-03T00:00:00.000Z");
     const created = await withTestTenantResult(
@@ -316,7 +316,7 @@ describe("manual availability services", () => {
       throw new Error(created.error.message);
     }
     const where = {
-      clerk_org_id: tenantA.clerkOrgId,
+      account_id: tenantA.accountId,
       id: created.value.id,
       organisation_id: tenantA.organisationId,
     };
@@ -361,7 +361,7 @@ describe("manual availability services", () => {
       await database.availabilityRecord.count({
         where: {
           ...where,
-          clerk_org_id: tenantB.clerkOrgId,
+          account_id: tenantB.accountId,
           organisation_id: tenantB.organisationId,
         },
       })
@@ -374,7 +374,7 @@ describe("manual availability services", () => {
         createManualAvailability(
           contextFor(tenantA),
           inputFor(tenantA),
-          { orgRole: "org:admin", userId: "user_test" },
+          { role: "admin", userId: "user_test" },
           db
         )
     );
@@ -388,7 +388,7 @@ describe("manual availability services", () => {
           contextFor(tenantB),
           created.value.id,
           patchInput,
-          { orgRole: "org:admin", userId: "user_test" },
+          { role: "admin", userId: "user_test" },
           db
         )
       )
@@ -408,7 +408,7 @@ describe("manual availability services", () => {
             includeInFeed: false,
             title: "Training day",
           },
-          { orgRole: "org:admin", userId: "user_test" },
+          { role: "admin", userId: "user_test" },
           db
         )
     );
@@ -426,7 +426,7 @@ describe("manual availability services", () => {
           contextFor(tenantB),
           created.value.id,
           {
-            orgRole: "org:admin",
+            role: "admin",
             userId: "user_test",
           },
           db
@@ -442,7 +442,7 @@ describe("manual availability services", () => {
           contextFor(tenantA),
           created.value.id,
           {
-            orgRole: "org:admin",
+            role: "admin",
             userId: "user_test",
           },
           db
@@ -466,14 +466,14 @@ describe("current user person identity", () => {
     await createProvisioningOrganisation();
     await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: provisioningClerkOrgId,
+        accountId: provisioningAccountId,
         countryCode: "AU",
         name: "Default feed provisioning",
       }),
       (db) =>
-        ensureOrganisationForClerk(
+        ensureOrganisationForAccount(
           {
-            clerkOrgId: provisioningClerkOrgId,
+            accountId: provisioningAccountId,
             countryCode: "AU",
             name: "Default feed provisioning",
           },
@@ -482,13 +482,13 @@ describe("current user person identity", () => {
     );
     await expect(
       database.organisation.count({
-        where: { clerk_org_id: provisioningClerkOrgId },
+        where: { account_id: provisioningAccountId },
       })
     ).resolves.toBe(1);
     const feeds = await database.feed.findMany({
       where: {
+        account_id: provisioningAccountId,
         archived_at: null,
-        clerk_org_id: provisioningClerkOrgId,
         organisation_id: null,
       },
     });
@@ -501,7 +501,7 @@ describe("current user person identity", () => {
     await expect(
       database.feedScope.findMany({
         where: {
-          clerk_org_id: provisioningClerkOrgId,
+          account_id: provisioningAccountId,
           feed_id: feeds[0]?.id,
           organisation_id: null,
         },
@@ -512,7 +512,7 @@ describe("current user person identity", () => {
     await expect(
       database.feedToken.count({
         where: {
-          clerk_org_id: provisioningClerkOrgId,
+          account_id: provisioningAccountId,
           feed_id: feeds[0]?.id,
           organisation_id: null,
           status: "active",
@@ -521,14 +521,14 @@ describe("current user person identity", () => {
     ).resolves.toBe(1);
     await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: provisioningClerkOrgId,
+        accountId: provisioningAccountId,
         countryCode: "AU",
         name: "Default feed provisioning renamed",
       }),
       (db) =>
-        ensureOrganisationForClerk(
+        ensureOrganisationForAccount(
           {
-            clerkOrgId: provisioningClerkOrgId,
+            accountId: provisioningAccountId,
             countryCode: "AU",
             name: "Default feed provisioning renamed",
           },
@@ -538,7 +538,7 @@ describe("current user person identity", () => {
     await expect(
       database.feed.count({
         where: {
-          clerk_org_id: provisioningClerkOrgId,
+          account_id: provisioningAccountId,
           organisation_id: null,
         },
       })
@@ -549,14 +549,14 @@ describe("current user person identity", () => {
     await createProvisioningOrganisation();
     const context = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: provisioningClerkOrgId,
+        accountId: provisioningAccountId,
         countryCode: "AU",
         name: "Default holiday provisioning test",
       }),
       (db) =>
-        ensureOrganisationForClerk(
+        ensureOrganisationForAccount(
           {
-            clerkOrgId: provisioningClerkOrgId,
+            accountId: provisioningAccountId,
             countryCode: "AU",
             name: "Default holiday provisioning test",
           },
@@ -564,14 +564,14 @@ describe("current user person identity", () => {
         )
     );
     const orgCount = await database.organisation.count({
-      where: { clerk_org_id: provisioningClerkOrgId },
+      where: { account_id: provisioningAccountId },
     });
     expect(orgCount).toBe(1);
     // Official holidays come from the bundled reference files at read time.
     await expect(
       database.publicHoliday.count({
         where: {
-          clerk_org_id: provisioningClerkOrgId,
+          account_id: provisioningAccountId,
           organisation_id: context.organisationId,
         },
       })
@@ -579,7 +579,7 @@ describe("current user person identity", () => {
   });
   test("returns an existing linked person", async () => {
     await database.person.update({
-      data: { clerk_user_id: "user_existing" },
+      data: { user_id: "user_existing" },
       where: { id: tenantA.personId },
     });
     const result = await withTestTenantResult(
@@ -588,9 +588,9 @@ describe("current user person identity", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_existing",
             displayName: "Existing User",
-            email: `${tenantA.clerkOrgId}@example.com`,
+            email: `${tenantA.accountId}@example.com`,
+            userId: "user_existing",
           },
           db
         )
@@ -607,9 +607,9 @@ describe("current user person identity", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_same_email",
             displayName: "Manual Person",
-            email: `${tenantA.clerkOrgId}@example.com`,
+            email: `${tenantA.accountId}@example.com`,
+            userId: "user_same_email",
           },
           db
         )
@@ -622,9 +622,9 @@ describe("current user person identity", () => {
       database.person.findFirst({
         select: { id: true },
         where: {
-          clerk_user_id: "user_same_email",
           id: tenantA.personId,
           organisation_id: tenantA.organisationId,
+          user_id: "user_same_email",
         },
       })
     ).resolves.toEqual({ id: tenantA.personId });
@@ -636,9 +636,9 @@ describe("current user person identity", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_cross_tenant",
             displayName: "Cross Tenant",
-            email: `${tenantB.clerkOrgId}@example.com`,
+            email: `${tenantB.accountId}@example.com`,
+            userId: "user_cross_tenant",
           },
           db
         )
@@ -650,10 +650,10 @@ describe("current user person identity", () => {
     expect(result.value.id).not.toBe(tenantB.personId);
     await expect(
       database.person.findUnique({
-        select: { clerk_user_id: true },
+        select: { user_id: true },
         where: { id: tenantB.personId },
       })
-    ).resolves.toEqual({ clerk_user_id: null });
+    ).resolves.toEqual({ user_id: null });
   });
   test("creates a manual person when no same-email profile exists", async () => {
     const result = await withTestTenantResult(
@@ -663,9 +663,9 @@ describe("current user person identity", () => {
           contextFor(tenantA),
           {
             avatarUrl: "https://img.clerk.com/avatar.png",
-            clerkUserId: "user_new",
             displayName: "New User",
             email: "New.User@example.com",
+            userId: "user_new",
           },
           db
         )
@@ -677,29 +677,29 @@ describe("current user person identity", () => {
     await expect(
       database.person.findUnique({
         select: {
+          account_id: true,
           avatar_url: true,
-          clerk_org_id: true,
-          clerk_user_id: true,
           email: true,
           organisation_id: true,
           source_system: true,
+          user_id: true,
         },
         where: { id: result.value.id },
       })
     ).resolves.toEqual({
+      account_id: tenantA.accountId,
       avatar_url: "https://img.clerk.com/avatar.png",
-      clerk_org_id: tenantA.clerkOrgId,
-      clerk_user_id: "user_new",
       email: "new.user@example.com",
       organisation_id: tenantA.organisationId,
       source_system: "MANUAL",
+      user_id: "user_new",
     });
   });
   test("returns a conflict when multiple same-email people exist", async () => {
     await database.person.createMany({
       data: [
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           email: "duplicate@example.com",
           employment_type: "employee",
           first_name: "Duplicate",
@@ -709,7 +709,7 @@ describe("current user person identity", () => {
           source_system: "MANUAL",
         },
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           email: "duplicate@example.com",
           employment_type: "employee",
           first_name: "Duplicate",
@@ -725,9 +725,9 @@ describe("current user person identity", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_conflict",
             displayName: "Duplicate User",
             email: "duplicate@example.com",
+            userId: "user_conflict",
           },
           db
         )
@@ -742,7 +742,7 @@ describe("release list-query evidence", () => {
   test("returns no public-holiday people when no holiday applies", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
         filters: { status: ["public_holiday"] },
         organisationId: tenantA.organisationId,
         pagination: { pageSize: 50 },
@@ -751,7 +751,7 @@ describe("release list-query evidence", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: tenantA.clerkOrgId,
+            accountId: tenantA.accountId,
             filters: { status: ["public_holiday"] },
             organisationId: tenantA.organisationId,
             pagination: { pageSize: 50 },
@@ -780,7 +780,7 @@ describe("release list-query evidence", () => {
     await database.location.createMany({
       data: [
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           country_code: "AU",
           id: losAngelesLocationId,
           name: "Previous local date",
@@ -789,7 +789,7 @@ describe("release list-query evidence", () => {
           timezone: "America/Los_Angeles",
         },
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           country_code: "AU",
           id: sydneyLocationId,
           name: "Sydney after DST midnight",
@@ -798,7 +798,7 @@ describe("release list-query evidence", () => {
           timezone: "Australia/Sydney",
         },
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           country_code: "AU",
           id: workingOverrideLocationId,
           name: "Working holiday override",
@@ -807,7 +807,7 @@ describe("release list-query evidence", () => {
           timezone: "Australia/Sydney",
         },
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           country_code: "AU",
           id: archivedOverrideLocationId,
           name: "Archived holiday override",
@@ -856,11 +856,11 @@ describe("release list-query evidence", () => {
     ];
     await database.person.createMany({
       data: people.map((person, index) => ({
+        account_id: tenantA.accountId,
         archived_at:
           person.id === archivedPersonId
             ? new Date("2026-09-01T00:00:00.000Z")
             : null,
-        clerk_org_id: tenantA.clerkOrgId,
         email: `status-${index}@example.com`,
         employment_type: "employee" as const,
         first_name: "Status",
@@ -875,8 +875,8 @@ describe("release list-query evidence", () => {
     await database.availabilityRecord.createMany({
       data: [
         ...statusCases.map(([, recordType, approvalStatus], index) => ({
+          account_id: tenantA.accountId,
           approval_status: approvalStatus,
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "unavailable" as const,
           derived_uid_key: fixture.key("people-status-record", index),
           ends_at: new Date("2026-10-05T00:00:00.000Z"),
@@ -890,8 +890,8 @@ describe("release list-query evidence", () => {
           starts_at: new Date("2026-10-03T00:00:00.000Z"),
         })),
         {
+          account_id: tenantA.accountId,
           approval_status: "approved" as const,
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "limited" as const,
           derived_uid_key: fixture.key("people-status-record", 25),
           ends_at: new Date("2026-10-05T00:00:00.000Z"),
@@ -911,8 +911,8 @@ describe("release list-query evidence", () => {
             [holidayPersonId, "wfh"],
           ] as const
         ).map(([personId, recordType], index) => ({
+          account_id: tenantA.accountId,
           approval_status: "approved" as const,
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "limited" as const,
           derived_uid_key: fixture.key("people-precedence-record", index),
           ends_at: new Date("2026-10-05T00:00:00.000Z"),
@@ -930,7 +930,7 @@ describe("release list-query evidence", () => {
     const holidayId = fixture.id("people-holiday", 0);
     await database.publicHoliday.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         country_code: "AU",
         default_classification: "non_working",
         holiday_date: new Date("2026-10-04T00:00:00.000Z"),
@@ -946,7 +946,7 @@ describe("release list-query evidence", () => {
     // its default non-working classification there.
     await database.publicHolidayPreference.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         holiday_key: `custom:${holidayId}`,
         id: fixture.id("people-holiday-preference", 0),
         location_id: workingOverrideLocationId,
@@ -956,8 +956,8 @@ describe("release list-query evidence", () => {
     });
     const oracle = await withTestTenantDb(
       tenantTestAccount({
+        accountId: tenantA.accountId,
         at,
-        clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         people: people.map((person) => ({
           locationId: person.locationId,
@@ -967,8 +967,8 @@ describe("release list-query evidence", () => {
       (db) =>
         computeCurrentStatusForPeople(
           {
+            accountId: tenantA.accountId,
             at,
-            clerkOrgId: tenantA.clerkOrgId,
             organisationId: tenantA.organisationId,
             people: people.map((person) => ({
               locationId: person.locationId,
@@ -1004,7 +1004,7 @@ describe("release list-query evidence", () => {
         .sort();
       const result = await withTestTenantResult(
         tenantTestAccount({
-          clerkOrgId: tenantA.clerkOrgId,
+          accountId: tenantA.accountId,
           filters: { status: [status] },
           organisationId: tenantA.organisationId,
           pagination: { pageSize: 200 },
@@ -1013,7 +1013,7 @@ describe("release list-query evidence", () => {
         (db) =>
           listPeople(
             {
-              clerkOrgId: tenantA.clerkOrgId,
+              accountId: tenantA.accountId,
               filters: { status: [status] },
               organisationId: tenantA.organisationId,
               pagination: { pageSize: 200 },
@@ -1040,7 +1040,7 @@ describe("release list-query evidence", () => {
     expect(oracle.get(availablePersonId)?.statusKey).toBe("available");
     const archivedResult = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
         filters: { includeArchived: true, status: ["wfh"] },
         organisationId: tenantA.organisationId,
         pagination: { pageSize: 200 },
@@ -1049,7 +1049,7 @@ describe("release list-query evidence", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: tenantA.clerkOrgId,
+            accountId: tenantA.accountId,
             filters: { includeArchived: true, status: ["wfh"] },
             organisationId: tenantA.organisationId,
             pagination: { pageSize: 200 },
@@ -1081,8 +1081,8 @@ describe("release list-query evidence", () => {
         data: [pendingId, completedId, foreignId].map((id, index) => {
           const tenant = index === 2 ? tenantB : tenantA;
           return {
+            account_id: tenant.accountId,
             approval_status: "submitted" as const,
-            clerk_org_id: tenant.clerkOrgId,
             contactability: "limited" as const,
             derived_uid_key: fixture.key("imported-recovery-uid", index),
             ends_at: new Date("2026-11-06T00:00:00.000Z"),
@@ -1101,10 +1101,10 @@ describe("release list-query evidence", () => {
         data: [pendingId, completedId, foreignId].map((id, index) => {
           const tenant = index === 2 ? tenantB : tenantA;
           return {
+            account_id: tenant.accountId,
             action,
             actor_user_id: "recovery_actor",
             availability_record_id: id,
-            clerk_org_id: tenant.clerkOrgId,
             organisation_id: tenant.organisationId,
             request_fingerprint: fixture.key(
               "imported-recovery-fingerprint",
@@ -1115,9 +1115,9 @@ describe("release list-query evidence", () => {
         }),
       });
       const scope = {
-        actingOrgRole: "org:admin",
+        accountId: tenantA.accountId,
+        actingRole: "admin",
         allHistory: true,
-        clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
       };
       for (const filters of [undefined, { sourceType: ["xero_leave"] }]) {
@@ -1179,7 +1179,7 @@ describe("release list-query evidence", () => {
         },
       });
       for (const mismatchedScope of [
-        { ...scope, clerkOrgId: tenantB.clerkOrgId },
+        { ...scope, accountId: tenantB.accountId },
         { ...scope, organisationId: tenantB.organisationId },
       ]) {
         await expect(
@@ -1195,7 +1195,7 @@ describe("release list-query evidence", () => {
         withTestTenantResult(
           tenantTestAccount({
             ...scope,
-            actingOrgRole: "org:viewer",
+            actingRole: "viewer",
             actingUserId: "unlinked_viewer",
             recordId: pendingId,
           }),
@@ -1203,7 +1203,7 @@ describe("release list-query evidence", () => {
             getRecord(
               {
                 ...scope,
-                actingOrgRole: "org:viewer",
+                actingRole: "viewer",
                 actingUserId: "unlinked_viewer",
                 recordId: pendingId,
               },
@@ -1230,7 +1230,7 @@ describe("release list-query evidence", () => {
     for (const rowCount of [1, 50, 200]) {
       await database.availabilityRecord.deleteMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -1238,8 +1238,8 @@ describe("release list-query evidence", () => {
       const equalCreatedAt = new Date("2026-05-01T00:00:00.000Z");
       await database.availabilityRecord.createMany({
         data: Array.from({ length: rowCount }, (_, index) => ({
+          account_id: tenantA.accountId,
           approval_status: "approved" as const,
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "limited" as const,
           created_at: equalCreatedAt,
           derived_uid_key: fixture.key(`plan-${rowCount}-uid`, index),
@@ -1258,16 +1258,16 @@ describe("release list-query evidence", () => {
       const startedAt = process.hrtime.bigint();
       const result = await withTestTenantResult(
         tenantTestAccount({
-          actingOrgRole: "org:admin",
-          clerkOrgId: tenantA.clerkOrgId,
+          accountId: tenantA.accountId,
+          actingRole: "admin",
           organisationId: tenantA.organisationId,
           pageSize: 200,
         }),
         (db) =>
           listTeamRecordsPage(
             {
-              actingOrgRole: "org:admin",
-              clerkOrgId: tenantA.clerkOrgId,
+              accountId: tenantA.accountId,
+              actingRole: "admin",
               organisationId: tenantA.organisationId,
               pageSize: 200,
             },
@@ -1315,8 +1315,8 @@ describe("release list-query evidence", () => {
     await database.availabilityRecord.createMany({
       data: [
         ...ids.map((id, index) => ({
+          account_id: tenantA.accountId,
           approval_status: "approved" as const,
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "limited" as const,
           created_at: equalCreatedAt,
           derived_uid_key: fixture.key("plan-cursor-uid", index),
@@ -1331,8 +1331,8 @@ describe("release list-query evidence", () => {
           starts_at: equalStartsAt,
         })),
         {
+          account_id: tenantA.accountId,
           approval_status: "approved",
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "limited",
           created_at: new Date("2020-01-01T00:00:00.000Z"),
           derived_uid_key: fixture.key("plan-history-uid", 0),
@@ -1350,16 +1350,16 @@ describe("release list-query evidence", () => {
     });
     const first = await withTestTenantResult(
       tenantTestAccount({
-        actingOrgRole: "org:admin",
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
+        actingRole: "admin",
         organisationId: tenantA.organisationId,
         pageSize: 50,
       }),
       (db) =>
         listTeamRecordsPage(
           {
-            actingOrgRole: "org:admin",
-            clerkOrgId: tenantA.clerkOrgId,
+            accountId: tenantA.accountId,
+            actingRole: "admin",
             organisationId: tenantA.organisationId,
             pageSize: 50,
           },
@@ -1376,8 +1376,8 @@ describe("release list-query evidence", () => {
     await database.availabilityRecord.delete({ where: { id: ids[49] ?? "" } });
     const second = await withTestTenantResult(
       tenantTestAccount({
-        actingOrgRole: "org:admin",
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
+        actingRole: "admin",
         cursor: first.value.nextCursor,
         organisationId: tenantA.organisationId,
         pageSize: 50,
@@ -1385,8 +1385,8 @@ describe("release list-query evidence", () => {
       (db) =>
         listTeamRecordsPage(
           {
-            actingOrgRole: "org:admin",
-            clerkOrgId: tenantA.clerkOrgId,
+            accountId: tenantA.accountId,
+            actingRole: "admin",
             cursor: first.value.nextCursor,
             organisationId: tenantA.organisationId,
             pageSize: 50,
@@ -1405,18 +1405,18 @@ describe("release list-query evidence", () => {
     }
     const allHistory = await withTestTenantResult(
       tenantTestAccount({
-        actingOrgRole: "org:admin",
+        accountId: tenantA.accountId,
+        actingRole: "admin",
         allHistory: true,
-        clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         pageSize: 200,
       }),
       (db) =>
         listTeamRecordsPage(
           {
-            actingOrgRole: "org:admin",
+            accountId: tenantA.accountId,
+            actingRole: "admin",
             allHistory: true,
-            clerkOrgId: tenantA.clerkOrgId,
             organisationId: tenantA.organisationId,
             pageSize: 200,
           },
@@ -1442,12 +1442,12 @@ describe("onboarding wizard snapshot", () => {
       where: { id: tenantA.organisationId },
     });
     await database.person.update({
-      data: { clerk_user_id: "user_wizard_admin" },
+      data: { user_id: "user_wizard_admin" },
       where: { id: tenantA.personId },
     });
     const connection = await database.xeroConnection.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         initial_sync_requested_at: requestedAt,
         // Left over from an earlier connection, so it must not count.
         last_full_leave_records_sync_at: new Date("2026-10-01T00:00:00.000Z"),
@@ -1459,7 +1459,7 @@ describe("onboarding wizard snapshot", () => {
     });
     await database.syncRun.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         organisation_id: tenantA.organisationId,
         run_type: "leave_records",
         started_at: new Date("2026-10-09T01:06:00.000Z"),
@@ -1469,7 +1469,7 @@ describe("onboarding wizard snapshot", () => {
     });
     await database.xeroPersonMatch.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         detected_reason: "same_email",
         organisation_id: tenantA.organisationId,
         xero_person_id: tenantA.personId,
@@ -1477,8 +1477,8 @@ describe("onboarding wizard snapshot", () => {
     });
 
     const actor = {
-      actingRole: "org:admin",
-      clerkOrgId: tenantA.clerkOrgId,
+      accountId: tenantA.accountId,
+      actingRole: "admin",
       organisationId: tenantA.organisationId,
       userId: "user_wizard_admin",
     };
@@ -1502,14 +1502,14 @@ describe("onboarding wizard snapshot", () => {
       withTestTenantResult(
         tenantTestAccount({
           ...actor,
-          clerkOrgId: tenantB.clerkOrgId,
+          accountId: tenantB.accountId,
           organisationId: tenantB.organisationId,
         }),
         (db) =>
           loadWizardSnapshot(
             {
               ...actor,
-              clerkOrgId: tenantB.clerkOrgId,
+              accountId: tenantB.accountId,
               organisationId: tenantB.organisationId,
             },
             db

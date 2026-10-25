@@ -2,7 +2,8 @@ import type { TenantDb } from "@repo/database";
 import { withTenantResult } from "@repo/database";
 import { acquireSyncRun } from "./sync-run-lifecycle";
 import "server-only";
-import { clerkClient } from "@repo/auth/server";
+import { listAccountMembers } from "@repo/auth/accounts";
+import { hasPermission } from "@repo/auth/permissions";
 import { unclaimedOrExpiredXeroWriteWhere } from "@repo/availability";
 import { type Result, xeroRecoveryMessage } from "@repo/core";
 import { scopedTo as scoped, withTenantDb } from "@repo/database";
@@ -45,7 +46,7 @@ const noUnresolvedSubmitOperationWhere =
     },
   });
 const ReconcileInputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
@@ -120,7 +121,7 @@ interface ReconciliationRecord {
   failed_action: string | null;
   id: string;
   person: {
-    clerk_user_id: string | null;
+    user_id: string | null;
     first_name: string;
     id: string;
     last_name: string;
@@ -185,13 +186,13 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
   let runId: string | null = null;
   try {
     if (
-      !(await withTenantDb(context.clerkOrgId, (db) =>
+      !(await withTenantDb(context.accountId, (db) =>
         isCurrentXeroSyncBinding(context, db)
       ))
     ) {
       return { ok: true, value: emptyResult(null, "ignored") };
     }
-    const acquired = await withTenantDb(context.clerkOrgId, (db) =>
+    const acquired = await withTenantDb(context.accountId, (db) =>
       acquireSyncRun(context, "approval_state_reconciliation", startedAt, db)
     );
     if (acquired.kind !== "active") {
@@ -222,16 +223,16 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
     const windowStart = new Date(
       Date.now() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
     );
-    const records = await withTenantDb(context.clerkOrgId, (db) =>
+    const records = await withTenantDb(context.accountId, (db) =>
       db.availabilityRecord.findMany({
         include: {
           person: {
             select: {
-              clerk_user_id: true,
               first_name: true,
               id: true,
               last_name: true,
-              manager: { select: { clerk_user_id: true, id: true } },
+              manager: { select: { id: true, user_id: true } },
+              user_id: true,
               xero_employee_id: true,
             },
           },
@@ -263,7 +264,7 @@ async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
       withdrawn: 0,
     };
     for (let index = 0; index < records.length; index += BATCH_SIZE) {
-      const runState = await withTenantDb(context.clerkOrgId, (db) =>
+      const runState = await withTenantDb(context.accountId, (db) =>
         db.syncRun.findFirst({
           select: { cancel_requested_at: true },
           where: { ...scoped(context), id: run.id },
@@ -509,8 +510,8 @@ async function transitionRecord(
     });
     if (updated.count !== 1) {
       log.info("Skipped stale reconciliation transition", {
+        accountId: context.accountId,
         attemptedAction: options.action,
-        clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
         recordId: record.id,
         snapshotApprovalStatus: record.approval_status,
@@ -555,8 +556,8 @@ async function archiveMissing(
     });
     if (updated.count !== 1) {
       log.info("Skipped stale reconciliation archival", {
+        accountId: context.accountId,
         attemptedAction: "availability_records.reconciled_to_archived_missing",
-        clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
         recordId: record.id,
         snapshotApprovalStatus: record.approval_status,
@@ -591,20 +592,20 @@ async function notifyRecordOwner(
   record: ReconciliationRecord,
   type: "leave_approved" | "leave_declined" | "leave_withdrawn"
 ) {
-  if (!record.person.clerk_user_id) {
+  if (!record.person.user_id) {
     return;
   }
   await dispatchNotification(
     {
+      accountId: context.accountId,
       actionUrl: `/plans?recordId=${record.id}`,
       actorUserId: context.triggeredByUserId ?? null,
       body: notificationBody(record, type),
-      clerkOrgId: context.clerkOrgId,
       objectId: record.id,
       objectType: "availability_record",
       organisationId: context.organisationId,
       recipientPersonId: record.person.id,
-      recipientUserId: record.person.clerk_user_id,
+      recipientUserId: record.person.user_id,
       title: notificationTitle(type),
       type,
     },
@@ -626,10 +627,10 @@ async function notifyCompletion(
   const body = `Reconciliation completed: ${counts.approved} approved, ${counts.declined} declined, ${counts.withdrawn} withdrawn, ${counts.archivedMissing} archived-missing`;
   for (const userId of recipients) {
     const phaseInput1 = {
+      accountId: context.accountId,
       actionUrl: `/sync/${runId}`,
       actorUserId: context.triggeredByUserId ?? null,
       body,
-      clerkOrgId: context.clerkOrgId,
       objectId: runId,
       objectType: "sync_run",
       organisationId: context.organisationId,
@@ -637,7 +638,7 @@ async function notifyCompletion(
       title: "Approval reconciliation complete",
       type: "sync_reconciliation_complete",
     } satisfies Parameters<typeof dispatchNotification>[0];
-    await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+    await withTenantResult(phaseInput1.accountId, (db) =>
       dispatchNotification(phaseInput1, undefined, db)
     );
   }
@@ -649,19 +650,15 @@ async function completionRecipients(
     return [context.triggeredByUserId];
   }
   try {
-    const clerk = await clerkClient();
-    const memberships = await clerk.organizations.getOrganizationMembershipList(
-      {
-        limit: 100,
-        organizationId: context.clerkOrgId,
-      }
-    );
+    const memberships = await listAccountMembers({
+      accountId: context.accountId,
+      limit: 100,
+    });
     return memberships.data
-      .filter(
-        (membership) =>
-          membership.role === "org:admin" || membership.role === "org:owner"
+      .filter((membership) =>
+        hasPermission(membership.role, { xero: ["sync"] })
       )
-      .map((membership) => membership.publicUserData?.userId)
+      .map((membership) => membership.userId)
       .filter((userId): userId is string => Boolean(userId));
   } catch (error) {
     if (
@@ -696,7 +693,7 @@ async function recordFailure(
     errorMessage =
       "The Xero leave application no longer exists. The Team Calendar record has been archived.";
   }
-  await withTenantDb(context.clerkOrgId, (db) =>
+  await withTenantDb(context.accountId, (db) =>
     db.failedRecord.create({
       data: {
         ...scoped(context),
@@ -770,7 +767,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await withTenantDb(context.clerkOrgId, persist);
+    await withTenantDb(context.accountId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }
@@ -792,7 +789,7 @@ async function publishRunStatusChanged(
     await (() =>
       publishOrganisationNotificationEvent(
         {
-          clerkOrgId: context.clerkOrgId,
+          accountId: context.accountId,
           organisationId: context.organisationId,
         },
         {
@@ -827,9 +824,9 @@ function auditBase(
   recordId: string
 ) {
   return {
+    account_id: context.accountId,
     action,
     actor_user_id: context.triggeredByUserId ?? null,
-    clerk_org_id: context.clerkOrgId,
     organisation_id: context.organisationId,
     resource_id: recordId,
     resource_type: "availability_record",

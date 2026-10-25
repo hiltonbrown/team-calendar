@@ -1,6 +1,6 @@
-import { auth, currentUser, requireOrg } from "@repo/auth/helpers";
+import { getCurrentUser, getSession, requireAccount } from "@repo/auth/helpers";
 import { createManualAvailability } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { listPeopleForOrganisation } from "@repo/database/queries/people";
@@ -25,9 +25,9 @@ export async function POST(request: Request): Promise<Response> {
   assertNoTenantTransaction("POST");
   try {
     // Get authenticated user and organisation
-    let clerkOrgId: string;
+    let accountId: string;
     try {
-      clerkOrgId = await requireOrg();
+      accountId = await requireAccount();
     } catch {
       return Response.json(
         {
@@ -38,7 +38,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     // Get current user
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return Response.json(
         {
@@ -75,16 +75,21 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const { data } = parseResult;
-    // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId is validated by Zod UUID schema
-    const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
+    // Safe branded cast: accountId is verified by Clerk requireAccount(), organisationId is validated by Zod UUID schema
+    const scopedAccountId = accountId as AccountId;
     const scopedOrgId = data.organisationId as OrganisationId;
-    const authResult = await auth();
+    const authResult = (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
     const prepared = await withTenantResult(
-      scopedClerkOrgId,
+      scopedAccountId,
       async (db): Promise<Result<HttpDescriptor, HttpDescriptor>> => {
         // Validate organisation exists and is in scope
         const orgResult = await getOrganisationById(
-          scopedClerkOrgId,
+          scopedAccountId,
           scopedOrgId,
           db
         );
@@ -96,7 +101,7 @@ export async function POST(request: Request): Promise<Response> {
         }
         // Validate person exists in organisation
         const peopleResult = await listPeopleForOrganisation(
-          scopedClerkOrgId,
+          scopedAccountId,
           scopedOrgId,
           undefined,
           db
@@ -123,7 +128,7 @@ export async function POST(request: Request): Promise<Response> {
         const createResult = await (() =>
           createManualAvailability(
             {
-              clerkOrgId: scopedClerkOrgId,
+              accountId: scopedAccountId,
               organisationId: scopedOrgId,
             },
             {
@@ -138,7 +143,7 @@ export async function POST(request: Request): Promise<Response> {
               title: data.title,
               workingLocation: data.workingLocation,
             },
-            { orgRole: authResult.orgRole, userId: user.id },
+            { role: authResult.role, userId: user.id },
             db
           ))();
         if (!createResult.ok) {

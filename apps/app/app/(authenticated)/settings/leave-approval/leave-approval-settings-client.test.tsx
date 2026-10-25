@@ -24,7 +24,7 @@ vi.mock("./_actions", () => ({
 
 const organisationId = "70000000-0000-4000-8000-000000000001";
 const settings: OrganisationSettings = {
-  clerkOrgId: "org_clerk",
+  accountId: "org_clerk",
   createdAt: new Date("2026-08-30T00:00:00.000Z"),
   defaultFeedPrivacyMode: "named",
   defaultLeaveRequestAdvanceDays: 0,
@@ -51,7 +51,7 @@ describe("LeaveApprovalSettingsClient", () => {
     render(
       <LeaveApprovalSettingsClient
         accountSettings={{
-          clerkOrgId: settings.clerkOrgId,
+          accountId: settings.accountId,
           managerVisibilityScope: "direct_reports_only",
         }}
         organisationId={organisationId}
@@ -101,7 +101,7 @@ describe("LeaveApprovalSettingsClient", () => {
     render(
       <LeaveApprovalSettingsClient
         accountSettings={{
-          clerkOrgId: settings.clerkOrgId,
+          accountId: settings.accountId,
           managerVisibilityScope: "direct_reports_only",
         }}
         organisationId={organisationId}
@@ -128,7 +128,7 @@ it("saves manager visibility to the account action without a company id", async 
   render(
     <LeaveApprovalSettingsClient
       accountSettings={{
-        clerkOrgId: settings.clerkOrgId,
+        accountId: settings.accountId,
         managerVisibilityScope: "direct_reports_only",
       }}
       organisationId={organisationId}

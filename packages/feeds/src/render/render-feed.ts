@@ -30,7 +30,7 @@ import {
 } from "../tokens/token-service";
 
 const feedTokenSelect = {
-  clerk_org_id: true,
+  account_id: true,
   expires_at: true,
   feed: {
     select: {
@@ -54,7 +54,7 @@ type FeedTokenRow = Prisma.FeedTokenGetPayload<{
 
 export interface RenderedFeed {
   activation?: Promise<null | {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     occurredAt: Date;
   }>;
@@ -78,7 +78,7 @@ export interface FeedBody {
 // per-token render path and the rebuild-feed-cache job so both produce byte-identical
 // bodies and the same cache key.
 export async function renderFeedBody(input: {
-  clerkOrgId: string;
+  accountId: string;
   feedId: string;
   feedName: string;
   organisationId: string | null;
@@ -182,7 +182,7 @@ async function renderFeedAttempt(
     return { ok: true, value: { body: "", etag: "", status: inactive } };
   }
   const input = {
-    clerkOrgId: feedToken.clerk_org_id,
+    accountId: feedToken.account_id,
     feedId: feedToken.feed_id,
     feedName: feedToken.feed.name,
     organisationId: feedToken.organisation_id,
@@ -263,7 +263,7 @@ async function persistRenderedBody(
   token: FeedTokenRow,
   rendered: FeedBody
 ): Promise<void> {
-  await withTenantDb(token.clerk_org_id, (db) =>
+  await withTenantDb(token.account_id, (db) =>
     persistRenderedMetadata(token, rendered, db)
   );
   try {
@@ -286,11 +286,11 @@ async function persistedInactiveStatus(
 ): Promise<"expired" | "revoked" | null> {
   const inactive = tokenInactiveStatus(token);
   if (inactive === "expired" && token.status === "active") {
-    await withTenantDb(token.clerk_org_id, (db) =>
+    await withTenantDb(token.account_id, (db) =>
       db.feedToken.updateMany({
         data: { status: "expired" },
         where: {
-          clerk_org_id: token.clerk_org_id,
+          account_id: token.account_id,
           expires_at: { lt: new Date() },
           id: token.id,
           organisation_id: token.organisation_id,
@@ -354,16 +354,16 @@ async function resolveFeedToken(token: string): Promise<FeedTokenRow | null> {
 }
 
 async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   occurredAt: Date;
 }> {
   try {
-    return await withTenantDb(token.clerk_org_id, async (db) => {
+    return await withTenantDb(token.account_id, async (db) => {
       const occurredAt = new Date();
       const auditOrganisationId =
         token.organisation_id ??
-        (await resolveAccountCompanies(token.clerk_org_id, db))[0]?.id;
+        (await resolveAccountCompanies(token.account_id, db))[0]?.id;
       if (!auditOrganisationId) {
         await markTokenUsed(token, occurredAt, db);
         return null;
@@ -371,11 +371,11 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
       await markTokenUsed(token, occurredAt, db);
       await db.auditEvent.createMany({
         data: {
+          account_id: token.account_id,
           action: "activation.first_feed_accessed",
-          clerk_org_id: token.clerk_org_id,
           created_at: occurredAt,
           id: activationMilestoneId(
-            token.clerk_org_id,
+            token.account_id,
             token.organisation_id,
             "first_feed_accessed"
           ),
@@ -387,9 +387,9 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
       const first = await db.auditEvent.findUnique({
         select: { created_at: true },
         where: {
-          clerk_org_id: token.clerk_org_id,
+          account_id: token.account_id,
           id: activationMilestoneId(
-            token.clerk_org_id,
+            token.account_id,
             token.organisation_id,
             "first_feed_accessed"
           ),
@@ -398,7 +398,7 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
       });
       return first?.created_at
         ? {
-            clerkOrgId: token.clerk_org_id,
+            accountId: token.account_id,
             occurredAt: first.created_at,
             organisationId: auditOrganisationId,
           }
@@ -418,7 +418,7 @@ function markTokenUsed(
   occurredAt: Date,
   db: TenantDb
 ): Promise<unknown> {
-  assertTenantDb(db, token.clerk_org_id);
+  assertTenantDb(db, token.account_id);
   const oneHourAgo = new Date(occurredAt.getTime() - 60 * 60 * 1000);
   if (token.last_used_at && token.last_used_at >= oneHourAgo) {
     return Promise.resolve();
@@ -426,7 +426,7 @@ function markTokenUsed(
   return db.feedToken.updateMany({
     data: { last_used_at: occurredAt },
     where: {
-      clerk_org_id: token.clerk_org_id,
+      account_id: token.account_id,
       id: token.id,
       OR: [{ last_used_at: null }, { last_used_at: { lt: oneHourAgo } }],
       organisation_id: token.organisation_id,
@@ -435,12 +435,12 @@ function markTokenUsed(
 }
 
 function activationMilestoneId(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string | null,
   milestone: string
 ): string {
   const hex = createHash("sha256")
-    .update(`${clerkOrgId}:${organisationId}:${milestone}`)
+    .update(`${accountId}:${organisationId}:${milestone}`)
     .digest("hex")
     .slice(0, 32);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
@@ -451,11 +451,11 @@ async function persistRenderedMetadata(
   rendered: FeedBody,
   db: TenantDb
 ): Promise<void> {
-  assertTenantDb(db, token.clerk_org_id);
+  assertTenantDb(db, token.account_id);
   await db.feed.updateMany({
     data: { last_etag: rendered.etag, last_rendered_at: new Date() },
     where: {
-      clerk_org_id: token.clerk_org_id,
+      account_id: token.account_id,
       id: token.feed_id,
       organisation_id: token.organisation_id,
       representation_generation: rendered.generation,

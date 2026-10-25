@@ -1,66 +1,66 @@
+import type { AccountDirectory } from "@repo/auth/accounts";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
-  type ClerkOrganizationsApi,
-  inviteClerkAccessCandidates,
-  loadClerkAccessReview,
-  reconcileClerkAccessLinks,
-} from "./clerk-access-service";
+  inviteAccountAccessCandidates,
+  loadAccountAccessReview,
+  reconcileAccountAccessLinks,
+} from "./account-access-service";
 
 const fixture = allocateLiveTestFixture(
-  "packages/availability/src/people/clerk-access-service.integration.test.ts"
+  "packages/availability/src/people/account-access-service.integration.test.ts"
 );
 const { systemDatabase: database } = await import("@repo/database");
 const tenantA = {
-  clerkOrgId: fixture.tenants[0]?.clerkOrgId as ClerkOrgId,
+  accountId: fixture.tenants[0]?.accountId as AccountId,
   organisationId: fixture.tenants[0]?.organisationId as OrganisationId,
 };
 
 const tenantB = {
-  clerkOrgId: fixture.tenants[1]?.clerkOrgId as ClerkOrgId,
+  accountId: fixture.tenants[1]?.accountId as AccountId,
   organisationId: fixture.tenants[1]?.organisationId as OrganisationId,
 };
-if (!(tenantA.clerkOrgId && tenantB.clerkOrgId)) {
-  throw new Error("Clerk-access live fixture tenants were not allocated");
+if (!(tenantA.accountId && tenantB.accountId)) {
+  throw new Error("Account-access live fixture tenants were not allocated");
 }
 
 const testOrgIds = [tenantA.organisationId, tenantB.organisationId];
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const testAccountIds = [tenantA.accountId, tenantB.accountId];
 
 async function cleanDatabase() {
   await database.auditEvent.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.availabilityRecord.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.person.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.organisation.deleteMany({
     where: { id: { in: testOrgIds } },
   });
 }
 
-describe("clerk-access-service integration", () => {
+describe("account-access-service integration", () => {
   beforeEach(async () => {
     await cleanDatabase();
 
     await database.organisation.createMany({
       data: [
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           country_code: "AU",
           id: tenantA.organisationId,
           name: "Tenant A",
           timezone: "Australia/Sydney",
         },
         {
-          clerk_org_id: tenantB.clerkOrgId,
+          account_id: tenantB.accountId,
           country_code: "AU",
           id: tenantB.organisationId,
           name: "Tenant B",
@@ -78,10 +78,10 @@ describe("clerk-access-service integration", () => {
   });
 
   it("links unique one-to-one matches and isolates by tenant keys", async () => {
-    // Person in Tenant A with matching Clerk member
+    // Person in Tenant A with matching account member
     const personA1 = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "alice@example.com",
         employment_type: "employee",
         first_name: "Alice",
@@ -96,7 +96,7 @@ describe("clerk-access-service integration", () => {
     // Person in Tenant B with same email (should be isolated to tenant B)
     const personB1 = await database.person.create({
       data: {
-        clerk_org_id: tenantB.clerkOrgId,
+        account_id: tenantB.accountId,
         email: "alice@example.com",
         employment_type: "employee",
         first_name: "Alice",
@@ -108,32 +108,31 @@ describe("clerk-access-service integration", () => {
       },
     });
 
-    const mockClerk: ClerkOrganizationsApi = {
-      createOrganizationInvitationBulk: vi.fn(),
-      getOrganizationInvitationList: vi.fn().mockResolvedValue({
+    const mockDirectory: AccountDirectory = {
+      inviteMembers: vi.fn(),
+      listInvitations: vi.fn().mockResolvedValue({
         data: [],
         totalCount: 0,
       }),
-      getOrganizationMembershipList: vi.fn().mockResolvedValue({
+      listMembers: vi.fn().mockResolvedValue({
         data: [
           {
+            accountId: tenantA.accountId,
+            email: "alice@example.com",
             id: "mem_1",
-            publicUserData: {
-              firstName: "Alice",
-              identifier: "alice@example.com",
-              lastName: "Smith",
-              userId: "user_clerk_alice_a",
-            },
-            role: "org:member",
+            image: null,
+            name: "Alice Smith",
+            role: "viewer",
+            userId: "user_alice_a",
           },
         ],
         totalCount: 1,
       }),
     };
 
-    const reviewResult = await loadClerkAccessReview({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const reviewResult = await loadAccountAccessReview({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       organisationId: tenantA.organisationId,
     });
 
@@ -150,9 +149,9 @@ describe("clerk-access-service integration", () => {
       state: "linkable",
     });
 
-    const linkResult = await reconcileClerkAccessLinks({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const linkResult = await reconcileAccountAccessLinks({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       organisationId: tenantA.organisationId,
     });
 
@@ -165,20 +164,20 @@ describe("clerk-access-service integration", () => {
     const updatedA = await database.person.findUnique({
       where: { id: personA1.id },
     });
-    expect(updatedA?.clerk_user_id).toBe("user_clerk_alice_a");
+    expect(updatedA?.user_id).toBe("user_alice_a");
 
     // Tenant B person should NOT have been linked
     const unchangedB = await database.person.findUnique({
       where: { id: personB1.id },
     });
-    expect(unchangedB?.clerk_user_id).toBeNull();
+    expect(unchangedB?.user_id).toBeNull();
   });
 
   it("excludes fallback emails, duplicate local emails, and pending invitations from invitable candidates", async () => {
     // 1. Invitable Xero employee
     const validPerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "valid@example.com",
         employment_type: "employee",
         first_name: "Valid",
@@ -193,7 +192,7 @@ describe("clerk-access-service integration", () => {
     // 2. Fallback email employee
     const fallbackPerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "fallback.user@noemail.teamcalendar.online",
         employment_type: "employee",
         first_name: "Fallback",
@@ -208,7 +207,7 @@ describe("clerk-access-service integration", () => {
     // 3. Duplicate email local people (one XERO, one MANUAL)
     const dup1 = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "dup@example.com",
         employment_type: "employee",
         first_name: "Dup",
@@ -221,7 +220,7 @@ describe("clerk-access-service integration", () => {
     });
     const dup2 = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "dup@example.com",
         employment_type: "employee",
         first_name: "Dup",
@@ -236,7 +235,7 @@ describe("clerk-access-service integration", () => {
     // 4. Pending invitation person
     const pendingPerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "pending@example.com",
         employment_type: "employee",
         first_name: "Pending",
@@ -248,32 +247,30 @@ describe("clerk-access-service integration", () => {
       },
     });
 
-    const mockClerk: ClerkOrganizationsApi = {
-      createOrganizationInvitationBulk: vi.fn().mockResolvedValue({
-        data: [
-          { emailAddress: "valid@example.com", id: "inv_1", status: "pending" },
-        ],
+    const mockDirectory: AccountDirectory = {
+      inviteMembers: vi.fn().mockResolvedValue({
+        data: [{ email: "valid@example.com", id: "inv_1", status: "pending" }],
         totalCount: 1,
       }),
-      getOrganizationInvitationList: vi.fn().mockResolvedValue({
+      listInvitations: vi.fn().mockResolvedValue({
         data: [
           {
-            emailAddress: "pending@example.com",
+            email: "pending@example.com",
             id: "inv_pending_1",
             status: "pending",
           },
         ],
         totalCount: 1,
       }),
-      getOrganizationMembershipList: vi.fn().mockResolvedValue({
+      listMembers: vi.fn().mockResolvedValue({
         data: [],
         totalCount: 0,
       }),
     };
 
-    const review = await loadClerkAccessReview({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const review = await loadAccountAccessReview({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       organisationId: tenantA.organisationId,
     });
 
@@ -307,9 +304,9 @@ describe("clerk-access-service integration", () => {
     });
 
     // Now dispatch invitations
-    const inviteResult = await inviteClerkAccessCandidates({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const inviteResult = await inviteAccountAccessCandidates({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       inviterUserId: "user_inviter_admin",
       organisationId: tenantA.organisationId,
     });
@@ -320,16 +317,16 @@ describe("clerk-access-service integration", () => {
     }
 
     expect(inviteResult.value.succeededCount).toBe(1);
-    expect(mockClerk.createOrganizationInvitationBulk).toHaveBeenCalledWith(
-      tenantA.clerkOrgId,
-      [
+    expect(mockDirectory.inviteMembers).toHaveBeenCalledWith({
+      accountId: tenantA.accountId,
+      invitations: [
         {
-          emailAddress: "valid@example.com",
+          email: "valid@example.com",
           inviterUserId: "user_inviter_admin",
-          role: "org:viewer",
+          role: "viewer",
         },
-      ]
-    );
+      ],
+    });
   });
 
   it("handles batch limits (<= 10) and retries on transient errors", async () => {
@@ -337,7 +334,7 @@ describe("clerk-access-service integration", () => {
     for (let i = 1; i <= 12; i += 1) {
       await database.person.create({
         data: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           email: `employee${i}@example.com`,
           employment_type: "employee",
           first_name: `Emp${i}`,
@@ -351,39 +348,37 @@ describe("clerk-access-service integration", () => {
     }
 
     let bulkCallCount = 0;
-    const mockClerk: ClerkOrganizationsApi = {
-      createOrganizationInvitationBulk: vi
-        .fn()
-        .mockImplementation((_orgId, batch) => {
-          bulkCallCount += 1;
-          if (bulkCallCount === 1) {
-            // First attempt of batch 1 fails with transient 429
-            const err = new Error("Rate limit exceeded");
-            (err as unknown as { status: number }).status = 429;
-            return Promise.reject(err);
-          }
-          return Promise.resolve({
-            data: batch.map((b: { emailAddress: string }, idx: number) => ({
-              emailAddress: b.emailAddress,
-              id: `inv_${bulkCallCount}_${idx}`,
-              status: "pending",
-            })),
-            totalCount: batch.length,
-          });
-        }),
-      getOrganizationInvitationList: vi.fn().mockResolvedValue({
+    const mockDirectory: AccountDirectory = {
+      inviteMembers: vi.fn().mockImplementation(({ invitations: batch }) => {
+        bulkCallCount += 1;
+        if (bulkCallCount === 1) {
+          // First attempt of batch 1 fails with transient 429
+          const err = new Error("Rate limit exceeded");
+          (err as unknown as { status: number }).status = 429;
+          return Promise.reject(err);
+        }
+        return Promise.resolve({
+          data: batch.map((b: { email: string }, idx: number) => ({
+            email: b.email,
+            id: `inv_${bulkCallCount}_${idx}`,
+            status: "pending",
+          })),
+          totalCount: batch.length,
+        });
+      }),
+      listInvitations: vi.fn().mockResolvedValue({
         data: [],
         totalCount: 0,
       }),
-      getOrganizationMembershipList: vi.fn().mockResolvedValue({
+      listMembers: vi.fn().mockResolvedValue({
         data: [],
         totalCount: 0,
       }),
     };
 
-    const inviteResult = await inviteClerkAccessCandidates({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const inviteResult = await inviteAccountAccessCandidates({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       inviterUserId: "user_inviter_admin",
       organisationId: tenantA.organisationId,
     });
@@ -398,14 +393,14 @@ describe("clerk-access-service integration", () => {
     // Total succeeded: 12
     expect(inviteResult.value.succeededCount).toBe(12);
     expect(inviteResult.value.failedCount).toBe(0);
-    expect(mockClerk.createOrganizationInvitationBulk).toHaveBeenCalledTimes(3);
+    expect(mockDirectory.inviteMembers).toHaveBeenCalledTimes(3);
   });
 
-  it("handles no-email, invalid-email, clerk-user conflicts and non-transient errors without rollback", async () => {
+  it("handles no-email, invalid-email, user conflicts and non-transient errors without rollback", async () => {
     // 1. Person with no email
     const noEmailPerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "",
         employment_type: "employee",
         first_name: "NoEmail",
@@ -420,7 +415,7 @@ describe("clerk-access-service integration", () => {
     // 2. Person with invalid email
     const invalidEmailPerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "not-a-valid-email",
         employment_type: "employee",
         first_name: "Invalid",
@@ -432,10 +427,10 @@ describe("clerk-access-service integration", () => {
       },
     });
 
-    // 3. Person with multiple Clerk users for the same email
-    const clerkConflictPerson = await database.person.create({
+    // 3. Person with multiple users for the same email
+    const userConflictPerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "shared@example.com",
         employment_type: "employee",
         first_name: "Shared",
@@ -450,7 +445,7 @@ describe("clerk-access-service integration", () => {
     // 4. Linkable person that should succeed linking even if bulk invitations fail
     const linkablePerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "linkable@example.com",
         employment_type: "employee",
         first_name: "Linkable",
@@ -465,7 +460,7 @@ describe("clerk-access-service integration", () => {
     // 5. Invitable candidate whose bulk invitation throws a non-transient error
     const invitablePerson = await database.person.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: "invitable@example.com",
         employment_type: "employee",
         first_name: "Invitable",
@@ -477,49 +472,52 @@ describe("clerk-access-service integration", () => {
       },
     });
 
-    const mockClerk: ClerkOrganizationsApi = {
-      createOrganizationInvitationBulk: vi
+    const mockDirectory: AccountDirectory = {
+      inviteMembers: vi
         .fn()
         .mockRejectedValue(
           new Error("Permanent failure (e.g. 400 Bad Request)")
         ),
-      getOrganizationInvitationList: vi.fn().mockResolvedValue({
+      listInvitations: vi.fn().mockResolvedValue({
         data: [],
         totalCount: 0,
       }),
-      getOrganizationMembershipList: vi.fn().mockResolvedValue({
+      listMembers: vi.fn().mockResolvedValue({
         data: [
           // 2 members for shared@example.com -> conflict!
           {
+            accountId: tenantA.accountId,
+            email: "shared@example.com",
             id: "mem_shared_1",
-            publicUserData: {
-              identifier: "shared@example.com",
-              userId: "user_shared_1",
-            },
+            image: null,
+            name: null,
+            userId: "user_shared_1",
           },
           {
+            accountId: tenantA.accountId,
+            email: "shared@example.com",
             id: "mem_shared_2",
-            publicUserData: {
-              identifier: "shared@example.com",
-              userId: "user_shared_2",
-            },
+            image: null,
+            name: null,
+            userId: "user_shared_2",
           },
           // 1 member for linkable@example.com -> linkable!
           {
+            accountId: tenantA.accountId,
+            email: "linkable@example.com",
             id: "mem_linkable",
-            publicUserData: {
-              identifier: "linkable@example.com",
-              userId: "user_linkable_1",
-            },
+            image: null,
+            name: null,
+            userId: "user_linkable_1",
           },
         ],
         totalCount: 3,
       }),
     };
 
-    const review = await loadClerkAccessReview({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const review = await loadAccountAccessReview({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       organisationId: tenantA.organisationId,
     });
 
@@ -538,8 +536,8 @@ describe("clerk-access-service integration", () => {
       conflictReason: "invalid_email",
       state: "conflict",
     });
-    expect(candidateMap.get(clerkConflictPerson.id)).toMatchObject({
-      conflictReason: "clerk_user_conflict",
+    expect(candidateMap.get(userConflictPerson.id)).toMatchObject({
+      conflictReason: "user_conflict",
       state: "conflict",
     });
     expect(candidateMap.get(linkablePerson.id)).toMatchObject({
@@ -552,9 +550,9 @@ describe("clerk-access-service integration", () => {
     });
 
     // Now invite candidates - bulk invitation will fail with 400
-    const inviteResult = await inviteClerkAccessCandidates({
-      clerkOrganizations: mockClerk,
-      clerkOrgId: tenantA.clerkOrgId,
+    const inviteResult = await inviteAccountAccessCandidates({
+      accountDirectory: mockDirectory,
+      accountId: tenantA.accountId,
       inviterUserId: "user_admin",
       organisationId: tenantA.organisationId,
     });
@@ -572,6 +570,6 @@ describe("clerk-access-service integration", () => {
     const linkedInDb = await database.person.findUnique({
       where: { id: linkablePerson.id },
     });
-    expect(linkedInDb?.clerk_user_id).toBe("user_linkable_1");
+    expect(linkedInDb?.user_id).toBe("user_linkable_1");
   });
 });

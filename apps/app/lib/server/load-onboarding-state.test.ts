@@ -37,7 +37,7 @@ function buildTenantTestDatabase() {
 
 const { loadOnboardingState } = await import("./load-onboarding-state");
 const input = {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 
@@ -131,14 +131,14 @@ describe("loadOnboardingState", () => {
     );
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: expect.objectContaining({
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         organisation_id: input.organisationId,
       }),
     });
     expect(mocks.organisationFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           id: input.organisationId,
         }),
       })

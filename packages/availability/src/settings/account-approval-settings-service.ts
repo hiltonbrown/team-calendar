@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import "server-only";
 import type { Result } from "@repo/core";
 import {
@@ -13,14 +14,14 @@ const ManagerVisibilitySchema = z.enum([
   "direct_reports_only",
   "all_team_leave",
 ]);
-const ReadSchema = z.object({ clerkOrgId: z.string().min(1) });
+const ReadSchema = z.object({ accountId: z.string().min(1) });
 const WriteSchema = ReadSchema.extend({
   actingRole: z.enum(["admin", "owner", "manager", "viewer"]),
   actingUserId: z.string().min(1),
   managerVisibilityScope: ManagerVisibilitySchema,
 });
 export interface AccountApprovalSettings {
-  clerkOrgId: string;
+  accountId: string;
   managerVisibilityScope: z.infer<typeof ManagerVisibilitySchema>;
 }
 export interface AccountApprovalSettingsError {
@@ -30,7 +31,7 @@ export interface AccountApprovalSettingsError {
 const mapSettings = (
   row: Awaited<ReturnType<typeof getAccountSettings>>
 ): AccountApprovalSettings => ({
-  clerkOrgId: row.clerk_org_id,
+  accountId: row.account_id,
   managerVisibilityScope: ManagerVisibilitySchema.parse(
     row.manager_visibility_scope
   ),
@@ -49,10 +50,10 @@ export async function getAccountApprovalSettings(
       ok: false,
     };
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   return {
     ok: true,
-    value: mapSettings(await getAccountSettings(parsed.data.clerkOrgId, db)),
+    value: mapSettings(await getAccountSettings(parsed.data.accountId, db)),
   };
 }
 export async function updateAccountApprovalSettings(
@@ -69,11 +70,8 @@ export async function updateAccountApprovalSettings(
       ok: false,
     };
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
-  if (
-    parsed.data.actingRole !== "admin" &&
-    parsed.data.actingRole !== "owner"
-  ) {
+  assertTenantDb(db, parsed.data.accountId);
+  if (!hasPermission(parsed.data.actingRole, { settings: ["update"] })) {
     return {
       error: {
         code: "not_authorised",
@@ -86,7 +84,7 @@ export async function updateAccountApprovalSettings(
     tenantDb: TenantDb
   ): Promise<Result<AccountApprovalSettings, AccountApprovalSettingsError>> => {
     const [company] = await resolveAccountCompanies(
-      parsed.data.clerkOrgId,
+      parsed.data.accountId,
       tenantDb
     );
     if (!company) {
@@ -98,19 +96,19 @@ export async function updateAccountApprovalSettings(
         ok: false,
       };
     }
-    const before = await getAccountSettings(parsed.data.clerkOrgId, tenantDb);
+    const before = await getAccountSettings(parsed.data.accountId, tenantDb);
     const after = await updateAccountSettings(
-      parsed.data.clerkOrgId,
+      parsed.data.accountId,
       parsed.data.managerVisibilityScope,
       tenantDb
     );
     await tenantDb.auditEvent.create({
       data: {
+        account_id: parsed.data.accountId,
         action: "account_settings.updated",
         actor_user_id: parsed.data.actingUserId,
         after_value: { ...mapSettings(after) },
         before_value: { ...mapSettings(before) },
-        clerk_org_id: parsed.data.clerkOrgId,
         entity_id: after.id,
         entity_type: "account_settings",
         metadata: { changedKeys: ["managerVisibilityScope"] },
@@ -122,7 +120,7 @@ export async function updateAccountApprovalSettings(
     return { ok: true, value: mapSettings(after) };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }

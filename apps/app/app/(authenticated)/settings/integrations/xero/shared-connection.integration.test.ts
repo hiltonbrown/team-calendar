@@ -1,4 +1,10 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
+import {
+  isAuthRole,
+  type PermissionRequest,
+  hasPermission as roleHasPermission,
+} from "@repo/auth/permissions";
+import type { AuthSession, AuthUser } from "@repo/auth/server";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
   afterAll,
@@ -12,16 +18,15 @@ import {
 } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const clerk = vi.hoisted(() => ({ auth: vi.fn(), currentUser: vi.fn() }));
+const authIdentity = vi.hoisted(() => ({
+  getCurrentUser: vi.fn<() => Promise<AuthUser | null>>(),
+  getSession: vi.fn<() => Promise<AuthSession | null>>(),
+  hasPermission: vi.fn<(request: PermissionRequest) => Promise<boolean>>(),
+  requireAccount: vi.fn<() => Promise<string>>(),
+}));
 const providerIdentity = vi.hoisted(() => ({ verify: vi.fn() }));
-vi.mock(
-  "@repo/auth/node_modules/@clerk/nextjs/dist/esm/server/index.js",
-  async (importOriginal) => ({
-    ...(await importOriginal<typeof import("@repo/auth/server")>()),
-    auth: clerk.auth,
-    currentUser: clerk.currentUser,
-  })
-);
+vi.mock("@repo/auth/server", () => authIdentity);
+vi.mock("@repo/auth/helpers", () => authIdentity);
 vi.mock("next/headers", () => ({
   headers: () => Promise.resolve(new Headers()),
 }));
@@ -54,7 +59,7 @@ function tenancy(index: number) {
 const tenancyA = tenancy(0),
   tenancyB = tenancy(1);
 const scopes = {
-  clerk_org_id: { in: allocation.tenants.map((owned) => owned.clerkOrgId) },
+  account_id: { in: allocation.tenants.map((owned) => owned.accountId) },
 };
 const adminA = allocation.key("admin-a"),
   adminB = allocation.key("admin-b"),
@@ -76,8 +81,8 @@ let crypto: typeof import("@repo/xero/src/crypto/tokens");
 let readContext: typeof import("@/lib/server/get-active-org-context")["getActiveOrgContext"];
 const removedMembers = new Set<string>();
 let activeActor = adminA;
-let activeClerkOrg = tenancyA.clerkOrgId;
-let activeRole = "org:admin";
+let activeAccount = tenancyA.accountId;
+let activeRole = "admin";
 let authoriser = xeroX;
 let accessToken = "access-x";
 let refreshToken = "refresh-x";
@@ -86,11 +91,11 @@ let provider: ReturnType<typeof vi.fn<typeof fetch>>;
 
 function authenticate(
   actor = adminA,
-  org = tenancyA.clerkOrgId,
-  role = "org:admin"
+  org = tenancyA.accountId,
+  role = "admin"
 ) {
   activeActor = actor;
-  activeClerkOrg = org;
+  activeAccount = org;
   activeRole = role;
 }
 function currentIdentity() {
@@ -149,37 +154,48 @@ beforeEach(async () => {
   rotationCount = 0;
   selectedTenant = tenantX;
   selectedRemote = remoteX;
-  clerk.auth.mockImplementation(() => {
-    const roleSnapshot = activeRole;
+  authIdentity.getSession.mockImplementation(() => {
     if (removedMembers.has(activeActor)) {
       return Promise.resolve({
-        has: () => false,
-        isAuthenticated: true,
-        orgId: null,
-        orgRole: null,
+        accountId: null,
+        role: null,
+        sessionId: allocation.key("session"),
         userId: activeActor,
       });
     }
     return Promise.resolve({
-      has: ({ role }: { role: string }) => role === roleSnapshot,
-      isAuthenticated: true,
-      orgId: activeClerkOrg,
-      orgRole: activeRole,
+      accountId: activeAccount,
+      role: isAuthRole(activeRole) ? activeRole : null,
+      sessionId: allocation.key("session"),
       userId: activeActor,
     });
   });
-  clerk.currentUser.mockImplementation(() =>
+  authIdentity.getCurrentUser.mockImplementation(() =>
     Promise.resolve({
-      emailAddresses: [{ emailAddress: `${activeActor}@example.test` }],
-      firstName: "Fixture",
+      email: `${activeActor}@example.test`,
+      emailVerified: true,
       id: activeActor,
-      lastName: "User",
+      image: null,
+      name: "Fixture User",
     })
   );
+  authIdentity.hasPermission.mockImplementation(async (request) => {
+    const session = await authIdentity.getSession();
+    return Boolean(
+      session?.accountId && roleHasPermission(session.role, request)
+    );
+  });
+  authIdentity.requireAccount.mockImplementation(async () => {
+    const accountId = (await authIdentity.getSession())?.accountId;
+    if (!accountId) {
+      throw new Error("Not authenticated or no account selected");
+    }
+    return accountId;
+  });
   providerIdentity.verify.mockImplementation(currentIdentity);
   await database.organisation.createMany({
     data: [tenancyA, tenancyB].map((owned, index) => ({
-      clerk_org_id: owned.clerkOrgId,
+      account_id: owned.accountId,
       country_code: "AU",
       id: owned.organisationId,
       name: index === 0 ? "Shared Org A" : "Foreign Org B",
@@ -187,8 +203,7 @@ beforeEach(async () => {
   });
   await database.person.createMany({
     data: [adminA, adminB, memberA, userB].map((actor, index) => ({
-      clerk_org_id: index === 3 ? tenancyB.clerkOrgId : tenancyA.clerkOrgId,
-      clerk_user_id: actor,
+      account_id: index === 3 ? tenancyB.accountId : tenancyA.accountId,
       email: `${actor}@example.test`,
       employment_type: "employee",
       first_name: "Fixture",
@@ -197,6 +212,7 @@ beforeEach(async () => {
       organisation_id:
         index === 3 ? tenancyB.organisationId : tenancyA.organisationId,
       source_system: "MANUAL",
+      user_id: actor,
     })),
   });
   provider = vi.fn<typeof fetch>((url, init) => {
@@ -276,7 +292,7 @@ afterAll(async () => {
 });
 
 async function connect(actor = adminA, principal = xeroX, owned = tenancyA) {
-  authenticate(actor, owned.clerkOrgId);
+  authenticate(actor, owned.accountId);
   selectedTenant = owned === tenancyA ? tenantX : tenantY;
   selectedRemote = owned === tenancyA ? remoteX : remoteY;
   authoriser = principal;
@@ -289,9 +305,9 @@ async function connect(actor = adminA, principal = xeroX, owned = tenancyA) {
     throw new Error("Expected admin connect action");
   }
   const startRequest = new URL(action.value.redirectUrl);
-  expect(startRequest.searchParams.get("clerkOrgId")).toBe(owned.clerkOrgId);
+  expect(startRequest.searchParams.get("accountId")).toBe(owned.accountId);
   const started = await xero.buildXeroOAuthStartUrl({
-    clerkOrgId: startRequest.searchParams.get("clerkOrgId") ?? "",
+    accountId: startRequest.searchParams.get("accountId") ?? "",
     organisationId: startRequest.searchParams.get("organisationId"),
     returnTo: startRequest.searchParams.get("returnTo") ?? undefined,
     userId: actor,
@@ -300,7 +316,7 @@ async function connect(actor = adminA, principal = xeroX, owned = tenancyA) {
     throw new Error(`Expected scope-bound OAuth start: ${started.error.code}`);
   }
   const callback = {
-    authenticatedClerkOrgId: owned.clerkOrgId,
+    authenticatedAccountId: owned.accountId,
     authenticatedUserId: actor,
     code: "fixture-code",
     nonce: started.value.nonce,
@@ -313,8 +329,8 @@ async function connect(actor = adminA, principal = xeroX, owned = tenancyA) {
   expect(
     await xero.completeXeroOAuth({
       ...callback,
-      authenticatedClerkOrgId:
-        owned === tenancyA ? tenancyB.clerkOrgId : tenancyA.clerkOrgId,
+      authenticatedAccountId:
+        owned === tenancyA ? tenancyB.accountId : tenancyA.accountId,
     })
   ).toMatchObject({ error: { code: "invalid_state" }, ok: false });
   expect(provider.mock.calls).toHaveLength(callsBeforeCallback);
@@ -329,12 +345,12 @@ async function connect(actor = adminA, principal = xeroX, owned = tenancyA) {
 async function readAs(
   actor: string,
   organisationId = tenancyA.organisationId,
-  clerkOrgId = tenancyA.clerkOrgId
+  accountId = tenancyA.accountId
 ) {
   authenticate(
     actor,
-    clerkOrgId,
-    actor === memberA || actor === userB ? "org:member" : "org:admin"
+    accountId,
+    actor === memberA || actor === userB ? "member" : "admin"
   );
   const context = await readContext(organisationId);
   if (!context.ok) {
@@ -352,7 +368,7 @@ async function readAs(
 function savedConnection() {
   return database.xeroConnection.findFirstOrThrow({
     where: {
-      clerk_org_id: tenancyA.clerkOrgId,
+      account_id: tenancyA.accountId,
       organisation_id: tenancyA.organisationId,
     },
   });
@@ -420,7 +436,7 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
   });
 
   it("denies a member initiating OAuth or disconnecting at the real action permission boundary", async () => {
-    authenticate(memberA, tenancyA.clerkOrgId, "org:member");
+    authenticate(memberA, tenancyA.accountId, "member");
     expect(
       await actions.connectXeroAction({
         organisationId: tenancyA.organisationId,
@@ -430,7 +446,7 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     expect(provider).not.toHaveBeenCalled();
     const connected = await connect();
     provider.mockClear();
-    authenticate(memberA, tenancyA.clerkOrgId, "org:member");
+    authenticate(memberA, tenancyA.accountId, "member");
     expect(
       await actions.disconnectXeroAction({
         confirmationText: "Shared Org A",
@@ -448,11 +464,11 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     const firstGrant = await savedGrant();
     removedMembers.add(adminA);
     await database.person.deleteMany({
-      where: { clerk_org_id: tenancyA.clerkOrgId, clerk_user_id: adminA },
+      where: { account_id: tenancyA.accountId, user_id: adminA },
     });
     expect(await readAs(adminA)).toMatchObject({ ok: false });
     expect(await savedConnection()).toMatchObject({
-      clerk_org_id: tenancyA.clerkOrgId,
+      account_id: tenancyA.accountId,
       id: original.connectionId,
       organisation_id: tenancyA.organisationId,
       status: "active",
@@ -468,7 +484,7 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     expect(replacement.id).not.toBe(firstGrant.id);
     expect(replacement.xero_user_id).toBe(xeroY);
     expect(await savedConnection()).toMatchObject({
-      clerk_org_id: tenancyA.clerkOrgId,
+      account_id: tenancyA.accountId,
       id: original.connectionId,
       organisation_id: tenancyA.organisationId,
       status: "active",
@@ -487,39 +503,39 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
   it("rejects foreign tenancy, Organisation, connection and provider tenant substitutions before an HTTP dispatch", async () => {
     const connected = await connect();
     provider.mockClear();
-    authenticate(userB, tenancyB.clerkOrgId);
+    authenticate(userB, tenancyB.accountId);
     expect(
       await actions.connectXeroAction({
         organisationId: tenancyA.organisationId,
       })
     ).toMatchObject({ ok: false });
     expect(
-      await readAs(userB, tenancyA.organisationId, tenancyB.clerkOrgId)
+      await readAs(userB, tenancyA.organisationId, tenancyB.accountId)
     ).toMatchObject({ ok: false });
     expect(
       await xero.resolveXeroAccess({
-        clerkOrgId: tenancyB.clerkOrgId,
+        accountId: tenancyB.accountId,
         connectionId: connected.connectionId,
         organisationId: tenancyB.organisationId,
       })
     ).toMatchObject({ ok: false });
     expect(
       await xero.resolveXeroAccess({
-        clerkOrgId: tenancyA.clerkOrgId,
+        accountId: tenancyA.accountId,
         connectionId: connected.connectionId,
         organisationId: tenancyB.organisationId,
       })
     ).toMatchObject({ ok: false });
     expect(
       await xero.buildXeroOAuthStartUrl({
-        clerkOrgId: tenancyA.clerkOrgId,
+        accountId: tenancyA.accountId,
         organisationId: tenancyB.organisationId,
         userId: adminB,
       })
     ).toMatchObject({ ok: false });
     const scope = {
+      accountId: tenancyA.accountId,
       capability: "payroll.employees.read",
-      clerkOrgId: tenancyA.clerkOrgId,
       organisationId: tenancyA.organisationId,
     };
     const access = await xero.resolveXeroAccess(scope);
@@ -535,12 +551,12 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     expect(provider).not.toHaveBeenCalled();
     await database.xeroOAuthSession.create({
       data: {
+        account_id: tenancyA.accountId,
         available_tenants_json: {
           tenants: [
             { connectionId: remoteX, tenantId: tenantX, tenantName: "Payroll" },
           ],
         },
-        clerk_org_id: tenancyA.clerkOrgId,
         created_by_user_id: adminB,
         expires_at: new Date(Date.now() + 600_000),
         id: allocation.id("forgery-session"),
@@ -552,7 +568,7 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     });
     expect(
       await xero.completeXeroTenantSelection({
-        clerkOrgId: tenancyA.clerkOrgId,
+        accountId: tenancyA.accountId,
         organisationId: tenancyA.organisationId,
         sessionId: allocation.id("forgery-session"),
         tenantId: tenantY,
@@ -568,7 +584,7 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     const foreign = await connect(userB, xeroY, tenancyB);
     const foreignConnection = await database.xeroConnection.findFirstOrThrow({
       where: {
-        clerk_org_id: tenancyB.clerkOrgId,
+        account_id: tenancyB.accountId,
         organisation_id: tenancyB.organisationId,
       },
     });
@@ -582,12 +598,12 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     });
     expect(foreignGrant.xero_user_id).toBe(xeroY);
     expect(
-      await readAs(userB, tenancyB.organisationId, tenancyB.clerkOrgId)
+      await readAs(userB, tenancyB.organisationId, tenancyB.accountId)
     ).toMatchObject({ ok: true });
     provider.mockClear();
     expect(
       await xero.resolveXeroAccess({
-        clerkOrgId: tenancyA.clerkOrgId,
+        accountId: tenancyA.accountId,
         connectionId: foreign.connectionId,
         organisationId: tenancyA.organisationId,
       })
@@ -696,11 +712,11 @@ describe("shared Organisation Xero authorisation across Clerk members", () => {
     );
   });
 
-  it.each(["org:admin", "org:owner"])(
+  it.each(["admin", "owner"])(
     "lets %s disconnect the shared link, denies disconnected access and reconnects without duplicate rows",
     async (role) => {
       const connected = await connect();
-      authenticate(adminB, tenancyA.clerkOrgId, role);
+      authenticate(adminB, tenancyA.accountId, role);
       expect(
         await actions.disconnectXeroAction({
           confirmationText: "Shared Org A",

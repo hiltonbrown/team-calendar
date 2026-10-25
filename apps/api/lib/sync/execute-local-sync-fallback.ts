@@ -15,8 +15,8 @@ type LocalSyncRunType =
   | "leave_records"
   | "people";
 interface LocalSyncFallbackInput {
+  accountId: string;
   actingUserId: string;
-  clerkOrgId: string;
   connectionId: string;
   organisationId: string;
   runType: LocalSyncRunType;
@@ -55,7 +55,7 @@ export async function executeLocalSyncFallback(
 ): Promise<Result<LocalSyncFallbackValue, LocalSyncFallbackError>> {
   assertNoTenantTransaction("executeLocalSyncFallback");
   try {
-    const state = await withTenantResult(input.clerkOrgId, (db) =>
+    const state = await withTenantResult(input.accountId, (db) =>
       getXeroConnectionState(input, db)
     );
     if (!state.ok) {
@@ -64,11 +64,11 @@ export async function executeLocalSyncFallback(
     if (state.value.state !== "connected") {
       return syncFailed(xeroRecoveryMessage(state.value.state));
     }
-    const tenant = await withTenantDb(input.clerkOrgId, (db) =>
+    const tenant = await withTenantDb(input.accountId, (db) =>
       db.xeroConnection.findFirst({
         select: { id: true },
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           id: input.connectionId,
           organisation_id: input.organisationId,
         },
@@ -78,7 +78,7 @@ export async function executeLocalSyncFallback(
       return syncFailed("The Xero connection changed. Try again.");
     }
     const payload = {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       connectionId: tenant.id,
       organisationId: input.organisationId,
       triggeredByUserId: input.actingUserId,
@@ -97,11 +97,11 @@ export async function executeLocalSyncFallback(
       syncResult.value.status === "cancelled"
     ) {
       if (syncResult.value.status === "failed") {
-        const run = await withTenantDb(input.clerkOrgId, (db) =>
+        const run = await withTenantDb(input.accountId, (db) =>
           db.syncRun.findFirst({
             select: { error_summary: true },
             where: {
-              clerk_org_id: input.clerkOrgId,
+              account_id: input.accountId,
               id: runId,
               organisation_id: input.organisationId,
             },
@@ -134,7 +134,7 @@ export async function executeLocalSyncFallback(
 async function executeLocalSync(
   runType: LocalSyncRunType,
   payload: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     triggeredByUserId: string;
     triggerType: "manual";

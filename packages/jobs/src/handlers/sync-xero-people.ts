@@ -35,7 +35,7 @@ import {
 } from "./xero-sync-access";
 
 const SyncXeroPeopleInputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
@@ -123,13 +123,13 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
   let runId: string | null = null;
   try {
     if (
-      !(await withTenantDb(context.clerkOrgId, (db) =>
+      !(await withTenantDb(context.accountId, (db) =>
         isCurrentXeroSyncBinding(context, db)
       ))
     ) {
       return { ok: true, value: emptyResult(null, "ignored") };
     }
-    const runAcquisition = await withTenantDb(context.clerkOrgId, (db) =>
+    const runAcquisition = await withTenantDb(context.accountId, (db) =>
       acquireSyncRun(context, "people", startedAt, db)
     );
     if (runAcquisition.kind === "terminal") {
@@ -201,7 +201,7 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
     counts.fetched = rawItemCount;
     if (!complete) {
       log.warn("Xero employee fetch was truncated before completion", {
-        clerkOrgId: context.clerkOrgId,
+        accountId: context.accountId,
         connectionId: context.connectionId,
         organisationId: context.organisationId,
       });
@@ -211,7 +211,7 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       .filter((id) => id.length > 0);
     await recordMappingFailures(context, run.id, failures, counts);
     for (let index = 0; index < employees.length; index += BATCH_SIZE) {
-      const runState = await withTenantDb(context.clerkOrgId, (db) =>
+      const runState = await withTenantDb(context.accountId, (db) =>
         db.syncRun.findFirst({
           select: { cancel_requested_at: true },
           where: { ...scoped(context), id: run.id },
@@ -233,7 +233,7 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
         await sleep(150);
       }
     }
-    const postBatchRunState = await withTenantDb(context.clerkOrgId, (db) =>
+    const postBatchRunState = await withTenantDb(context.accountId, (db) =>
       db.syncRun.findFirst({
         select: { cancel_requested_at: true },
         where: { ...scoped(context), id: run.id },
@@ -283,8 +283,8 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
         await tx.person.updateMany({
           data: { archived_at: now, is_active: false, updated_at: now },
           where: {
+            account_id: context.accountId,
             archived_at: null,
-            clerk_org_id: context.clerkOrgId,
             organisation_id: context.organisationId,
             source_person_key: { not: null, notIn: returnedEmployeeIds },
             source_system: "XERO",
@@ -493,10 +493,10 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await withTenantDb(context.clerkOrgId, (db) =>
+  await withTenantDb(context.accountId, (db) =>
     db.failedRecord.create({
       data: {
-        clerk_org_id: context.clerkOrgId,
+        account_id: context.accountId,
         entity_type: "people",
         error_code: input.errorCode,
         error_message: input.errorMessage,
@@ -548,7 +548,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await withTenantDb(context.clerkOrgId, persist);
+    await withTenantDb(context.accountId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }
@@ -609,7 +609,7 @@ async function publishRunStatusChanged(
     await (() =>
       publishOrganisationNotificationEvent(
         {
-          clerkOrgId: context.clerkOrgId,
+          accountId: context.accountId,
           organisationId: context.organisationId,
         },
         {

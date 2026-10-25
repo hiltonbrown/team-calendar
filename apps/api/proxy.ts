@@ -14,9 +14,9 @@ export const isPublicApiRoute = createRouteMatcher([
   "/__clerk(.*)",
 ]);
 
-export default authMiddleware(async (auth, request) => {
+export default authMiddleware(async (context, request) => {
   if (!isPublicApiRoute(request)) {
-    await auth.protect();
+    await context.requireAuthentication();
   }
 }) as unknown as NextProxy;
 

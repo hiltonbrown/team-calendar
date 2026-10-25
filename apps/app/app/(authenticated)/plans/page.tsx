@@ -1,4 +1,5 @@
-import { auth, currentUser } from "@repo/auth/server";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   computeWorkingDaysFromReferenceData,
   ensureCurrentUserPerson,
@@ -9,7 +10,7 @@ import {
   type RecordListItem,
 } from "@repo/availability";
 import {
-  type ClerkOrgId,
+  type AccountId,
   type OrganisationId,
   type Result,
   toXeroConnectionDisplayState,
@@ -26,7 +27,7 @@ import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/states/empty-state";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { XeroRecoveryNotice } from "@/components/xero/xero-recovery-notice";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { withOrg } from "@/lib/navigation/org-url";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
@@ -55,7 +56,7 @@ interface PlansPageError {
   orgQueryValue: string;
 }
 const PlansPage = async ({ searchParams }: PlansPageProps) => {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ plans: ["readOwn"] });
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
@@ -64,28 +65,40 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     recordTypeCategory: "all",
     tab: "my",
   };
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(orgId && user)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user)) {
     redirect("/");
   }
   // Clerk supplies the authenticated account before one Result preparation scope.
-  const clerkOrgId = orgId as ClerkOrgId;
-  const canViewTeam = isManagerOrAbove(orgRole);
+  const accountId = sessionAccountId as AccountId;
+  const canViewTeam = isManagerOrAbove(sessionRole);
   const prepared = await withTenantResult(
-    clerkOrgId,
+    accountId,
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Authentication, scope and filter failures are rendered at the route boundary.
     async (db): Promise<Result<PreparedPlansPage, PlansPageError>> => {
-      const companies = await resolveAccountCompanies(clerkOrgId, db);
+      const companies = await resolveAccountCompanies(accountId, db);
       const existingPerson = await db.person.findFirst({
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: { organisation_id: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: user.id,
           organisation_id: {
             in: companies.map((preparedCompany) => preparedCompany.id),
           },
+          user_id: user.id,
         },
       });
       const company = orgParam
@@ -104,17 +117,12 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         redirect(withOrg("/plans?tab=my", orgQueryValue));
       }
       const currentPersonResult = await ensureCurrentUserPerson(
-        { clerkOrgId, organisationId },
+        { accountId, organisationId },
         {
-          avatarUrl: user.imageUrl,
-          clerkUserId: user.id,
-          displayName:
-            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-            user.emailAddresses[0]?.emailAddress ||
-            user.id,
-          email: user.emailAddresses[0]?.emailAddress,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          avatarUrl: user.image,
+          displayName: user.name || user.email || user.id,
+          email: user.email,
+          userId: user.id,
         },
         db
       );
@@ -145,8 +153,8 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         sourceType: filters.sourceType,
       };
       const common = {
+        accountId,
         allHistory: filters.allHistory ?? false,
-        clerkOrgId,
         cursor: filters.cursor,
         filters: serviceFilters,
         organisationId,
@@ -157,7 +165,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
           ? await listTeamRecordsPage(
               {
                 ...common,
-                actingOrgRole: orgRole,
+                actingRole: sessionRole,
                 managerPersonId: currentPersonResult.value.id,
               },
               db
@@ -174,13 +182,13 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         };
       }
       const xeroStateResult = await getXeroConnectionStateForScope(
-        { clerkOrgId, organisationId },
+        { accountId, organisationId },
         db
       );
       const xeroConnectionState = toXeroConnectionDisplayState(xeroStateResult);
       const durationInputs = recordsResult.value.items.map((record) => ({
+        accountId,
         allDay: record.allDay,
-        clerkOrgId,
         endsAt: record.endsAt,
         locationId: record.person.locationId,
         organisationId,
@@ -232,7 +240,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
                   </Link>
                 </Button>
               }
-              description="Your Clerk account could not be linked to a single person profile. Review the people directory, then reload plans."
+              description="Your Account could not be linked to a single person profile. Review the people directory, then reload plans."
               title="Person profile needs review"
             />
           ) : (
@@ -260,7 +268,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
                 appears on calendars but does not create payroll leave or enter
                 the Leave approval queue.
               </p>
-              {isAdminOrOwner(orgRole) && (
+              {isAdminOrOwner(sessionRole) && (
                 <a
                   className="font-medium text-primary"
                   href={withOrg("/settings/integrations/xero", orgQueryValue)}
@@ -278,7 +286,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         ) : null}
 
         <PlansClient
-          canRecoverSubmit={isAdminOrOwner(orgRole)}
+          canRecoverSubmit={isAdminOrOwner(sessionRole)}
           canViewTeam={canViewTeam}
           filters={filters}
           nextCursor={recordsResult.value.nextCursor}
@@ -362,10 +370,10 @@ function toClientRecord(
   };
 }
 function isManagerOrAbove(role: string | null | undefined): boolean {
-  return role === "org:manager" || role === "org:admin" || role === "org:owner";
+  return role === "manager" || can(role, { plans: ["manageAll"] });
 }
 function isAdminOrOwner(role: string | null | undefined): boolean {
-  return role === "org:admin" || role === "org:owner";
+  return can(role, { plans: ["manageAll"] });
 }
 function filtersAreDefault(filters: PlansFilterInput): boolean {
   return (

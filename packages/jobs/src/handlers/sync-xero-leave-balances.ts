@@ -38,7 +38,7 @@ import {
 } from "./xero-sync-access";
 
 const SyncXeroLeaveBalancesInputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -144,13 +144,13 @@ async function syncXeroLeaveBalancesInternal(
   let runId: string | null = null;
   try {
     if (
-      !(await withTenantDb(context.clerkOrgId, (db) =>
+      !(await withTenantDb(context.accountId, (db) =>
         isCurrentXeroSyncBinding(context, db)
       ))
     ) {
       return { ok: true, value: emptyResult(null, "ignored") };
     }
-    const runAcquisition = await withTenantDb(context.clerkOrgId, (db) =>
+    const runAcquisition = await withTenantDb(context.accountId, (db) =>
       acquireSyncRun(context, "leave_balances", startedAt, db)
     );
     if (runAcquisition.kind === "terminal") {
@@ -190,7 +190,7 @@ async function syncXeroLeaveBalancesInternal(
       cursorRecord,
       initialCursorValue,
       nextCursorValue,
-    } = await withTenantDb(context.clerkOrgId, async (db) => {
+    } = await withTenantDb(context.accountId, async (db) => {
       let preparedPeopleToProcess: Array<{
         id: string;
         xero_employee_id: string | null;
@@ -552,7 +552,7 @@ function makeHeartbeat(
       return;
     }
     lastBeatAt = now;
-    await withTenantDb(context.clerkOrgId, (db) =>
+    await withTenantDb(context.accountId, (db) =>
       db.syncRun.updateMany({
         data: { updated_at: new Date() },
         where: { ...scoped(context), id: runId, status: "running" },
@@ -564,7 +564,7 @@ async function cancellationRequested(
   context: SyncXeroLeaveBalancesInput,
   runId: string
 ): Promise<boolean> {
-  const runState = await withTenantDb(context.clerkOrgId, (db) =>
+  const runState = await withTenantDb(context.accountId, (db) =>
     db.syncRun.findFirst({
       select: { cancel_requested_at: true },
       where: { ...scoped(context), id: runId },
@@ -664,7 +664,7 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await withTenantDb(context.clerkOrgId, (db) =>
+  await withTenantDb(context.accountId, (db) =>
     db.failedRecord.create({
       data: {
         ...scoped(context),
@@ -713,7 +713,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await withTenantDb(context.clerkOrgId, persist);
+    await withTenantDb(context.accountId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }
@@ -796,7 +796,7 @@ async function publishRunStatusChanged(
     await (() =>
       publishOrganisationNotificationEvent(
         {
-          clerkOrgId: context.clerkOrgId,
+          accountId: context.accountId,
           organisationId: context.organisationId,
         },
         {

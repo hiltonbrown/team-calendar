@@ -22,8 +22,8 @@ const mocks = vi.hoisted(() => ({
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
   scopeDatabase: null as Record<string, unknown> | null,
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   syncRunCreate: vi.fn(),
@@ -164,7 +164,7 @@ vi.mock("@repo/xero", async () => ({
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
   toResolvedXeroConnection: (scope, value) => ({
     ...value,
-    clerk_org_id: scope.clerkOrgId,
+    account_id: scope.accountId,
     id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
@@ -173,7 +173,7 @@ vi.mock("@repo/xero", async () => ({
 }));
 const { database } = await import("@repo/database");
 const { syncXeroLeaveRecords } = await import("./sync-xero-leave-records");
-const CLERK_ORG_ID = "org_leave_records_guard";
+const ACCOUNT_ID = "org_leave_records_guard";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
 const XERO_CONNECTION_ID = "20000000-0000-4000-8000-000000000001";
@@ -200,7 +200,7 @@ function expectRosterUnchanged() {
 }
 function input() {
   return {
-    clerkOrgId: CLERK_ORG_ID,
+    accountId: ACCOUNT_ID,
     connectionId: XERO_CONNECTION_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -306,7 +306,7 @@ describe("leave records stale archival", () => {
       expect.objectContaining({
         data: { modified_since: expect.any(Date) },
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           modified_since: modifiedSince,
           organisation_id: ORGANISATION_ID,
         }),
@@ -388,8 +388,8 @@ describe("leave records stale archival", () => {
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           archived_at: null,
-          clerk_org_id: CLERK_ORG_ID,
           organisation_id: ORGANISATION_ID,
           source_type: "xero_leave",
         }),
@@ -463,7 +463,7 @@ describe("leave records stale archival", () => {
     );
     expect(mocks.failedRecordCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        clerk_org_id: CLERK_ORG_ID,
+        account_id: ACCOUNT_ID,
         error_code: "unmapped_leave_type",
         organisation_id: ORGANISATION_ID,
         source_remote_id: LEAVE_APPLICATION_ID,
@@ -494,8 +494,8 @@ describe("leave records stale archival", () => {
         distinct: ["person_id"],
         select: { person_id: true },
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           archived_at: null,
-          clerk_org_id: CLERK_ORG_ID,
           organisation_id: ORGANISATION_ID,
           source_remote_id: { notIn: [LEAVE_APPLICATION_ID] },
           source_type: "xero_leave",
@@ -512,8 +512,8 @@ describe("leave records stale archival", () => {
           updated_at: expect.any(Date),
         }),
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           archived_at: null,
-          clerk_org_id: CLERK_ORG_ID,
           organisation_id: ORGANISATION_ID,
           source_remote_id: { notIn: [LEAVE_APPLICATION_ID] },
           source_type: "xero_leave",
@@ -602,7 +602,7 @@ describe("leave records stale archival", () => {
     // Canonical feed resolution called with person IDs
     expect(mocks.feedIdsForPeople).toHaveBeenCalledWith(
       {
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: expect.arrayContaining([PERSON_ID, PERSON_ID_2]),
       },
@@ -613,7 +613,7 @@ describe("leave records stale archival", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000001",
           organisationId: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
@@ -622,7 +622,7 @@ describe("leave records stale archival", () => {
       },
       {
         data: {
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000002",
           organisationId: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
@@ -733,7 +733,7 @@ describe("leave records stale archival", () => {
       1,
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           organisation_id: ORGANISATION_ID,
           source_remote_id: {
             in: [
@@ -750,7 +750,7 @@ describe("leave records stale archival", () => {
     expect(mocks.availabilityRecordCreate).toHaveBeenCalledTimes(1);
     expect(mocks.feedIdsForPeople).toHaveBeenCalledWith(
       {
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [PERSON_ID_2, PERSON_ID_3],
       },
@@ -760,7 +760,7 @@ describe("leave records stale archival", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000001",
           organisationId: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
@@ -769,7 +769,7 @@ describe("leave records stale archival", () => {
       },
       {
         data: {
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000002",
           organisationId: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
@@ -1189,8 +1189,8 @@ describe("leave records stale archival", () => {
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           approval_status: "approved",
-          clerk_org_id: CLERK_ORG_ID,
           derived_sequence: 3,
           id: "80000000-0000-4000-8000-000000000001",
           organisation_id: ORGANISATION_ID,
@@ -1529,7 +1529,7 @@ describe("regional leave sync (NZ/UK)", () => {
           leave_next_person_id: peopleList[19]?.id,
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: XERO_CONNECTION_ID,
           leave_next_person_id: null,
           organisation_id: ORGANISATION_ID,
@@ -1575,7 +1575,7 @@ describe("regional leave sync (NZ/UK)", () => {
           leave_next_person_id: peopleList[19]?.id,
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: XERO_CONNECTION_ID,
           leave_next_person_id: "70000000-0000-4000-8000-000000000020",
           organisation_id: ORGANISATION_ID,
@@ -1601,7 +1601,7 @@ describe("regional leave sync (NZ/UK)", () => {
       expect.objectContaining({
         data: expect.objectContaining({ leave_next_person_id: null }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: XERO_CONNECTION_ID,
           leave_next_person_id: continuation.leave_next_person_id,
           organisation_id: ORGANISATION_ID,
@@ -1630,7 +1630,7 @@ describe("regional leave sync (NZ/UK)", () => {
       expect.objectContaining({
         data: expect.objectContaining({ leave_next_person_id: null }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: XERO_CONNECTION_ID,
           leave_next_person_id: null,
           organisation_id: ORGANISATION_ID,
@@ -1853,8 +1853,8 @@ describe("regional leave sync (NZ/UK)", () => {
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           archived_at: null,
-          clerk_org_id: CLERK_ORG_ID,
           organisation_id: ORGANISATION_ID,
           person_id: PERSON_ID,
           source_remote_id: { notIn: [LEAVE_APPLICATION_ID] },
@@ -1866,8 +1866,8 @@ describe("regional leave sync (NZ/UK)", () => {
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          account_id: ACCOUNT_ID,
           archived_at: null,
-          clerk_org_id: CLERK_ORG_ID,
           organisation_id: ORGANISATION_ID,
           person_id: PERSON_ID,
           source_remote_id: { notIn: [LEAVE_APPLICATION_ID] },

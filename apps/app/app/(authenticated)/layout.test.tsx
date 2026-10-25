@@ -1,34 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
   getOnboardingRecord: vi.fn(),
+  getSession: vi.fn(),
   headers: vi.fn(),
-  listOrganisationsByClerkOrg: vi.fn(),
+  listOrganisationsByAccount: vi.fn(),
   loadWelcomeEligibility: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
-  requireOrg: vi.fn(),
+  requireAccount: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/auth/helpers", () => ({ requireOrg: mocks.requireOrg }));
+vi.mock("@repo/auth/helpers", () => ({ requireAccount: mocks.requireAccount }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   isOnboardingAdmin: (role: string | null) =>
-    role === "org:admin" || role === "org:owner",
+    role === "admin" || role === "owner",
   loadWelcomeEligibility: mocks.loadWelcomeEligibility,
 }));
 vi.mock("@repo/database/queries/onboarding", () => ({
   getOnboardingRecord: mocks.getOnboardingRecord,
 }));
 vi.mock("@repo/database/queries/organisations", () => ({
-  listOrganisationsByClerkOrg: mocks.listOrganisationsByClerkOrg,
+  listOrganisationsByAccount: mocks.listOrganisationsByAccount,
 }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
@@ -56,9 +56,9 @@ function setPath(pathname: string) {
 describe("AppLayout first-run gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireOrg.mockResolvedValue("org_1");
-    mocks.listOrganisationsByClerkOrg.mockResolvedValue({
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
+    mocks.requireAccount.mockResolvedValue("org_1");
+    mocks.listOrganisationsByAccount.mockResolvedValue({
       ok: true,
       value: [{ id: organisationId }],
     });
@@ -66,7 +66,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("sends an admin with an unfinished wizard to onboarding", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     mocks.getOnboardingRecord.mockResolvedValue({
       ok: true,
       value: { completedAt: null, step: "xero", xeroSkippedAt: null },
@@ -78,8 +78,8 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("sends an admin to onboarding before the organisation row exists", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:owner" });
-    mocks.listOrganisationsByClerkOrg.mockResolvedValue({
+    mocks.getSession.mockResolvedValue({ role: "owner" });
+    mocks.listOrganisationsByAccount.mockResolvedValue({
       ok: true,
       value: [],
     });
@@ -89,7 +89,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("lets the wizard's Xero selection page render", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     mocks.getOnboardingRecord.mockResolvedValue({
       ok: true,
       value: { completedAt: null, step: "xero", xeroSkippedAt: null },
@@ -99,7 +99,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("does not lock admins out when the onboarding lookup fails", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     mocks.getOnboardingRecord.mockResolvedValue({
       error: { code: "internal", message: "down" },
       ok: false,
@@ -108,7 +108,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("sends an eligible member to the welcome", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.getSession.mockResolvedValue({ role: "viewer" });
     mocks.loadWelcomeEligibility.mockResolvedValue({
       ok: true,
       value: { eligible: true, personId: "p1" },
@@ -120,7 +120,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("leaves an unlinked member on the requested page", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:manager" });
+    mocks.getSession.mockResolvedValue({ role: "manager" });
     mocks.loadWelcomeEligibility.mockResolvedValue({
       ok: true,
       value: { eligible: false, personId: null },

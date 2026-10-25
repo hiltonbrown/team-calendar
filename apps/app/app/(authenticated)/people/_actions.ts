@@ -1,15 +1,18 @@
 "use server";
-import { auth, clerkClient, currentUser } from "@repo/auth/server";
+
+import { accountDirectory } from "@repo/auth/accounts";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
+  type AccountAccessReviewResult,
+  type AccountAccessServiceError,
+  type AccountInvitationDispatchResult,
   type AlternativeContactServiceError,
   addAlternativeContact,
   type BalanceRefreshError,
-  type ClerkAccessReviewResult,
-  type ClerkAccessServiceError,
-  type ClerkInvitationDispatchResult,
   deleteAlternativeContact,
   getXeroConnectionStateForScope,
-  loadClerkAccessReview,
+  loadAccountAccessReview,
   type ManagerAssignmentError,
   type ManualBalanceServiceError,
   type PeopleRole,
@@ -17,12 +20,12 @@ import {
   recordBalanceRefreshDispatch,
   reorderAlternativeContacts,
   sendPreparedBalanceRefresh,
-  inviteClerkAccessCandidates as serviceInviteClerkAccessCandidates,
+  inviteAccountAccessCandidates as serviceInviteAccountAccessCandidates,
   setManualLeaveBalance,
   setPersonManager,
   updateAlternativeContact,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import {
   afterTenantCommit,
   assertTenantDb,
@@ -41,10 +44,10 @@ import {
   AddAlternativeContactActionSchema,
   type DeleteAlternativeContactActionInput,
   DeleteAlternativeContactActionSchema,
-  type InviteClerkAccessCandidatesInput,
-  InviteClerkAccessCandidatesSchema,
-  type LoadClerkAccessCandidatesInput,
-  LoadClerkAccessCandidatesSchema,
+  type InviteAccountAccessCandidatesInput,
+  InviteAccountAccessCandidatesSchema,
+  type LoadAccountAccessCandidatesInput,
+  LoadAccountAccessCandidatesSchema,
   type RefreshBalancesActionInput,
   RefreshBalancesActionSchema,
   type ReorderAlternativeContactsActionInput,
@@ -58,7 +61,7 @@ import {
 export type PeopleActionError =
   | AlternativeContactServiceError
   | BalanceRefreshError
-  | ClerkAccessServiceError
+  | AccountAccessServiceError
   | ManualBalanceServiceError
   | {
       code: "not_authorised";
@@ -86,7 +89,7 @@ export async function addAlternativeContactAction(
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const context = await resolvePeopleActionContext(
         actor.value,
         parsed.data.organisationId,
@@ -97,10 +100,10 @@ export async function addAlternativeContactAction(
       }
       const result = await addAlternativeContact(
         {
+          accountId: context.value.accountId,
           actingPersonId: context.value.actingPersonId,
           actingRole: context.value.role,
           actingUserId: context.value.actingUserId,
-          clerkOrgId: context.value.clerkOrgId,
           email: parsed.data.email,
           name: parsed.data.name,
           notes: parsed.data.notes,
@@ -146,7 +149,7 @@ export async function updateAlternativeContactAction(
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const context = await resolvePeopleActionContext(
         actor.value,
         parsed.data.organisationId,
@@ -156,17 +159,17 @@ export async function updateAlternativeContactAction(
         return context;
       }
       const personId = await resolveContactPersonId(
-        context.value.clerkOrgId,
+        context.value.accountId,
         context.value.organisationId,
         parsed.data.contactId,
         db
       );
       const result = await updateAlternativeContact(
         {
+          accountId: context.value.accountId,
           actingPersonId: context.value.actingPersonId,
           actingRole: context.value.role,
           actingUserId: context.value.actingUserId,
-          clerkOrgId: context.value.clerkOrgId,
           contactId: parsed.data.contactId,
           organisationId: context.value.organisationId,
           patch: parsed.data.patch,
@@ -210,7 +213,7 @@ export async function deleteAlternativeContactAction(
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const context = await resolvePeopleActionContext(
         actor.value,
         parsed.data.organisationId,
@@ -221,10 +224,10 @@ export async function deleteAlternativeContactAction(
       }
       const result = await deleteAlternativeContact(
         {
+          accountId: context.value.accountId,
           actingPersonId: context.value.actingPersonId,
           actingRole: context.value.role,
           actingUserId: context.value.actingUserId,
-          clerkOrgId: context.value.clerkOrgId,
           contactId: parsed.data.contactId,
           organisationId: context.value.organisationId,
         },
@@ -265,7 +268,7 @@ export async function reorderAlternativeContactsAction(
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const context = await resolvePeopleActionContext(
         actor.value,
         parsed.data.organisationId,
@@ -276,10 +279,10 @@ export async function reorderAlternativeContactsAction(
       }
       const result = await reorderAlternativeContacts(
         {
+          accountId: context.value.accountId,
           actingPersonId: context.value.actingPersonId,
           actingRole: context.value.role,
           actingUserId: context.value.actingUserId,
-          clerkOrgId: context.value.clerkOrgId,
           orderedContactIds: parsed.data.orderedContactIds,
           organisationId: context.value.organisationId,
           personId: parsed.data.personId,
@@ -322,15 +325,15 @@ export async function refreshBalancesAction(
     return context;
   }
   const refreshInput = {
+    accountId: context.value.accountId,
     actingRole: context.value.role,
     actingUserId: context.value.actingUserId,
-    clerkOrgId: context.value.clerkOrgId,
     organisationId: context.value.organisationId,
     personId: parsed.data.personId,
   };
   let result: Awaited<ReturnType<typeof sendPreparedBalanceRefresh>>;
   try {
-    const prepared = await withTenantDb(context.value.clerkOrgId, (db) =>
+    const prepared = await withTenantDb(context.value.accountId, (db) =>
       prepareBalanceRefresh(refreshInput, db)
     );
     if (!prepared.ok) {
@@ -341,7 +344,7 @@ export async function refreshBalancesAction(
       return result;
     }
     const outcome = result.value;
-    const audited = await withTenantDb(context.value.clerkOrgId, (db) =>
+    const audited = await withTenantDb(context.value.accountId, (db) =>
       recordBalanceRefreshDispatch(refreshInput, outcome, db)
     );
     if (!audited.ok) {
@@ -358,19 +361,19 @@ export async function refreshBalancesAction(
   }
   if (result.value.queued) {
     const { xeroConnection, connectionState } = await withTenantDb(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db) => {
         const preparedXeroConnection = await db.xeroConnection.findFirst({
           select: { id: true },
           where: {
+            account_id: context.value.accountId,
             archived_at: null,
-            clerk_org_id: context.value.clerkOrgId,
             organisation_id: context.value.organisationId,
           },
         });
         const preparedConnectionState = await getXeroConnectionStateForScope(
           {
-            clerkOrgId: context.value.clerkOrgId,
+            accountId: context.value.accountId,
             organisationId: context.value.organisationId,
           },
           db
@@ -388,7 +391,7 @@ export async function refreshBalancesAction(
     ) {
       try {
         await syncXeroLeaveBalances({
-          clerkOrgId: context.value.clerkOrgId,
+          accountId: context.value.accountId,
           connectionId: xeroConnection.id,
           organisationId: context.value.organisationId,
           personId: parsed.data.personId,
@@ -422,7 +425,7 @@ export async function setManualBalanceAction(
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const context = await resolvePeopleActionContext(
         actor.value,
         parsed.data.organisationId,
@@ -433,11 +436,11 @@ export async function setManualBalanceAction(
       }
       const result = await setManualLeaveBalance(
         {
+          accountId: context.value.accountId,
           actingRole: context.value.role,
           actingUserId: context.value.actingUserId,
           balance: parsed.data.balance,
           balanceUnit: parsed.data.balanceUnit ?? null,
-          clerkOrgId: context.value.clerkOrgId,
           leaveTypeName: parsed.data.leaveTypeName ?? null,
           leaveTypeXeroId: parsed.data.leaveTypeXeroId,
           organisationId: context.value.organisationId,
@@ -465,22 +468,38 @@ export async function setManualBalanceAction(
   }
 }
 interface AuthenticatedPeopleActor {
+  accountId: AccountId;
   actingUserId: string;
-  clerkOrgId: ClerkOrgId;
   role: PeopleRole;
 }
 async function resolveAuthenticatedPeopleActor(): Promise<
   PeopleActionResult<AuthenticatedPeopleActor>
 > {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  const role = effectiveRole(orgRole);
-  if (!(orgId && role && user)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const role = effectiveRole(sessionRole);
+  if (!(sessionAccountId && role && user)) {
     return notAuthorised();
   }
   // The account comes from the authenticated Clerk session.
   return {
     ok: true,
-    value: { actingUserId: user.id, clerkOrgId: orgId as ClerkOrgId, role },
+    value: {
+      accountId: sessionAccountId as AccountId,
+      actingUserId: user.id,
+      role,
+    },
   };
 }
 async function resolvePeopleActionContext(
@@ -495,26 +514,26 @@ async function resolvePeopleActionContext(
     }
   >
 > {
-  assertTenantDb(db, actor.clerkOrgId);
+  assertTenantDb(db, actor.accountId);
   const company = await getOrganisationById(
-    actor.clerkOrgId,
+    actor.accountId,
     organisationId as OrganisationId,
     db
   );
   if (!company.ok) {
     return notAuthorised();
   }
-  const companies = await resolveAccountCompanies(actor.clerkOrgId, db);
+  const companies = await resolveAccountCompanies(actor.accountId, db);
   const actingPerson = await db.person.findFirst({
     orderBy: [{ created_at: "asc" }, { id: "asc" }],
     select: { id: true },
     where: {
+      account_id: actor.accountId,
       archived_at: null,
-      clerk_org_id: actor.clerkOrgId,
-      clerk_user_id: actor.actingUserId,
       organisation_id: {
         in: companies.map((preparedCompany) => preparedCompany.id),
       },
+      user_id: actor.actingUserId,
     },
   });
   return {
@@ -530,7 +549,7 @@ async function resolveActionContext(organisationId: string): Promise<
   PeopleActionResult<{
     actingPersonId: string | null;
     actingUserId: string;
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: OrganisationId;
     role: PeopleRole;
   }>
@@ -539,12 +558,12 @@ async function resolveActionContext(organisationId: string): Promise<
   if (!actor.ok) {
     return actor;
   }
-  return withTenantDb(actor.value.clerkOrgId, (db) =>
+  return withTenantDb(actor.value.accountId, (db) =>
     resolvePeopleActionContext(actor.value, organisationId, db)
   );
 }
 async function resolveContactPersonId(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   contactId: string,
   db: TenantDb
@@ -552,23 +571,23 @@ async function resolveContactPersonId(
   const contact = await db.alternativeContact.findFirst({
     select: { person_id: true },
     where: {
-      ...scopedQuery(clerkOrgId, organisationId),
+      ...scopedQuery(accountId, organisationId),
       id: contactId,
     },
   });
   return contact?.person_id ?? null;
 }
 function effectiveRole(role: string | null | undefined): PeopleRole | null {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
-  if (role === "org:manager") {
+  if (role === "manager") {
     return "manager";
   }
-  if (role === "org:viewer") {
+  if (role === "viewer") {
     return "viewer";
   }
   return null;
@@ -577,11 +596,11 @@ function revalidatePeoplePaths(personId: string) {
   revalidatePath("/people");
   revalidatePath(`/people/${personId}`);
 }
-export async function loadClerkAccessCandidates(
-  input: LoadClerkAccessCandidatesInput
-): Promise<PeopleActionResult<ClerkAccessReviewResult>> {
-  assertNoTenantTransaction("loadClerkAccessCandidates");
-  const parsed = LoadClerkAccessCandidatesSchema.safeParse(input);
+export async function loadAccountAccessCandidates(
+  input: LoadAccountAccessCandidatesInput
+): Promise<PeopleActionResult<AccountAccessReviewResult>> {
+  assertNoTenantTransaction("loadAccountAccessCandidates");
+  const parsed = LoadAccountAccessCandidatesSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
@@ -589,21 +608,21 @@ export async function loadClerkAccessCandidates(
   if (!context.ok) {
     return context;
   }
-  const clerk = await clerkClient();
-  const reviewResult = await loadClerkAccessReview({
-    clerkOrganizations: clerk.organizations,
-    clerkOrgId: context.value.clerkOrgId,
+
+  const reviewResult = await loadAccountAccessReview({
+    accountDirectory,
+    accountId: context.value.accountId,
     organisationId: context.value.organisationId,
   });
   if (!reviewResult.ok) {
     return reviewResult;
   }
-  await withTenantDb(context.value.clerkOrgId, (db) =>
+  await withTenantDb(context.value.accountId, (db) =>
     db.auditEvent.create({
       data: {
+        account_id: context.value.accountId,
         action: "people.clerk_access_reviewed",
         actor_user_id: context.value.actingUserId,
-        clerk_org_id: context.value.clerkOrgId,
         entity_id: context.value.organisationId,
         entity_type: "people",
         metadata: {
@@ -624,12 +643,12 @@ export async function loadClerkAccessCandidates(
   );
   return reviewResult;
 }
-export const loadClerkAccessCandidatesAction = loadClerkAccessCandidates;
-export async function inviteClerkAccessCandidates(
-  input: InviteClerkAccessCandidatesInput
-): Promise<PeopleActionResult<ClerkInvitationDispatchResult>> {
-  assertNoTenantTransaction("inviteClerkAccessCandidates");
-  const parsed = InviteClerkAccessCandidatesSchema.safeParse(input);
+export const loadAccountAccessCandidatesAction = loadAccountAccessCandidates;
+export async function inviteAccountAccessCandidates(
+  input: InviteAccountAccessCandidatesInput
+): Promise<PeopleActionResult<AccountInvitationDispatchResult>> {
+  assertNoTenantTransaction("inviteAccountAccessCandidates");
+  const parsed = InviteAccountAccessCandidatesSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
@@ -637,23 +656,23 @@ export async function inviteClerkAccessCandidates(
   if (!context.ok) {
     return context;
   }
-  const clerk = await clerkClient();
-  const inviteResult = await serviceInviteClerkAccessCandidates({
+
+  const inviteResult = await serviceInviteAccountAccessCandidates({
+    accountDirectory,
+    accountId: context.value.accountId,
     candidatePersonIds: parsed.data.candidatePersonIds,
-    clerkOrganizations: clerk.organizations,
-    clerkOrgId: context.value.clerkOrgId,
     inviterUserId: context.value.actingUserId,
     organisationId: context.value.organisationId,
   });
   if (!inviteResult.ok) {
     return inviteResult;
   }
-  await withTenantDb(context.value.clerkOrgId, (db) =>
+  await withTenantDb(context.value.accountId, (db) =>
     db.auditEvent.create({
       data: {
+        account_id: context.value.accountId,
         action: "people.clerk_invitations_sent",
         actor_user_id: context.value.actingUserId,
-        clerk_org_id: context.value.clerkOrgId,
         entity_id: context.value.organisationId,
         entity_type: "people",
         metadata: {
@@ -675,30 +694,36 @@ export async function inviteClerkAccessCandidates(
   revalidatePath("/people");
   return inviteResult;
 }
-export const inviteClerkAccessCandidatesAction = inviteClerkAccessCandidates;
+export const inviteAccountAccessCandidatesAction =
+  inviteAccountAccessCandidates;
 async function resolveAdminAccessContext(organisationId: string): Promise<
   PeopleActionResult<{
     actingUserId: string;
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: OrganisationId;
   }>
 > {
-  const [{ orgId, has, orgRole }, user] = await Promise.all([
-    auth(),
-    currentUser(),
-  ]);
-  const isOwnerOrAdmin =
-    orgRole === "org:owner" ||
-    orgRole === "org:admin" ||
-    Boolean(has?.({ role: "org:owner" })) ||
-    Boolean(has?.({ role: "org:admin" }));
-  if (!(orgId && isOwnerOrAdmin && user)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const isOwnerOrAdmin = can(sessionRole, { people: ["manage"] });
+  if (!(sessionAccountId && isOwnerOrAdmin && user)) {
     return notAuthorised();
   }
-  // Authenticated Clerk account precedes an owned-company scope.
-  const clerkOrgId = orgId as ClerkOrgId;
-  const context = await withTenantDb(clerkOrgId, (db) =>
-    getOrganisationById(clerkOrgId, organisationId as OrganisationId, db)
+  // Authenticated Account precedes an owned-company scope.
+  const accountId = sessionAccountId as AccountId;
+  const context = await withTenantDb(accountId, (db) =>
+    getOrganisationById(accountId, organisationId as OrganisationId, db)
   );
   if (!context.ok) {
     return notAuthorised();
@@ -706,8 +731,8 @@ async function resolveAdminAccessContext(organisationId: string): Promise<
   return {
     ok: true,
     value: {
+      accountId,
       actingUserId: user.id,
-      clerkOrgId,
       organisationId: context.value.id as OrganisationId,
     },
   };
@@ -741,10 +766,18 @@ export async function setPersonManagerAction(input: {
   >
 > {
   assertNoTenantTransaction("setPersonManagerAction");
-  const { orgId, userId, orgRole } = await auth();
+  const {
+    accountId: sessionAccountId,
+    userId,
+    role: sessionRole,
+  } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
   if (
-    !(orgId && userId) ||
-    (orgRole !== "org:owner" && orgRole !== "org:admin")
+    !(sessionAccountId && userId && can(sessionRole, { people: ["manage"] }))
   ) {
     return {
       error: {
@@ -755,13 +788,13 @@ export async function setPersonManagerAction(input: {
     };
   }
   try {
-    return await withTenantResult(orgId, async (db) => {
+    return await withTenantResult(sessionAccountId, async (db) => {
       const result = await setPersonManager(
         {
           ...input,
-          actingRole: orgRole === "org:owner" ? "owner" : "admin",
+          accountId: sessionAccountId,
+          actingRole: sessionRole === "owner" ? "owner" : "admin",
           actingUserId: userId,
-          clerkOrgId: orgId,
         },
         db
       );

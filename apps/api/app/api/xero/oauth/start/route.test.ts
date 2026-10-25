@@ -1,16 +1,17 @@
+import { hasPermission as can } from "@repo/auth/permissions";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   buildXeroOAuthStartUrl: vi.fn(),
-  currentUser: vi.fn(),
-  requireOrg: vi.fn(),
-  requireRole: vi.fn(),
+  getCurrentUser: vi.fn(),
+  hasPermission: vi.fn(),
+  requireAccount: vi.fn(),
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
-  currentUser: mocks.currentUser,
-  requireOrg: mocks.requireOrg,
-  requireRole: mocks.requireRole,
+  getCurrentUser: mocks.getCurrentUser,
+  hasPermission: mocks.hasPermission,
+  requireAccount: mocks.requireAccount,
 }));
 
 vi.mock("@repo/xero", () => ({
@@ -23,19 +24,19 @@ describe("Xero OAuth start route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mocks.requireOrg.mockResolvedValue("org_clerk_123");
-    mocks.currentUser.mockResolvedValue({
+    mocks.requireAccount.mockResolvedValue("org_account_123");
+    mocks.getCurrentUser.mockResolvedValue({
       id: "user_123",
     });
-    mocks.requireRole.mockResolvedValue(false);
+    mocks.hasPermission.mockResolvedValue(false);
   });
 
   it("returns 401 when the caller is not authenticated", async () => {
-    mocks.requireOrg.mockRejectedValue(new Error("missing org"));
+    mocks.requireAccount.mockRejectedValue(new Error("missing org"));
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
+        "https://api.example.com/api/xero/oauth/start?accountId=org_account_123&organisationId=payroll_1"
       )
     );
 
@@ -43,15 +44,15 @@ describe("Xero OAuth start route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Not authenticated.",
     });
-    expect(mocks.requireRole).not.toHaveBeenCalled();
+    expect(mocks.hasPermission).not.toHaveBeenCalled();
   });
 
   it("returns 401 when the current user cannot be resolved", async () => {
-    mocks.currentUser.mockResolvedValue(null);
+    mocks.getCurrentUser.mockResolvedValue(null);
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
+        "https://api.example.com/api/xero/oauth/start?accountId=org_account_123&organisationId=payroll_1"
       )
     );
 
@@ -59,15 +60,15 @@ describe("Xero OAuth start route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Not authenticated.",
     });
-    expect(mocks.requireRole).not.toHaveBeenCalled();
+    expect(mocks.hasPermission).not.toHaveBeenCalled();
   });
 
   it("returns 403 when the caller is neither an admin nor an owner", async () => {
-    mocks.requireRole.mockResolvedValue(false);
+    mocks.hasPermission.mockResolvedValue(false);
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
+        "https://api.example.com/api/xero/oauth/start?accountId=org_account_123&organisationId=payroll_1"
       )
     );
 
@@ -75,14 +76,15 @@ describe("Xero OAuth start route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Only admins and owners can connect Xero.",
     });
-    expect(mocks.requireRole).toHaveBeenCalledWith("org:admin");
-    expect(mocks.requireRole).toHaveBeenCalledWith("org:owner");
+    expect(mocks.hasPermission).toHaveBeenCalledWith({ xero: ["connect"] });
+    expect(mocks.hasPermission).toHaveBeenCalledWith({ ownership: ["manage"] });
     expect(mocks.buildXeroOAuthStartUrl).not.toHaveBeenCalled();
   });
 
   it("redirects to the Xero OAuth URL when the caller is an admin", async () => {
-    mocks.requireRole.mockImplementation((role: string) =>
-      Promise.resolve(role === "org:admin")
+    mocks.hasPermission.mockImplementation(
+      (request: import("@repo/auth/permissions").PermissionRequest) =>
+        Promise.resolve(can("admin", request))
     );
     mocks.buildXeroOAuthStartUrl.mockReturnValue({
       ok: true,
@@ -95,7 +97,7 @@ describe("Xero OAuth start route", () => {
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
+        "https://api.example.com/api/xero/oauth/start?accountId=org_account_123&organisationId=payroll_1"
       )
     );
 
@@ -107,14 +109,14 @@ describe("Xero OAuth start route", () => {
     expect(response.headers.get("set-cookie")).toContain("HttpOnly");
     expect(response.headers.get("set-cookie")).toContain("Max-Age=600");
     expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith({
-      clerkOrgId: "org_clerk_123",
+      accountId: "org_account_123",
       organisationId: "payroll_1",
       returnTo: undefined,
       userId: "user_123",
     });
   });
   it("uses the authenticated actor despite a forged query user ID", async () => {
-    mocks.requireRole.mockResolvedValue(true);
+    mocks.hasPermission.mockResolvedValue(true);
     mocks.buildXeroOAuthStartUrl.mockResolvedValue({
       ok: true,
       value: {
@@ -123,7 +125,7 @@ describe("Xero OAuth start route", () => {
       },
     });
     const request = new Request(
-      "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=00000000-0000-4000-8000-000000000001&userId=forged"
+      "https://api.example.com/api/xero/oauth/start?accountId=org_account_123&organisationId=00000000-0000-4000-8000-000000000001&userId=forged"
     );
     expect((await GET(request)).status).toBe(307);
     expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith(
@@ -135,9 +137,9 @@ describe("Xero OAuth start route", () => {
 describe("Add company Xero consent", () => {
   it("starts consent without a preset payroll company", async () => {
     vi.clearAllMocks();
-    mocks.requireOrg.mockResolvedValue("org_clerk_123");
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireRole.mockResolvedValue(true);
+    mocks.requireAccount.mockResolvedValue("org_account_123");
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
+    mocks.hasPermission.mockResolvedValue(true);
     mocks.buildXeroOAuthStartUrl.mockResolvedValue({
       ok: true,
       value: {
@@ -147,13 +149,13 @@ describe("Add company Xero consent", () => {
     });
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
+        "https://api.example.com/api/xero/oauth/start?accountId=org_account_123"
       )
     );
     expect(response.status).toBe(307);
     expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         organisationId: null,
         userId: "user_1",
       })

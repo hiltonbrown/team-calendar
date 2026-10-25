@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   constructEvent: vi.fn(),
-  getFirstActiveOrganisationIdForClerkOrg: vi.fn(),
-  getSubscriptionForOrg: vi.fn(),
+  getFirstActiveOrganisationIdForAccount: vi.fn(),
+  getSubscriptionForAccount: vi.fn(),
   getSubscriptionForStripeCustomer: vi.fn(),
   getSubscriptionForStripeSubscription: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve()),
@@ -30,9 +30,9 @@ vi.mock("@repo/database", async () => ({
   ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
     "@repo/database/tenant-db"
   )),
-  getFirstActiveOrganisationIdForClerkOrg:
-    mocks.getFirstActiveOrganisationIdForClerkOrg,
-  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  getFirstActiveOrganisationIdForAccount:
+    mocks.getFirstActiveOrganisationIdForAccount,
+  getSubscriptionForAccount: mocks.getSubscriptionForAccount,
   getSubscriptionForStripeCustomer: mocks.getSubscriptionForStripeCustomer,
   getSubscriptionForStripeSubscription:
     mocks.getSubscriptionForStripeSubscription,
@@ -88,10 +88,10 @@ function subscriptionEvent(overrides: Record<string, unknown> = {}) {
 describe("Stripe payments webhook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getFirstActiveOrganisationIdForClerkOrg.mockResolvedValue(
+    mocks.getFirstActiveOrganisationIdForAccount.mockResolvedValue(
       "30000000-0000-4000-8000-000000000001"
     );
-    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getSubscriptionForAccount.mockResolvedValue(null);
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue(null);
     mocks.getSubscriptionForStripeSubscription.mockResolvedValue(null);
     mocks.isStripeEventProcessed.mockResolvedValue(false);
@@ -143,7 +143,7 @@ describe("Stripe payments webhook", () => {
     expect(response.status).toBe(200);
     expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         planKey: "basic",
         status: "active",
         stripeCustomerId: "cus_1",
@@ -162,7 +162,7 @@ describe("Stripe payments webhook", () => {
     expect(mocks.recordStripeEvent).toHaveBeenCalledWith(
       "evt_1",
       "customer.subscription.updated",
-      expect.objectContaining({ clerkOrgId: "org_1" })
+      expect.objectContaining({ accountId: "org_1" })
     );
 
     // The event must only be recorded once the mirror write has completed, so
@@ -181,9 +181,9 @@ describe("Stripe payments webhook", () => {
         metadata: { clerk_org_id: "org_1" },
       }),
     });
-    mocks.getSubscriptionForOrg.mockResolvedValue({
+    mocks.getSubscriptionForAccount.mockResolvedValue({
+      account_id: "org_1",
       cancel_at_period_end: false,
-      clerk_org_id: "org_1",
       current_period_end: null,
       ended_at: null,
       plan_key: "basic",
@@ -205,7 +205,7 @@ describe("Stripe payments webhook", () => {
       "Stripe subscription tenant cross-check conflict detected.",
       expect.objectContaining({
         metadataOrgId: "org_1",
-        resolvedClerkOrgId: null,
+        resolvedAccountId: null,
         stripeCustomerId: "cus_different",
       })
     );
@@ -220,8 +220,8 @@ describe("Stripe payments webhook", () => {
       }),
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_bound_to_cus_1",
       cancel_at_period_end: false,
-      clerk_org_id: "org_bound_to_cus_1",
       current_period_end: null,
       ended_at: null,
       plan_key: "basic",
@@ -240,7 +240,7 @@ describe("Stripe payments webhook", () => {
       "Stripe subscription tenant cross-check conflict detected.",
       expect.objectContaining({
         metadataOrgId: "org_different",
-        resolvedClerkOrgId: "org_bound_to_cus_1",
+        resolvedAccountId: "org_bound_to_cus_1",
         stripeCustomerId: "cus_1",
       })
     );
@@ -254,9 +254,9 @@ describe("Stripe payments webhook", () => {
         metadata: { clerk_org_id: "org_1" },
       }),
     });
-    mocks.getSubscriptionForOrg.mockResolvedValue({
+    mocks.getSubscriptionForAccount.mockResolvedValue({
+      account_id: "org_1",
       cancel_at_period_end: false,
-      clerk_org_id: "org_1",
       current_period_end: null,
       ended_at: null,
       plan_key: "basic",
@@ -265,8 +265,8 @@ describe("Stripe payments webhook", () => {
       stripe_subscription_id: "sub_1",
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_1",
       cancel_at_period_end: false,
-      clerk_org_id: "org_1",
       current_period_end: null,
       ended_at: null,
       plan_key: "basic",
@@ -291,9 +291,9 @@ describe("Stripe payments webhook", () => {
         metadata: { clerk_org_id: "org_1" },
       }),
     });
-    mocks.getSubscriptionForOrg.mockResolvedValue({
+    mocks.getSubscriptionForAccount.mockResolvedValue({
+      account_id: "org_1",
       cancel_at_period_end: false,
-      clerk_org_id: "org_1",
       current_period_end: null,
       ended_at: null,
       plan_key: "basic",
@@ -335,8 +335,8 @@ describe("Stripe payments webhook", () => {
       },
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_other",
       cancel_at_period_end: false,
-      clerk_org_id: "org_other",
       current_period_end: null,
       ended_at: null,
       plan_key: "basic",
@@ -492,7 +492,7 @@ describe("Stripe payments webhook", () => {
         });
       }
       mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         stripe_event_created_at: new Date(event.created * 1000),
       });
       mocks.retrieveStripeSubscription.mockResolvedValue({
@@ -691,7 +691,7 @@ describe("Stripe payments webhook", () => {
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         errorCategory: "processing_exception",
         stripeCustomerId: "cus_1",
       })
@@ -723,8 +723,8 @@ describe("Stripe payments webhook", () => {
       value: subscriptionEvent({ metadata: { clerk_org_id: "org_foreign" } }),
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_verified",
       cancel_at_period_end: false,
-      clerk_org_id: "org_verified",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -739,7 +739,7 @@ describe("Stripe payments webhook", () => {
     expect(response.status).toBe(503);
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_verified",
+        accountId: "org_verified",
         errorCategory: "tenant_conflict",
         stripeCustomerId: "cus_1",
       })
@@ -753,8 +753,8 @@ describe("Stripe payments webhook", () => {
       value: subscriptionEvent({ metadata: null }),
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_verified",
       cancel_at_period_end: false,
-      clerk_org_id: "org_verified",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -768,7 +768,7 @@ describe("Stripe payments webhook", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({ clerkOrgId: "org_verified" }),
+      expect.objectContaining({ accountId: "org_verified" }),
       expect.any(Object)
     );
   });
@@ -788,8 +788,8 @@ describe("Stripe payments webhook", () => {
       ok: false,
     });
     mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      account_id: "org_verified",
       cancel_at_period_end: false,
-      clerk_org_id: "org_verified",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -804,7 +804,7 @@ describe("Stripe payments webhook", () => {
     expect(response.status).toBe(503);
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_verified",
+        accountId: "org_verified",
         errorCategory: "provider_fetch",
         stripeCustomerId: "cus_known",
       })
@@ -822,8 +822,8 @@ describe("Stripe payments webhook", () => {
       },
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_verified",
       cancel_at_period_end: false,
-      clerk_org_id: "org_verified",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -838,7 +838,7 @@ describe("Stripe payments webhook", () => {
     expect(response.status).toBe(503);
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_verified",
+        accountId: "org_verified",
         errorCategory: "invalid_payload",
         stripeCustomerId: "cus_known",
       })
@@ -883,8 +883,8 @@ describe("Stripe payments webhook", () => {
       value: { id: "sub_known" },
     });
     mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      account_id: "org_verified",
       cancel_at_period_end: false,
-      clerk_org_id: "org_verified",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -899,7 +899,7 @@ describe("Stripe payments webhook", () => {
     expect(response.status).toBe(503);
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_verified",
+        accountId: "org_verified",
         errorCategory: "invalid_payload",
         stripeCustomerId: "cus_known",
       })
@@ -912,8 +912,8 @@ describe("Stripe payments webhook", () => {
       value: subscriptionEvent(),
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      account_id: "org_customer",
       cancel_at_period_end: false,
-      clerk_org_id: "org_customer",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -923,8 +923,8 @@ describe("Stripe payments webhook", () => {
       stripe_subscription_id: "sub_customer",
     });
     mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      account_id: "org_subscription",
       cancel_at_period_end: false,
-      clerk_org_id: "org_subscription",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -940,7 +940,7 @@ describe("Stripe payments webhook", () => {
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: null,
+        accountId: null,
         errorCategory: "tenant_conflict",
       })
     );
@@ -957,8 +957,8 @@ describe("Stripe payments webhook", () => {
       },
     });
     mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      account_id: "org_verified",
       cancel_at_period_end: false,
-      clerk_org_id: "org_verified",
       current_period_end: null,
       ended_at: null,
       plan_key: "premium",
@@ -976,7 +976,7 @@ describe("Stripe payments webhook", () => {
     );
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_verified",
+        accountId: "org_verified",
         errorCategory: "invalid_payload",
         stripeCustomerId: "cus_known",
       })

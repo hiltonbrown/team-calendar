@@ -1,5 +1,7 @@
 "use client";
 
+import { hasPermission } from "@repo/auth/permissions";
+
 import {
   Avatar,
   AvatarFallback,
@@ -40,14 +42,13 @@ import { ConfirmActionDialog } from "../components/confirm-action-dialog";
 import { RoleBadge } from "../components/role-badge";
 import { SettingsSectionHeader } from "../components/settings-section-header";
 
-type OrgRole = "org:owner" | "org:admin" | "org:manager" | "org:viewer";
+type OrgRole = "owner" | "admin" | "manager" | "viewer";
 
 interface Member {
-  emailAddress: string;
-  firstName: string | null;
-  imageUrl: string;
-  lastName: string | null;
+  email: string;
+  image: string | null;
   membershipId: string;
+  name: string | null;
   role: string;
   userId: string;
 }
@@ -60,46 +61,41 @@ interface PendingInvitation {
 }
 
 interface MembersClientProps {
-  currentUserId: string;
-  currentUserRole: string;
+  getCurrentUserId: string;
+  getCurrentUserRole: string;
   members: Member[];
   pendingInvitations: PendingInvitation[];
 }
 
 const ROLE_OPTIONS: { value: OrgRole; label: string }[] = [
-  { label: "Admin", value: "org:admin" },
-  { label: "Manager", value: "org:manager" },
-  { label: "Viewer", value: "org:viewer" },
+  { label: "Admin", value: "admin" },
+  { label: "Manager", value: "manager" },
+  { label: "Viewer", value: "viewer" },
 ];
 
-const getInitials = (
-  firstName: string | null,
-  lastName: string | null,
-  email: string
-) => {
-  if (firstName && lastName) {
-    return `${firstName[0]}${lastName[0]}`.toUpperCase();
-  }
-  if (firstName) {
-    return firstName[0].toUpperCase();
-  }
-  return email[0].toUpperCase();
+const NAME_WORD_SEPARATOR = /\s+/;
+
+const getInitials = (name: string | null, email: string) => {
+  const words = name?.trim().split(NAME_WORD_SEPARATOR).filter(Boolean) ?? [];
+  const first = words[0]?.[0] ?? email[0] ?? "?";
+  const last = words.length > 1 ? (words.at(-1)?.[0] ?? "") : "";
+  return `${first}${last}`.toUpperCase();
 };
 
 export const MembersClient = ({
   members,
   pendingInvitations,
-  currentUserId,
-  currentUserRole,
+  getCurrentUserId,
+  getCurrentUserRole,
 }: MembersClientProps) => {
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<OrgRole>("org:viewer");
+  const [inviteRole, setInviteRole] = useState<OrgRole>("viewer");
   const [isPendingInvite, startInviteTransition] = useTransition();
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
   const [isActionPending, startActionTransition] = useTransition();
 
-  const isOwner = currentUserRole === "org:owner";
+  const isOwner = hasPermission(getCurrentUserRole, { ownership: ["manage"] });
 
   const handleInvite = () => {
     if (!inviteEmail) {
@@ -128,9 +124,7 @@ export const MembersClient = ({
       });
       setUpdatingMemberId(null);
       if (result.ok) {
-        toast.success(
-          `Updated ${member.firstName ?? member.emailAddress}'s role`
-        );
+        toast.success(`Updated ${member.name ?? member.email}'s role`);
       } else {
         toast.error(result.error);
       }
@@ -147,7 +141,7 @@ export const MembersClient = ({
       const result = await removeMember({ userId: target.userId });
       if (result.ok) {
         toast.success(
-          `${target.firstName ?? target.emailAddress} removed from organisation`
+          `${target.name ?? target.email} removed from organisation`
         );
       } else {
         toast.error(result.error);
@@ -198,7 +192,7 @@ export const MembersClient = ({
                     {opt.label}
                   </SelectItem>
                 ))}
-                {isOwner && <SelectItem value="org:owner">Owner</SelectItem>}
+                {isOwner && <SelectItem value="owner">Owner</SelectItem>}
               </SelectContent>
             </Select>
             <Button
@@ -231,12 +225,9 @@ export const MembersClient = ({
             </TableHeader>
             <TableBody>
               {members.map((member) => {
-                const isSelf = member.userId === currentUserId;
+                const isSelf = member.userId === getCurrentUserId;
                 const isUpdating = updatingMemberId === member.userId;
-                const displayName =
-                  [member.firstName, member.lastName]
-                    .filter(Boolean)
-                    .join(" ") || member.emailAddress;
+                const displayName = member.name || member.email;
 
                 return (
                   <TableRow
@@ -248,14 +239,10 @@ export const MembersClient = ({
                         <Avatar className="h-8 w-8">
                           <AvatarImage
                             alt={displayName}
-                            src={member.imageUrl}
+                            src={member.image ?? undefined}
                           />
                           <AvatarFallback className="text-label-md">
-                            {getInitials(
-                              member.firstName,
-                              member.lastName,
-                              member.emailAddress
-                            )}
+                            {getInitials(member.name, member.email)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
@@ -268,13 +255,13 @@ export const MembersClient = ({
                             )}
                           </p>
                           <p className="mt-0.5 text-label-md text-muted-foreground">
-                            {member.emailAddress}
+                            {member.email}
                           </p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
-                      {isSelf || (!isOwner && member.role === "org:owner") ? (
+                      {isSelf || (!isOwner && member.role === "owner") ? (
                         <RoleBadge role={member.role} />
                       ) : (
                         <Select
@@ -300,7 +287,7 @@ export const MembersClient = ({
                             {isOwner && (
                               <SelectItem
                                 className="text-label-md"
-                                value="org:owner"
+                                value="owner"
                               >
                                 Owner
                               </SelectItem>
@@ -387,7 +374,7 @@ export const MembersClient = ({
         confirmLabel="Remove"
         description={
           removeTarget
-            ? `Remove ${[removeTarget.firstName, removeTarget.lastName].filter(Boolean).join(" ") || removeTarget.emailAddress} from this organisation? They will lose all access immediately.`
+            ? `Remove ${removeTarget.name || removeTarget.email} from this organisation? They will lose all access immediately.`
             : ""
         }
         destructive

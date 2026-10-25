@@ -1,5 +1,5 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is leave_balances.integration.test.ts.
-import type { ClerkOrgId, OrganisationId, PersonId } from "@repo/core";
+import type { AccountId, OrganisationId, PersonId } from "@repo/core";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { withTenantResult as withTestTenantResult } from "./src/tenant-db";
@@ -20,28 +20,28 @@ const { listLeaveBalancesForOrganisation, listLeaveBalancesForPerson } =
   await import("./src/queries/leave-balances.js");
 
 const tenant = {
-  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  accountId: fixture.tenants[0]?.accountId as string,
   locationId: fixture.id("location"),
   organisationId: fixture.tenants[0]?.organisationId as string,
   personId: fixture.id("person"),
   teamId: fixture.id("team"),
 } as const;
 
-const testClerkOrgIds = [tenant.clerkOrgId] as const;
+const testAccountIds = [tenant.accountId] as const;
 
 const createTenant = async () => {
   await database.organisation.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       country_code: "AU",
       id: tenant.organisationId,
-      name: `Test ${tenant.clerkOrgId}`,
+      name: `Test ${tenant.accountId}`,
     },
   });
 
   await database.team.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.teamId,
       name: "Operations",
       organisation_id: tenant.organisationId,
@@ -50,7 +50,7 @@ const createTenant = async () => {
 
   await database.location.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.locationId,
       name: "Brisbane",
       organisation_id: tenant.organisationId,
@@ -60,8 +60,8 @@ const createTenant = async () => {
 
   await database.person.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
-      email: `${tenant.clerkOrgId}@example.com`,
+      account_id: tenant.accountId,
+      email: `${tenant.accountId}@example.com`,
       employment_type: employment_type.employee,
       first_name: "Test",
       id: tenant.personId,
@@ -85,8 +85,8 @@ const createManualBalance = ({
 }) =>
   database.leaveBalance.create({
     data: {
+      account_id: tenant.accountId,
       balance: "10.0000",
-      clerk_org_id: tenant.clerkOrgId,
       id,
       leave_type_xero_id: leaveTypeXeroId,
       organisation_id: tenant.organisationId,
@@ -96,7 +96,7 @@ const createManualBalance = ({
   });
 
 const cleanTestData = async () => {
-  const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
+  const scope = { account_id: { in: [...testAccountIds] } };
   await database.leaveBalance.deleteMany({ where: scope });
   await database.person.deleteMany({ where: scope });
   await database.location.deleteMany({ where: scope });
@@ -154,7 +154,7 @@ describe("leave_balances", () => {
     });
 
     expect(balance).toMatchObject({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       leave_type_xero_id: "annual-leave",
       person_id: tenant.personId,
       xero_connection_id: null,
@@ -200,20 +200,20 @@ describe("leave_balances", () => {
       id: "41000000-0000-4000-8000-000000000006",
     });
 
-    const clerkOrgId = tenant.clerkOrgId as ClerkOrgId;
+    const accountId = tenant.accountId as AccountId;
     const organisationId = tenant.organisationId as OrganisationId;
     const personId = tenant.personId as PersonId;
 
     const forPerson = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
+      tenantTestAccount(accountId),
       (db) =>
-        listLeaveBalancesForPerson(clerkOrgId, organisationId, personId, db)
+        listLeaveBalancesForPerson(accountId, organisationId, personId, db)
     );
     const forOrganisation = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
+      tenantTestAccount(accountId),
       (db) =>
         listLeaveBalancesForOrganisation(
-          clerkOrgId,
+          accountId,
           organisationId,
           undefined,
           db
@@ -244,9 +244,9 @@ describe("leave_balances", () => {
     await createTenant();
     await database.leaveBalance.create({
       data: {
+        account_id: tenant.accountId,
         balance: "1234.5600",
         balance_unit: "currency",
-        clerk_org_id: tenant.clerkOrgId,
         currency_code: "NZD",
         id: "41000000-0000-4000-8000-000000000007",
         leave_type_xero_id: "holiday-pay",
@@ -257,20 +257,20 @@ describe("leave_balances", () => {
       },
     });
 
-    const clerkOrgId = tenant.clerkOrgId as ClerkOrgId;
+    const accountId = tenant.accountId as AccountId;
     const organisationId = tenant.organisationId as OrganisationId;
     const personId = tenant.personId as PersonId;
 
     const forPerson = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
+      tenantTestAccount(accountId),
       (db) =>
-        listLeaveBalancesForPerson(clerkOrgId, organisationId, personId, db)
+        listLeaveBalancesForPerson(accountId, organisationId, personId, db)
     );
     const forOrganisation = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
+      tenantTestAccount(accountId),
       (db) =>
         listLeaveBalancesForOrganisation(
-          clerkOrgId,
+          accountId,
           organisationId,
           undefined,
           db

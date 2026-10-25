@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, test } from "vitest";
 import { xeroSimplificationFixture } from "./src/test-fixtures/xero-simplification-fixture";
 
-const { database } = xeroSimplificationFixture();
+const { database, fixture: ownedFixture } = xeroSimplificationFixture(
+  "packages/database/xero-simplification-schema.integration.test.ts"
+);
 afterAll(() => database.$disconnect());
 
 describe("simplified Xero persistence", () => {
@@ -79,8 +81,8 @@ describe("simplified Xero persistence", () => {
   test("stores one grant for two scoped connections", async () => {
     await database
       .$transaction(async (tx) => {
-        const grantId = randomUUID();
-        const app = randomUUID();
+        const grantId = ownedFixture.id("shared-authorisation");
+        const app = ownedFixture.globalKey("provider_app");
         await tx.$executeRaw`INSERT INTO xero_authorisations
         (id, provider_app_id, xero_user_id, access_token_encrypted, access_token_iv,
         access_token_auth_tag, refresh_token_encrypted, refresh_token_iv, refresh_token_auth_tag,
@@ -89,19 +91,22 @@ describe("simplified Xero persistence", () => {
         VALUES (${grantId}::uuid, ${app}, 'verified-user', 'cipher', 'iv', 'tag', 'cipher',
         'iv', 'tag', 1, now(), now() + interval '30 minutes', ARRAY['payroll.employees'], now(), now())`;
         for (let i = 0; i < 2; i += 1) {
-          const organisationId = randomUUID();
-          const clerkOrgId = randomUUID();
+          const tenant = ownedFixture.tenants[i];
+          if (!tenant) {
+            throw new Error("Fixture tenant slot is not allocated");
+          }
+          const { organisationId, accountId } = tenant;
           await tx.organisation.create({
             data: {
-              clerk_org_id: clerkOrgId,
+              account_id: accountId,
               country_code: "AU",
               id: organisationId,
               name: "Owned test payroll",
             },
           });
-          await tx.$executeRaw`INSERT INTO xero_connections (id, clerk_org_id, organisation_id,
+          await tx.$executeRaw`INSERT INTO xero_connections (id, account_id, organisation_id,
           xero_authorisation_id, xero_tenant_id, remote_connection_id, payroll_region, updated_at)
-          VALUES (${randomUUID()}::uuid, ${clerkOrgId}, ${organisationId}::uuid,
+          VALUES (${randomUUID()}::uuid, ${accountId}, ${organisationId}::uuid,
           ${grantId}::uuid, ${randomUUID()}, ${randomUUID()}, 'AU', now())`;
         }
         const rows = await tx.$queryRaw<

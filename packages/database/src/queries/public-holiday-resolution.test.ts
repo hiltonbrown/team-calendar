@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { describe, expect, it, vi } from "vitest";
 import { withTenantDb } from "../tenant-db";
 import { loadHolidayResolutionData } from "./public-holiday-resolution";
@@ -12,7 +12,7 @@ vi.mock("../tenant-client", () => ({
   },
 }));
 
-const clerkOrgId = "org_a" as ClerkOrgId;
+const accountId = "org_a" as AccountId;
 const organisationId = "11111111-1111-4111-8111-111111111111" as OrganisationId;
 
 function fakeClient(organisation: unknown) {
@@ -59,16 +59,16 @@ describe("loadHolidayResolutionData", () => {
       region_code: "QLD",
     });
 
-    const data = await withTenantDb(clerkOrgId, (db) =>
+    const data = await withTenantDb(accountId, (db) =>
       loadHolidayResolutionData(
-        { clerkOrgId, from: "2026-01-01", organisationId, to: "2026-12-31" },
+        { accountId, from: "2026-01-01", organisationId, to: "2026-12-31" },
         db
       )
     );
 
     expect(client.organisation.findFirst.mock.calls[0]?.[0]?.where).toEqual({
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
       id: organisationId,
     });
     for (const findMany of [
@@ -77,7 +77,7 @@ describe("loadHolidayResolutionData", () => {
       client.publicHolidayPreference.findMany,
     ]) {
       expect(findMany.mock.calls[0]?.[0]?.where).toMatchObject({
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         organisation_id: organisationId,
       });
     }
@@ -109,9 +109,9 @@ describe("loadHolidayResolutionData", () => {
 
   it("returns null without further queries when the organisation is outside the tenant", async () => {
     const { client } = fakeClient(null);
-    const data = await withTenantDb(clerkOrgId, (db) =>
+    const data = await withTenantDb(accountId, (db) =>
       loadHolidayResolutionData(
-        { clerkOrgId, from: "2026-01-01", organisationId, to: "2026-12-31" },
+        { accountId, from: "2026-01-01", organisationId, to: "2026-12-31" },
         db
       )
     );

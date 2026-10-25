@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
+import { normalizeProviderMembershipRole } from "@repo/auth/accounts";
 import { ensureCurrentUserPerson } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { withTenantDb, withTenantResult } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
@@ -240,7 +241,7 @@ export const handleOrganizationMembershipCreated = async (
     timestamp: eventTimestamp,
     uuid: deliveryUuid(deliveryId),
   });
-  if (data.role === "org:owner") {
+  if (normalizeProviderMembershipRole(data.role) === "owner") {
     const activation = createActivationEvent({
       deduplicationKey: deliveryId,
       name: "Customer Admitted",
@@ -271,11 +272,11 @@ export const handleOrganizationMembershipDeleted = async (
   await withTenantDb(data.organization.id, (db) =>
     db.person.updateMany({
       data: {
-        clerk_user_id: null,
+        user_id: null,
       },
       where: {
-        clerk_org_id: data.organization.id,
-        clerk_user_id: data.public_user_data.user_id,
+        account_id: data.organization.id,
+        user_id: data.public_user_data.user_id,
       },
     })
   );
@@ -289,12 +290,12 @@ async function ensurePeopleForMembership(
   const organisations = await withTenantDb(data.organization.id, (db) =>
     db.organisation.findMany({
       select: {
-        clerk_org_id: true,
+        account_id: true,
         id: true,
       },
       where: {
+        account_id: data.organization.id,
         archived_at: null,
-        clerk_org_id: data.organization.id,
       },
     })
   );
@@ -302,15 +303,14 @@ async function ensurePeopleForMembership(
   const outcomes = await Promise.all(
     organisations.map(async (organisation) => {
       try {
-        const result = await withTenantResult(organisation.clerk_org_id, (db) =>
+        const result = await withTenantResult(organisation.account_id, (db) =>
           ensureCurrentUserPerson(
             {
-              clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
+              accountId: organisation.account_id as AccountId,
               organisationId: organisation.id as OrganisationId,
             },
             {
               avatarUrl: data.public_user_data.image_url,
-              clerkUserId: data.public_user_data.user_id,
               displayName:
                 [
                   data.public_user_data.first_name,
@@ -321,16 +321,15 @@ async function ensurePeopleForMembership(
                 data.public_user_data.identifier ||
                 data.public_user_data.user_id,
               email: data.public_user_data.identifier,
-              firstName: data.public_user_data.first_name,
-              lastName: data.public_user_data.last_name,
+              userId: data.public_user_data.user_id,
             },
             db
           )
         );
 
         if (!result.ok) {
-          log.error("Failed to link Clerk organisation member to person", {
-            clerkOrgId: data.organization.id,
+          log.error("Failed to link Account member to person", {
+            accountId: data.organization.id,
             errorCode: result.error.code,
             organisationId: organisation.id,
             userId: data.public_user_data.user_id,
@@ -339,8 +338,8 @@ async function ensurePeopleForMembership(
         }
         return true;
       } catch (error) {
-        log.error("Clerk organisation member provisioning failed", {
-          clerkOrgId: data.organization.id,
+        log.error("Account member provisioning failed", {
+          accountId: data.organization.id,
           error,
           organisationId: organisation.id,
           userId: data.public_user_data.user_id,

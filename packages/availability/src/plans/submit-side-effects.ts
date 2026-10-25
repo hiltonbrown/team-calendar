@@ -24,17 +24,17 @@ class NotificationDispatchRollback extends Error {}
 export async function completeSubmitSideEffects(input: {
   actorUserId: string;
   declineReason?: string | null;
-  approvalRecipient?: { clerkUserId: string; personId: string } | null;
+  approvalRecipient?: { userId: string; personId: string } | null;
   attempt: OutboundOperationAttemptScope;
   claimedAt: Date;
-  clerkOrgId: string;
-  manager: { clerkUserId: string; personId: string } | null;
+  accountId: string;
+  manager: { userId: string; personId: string } | null;
   notifyManager: boolean;
   organisationId: string;
   recordId: string;
 }): Promise<Result<void, { message: string }>> {
   assertNoTenantTransaction("completeSubmitSideEffects");
-  const publication = await withTenantDb(input.clerkOrgId, (db) =>
+  const publication = await withTenantDb(input.accountId, (db) =>
     db.auditEvent.findFirst({
       select: { id: true },
       where: checkpointWhere(
@@ -45,19 +45,19 @@ export async function completeSubmitSideEffects(input: {
   );
   if (!publication) {
     const phaseInput1 = {
+      accountId: input.accountId,
       availabilityRecordId: input.recordId,
-      clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
     } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
     const result = await withTenantResult(
-      phaseInput1.clerkOrgId,
+      phaseInput1.accountId,
       (db) => materialiseAvailabilityPublication(phaseInput1, db),
       TENANT_READ_TRANSACTION_OPTIONS
     );
     if (!result.ok) {
       return failure("Calendar publication is awaiting retry.");
     }
-    await withTenantDb(input.clerkOrgId, (db) =>
+    await withTenantDb(input.accountId, (db) =>
       db.auditEvent.create({
         data: checkpointData(
           input,
@@ -78,7 +78,7 @@ export async function completeSubmitSideEffects(input: {
     const manager = recipient;
     let notified: false | { notificationId: string | null } = false;
     try {
-      notified = await withTenantDb(input.clerkOrgId, async (tx) => {
+      notified = await withTenantDb(input.accountId, async (tx) => {
         if (
           !(await fenceSubmitRecoverySideEffectClaim(
             input.attempt,
@@ -108,13 +108,13 @@ export async function completeSubmitSideEffects(input: {
         const result = await dispatchNotification(
           {
             ...notification,
+            accountId: input.accountId,
             actorUserId: input.actorUserId,
-            clerkOrgId: input.clerkOrgId,
             objectId: input.recordId,
             objectType: "availability_record",
             organisationId: input.organisationId,
             recipientPersonId: manager.personId,
-            recipientUserId: manager.clerkUserId,
+            recipientUserId: manager.userId,
           },
           { publishRealtime: false },
           tx
@@ -144,10 +144,10 @@ export async function completeSubmitSideEffects(input: {
     if (notified.notificationId) {
       try {
         const { notificationId } = notified;
-        const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+        const prepared = await withTenantDb(input.accountId, (db) =>
           prepareNotificationPublication(
             {
-              clerkOrgId: input.clerkOrgId,
+              accountId: input.accountId,
               notificationId,
               organisationId: input.organisationId,
             },
@@ -165,7 +165,7 @@ export async function completeSubmitSideEffects(input: {
 
 function checkpointWhere(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recordId: string;
     attempt?: OutboundOperationAttemptScope;
@@ -173,6 +173,7 @@ function checkpointWhere(
   action: string
 ) {
   return {
+    account_id: input.accountId,
     action: input.attempt?.action
       ? action.replace(
           "submit_",
@@ -181,7 +182,6 @@ function checkpointWhere(
             : `${input.attempt.action}_`
         )
       : action,
-    clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
     resource_id: input.recordId,
   };
@@ -191,7 +191,7 @@ function checkpointData(
   input: {
     actorUserId: string;
     attempt?: OutboundOperationAttemptScope;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recordId: string;
   },

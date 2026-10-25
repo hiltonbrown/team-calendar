@@ -1,4 +1,5 @@
-import { auth, currentUser } from "@repo/auth/server";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   getPersonProfile,
   listHistoryPage,
@@ -6,7 +7,7 @@ import {
   type PeopleRole,
   type PersonProfile,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import {
   resolveAccountCompanies,
   TENANT_READ_TRANSACTION_OPTIONS,
@@ -16,7 +17,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PersonProfileContent } from "@/components/people/person-profile-content";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { parsePersonProfileTab } from "@/lib/navigation/person-profile-tab";
 import { Header } from "../../components/header";
 
@@ -36,7 +37,7 @@ const PersonProfilePage = async ({
   params,
   searchParams,
 }: PersonProfilePageProps) => {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ people: ["read"] });
   const { personId: personIdParam } = await params;
   const personId = PersonIdSchema.safeParse(personIdParam);
   if (!personId.success) {
@@ -67,21 +68,33 @@ async function loadProfileViewModel(
   searchParams: Record<string, string | string[] | undefined>
 ) {
   const orgParam = firstString(searchParams.org);
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  const role = effectiveRole(orgRole);
-  if (!(orgId && role && user)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const role = effectiveRole(sessionRole);
+  if (!(sessionAccountId && role && user)) {
     notFound();
   }
   // Clerk supplied the authenticated account before opening the SQL scope.
-  const clerkOrgId = orgId as ClerkOrgId;
+  const accountId = sessionAccountId as AccountId;
   return withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
-      const companies = await resolveAccountCompanies(clerkOrgId, db);
+      const companies = await resolveAccountCompanies(accountId, db);
       const target = await db.person.findFirst({
         select: { organisation_id: true },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: personId,
           organisation_id: { in: companies.map((company) => company.id) },
         },
@@ -94,18 +107,18 @@ async function loadProfileViewModel(
       const actingPerson = await db.person.findFirst({
         select: { id: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: user.id,
           organisation_id: { in: companies.map((company) => company.id) },
+          user_id: user.id,
         },
       });
 
       const profileResult = await getPersonProfile(
         {
+          accountId,
           actingPersonId: actingPerson?.id ?? null,
           actingUserId: user.id,
-          clerkOrgId,
           organisationId,
           personId,
           role,
@@ -118,8 +131,8 @@ async function loadProfileViewModel(
 
       const historyResult = await listHistoryPage(
         {
+          accountId,
           actingPersonId: actingPerson?.id ?? null,
-          clerkOrgId,
           cursor: firstString(searchParams.historyCursor),
           organisationId,
           pageSize: 25,
@@ -129,9 +142,9 @@ async function loadProfileViewModel(
         db
       );
 
-      const canAssignManager = role === "owner" || role === "admin";
+      const canAssignManager = can(role, { people: ["manage"] });
       const managerChoices = canAssignManager
-        ? await listManagerChoices(clerkOrgId, db)
+        ? await listManagerChoices(accountId, db)
         : [];
 
       return {
@@ -142,7 +155,7 @@ async function loadProfileViewModel(
           actingPerson?.id ?? null,
           role
         ),
-        canRefreshBalances: role === "admin" || role === "owner",
+        canRefreshBalances: can(role, { people: ["manage"] }),
         history: historyResult.ok
           ? historyResult.value
           : { nextCursor: null, records: [] },
@@ -163,24 +176,23 @@ function canManageContacts(
   role: PeopleRole
 ): boolean {
   return (
-    role === "admin" ||
-    role === "owner" ||
+    can(role, { people: ["manage"] }) ||
     actingPersonId === profile.header.id ||
     actingPersonId === profile.header.manager?.id
   );
 }
 
 function effectiveRole(role: string | null | undefined): PeopleRole | null {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
-  if (role === "org:manager") {
+  if (role === "manager") {
     return "manager";
   }
-  if (role === "org:viewer") {
+  if (role === "viewer") {
     return "viewer";
   }
   return null;

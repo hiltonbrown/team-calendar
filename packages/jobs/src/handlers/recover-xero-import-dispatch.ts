@@ -20,7 +20,7 @@ export async function recoverXeroImportDispatch(
   try {
     const tenants = await systemDatabase.xeroConnection.findMany({
       select: {
-        clerk_org_id: true,
+        account_id: true,
         id: true,
         initial_sync_requested_at: true,
         organisation_id: true,
@@ -42,10 +42,10 @@ export async function recoverXeroImportDispatch(
     let dispatched = 0;
     let skipped = 0;
     for (const tenant of tenants) {
-      const activeRun = await withTenantDb(tenant.clerk_org_id, (db) =>
+      const activeRun = await withTenantDb(tenant.account_id, (db) =>
         db.syncRun.findFirst({
           where: {
-            clerk_org_id: tenant.clerk_org_id,
+            account_id: tenant.account_id,
             organisation_id: tenant.organisation_id,
             run_type: "people",
             status: "running",
@@ -58,7 +58,7 @@ export async function recoverXeroImportDispatch(
         continue;
       }
       const dispatchRes = await dispatchInitialXeroSync({
-        clerkOrgId: tenant.clerk_org_id,
+        accountId: tenant.account_id,
         connectionId: tenant.id,
         organisationId: tenant.organisation_id,
         ...(tenant.initial_sync_requested_at
@@ -71,7 +71,7 @@ export async function recoverXeroImportDispatch(
       } else {
         skipped += 1;
         log.error("Failed to recover initial Xero sync dispatch", {
-          clerkOrgId: tenant.clerk_org_id,
+          accountId: tenant.account_id,
           connectionId: tenant.id,
           error: dispatchRes.error,
           organisationId: tenant.organisation_id,

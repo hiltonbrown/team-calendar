@@ -17,7 +17,7 @@ import { syncXeroPeople } from "./sync-xero-people";
 import { isCurrentXeroSyncBinding } from "./xero-sync-access";
 
 const InputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   requestedAt: z.string().datetime().optional(),
@@ -51,7 +51,7 @@ export async function executeInitialSync(
 ): Promise<InitialXeroSyncResult | { status: "ignored" }> {
   assertNoTenantTransaction("executeInitialSync");
   if (
-    !(await withTenantDb(input.clerkOrgId, (db) =>
+    !(await withTenantDb(input.accountId, (db) =>
       isCurrentXeroSyncBinding(input, db)
     ))
   ) {
@@ -59,7 +59,7 @@ export async function executeInitialSync(
   }
   const requestedAt =
     input.requestedAt ??
-    (await withTenantDb(input.clerkOrgId, (db) =>
+    (await withTenantDb(input.accountId, (db) =>
       ensureXeroInitialSyncRequested(input, db)
     ));
   if (!requestedAt) {
@@ -97,7 +97,7 @@ export async function completeInitialSyncPhase(
   input: Parameters<typeof completeXeroInitialSync>[0]
 ): Promise<Date> {
   assertNoTenantTransaction("completeInitialSyncPhase");
-  const completed = await withTenantDb(input.clerkOrgId, (db) =>
+  const completed = await withTenantDb(input.accountId, (db) =>
     completeXeroInitialSync(input, db)
   );
   if (!completed) {

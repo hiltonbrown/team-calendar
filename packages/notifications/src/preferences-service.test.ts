@@ -36,7 +36,7 @@ const { listPreferences, shouldDeliverToChannel, upsertPreference } =
   await import("./preferences-service");
 
 const input = {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   userId: "user_1",
 };

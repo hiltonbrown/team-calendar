@@ -1,13 +1,13 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { getSettings } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import { Button } from "@repo/design-system/components/ui/button";
 import { getFeedOversightCounts, listFeeds, normaliseRole } from "@repo/feeds";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { withOrg } from "@/lib/navigation/org-url";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
@@ -35,16 +35,24 @@ interface FeedsPageProps {
 // Lifecycle actions live on each feed's detail page; S-13 `/feeds` is the
 // subscribe page for every role.
 const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ feeds: ["manageAll"] });
 
-  const [{ orgRole }, user, params] = await Promise.all([
-    auth(),
-    currentUser(),
+  const [{ role: sessionRole }, user, params] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
     searchParams,
   ]);
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const accountId = (await requireAccount()) as AccountId;
 
   if (!user) {
     throw new Error("User not found.");
@@ -60,15 +68,15 @@ const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
     settingsResult,
     organisationId,
     orgQueryValue,
-  } = await withTenantDb(clerkOrgId, async (db) => {
+  } = await withTenantDb(accountId, async (db) => {
     const {
       organisationId: scopedOrganisationId,
       orgQueryValue: preparedOrgQueryValue,
-    } = await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+    } = await resolveActiveOrgPageContext(accountId, orgParam, db);
     const actor = {
-      actingRole: normaliseRole(orgRole),
+      accountId,
+      actingRole: normaliseRole(sessionRole),
       actingUserId: user.id,
-      clerkOrgId,
       organisationId: scopedOrganisationId,
     };
 
@@ -88,7 +96,7 @@ const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
         ),
         await getFeedOversightCounts(actor, db),
         await getSettings(
-          { clerkOrgId, organisationId: scopedOrganisationId },
+          { accountId, organisationId: scopedOrganisationId },
           db
         ),
       ];

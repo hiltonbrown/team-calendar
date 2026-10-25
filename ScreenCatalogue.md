@@ -29,7 +29,7 @@ Every screen was independently re-verified against current code (route files, cl
 | 4 | **`/plans` gained a `StatusOverview` summary-card row** (Pending / Approved / Failed or declined / Draft or archived counts) above the filter form. | S-04 | `apps/app/app/(authenticated)/plans/plans-client.tsx:264,646-679` |
 | 5 | **Legacy redirect shims now preserve every query parameter, not just `org`.** Retires a `[v5 proposal]`. | S-05, legacy redirects | `apps/app/lib/navigation/org-url.ts`; all six shim `page.tsx` files |
 | 6 | **`/calendar` gained a "Today in view" sidebar** (`CalendarScanPanel`) and an `ActiveFilterSummary` chip row summarising active filters. | S-07 | `apps/app/components/calendar/calendar-scan-panel.tsx`; `calendar-toolbar.tsx:253-268` |
-| 7 | **`/people` gained two admin features:** a "Sync from Xero" manual-dispatch button, and a "Reconcile Clerk access" dialog for inviting/linking Clerk users to person records. Neither existed at the last pass. | S-08 | `apps/app/app/(authenticated)/people/people-client.tsx:216-337,601-731`; `people/_actions.ts:277-337,457-466` |
+| 7 | **`/people` gained two admin features:** a "Sync from Xero" manual-dispatch button, and a "Reconcile Account access" dialog for inviting/linking users to person records. Neither existed at the last pass. | S-08 | `apps/app/app/(authenticated)/people/people-client.tsx:216-337,601-731`; `people/_actions.ts:277-337,457-466` |
 | 8 | **`/people`'s `StatusChip` radius corrected to 12px** (`rounded-sm`), matching `DESIGN.md`'s chip token. `/people/[personId]`'s separate `StatusChip` was not fixed and is still 20px: see Conflicts found. | S-08, S-09 | `people-client.tsx:970`; `person-profile-content.tsx:613-632` |
 | 9 | **`/leave-approvals`'s "Sync approval state" is now fully wired**, dispatching a real `approval_state_reconciliation` job. It was previously hard-disabled with `reconciliationEnabled={false}`. Retires a `[v5 proposal]`. | S-10 | `apps/app/app/(authenticated)/leave-approvals/leave-approvals-client.tsx:209-248`; `packages/availability/src/approvals/approval-service.ts:776-831` |
 | 10 | **`/public-holidays` now client-side hides mutating controls from non-admins**, matching the pattern `/feeds` already used. Previously every viewer saw fully interactive Suppress/Restore/Delete/"Add custom holiday" controls that failed server-side. Retires a `[v5 proposal]`. | S-11 | `apps/app/app/(authenticated)/public-holidays/page.tsx:22-36`; `public-holidays-list.tsx:56,196-204,265-317` |
@@ -67,7 +67,7 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-05 | New / edit plan | `/plans/new`, `/plans/[planId]/edit` | Drifted | Legacy-redirect query-param preservation now fully implemented; live balance-counter proposal remains open; undocumented empty-people-list message found. |
 | S-06 | Leave submission confirmation | `components/plans/submit-confirmation-modal.tsx` | Drifted | Retry-mode button literal is "Retry submission", not "Retry Xero sync"; everything else re-verified correct. |
 | S-07 | Calendar | `/calendar` | Drifted | New "Today in view" sidebar and active-filter chip row undocumented; mobile FAB gap and provenance icons re-confirmed exactly as before. |
-| S-08 | People | `/people` | Drifted | `StatusChip` radius fix confirmed; two substantial new admin features (Sync from Xero, Reconcile Clerk access) are undocumented. |
+| S-08 | People | `/people` | Drifted | `StatusChip` radius fix confirmed; two substantial new admin features (Sync from Xero, Reconcile Account access) are undocumented. |
 | S-09 | Person profile | `/people/[personId]` | Drifted | "Edit profile" still a stub; header has zero provenance signal (new finding); manual-balance Edit control wrongly shown to non-admins (new bug); its own `StatusChip` still 20px, now inconsistent with S-08's fixed one. |
 | S-10 | Leave approvals | `/leave-approvals` | Drifted | "Sync approval state" is now fully wired, resolving the primary prior finding; failure-copy and badge-differentiation gaps remain open. |
 | S-11 | Public holidays | `/public-holidays` | Matches | Single operational home for review, source refresh and admin holiday management; responsive rows and explicit suppressed state. |
@@ -88,7 +88,7 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-26 | Sync run detail | `/sync/[runId]` | Drifted | "Re-run sync" enabled for every run type; Records-failed stat cell colour-differentiated; undocumented Cancel/Timeline controls found. |
 | S-27 | Settings: Members | `/settings/members` | Matches | No drift found. |
 | S-28 | Settings: Xero connect | `/settings/integrations/xero/connect` | Matches | Reconciled 7 October: connect/reconnect audit distinction, one persisted queued full initial import and request-timestamp completion check. Live import NOT VERIFIED. |
-| S-29 | Settings: Xero person matches | `/settings/integrations/xero/matches` | Matches | No drift; Clerk-ID field is placeholder+fallback rather than a literal pre-filled value, functionally equivalent. |
+| S-29 | Settings: Xero person matches | `/settings/integrations/xero/matches` | Matches | No drift; user ID field is placeholder+fallback rather than a literal pre-filled value, functionally equivalent. |
 | S-30 | Settings: Getting started | `/settings/getting-started` | Matches | Reduced 9 October 2026 to post-wizard recommendations: holidays, feed, and Xero when manual-only or needing attention. |
 | E-01 | Empty state | Component | Matches | No drift. |
 | E-02 | Data fetch error | Component | Matches | No drift. |
@@ -163,7 +163,7 @@ Not re-investigated in this pass; no divergence signal surfaced incidentally. Ca
 | S-05 | New / edit plan | `/plans/new`, `/plans/[planId]/edit` (+ `@modal`) | No `requirePageRole`; implicit viewer via `currentUser()` + `requireActiveOrgPageContext` | All | Drifted | `apps/app/app/(authenticated)/plans/record-form-data.ts:24-161` |
 | S-06 | Leave submission confirmation | `components/plans/submit-confirmation-modal.tsx` | Inherits caller's guard | Employee (submit), any actor with a `xero_sync_failed` record (retry) | Drifted | `apps/app/components/plans/submit-confirmation-modal.tsx:182` |
 | S-07 | Calendar | `/calendar` | `requirePageRole("org:viewer")` | All | Drifted | `apps/app/app/(authenticated)/calendar/page.tsx:42` |
-| S-08 | People | `/people` | `requirePageRole("org:viewer")` | All (read); Admin/Owner (`Add person`, Sync from Xero, Reconcile Clerk access) | Drifted | `apps/app/app/(authenticated)/people/page.tsx:23`; `people/new/page.tsx:18` |
+| S-08 | People | `/people` | `requirePageRole("org:viewer")` | All (read); Admin/Owner (`Add person`, Sync from Xero, Reconcile Account access) | Drifted | `apps/app/app/(authenticated)/people/page.tsx:23`; `people/new/page.tsx:18` |
 | S-09 | Person profile | `/people/[personId]` (+ `@modal`) | `requirePageRole("org:viewer")` | All (scoped) | Drifted | `apps/app/app/(authenticated)/people/[personId]/page.tsx` |
 | S-10 | Leave approvals | `/leave-approvals` | `requirePageRole("org:manager")` | Manager, Admin, Owner | Drifted | `apps/app/app/(authenticated)/leave-approvals/page.tsx:68` |
 | S-11 | Public holidays | `/public-holidays` (+ `holidays/new`) | `requirePageRole("org:viewer")`; custom-holiday form requires admin; mutating actions independently call `requireRole("org:admin")` | All (read); Admin/Owner (mutate, client-hidden and server-enforced) | Matches | `apps/app/app/(authenticated)/public-holidays/page.tsx`; `holidays/new/form-data.ts` |
@@ -226,7 +226,7 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 **Guard:** Unauthenticated. Access: unauthenticated.
 **Evidence:** `apps/app/app/(unauthenticated)/(auth)/sign-up/[[...sign-up]]/page.tsx:1-17`; `packages/auth/components/sign-up.tsx:1-16`.
 
-**Purpose:** Create a new Clerk Organisation, or accept an existing invitation.
+**Purpose:** Create a new Account, or accept an existing invitation.
 
 **User interactions, as-built:** Same pattern as S-01. Copy ("Create your organisation" / "Start a new Team Calendar organisation, or accept an invitation from your team email.") is centralised into a shared `signUpCopy` export (`sign-up.tsx:5-9`), the same refactor applied to S-01. On completion, Clerk routes the user into the S-02 organisation-choice task if applicable.
 
@@ -248,7 +248,7 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 **Guard:** Unauthenticated route group; gated by Clerk session-task state (user is authenticated but has an unresolved "choose organisation" task). No app-level middleware special-cases this route: `apps/app/proxy.ts` has no `session-tasks` reference; it only attaches CSP/nonce headers. Access: authenticated, pre-organisation.
 **Evidence:** `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx:1-13`; `packages/auth/components/choose-organization-task.tsx:1-9`; `apps/app/proxy.ts`.
 
-**Purpose:** Organisation selection and creation for users who are members of multiple Clerk Organisations, or who have a pending invitation, before entering the app. Personal accounts are disabled, so every user belongs to at least one Organisation eventually. **Switching organisations after entry is not currently supported anywhere in the app**: `<OrganizationSwitcher />` is confirmed absent by a full-repo grep, and `CustomUserButton` exposes only Clerk's "Organisation profile" action (`openOrganizationProfile()`).
+**Purpose:** Organisation selection and creation for users who are members of multiple Accounts, or who have a pending invitation, before entering the app. Personal accounts are disabled, so every user belongs to at least one Organisation eventually. **Switching organisations after entry is not currently supported anywhere in the app**: `<OrganizationSwitcher />` is confirmed absent by a full-repo grep, and `CustomUserButton` exposes only Clerk's "Organisation profile" action (`openOrganizationProfile()`).
 
 **User interactions, as-built:** Renders `TaskChooseOrganization` directly with `redirectUrlComplete="/"`. **Resolved:** `ChooseOrganizationTask` (`choose-organization-task.tsx:5-9`) passes no `appearance` prop and is not wrapped in `AuthFormFrame`, unlike S-01/S-31: it is a bare `<ClerkTaskChooseOrganization redirectUrlComplete="/" />`. The surrounding Brand Panel is inherited purely from the `(auth)` layout, not from any Team Calendar wrapper component. Team Calendar supplies no custom list rendering, form fields, or interaction logic.
 
@@ -294,7 +294,7 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ### S-03: Dashboard
 
-**Account scope:** Defaults to all active companies in the Clerk account, with an optional company filter. Approved leave from every selected company follows the existing privacy rules for each role.
+**Account scope:** Defaults to all active companies in the Account, with an optional company filter. Approved leave from every selected company follows the existing privacy rules for each role.
 
 **Route:** `/` (root of the authenticated app). No `/dashboard` alias exists; `components/dashboard/` is a shared component library, not a second route. No modal behaviour.
 **Guard:** `requirePageRole("org:viewer")` (`page.tsx:24`). Access: all roles.
@@ -402,7 +402,7 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 **Purpose:** Visual calendar of availability, leave, and public holidays across individuals and teams.
 
-**User interactions, as-built:** The calendar defaults to all active payroll companies in the current Clerk account. A Company selector appears for multi-company accounts, offering All companies and individual companies; event details and person lanes identify the source company. Company filters are validated against the account-owned set, and records retain their own company settings and timezone. Day/Week/Month view selection, date navigation and Today. Week uses the `CalendarTimeline` with person lanes, affected-person counts, inline entry details and a chronological mobile list; no separate surface toggle is rendered. Scope select: Myself/My team/All teams/specific team/specific person. Filters: record category, approval status, person type and location, with reset and active-filter summary. Month/day views show `CalendarScanPanel` beside the main view, with a day-detail link and overflow count. Month overflow/mobile agenda, week desktop/mobile day links and the scan panel preserve the current validated scope and filters. Toolbar Add actions are available on desktop and in a persistent mobile safe-area bar. Date-only creation prefills all-day mode; timed day slots prefill their wall-clock hour and a one-hour end in the organisation timezone. Timed event details use that timezone and show both dates for overnight spans; all-day dates retain date-only semantics.
+**User interactions, as-built:** The calendar defaults to all active payroll companies in the current Account. A Company selector appears for multi-company accounts, offering All companies and individual companies; event details and person lanes identify the source company. Company filters are validated against the account-owned set, and records retain their own company settings and timezone. Day/Week/Month view selection, date navigation and Today. Week uses the `CalendarTimeline` with person lanes, affected-person counts, inline entry details and a chronological mobile list; no separate surface toggle is rendered. Scope select: Myself/My team/All teams/specific team/specific person. Filters: record category, approval status, person type and location, with reset and active-filter summary. Month/day views show `CalendarScanPanel` beside the main view, with a day-detail link and overflow count. Month overflow/mobile agenda, week desktop/mobile day links and the scan panel preserve the current validated scope and filters. Toolbar Add actions are available on desktop and in a persistent mobile safe-area bar. Date-only creation prefills all-day mode; timed day slots prefill their wall-clock hour and a one-hour end in the organisation timezone. Timed event details use that timezone and show both dates for overnight spans; all-day dates retain date-only semantics.
 
 **Role variations:** Scope selector default differs by role.
 
@@ -423,14 +423,14 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 **Account scope:** Defaults to all active owned companies, with company labels and a company filter. Existing read and edit permissions apply across the account.
 
 **Route:** `/people`. No modal on the list itself; row click opens S-09's modal.
-**Guard:** `requirePageRole("org:viewer")` (list); `requirePageRole("org:admin")` on `/people/new`. Access: all roles (read); Admin/Owner ("Add person", `includeArchived` filter, Sync from Xero, Reconcile Clerk access).
+**Guard:** `requirePageRole("org:viewer")` (list); `requirePageRole("org:admin")` on `/people/new`. Access: all roles (read); Admin/Owner ("Add person", `includeArchived` filter, Sync from Xero, Reconcile Account access).
 **Evidence:** `apps/app/app/(authenticated)/people/page.tsx:23`; `people-client.tsx`; `people/new/page.tsx:18`; `people/_actions.ts:277-337,457-466`.
 
 **Purpose:** Browse all people with current availability status.
 
-**User interactions, as-built:** Debounced name/email search. Filters: Team, Location, Person type, Status, Xero link, "Xero sync failed only", "Include archived" (admin/owner only, server-forced false otherwise). "Add person" CTA (admin/owner only). **Two features new since the last pass:** a **"Sync from Xero" button** (admin/owner, only when the org has an active Xero connection) that dispatches a real manual sync and reports fetched/upserted/failed counts inline; and a **"Reconcile Clerk access" dialog** (admin/owner) that loads linkable/invitable/conflict candidates and dispatches invitations, both server-role-checked independently of the client-side hiding.
+**User interactions, as-built:** Debounced name/email search. Filters: Team, Location, Person type, Status, Xero link, "Xero sync failed only", "Include archived" (admin/owner only, server-forced false otherwise). "Add person" CTA (admin/owner only). **Two features new since the last pass:** a **"Sync from Xero" button** (admin/owner, only when the org has an active Xero connection) that dispatches a real manual sync and reports fetched/upserted/failed counts inline; and a **"Reconcile Account access" dialog** (admin/owner) that loads linkable/invitable/conflict candidates and dispatches invitations, both server-role-checked independently of the client-side hiding.
 
-**Role variations:** Admin/owner see "Include archived", "Add person", "Sync from Xero", and "Reconcile Clerk access" (hidden, not disabled, for everyone else); every action is independently re-checked server-side.
+**Role variations:** Admin/owner see "Include archived", "Add person", "Sync from Xero", and "Reconcile Account access" (hidden, not disabled, for everyone else); every action is independently re-checked server-side.
 
 **Data displayed:** Avatar/initials, name, job title/type, "Archived" badge, team, location, `StatusChip`, Xero column with "Linked"/"Manual" badge plus `LeafIcon`/`PencilIcon` and an `AlertTriangleIcon` sync-failed count pill.
 
@@ -660,7 +660,7 @@ sidebar width on small screens.
 **Evidence:** `apps/app/app/(authenticated)/settings/general/page.tsx:20`; `general-client.tsx`; `_actions.ts`.
 **Country context:** `country_code` drives the region selector; `region_code` determines the public holiday set.
 
-**Purpose:** Core Clerk-Organisation and payroll-Organisation configuration.
+**Purpose:** Core Account and payroll-Organisation configuration.
 
 **User interactions, as-built:** Account card: Account name (editable, writes through to Clerk), Account slug (disabled). Payroll entity card: Organisation name; current Country as read-only context; Region (depends on the persisted country); Primary timezone (fixed list of six IANA zones). Region changes show a consequence note. The unreachable country-change confirmation flow has been removed; New Zealand and United Kingdom payroll sync remain explicitly planned.
 
@@ -695,7 +695,7 @@ sidebar width on small screens.
 **Guard:** `requirePageRole("org:admin")` + layout gate. Access: Admin, Owner.
 **Evidence:** `apps/app/app/(authenticated)/settings/integrations/page.tsx:14`; `integrations-client.tsx`.
 
-**Purpose:** Clerk-Organisation-level rollup of Xero connection health across every payroll Organisation.
+**Purpose:** Account-level rollup of Xero connection health across every payroll Organisation.
 
 **User interactions, as-built:** A single "Xero Payroll" card with a rolled-up status badge, a 4-stat grid, a per-organisation status list, and "Manage Xero" linking to S-20. A rollup dashboard, not a per-integration card grid; no "Coming soon" placeholders.
 
@@ -799,7 +799,7 @@ Automatic token refresh has no manual control. Normal disconnect completes synch
 **Guard:** `requirePageRole("org:admin")`. Access: Admin, Owner.
 **Evidence:** `apps/app/app/(authenticated)/sync/page.tsx:33`; `sync-client.tsx:40-53,248-259,288-428,617-656`; `packages/availability/src/sync/sync-events.ts:36-41`.
 
-**Purpose:** Monitor inbound Xero sync run health across all tenants in the current Clerk Organisation.
+**Purpose:** Monitor inbound Xero sync run health across all tenants in the current Account.
 
 **User interactions, as-built:** Per-tenant summary cards: name, payroll-region badge, connection status dot, a four-cell "last synced" grid. **All four manual dispatch buttons are now wired**: `people`, `leave_records`, `leave_balances`, and `approval_state_reconciliation` are all registered handlers; this is a fix since the last pass (previously only two of four were registered). Buttons are disabled only when a sync of that type is currently running or the connection is inactive. Run history table's Records column **now colour-differentiates**: failed counts render with `font-medium text-destructive` when greater than zero. Failure-surfacing logic is more nuanced than previously documented: a current-failure card, a distinct partial-success banner, and a plain historical-failures paragraph are three separate, mutually-adjusted states driven by current failed runs, pending failed records, and current partial-success runs in combination. The CTA in both failure states reads "Review affected runs", not "N pending failures" as previously documented.
 
@@ -839,7 +839,7 @@ Automatic token refresh has no manual control. Normal disconnect completes synch
 **Guard:** No page-level `requirePageRole`; relies entirely on `settings/layout.tsx`'s admin/owner gate (raw `orgRole` string check, redirects to `/` rather than rendering `PermissionDeniedState`). Access: Admin, Owner.
 **Evidence:** `apps/app/app/(authenticated)/settings/{layout.tsx:11-22,members/page.tsx:11-58,members/members-client.tsx}`; `apps/app/app/actions/settings/{invite-member,remove-member,update-member-role}.ts`.
 
-**Purpose:** Manage Clerk Organisation membership (invite, role change, remove) via the Clerk Backend SDK, distinct from `/people` (S-08).
+**Purpose:** Manage Account membership (invite, role change, remove) via the Clerk Backend SDK, distinct from `/people` (S-08).
 
 **User interactions, as-built:** Custom-built UI, not Clerk's hosted components. Invite: email + role select (Owner option only if the acting user is owner) → server independently re-checks owner assignment. Members table: role cell is read-only for self or for another owner unless the acting user is also owner, else an editable select. Remove: `ConfirmActionDialog` (destructive). Pending invitations list has no revoke/resend action: no such server action exists anywhere in the settings actions directory.
 
@@ -870,7 +870,7 @@ Completing selection returns per-file outcomes. One failed file does not undo su
 
 **Purpose:** Explicit-review reconciliation between Xero-synced and manually-created `Person` candidates. Possible matches are never merged automatically.
 
-**User interactions, as-built:** Per pending match card: Xero person's name/email, stored candidate person (or an explicit "no candidate stored" message), a Clerk-user-ID input, and two actions: "Link to Clerk user" and "Keep separate". The input uses an empty controlled value with the candidate's existing linked ID shown only as a placeholder; both the client click handler and the server independently fall back to the candidate's existing ID if the field is left untouched, so the documented "defaults to the existing link" behaviour holds even though the mechanism is placeholder+fallback rather than a literal pre-filled value. Server-side, linking verifies Clerk org membership and rejects a user already linked to a different person. Every resolution writes an audit event.
+**User interactions, as-built:** Per pending match card: Xero person's name/email, stored candidate person (or an explicit "no candidate stored" message), a user ID input, and two actions: "Link to user" and "Keep separate". The input uses an empty controlled value with the candidate's existing linked ID shown only as a placeholder; both the client click handler and the server independently fall back to the candidate's existing ID if the field is left untouched, so the documented "defaults to the existing link" behaviour holds even though the mechanism is placeholder+fallback rather than a literal pre-filled value. Server-side, linking verifies Account membership and rejects a user already linked to a different person. Every resolution writes an audit event.
 
 ---
 
@@ -1000,4 +1000,4 @@ Numbered independently of the change table above for cross-reference clarity.
 
 **Reconciled:** 30 August 2026, against `apps/app` as of that date.
 **Supersedes:** `ScreenCatalogue-v5.md` (16 August 2026) and, before that, `ScreenCatalogue-v4.1.md` (May 2026), in full.
-**Scope of this pass:** every catalogued screen (S-01 through S-31, E-01 through E-05, all redirect shims) was independently re-verified against current code. A substantial amount of app functionality changed in the thirteen days since the last full pass: several features did not exist yet (Sync from Xero, Reconcile Clerk access, dashboard onboarding panel, calendar "Today in view" sidebar, feed filter bar, analytics date-range filters) and several previously-flagged gaps were fixed in code (all four sync dispatch types, audit-log pagination, notifications SSE/reconnection, public-holidays role hiding, billing's amber-to-token migration). Two new bugs were found in the process (CSV export ignoring the analytics date filter; the manual-balance Edit control visible to non-admins). Next review should re-run this reconciliation after the frost/blur, withdraw-location, and E-05 aggregate-failure decisions (see Conflicts found and Decisions required) are resolved in code or product direction.
+**Scope of this pass:** every catalogued screen (S-01 through S-31, E-01 through E-05, all redirect shims) was independently re-verified against current code. A substantial amount of app functionality changed in the thirteen days since the last full pass: several features did not exist yet (Sync from Xero, Reconcile Account access, dashboard onboarding panel, calendar "Today in view" sidebar, feed filter bar, analytics date-range filters) and several previously-flagged gaps were fixed in code (all four sync dispatch types, audit-log pagination, notifications SSE/reconnection, public-holidays role hiding, billing's amber-to-token migration). Two new bugs were found in the process (CSV export ignoring the analytics date filter; the manual-balance Edit control visible to non-admins). Next review should re-run this reconciliation after the frost/blur, withdraw-location, and E-05 aggregate-failure decisions (see Conflicts found and Decisions required) are resolved in code or product direction.

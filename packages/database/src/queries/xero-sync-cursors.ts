@@ -16,7 +16,7 @@ export async function advanceXeroSyncCursor(
   db: TenantDb
 ) {
   {
-    assertTenantDb(db, input.scope.clerkOrgId);
+    assertTenantDb(db, input.scope.accountId);
     const tx = db;
 
     if (
@@ -66,10 +66,10 @@ export async function ensureXeroInitialSyncRequested(
   db: TenantDb
 ): Promise<string | null> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tenantDb = db;
 
-    await tenantDb.$queryRaw`SELECT id FROM xero_connections WHERE id = ${input.connectionId}::uuid AND clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${input.organisationId}::uuid FOR UPDATE`;
+    await tenantDb.$queryRaw`SELECT id FROM xero_connections WHERE id = ${input.connectionId}::uuid AND account_id = ${input.accountId} AND organisation_id = ${input.organisationId}::uuid FOR UPDATE`;
     const grant = await getScopedXeroAuthorisationMetadata(input, tenantDb);
     if (grant?.status !== "active") {
       return null;
@@ -110,7 +110,7 @@ export async function completeXeroInitialSync(
   db: TenantDb
 ): Promise<Date | null> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tx = db;
 
     const grant = await getScopedXeroAuthorisationMetadata(input, tx);

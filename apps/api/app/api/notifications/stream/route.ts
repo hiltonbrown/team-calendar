@@ -1,4 +1,4 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
+import { getCurrentUser, requireAccount } from "@repo/auth/helpers";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { pollNotificationStream } from "@repo/notifications";
 import { log } from "@repo/observability/log";
@@ -60,7 +60,7 @@ function resolveInitialLastId(lastEventIdHeader: string | null): string {
 }
 
 interface StreamContext {
-  clerkOrgId: string;
+  accountId: string;
   initialLastId: string;
   userId: string;
 }
@@ -162,7 +162,7 @@ class NotificationStreamSession {
   private async performPoll(): Promise<void> {
     const events = await pollNotificationStream(
       {
-        clerkOrgId: this.context.clerkOrgId,
+        accountId: this.context.accountId,
         userId: this.context.userId,
       },
       this.lastId
@@ -190,7 +190,7 @@ class NotificationStreamSession {
     }
     this.consecutiveFailures += 1;
     log.warn("Notification stream poll failed", {
-      clerkOrgId: this.context.clerkOrgId,
+      accountId: this.context.accountId,
       consecutiveFailures: this.consecutiveFailures,
       error: error instanceof Error ? error.message : String(error),
       userId: this.context.userId,
@@ -198,7 +198,7 @@ class NotificationStreamSession {
 
     if (this.consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
       log.error("Notification stream closing after consecutive poll failures", {
-        clerkOrgId: this.context.clerkOrgId,
+        accountId: this.context.accountId,
         consecutiveFailures: this.consecutiveFailures,
         userId: this.context.userId,
       });
@@ -221,9 +221,9 @@ class NotificationStreamSession {
 
 export async function GET(request: Request): Promise<Response> {
   assertNoTenantTransaction("GET");
-  let clerkOrgId: string;
+  let accountId: string;
   try {
-    clerkOrgId = await requireOrg();
+    accountId = await requireAccount();
   } catch {
     return Response.json(
       {
@@ -234,7 +234,7 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     return Response.json(
       { error: { code: "unauthorised", message: "User not found" }, ok: false },
@@ -250,7 +250,7 @@ export async function GET(request: Request): Promise<Response> {
     start(controller) {
       session = new NotificationStreamSession(
         {
-          clerkOrgId,
+          accountId,
           initialLastId: resolveInitialLastId(
             request.headers.get("last-event-id")
           ),

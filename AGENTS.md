@@ -188,7 +188,7 @@ bun run preflight          # Production environment preflight check
 | Package | Purpose |
 |---|---|
 | `packages/database` | Prisma schema, migrations, generated client, query helpers |
-| `packages/auth` | `requireOrg()`, `requireRole()`, `getOrgId()`, re-exported Clerk hooks |
+| `packages/auth` | `requireAccount()`, `requireRole()`, `getAccountId()`, re-exported Clerk hooks |
 | `packages/billing` | Stripe billing integration, checkout and customer portal sessions, webhook handling |
 | `packages/analytics` | PostHog and Vercel analytics, client and server instrumentation |
 | `packages/design-system` | Shared React components, Tailwind CSS, shadcn/ui |
@@ -206,10 +206,10 @@ Do not reference or depend on: `packages/ai`, `packages/cms`, `packages/collabor
 
 ## Tenancy model
 
-Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
+Team Calendar uses **Accounts** as the top-level tenant boundary. There is no custom `workspaces` database table.
 
 ```
-Clerk Organisation (clerk_org_id)   : one per customer account; one country code; billing anchor
+Account (account_id)   : one per customer account; one country code; billing anchor
   └─ Organisation                   : one or many payroll entities (e.g. Acme Restaurants, Acme Hotels)
         └─ XeroConnection           : one per Organisation; UNIQUE on organisation_id
               └─ XeroAuthorisation : canonical grant reference; one verified app/user may serve multiple connections
@@ -217,56 +217,53 @@ Clerk Organisation (clerk_org_id)   : one per customer account; one country code
 
 ### Key invariants
 
-- `clerk_org_id` (text, not null, indexed) is present on every tenant-scoped table.
-- **Every database query that touches tenant data must filter by `clerk_org_id`**, sourced from `auth().orgId` in server context or from job event payloads.
-- One Clerk Organisation = one country code (app-layer invariant, not a DB constraint).
+- `account_id` (text, not null, indexed) is present on every tenant-scoped table.
+- **Every database query that touches tenant data must filter by `account_id`**, sourced from `getSession().accountId` in server context or from job event payloads.
+- One Account = one country code (app-layer invariant, not a DB constraint).
 - One Organisation owns at most one XeroConnection (`UNIQUE` on `organisation_id`).
 - An active XeroConnection references its canonical XeroAuthorisation; credentials are never copied into the connection.
-- A Clerk Org with two Xero files has two Organisation rows, two scoped XeroConnections.
+- An Account with two Xero files has two Organisation rows, two scoped XeroConnections.
 - Membership and roles are managed entirely by Clerk. No custom membership or role tables.
-- Personal Accounts are disabled. Every user must belong to at least one Clerk Organisation.
-- Billing enforced at the Clerk Organisation level via `clerk_org_subscriptions`.
-- A company selector on company-scoped pages chooses a payroll Organisation inside the account; the calendar company filter defaults to all companies. Company selection differs from switching the top-level Clerk account. `CustomUserButton` still exposes Clerk's organisation profile, with account membership managed by Clerk.
+- Personal Accounts are disabled. Every user must belong to at least one Account.
+- Billing enforced at the Account level via `account_subscriptions`.
+- A company selector on company-scoped pages chooses a payroll Organisation inside the account; the calendar company filter defaults to all companies. Company selection differs from switching the top-level Account. `CustomUserButton` still exposes Clerk's organisation profile, with account membership managed by Clerk.
 
 ### Auth helpers (`packages/auth`)
 
 ```typescript
-import { requireOrg, requireRole, getOrgId } from '@repo/auth';
+import {
+  getSession, getCurrentUser, requireAccount, requireAccountResult,
+  getAccountId, requireRole, hasPermission, hasRoleResult,
+} from '@repo/auth/server';
 
-// Server: get clerk_org_id or throw
-const clerkOrgId = requireOrg();
-
-// Server: check role or return 403 Result
-requireRole('admin');
-
-// Server: get org ID for query scoping
-const clerkOrgId = getOrgId();
-
-// Re-exported Clerk helpers
-import { auth, currentUser, useAuth, useOrganization } from '@repo/auth';
+const accountId = await requireAccount();
+const canManagePeople = await hasPermission({ people: ['manage'] });
+const isAdmin = await requireRole('admin'); // Exact role, not a hierarchy.
 ```
 
-For Inngest jobs and background API routes, call `getToken()` and pass the token in the `Authorization` header. Do not rely on the session cookie in background contexts.
+The public session contains `accountId`, `userId`, `role` and `sessionId`; the user DTO contains `id`, `email`, `emailVerified`, `name` and `image`. Provider SDK imports and wire-role translation belong only in `packages/auth`. Client code uses `useSession` and `AccountUserMenu` from `@repo/auth/client`. Account operations use `@repo/auth/accounts`.
+
+Permissions are defined in `packages/auth/permissions.ts`. Domain services use its pure `hasPermission(role, request)` with explicit actor context. Grants complement ownership, company, report-scope, privacy and state checks. Jobs carry account/user context explicitly and never read sessions. Server-to-API requests use `getSessionAuthorizationHeaders` from `@repo/auth/transport` when they need bearer authorisation.
 
 ### Roles
 
 | Role | Scope |
 |---|---|
-| owner | Full Clerk Organisation access |
-| admin | Manage all payroll companies in the current Clerk account |
+| owner | Full Account access |
+| admin | Manage all payroll companies in the current Account |
 | manager | Team and direct-report access |
-| viewer | Read-only filtered access |
+| viewer | Filtered reads and own-record self-service |
 
-Roles are custom roles in the Clerk dashboard. Permission checks use `auth().has({ role: 'org:admin' })` or helpers from `@repo/auth`.
+The application roles are `owner`, `admin`, `manager` and `viewer`. Clerk remains the active provider; its adapter translates provider role values into these neutral roles. Unknown roles fail closed. No application or domain consumer imports a provider SDK.
 
 ### Database runtime roles and RLS
 
 `DATABASE_URL` uses the migration owner. `DATABASE_APP_URL` uses `team_calendar_app`, a non-owner role without superuser, `BYPASSRLS` or `neon_superuser` membership. Production preflight rejects unsafe roles. Run `bun run preflight app` and `bun run preflight api` as deployment gates; Next configuration alone does not run the database catalogue check.
 
-Tenant tables enforce PostgreSQL row-level security using the transaction-local `app.clerk_org_id`. Policies check both the account and ownership of any company ID. Missing context fails closed. RLS complements explicit query filters.
+Tenant tables enforce PostgreSQL row-level security using the transaction-local `app.account_id`. Policies check both the account and ownership of any company ID. Missing context fails closed. RLS complements explicit query filters.
 
 - Entry points authenticate before opening `withTenantDb` or `withTenantResult`. Load the complete tenant data set in that scope and close it before rendering. `withTenantResult` rolls back an unsuccessful business result.
-- Services take a required `db: TenantDb` last, call `assertTenantDb(db, clerkOrgId)`, and pass that same client to tenant callees. Do not open nested transactions or call `$transaction` on the client.
+- Services take a required `db: TenantDb` last, call `assertTenantDb(db, accountId)`, and pass that same client to tenant callees. Do not open nested transactions or call `$transaction` on the client.
 - Use `afterTenantCommit` for fire-and-forget effects. Prepare their database inputs inside the active scope; result-bearing sends run after the root returns. External HTTP never runs inside a tenant transaction.
 - Register phased flows per export and call `assertNoTenantTransaction` before opening their database phases. Each provider call stays between closed database scopes. Use `withTenantReads` only in measured, registered entry-point loaders.
 - `systemDatabase` is restricted to the checked import allowlist: migrations/fixtures, account discovery for scheduled fan-out, public-token discovery, Stripe routing and canonical Xero grant/ownership operations. Once the account is known, tenant data uses the restricted client.
@@ -276,22 +273,22 @@ Provision each environment by applying owner migrations first. The RLS migration
 
 ### Query scoping pattern
 
-Every company-scoped service must accept and apply both `clerk_org_id` and `organisation_id`. Account-wide calendar/feed queries validate company sets with `resolveAccountCompanies(clerkOrgId, db)` and use the owned IDs explicitly:
+Every company-scoped service must accept and apply both `account_id` and `organisation_id`. Account-wide calendar/feed queries validate company sets with `resolveAccountCompanies(accountId, db)` and use the owned IDs explicitly:
 
 ```typescript
 // Correct
 async function listPeople(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   db: TenantDb
 ) {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   return db.person.findMany({
-    where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
+    where: { account_id: accountId, organisation_id: organisationId },
   });
 }
 
-// Wrong: missing clerk_org_id
+// Wrong: missing account_id
 async function listPeople(organisationId: OrganisationId) {
   return db.person.findMany({ where: { organisation_id: organisationId } });
 }
@@ -328,11 +325,11 @@ Do not queue outbound writes as background jobs. Failures are surfaced inline to
 
 ### Xero connection structure
 
-Each Organisation owns at most one `XeroConnection`. It contains the external Xero tenant and remote connection IDs, region and sync health. Resolve it with both `clerk_org_id` and `organisation_id`; its optional `authorisation` relation is the sole encrypted token owner.
+Each Organisation owns at most one `XeroConnection`. It contains the external Xero tenant and remote connection IDs, region and sync health. Resolve it with both `account_id` and `organisation_id`; its optional `authorisation` relation is the sole encrypted token owner.
 
 ```typescript
 const connection = await db.xeroConnection.findFirst({
-  where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
+  where: { account_id: accountId, organisation_id: organisationId },
   include: { authorisation: true },
 });
 ```
@@ -351,7 +348,7 @@ const connection = await db.xeroConnection.findFirst({
 ### Validation
 
 - Zod on all external input: API params, Xero responses, webhook payloads, form submissions.
-- Branded types for domain IDs (`ClerkOrgId`, `OrganisationId`, `PersonId`, `XeroTenantId`, etc.), defined in `packages/core`.
+- Branded types for domain IDs (`AccountId`, `OrganisationId`, `PersonId`, `XeroTenantId`, etc.), defined in `packages/core`.
 
 ### Error handling
 
@@ -380,9 +377,9 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Table names: `snake_case`, plural (e.g. `availability_records`, `xero_connections`).
 - Column names: `snake_case`.
 - Every table: `id` (UUID, PK), `created_at`, `updated_at`.
-- `clerk_org_id` (text, not null, indexed) on every tenant-scoped table.
+- `account_id` (text, not null, indexed) on every tenant-scoped table.
 
-`xero_authorisations` deliberately has no `clerk_org_id`: it coordinates one verified Xero user per provider app across payroll connections and accounts. Customer access always resolves a `XeroConnection` using both tenancy keys before accessing its authorisation. Connections and OAuth sessions never store credential copies.
+`xero_authorisations` deliberately has no `account_id`: it coordinates one verified Xero user per provider app across payroll connections and accounts. Customer access always resolves a `XeroConnection` using both tenancy keys before accessing its authorisation. Connections and OAuth sessions never store credential copies.
 
 - Soft deletes where specified: `archived_at` (nullable timestamp).
 - Foreign keys explicit. Enums at database level.
@@ -399,7 +396,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Finish Prisma generation before running checks that import generated source. The build regenerates the client; run it separately from unit/integration tests to avoid transient missing-module failures.
 - Factories or builders for test data, not repeated raw literals.
 - Fixture-based tests for Xero response mappers and region-specific parsers.
-- Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `clerk_org_id` query isolation, XeroConnection/XeroAuthorisation uniqueness invariants, approval state transitions, decline-reason enforcement.
+- Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `account_id` query isolation, XeroConnection/XeroAuthorisation uniqueness invariants, approval state transitions, decline-reason enforcement.
 
 ---
 
@@ -419,8 +416,8 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - A single persisted initial full import sequences people, leave and the entire balance roster; completion requires the event `requestedAt` to match `initial_sync_requested_at`. Scheduler recovery redispatches pending imports.
 - Owner/admin disconnect deletes the exact remote connection before local teardown/audit; provider 204/404 permits completion, uncertain failure preserves retryable state and sibling connections.
 - Do not recreate mirrored credentials, manual token-refresh controls, asynchronous normal disconnect cleanup, behavioural inactivity classifications/reports, or multi-provider abstractions. Canonical authorisations, automatic refresh, synchronous remote-first disconnect and the existing Xero regional adapters are the approved model.
-- All Xero sync operations carry `clerk_org_id` and `organisation_id` in their context.
-- Resolve XeroConnection with both `clerk_org_id` and `organisation_id`, then its canonical authorisation.
+- All Xero sync operations carry `account_id` and `organisation_id` in their context.
+- Resolve XeroConnection with both `account_id` and `organisation_id`, then its canonical authorisation.
 - Outbound writes return `Result<T, XeroWriteError>`. `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `permission_error`, `rate_limit_error`, `network_error`, `not_found_error`, `region_not_supported_error`, `unknown_error`.
 
 ---
@@ -447,7 +444,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Outbound writes have no background retry. Supported synchronous retries reuse the exact provider idempotency key/request within the fixed replay cutoff; unresolved failures are surfaced to the user.
 - Record-level inbound failures are isolated and captured, but prevent traversal completeness, watermark advancement and absent-row archival.
 - All inbound upserts must be idempotent.
-- Jobs carry both `clerk_org_id` and `organisation_id` in their event payload. Never rely on session context inside a job handler.
+- Jobs carry both `account_id` and `organisation_id` in their event payload. Never rely on session context inside a job handler.
 
 ---
 
@@ -474,15 +471,15 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 ## Security baseline
 
-- Clerk Organisation isolation on every query (`clerk_org_id` from `auth().orgId`).
-- Organisation scoping on all data access (`organisation_id` within the Clerk Org).
+- Account isolation on every query (`account_id` from `(await getSession())?.accountId`).
+- Organisation scoping on all data access (`organisation_id` within the Account).
 - Clerk auth on all authenticated routes.
 - Xero tokens encrypted at rest using AES-256-GCM; never stored in plaintext.
 - Feed tokens signed and revocable; plaintext never persisted. The complete active subscribe URL is intentionally returned to authorised viewers.
 - Audit logs for all admin actions.
 - No Xero tokens, internal feed token hashes, signing material, or raw payloads exposed to client.
 - No secrets in client bundles. Never log or commit secrets or `.env` files.
-- SSE connections are per-user and per-Clerk-Organisation. Must not leak notifications across `clerk_org_id` boundaries.
+- SSE connections are per-user and per-Account. Must not leak notifications across `account_id` boundaries.
 
 ---
 
@@ -537,7 +534,7 @@ Optional variables with format constraints must be absent (commented out), not `
 
 - Keep changes aligned with existing package boundaries.
 - Default to Server Components unless a client component is necessary.
-- Every new service function must accept and apply both `clerk_org_id` and `organisation_id`.
+- Every new service function must accept and apply both `account_id` and `organisation_id`.
 - Resolve XeroConnection through its Organisation FK using both tenancy keys.
 
 ### 3. Verify changes
@@ -559,7 +556,7 @@ Optional variables with format constraints must be absent (commented out), not `
 
 ## Build order
 
-1. Organisation, people, team, location schema and seed data (keyed by `clerk_org_id`)
+1. Organisation, people, team, location schema and seed data (keyed by `account_id`)
 2. Xero OAuth and tenant persistence (scoped XeroConnection + canonical XeroAuthorisation)
 3. Xero employee sync (AU, NZ, UK)
 4. Xero leave normalisation into `availability_records`

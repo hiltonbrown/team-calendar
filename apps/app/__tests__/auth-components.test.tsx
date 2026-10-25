@@ -8,7 +8,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 describe("auth components", () => {
-  it("routes Clerk organisation session tasks to the app task page", () => {
+  it("routes Account session tasks to the app task page", () => {
     expect(chooseOrganizationTaskUrl).toBe(
       "/session-tasks/choose-organization"
     );
@@ -51,7 +51,7 @@ describe("auth components", () => {
     expect(embeddedAuthAppearance.elements.header).toBe("hidden");
   });
 
-  it("completes the Clerk organisation task back into the app", () => {
+  it("completes the Account task back into the app", () => {
     expect(chooseOrganizationTaskRedirectUrl).toBe("/");
   });
 });

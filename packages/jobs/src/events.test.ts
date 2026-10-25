@@ -36,7 +36,7 @@ describe("jobs events", () => {
   });
   it("dispatches approval reconciliation with full tenant payload", async () => {
     const result = await dispatchSyncEvent({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000010",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runType: "approval_state_reconciliation",
@@ -63,7 +63,7 @@ describe("jobs events", () => {
     mocks.send.mockClear();
     const explicitRunId = "11111111-1111-4111-8111-111111111111";
     await dispatchSyncEvent({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000010",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runId: explicitRunId,
@@ -83,7 +83,7 @@ describe("jobs events", () => {
     const eventId = "scheduled-sync:tenant_1:people:2026-08-10T19:45Z";
     await dispatchSyncEvent(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         connectionId: "00000000-0000-4000-8000-000000000010",
         organisationId: "00000000-0000-4000-8000-000000000001",
         runType: "people",
@@ -123,7 +123,7 @@ describe("jobs events", () => {
   });
   it("dispatches sync cancellation events", async () => {
     const result = await dispatchCancelSyncRun({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runId: "00000000-0000-4000-8000-000000000020",
     });
@@ -132,7 +132,7 @@ describe("jobs events", () => {
   it("dispatches initial Xero sync with deterministic event ID and scoped connection payload", async () => {
     mocks.send.mockClear();
     const result = await dispatchInitialXeroSync({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000010",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggeredByUserId: "user_1",
@@ -157,7 +157,7 @@ describe("jobs events", () => {
     expect(mocks.send).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          clerkOrgId: "org_1",
+          accountId: "org_1",
           connectionId: "00000000-0000-4000-8000-000000000010",
           organisationId: "00000000-0000-4000-8000-000000000001",
           runId: expect.any(String),
@@ -173,7 +173,7 @@ describe("jobs events", () => {
 it("rejects a sync event missing its local connection ID before queueing", async () => {
   mocks.send.mockClear();
   const missingConnection: unknown = {
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     organisationId: "00000000-0000-4000-8000-000000000001",
     runType: "people",
   };

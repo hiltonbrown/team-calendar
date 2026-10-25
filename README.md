@@ -52,7 +52,7 @@ Team Calendar is built for the whole team, not only the people on the pay run. E
 
 Team Calendar is multi-tenant by design. A small business that grows into several payroll entities (each with its own Xero file) can run them under one Account, with strict isolation between entities and role-based access for owners, admins, managers, and viewers.
 
-The tenancy boundary is the Clerk Organisation (the Account). Each payroll entity within it owns at most one Xero connection to an external payroll file. Canonical encrypted credentials belong to one verified Xero user/app authorisation, which may support several scoped connections. One Account maps to exactly one country code.
+The tenancy boundary is the Account (the Account). Each payroll entity within it owns at most one Xero connection to an external payroll file. Canonical encrypted credentials belong to one verified Xero user/app authorisation, which may support several scoped connections. One Account maps to exactly one country code.
 
 ## Tech stack
 
@@ -76,7 +76,7 @@ Slack and Teams notifications, HTML calendar views, and additional payroll conne
 
 ## Current status
 
-Team Calendar is under active development and pre-launch. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate architecture, verification and review rulings are recorded in the [final Xero audit](docs/reports/2026-10-07-xero-final-architecture-audit.md) and `tasks/todo.md`. Live Xero credentials are unavailable in this simplification session, so every live OAuth, import, write, refresh and disconnect journey remains **NOT VERIFIED**.
+Team Calendar is under active development and pre-launch. Core infrastructure, Account tenancy through Clerk, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate architecture, verification and review rulings are recorded in the [final Xero audit](docs/reports/2026-10-07-xero-final-architecture-audit.md) and `tasks/todo.md`. Live Xero credentials are unavailable in this simplification session, so every live OAuth, import, write, refresh and disconnect journey remains **NOT VERIFIED**.
 
 ## Production URLs
 
@@ -142,13 +142,13 @@ Team Calendar is under active development and pre-launch. Core infrastructure, C
    of Xero-sourced and manual records. Re-running creates no duplicates. The seed
    writes canonical data only; it never seeds Xero tokens or any other secret.
 
-   Every seeded row is scoped to a `clerk_org_id`. By default this is the
+   Every seeded row is scoped to a `account_id`. By default this is the
    placeholder `org_dev_teamcalendar`. For the authenticated app to render the
-   seeded tenant, the rows must be scoped to a **real** Clerk Organisation id.
-   Set `SEED_CLERK_ORG_ID` to your Clerk org id (visible in the Clerk dashboard,
+   seeded tenant, the rows must be scoped to a **real** Account id.
+   Set `SEED_ACCOUNT_ID` to your Clerk org id (visible in the Clerk dashboard,
    in the form `org_...`) before seeding:
    ```bash
-   SEED_CLERK_ORG_ID=org_yourrealid bun run seed
+   SEED_ACCOUNT_ID=org_yourrealid bun run seed
    ```
    `DATABASE_URL` must be available, either in `packages/database/.env` or the
    shell environment.

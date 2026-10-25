@@ -18,7 +18,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
   "people",
 ]);
 const SyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
@@ -34,7 +34,7 @@ const SyncEventSchema = z.object({
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
 });
 const CancelSyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
   runId: z.string().uuid(),
 });
@@ -114,7 +114,7 @@ export async function dispatchSyncEvent(
     const payload: {
       name: string;
       data: {
-        clerkOrgId: string;
+        accountId: string;
         organisationId: string;
         mode?: "full" | "incremental";
         personId?: string;
@@ -126,7 +126,7 @@ export async function dispatchSyncEvent(
       id?: string;
     } = {
       data: {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
         organisationId: parsed.data.organisationId,
         ...(["people", "leave_records"].includes(parsed.data.runType)
@@ -208,7 +208,7 @@ export function getInitialSyncEventId(
   return `initial-sync:${connectionId}:${requestedAt}`;
 }
 const InitialXeroSyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   requestedAt: z.string().datetime().optional(),
@@ -246,7 +246,7 @@ export async function dispatchInitialXeroSync(
     };
   }
   try {
-    const requestedAt = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+    const requestedAt = await withTenantDb(parsed.data.accountId, (db) =>
       ensureXeroInitialSyncRequested(parsed.data, db)
     );
     if (
@@ -266,7 +266,7 @@ export async function dispatchInitialXeroSync(
       getInitialSyncEventId(parsed.data.connectionId, requestedAt);
     const payload = {
       data: {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
         organisationId: parsed.data.organisationId,
         requestedAt,

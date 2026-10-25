@@ -1,5 +1,68 @@
 # Current work
 
+## Better Auth server behind the provider adapter (25 October 2026)
+
+- [x] Verify pinned Better Auth APIs and install server dependencies, preserving Clerk as default.
+- [x] Generate auth schema with the Better Auth CLI, merge repository mappings and create a Prisma migration without resetting Clerk data.
+- [x] Implement server configuration, cookie validation adapter, route, mail callbacks and validated environment/preflight configuration.
+- [x] Test all four roles, security boundaries and provider selection; pass source gates and read-only development database checks.
+- [x] Apply the approved migration, verify its backup restore, RLS suite, auth-table grants and final data preservation.
+- [ ] Resolve the full integration run's connection/lock/transaction timeouts and obtain a clean full-suite result.
+- [x] Review the scoped change and record evidence, staged cutover work and remaining external acceptance checks.
+
+Scope: server only, no UI. The user explicitly selects the owner Prisma connection for this stage. Existing Clerk identity/domain data remain intact; UUID domain foreign keys and the clean reset belong to cutover. Infrastructure remains disabled by default pending its residency/security decision. No deployment, reset, commit or merge.
+
+Migration authority: the user explicitly approved the migration after the server review. Resume the prepared configured-development Neon backup/restore, migration and guarded integration/RLS workflow. Do not reopen that approval or switch providers.
+
+Review: migration APPLIED to the explicitly approved development Neon target; Clerk remains active and UI is unchanged. PASS: backup restore, all 43 migration checksums, Prisma schema parity, final original 94-row hashes, nine empty auth tables with no restricted-role privileges, 29 tenant policies and all 17 RLS tests in guarded scoped run `1a2a8b34-f2eb-4b08-829f-eb13a9ffff7b`. Both guarded runs completed cleanup and released their fences, with no temporary resources left. Full integration run `aed7ed84-af91-440e-96d2-e20514bad895` FAIL: 367 passed/16 failed; the missed new-auth-table classification was fixed and its RLS suite rerun, while connection/lock/transaction timeout failures remain unresolved. Fresh lint (1,373 files), typecheck (19 tasks), all 4,326 unit tests and diff checks PASS. Earlier unchanged release-tool checks remain valid (248 passed, five existing skips). Atomic signup/lifecycle, live Better Auth/PrismaNeon sign-in, live OAuth/mail and UI cutover remain unverified or closed as documented in `docs/auth-migration/06-server-review.md`. No reset, provider switch, deployment, commit or merge.
+
+## Remote development integration and RLS verification (25 October 2026)
+
+- [x] Inspect configured development migration/role state and resolve pending migration prerequisites without a reset.
+- [x] Fix demonstrated integration-runner/fixture defects while retaining target ownership and cleanup controls.
+- [x] Run the full remote integration inventory and explicit restricted-role RLS coverage; fix observed failures.
+- [x] Verify owned fixture cleanup, unchanged unrelated data and final migration/role state; update auth reviews with evidence.
+
+Authority: the user confirms that the configured remote database is for development and explicitly requests integration and RLS verification. Use that target; do not substitute localhost, create a branch or reopen schema/test permission. Clerk remains active, and unrelated dirty work is preserved.
+
+Review: PASS. Applied the pending naming migration without a reset; all 42 migration checksums match and Prisma reports no schema difference. Final guarded run `2084be35-c887-460b-accf-8e3b189c1e8d` passed all 383 integration tests across 39 files/six packages, including 17 RLS checks, then passed cleanup and released its fence. All 33 application-table hashes and 94 original rows match the baseline; 29 tenant policies, denied system tables, safe restricted role, legacy/missing-context denial and same-backend commit/rollback clearing pass. No temporary databases, roles or tables remain. Fresh source gates PASS: lint (1,347 files), typecheck (19 tasks), unit tests (4,033), release-tool tests (248 passed, five existing skips), release-tool types and diff checks. See `docs/auth-migration/05-development-verification.md` for fixes, bounded fixture recovery and evidence. Reviewed lessons and saved the explicit development-database instruction. No Better Auth cutover, reset, deployment, commit or merge.
+
+## Provider-neutral auth facade, Clerk retained (25 October 2026)
+
+- [x] Define neutral session/user DTOs, roles, permission statements and Clerk adapter with regression tests.
+- [x] Migrate application/domain checks, UI and membership operations to the neutral boundary; record ambiguous checks.
+- [x] Enforce provider imports inside packages/auth and update testing/release wrappers.
+- [x] Run lint, typecheck, unit, release-tool and integration tests; review and stop with evidence and limits.
+
+Review: facade and consumers implemented with Clerk active. Follow-up remote verification PASS: 383 integration tests, including 17 RLS checks, with guarded cleanup and original data preserved. Latest source gates PASS: lint (1,347 files), typecheck (19 tasks), units (4,033 across 18 tasks), release units (248 passed, five existing skips), release-tool types and import boundary. The preserved viewer/direct-manager and presentation-role policy points remain recorded in `docs/auth-migration/04-neutral-auth-review.md`. Full follow-up evidence is in `docs/auth-migration/05-development-verification.md`. Existing dirty work preserved; no Better Auth runtime, reset, deployment or commit.
+
+## Neutral Account naming, Clerk retained (25 October 2026)
+
+- [x] Rename database columns, related objects and RLS context in one data-preserving migration.
+- [x] Rename repository identifiers, helpers, files, fixtures, tooling and current copy without changing Clerk behaviour.
+- [x] Generate Prisma and pass lint, typecheck, unit and release-tool checks.
+- [x] Pass integration and restricted-role RLS coverage against the configured remote development database: 383 tests, including 17 RLS checks, with guarded cleanup.
+- [x] Review the combined diff and report remaining SDK and required historical/compatibility references.
+
+Review: naming migration applied to the configured development database without resetting data. PASS: all 42 migration checksums, Prisma schema diff, all 383 integration tests including 17 RLS checks, guarded fixture cleanup and unchanged original 94 rows. Latest lint, typecheck, full unit and release-tool gates pass. Original naming details and compatibility references remain in `docs/auth-migration/03-naming-review.md`; final remote evidence and test/runner fixes are in `docs/auth-migration/05-development-verification.md`. No Better Auth cutover, reset, deployment, commit or merge.
+
+## Clerk migration inventory (25 October 2026)
+
+- [x] Read repository guidance and inventory imports, API calls and role checks.
+- [x] Inventory database, configuration, webhook, bearer/background and test dependencies.
+- [x] Write `docs/auth-migration/01-inventory.md`, including deployment evidence, risks and file counts.
+- [x] Check source coverage, links, counts and documentation-only diff; stop and report.
+
+Review: PASS for all ten inventory areas, parsed import/mock/role coverage, 1,862 valid source links and line targets, reconciled counts, and documentation-only diff checks. Application, test, schema and configuration files unchanged. Live authentication, database, browser and deployment behaviour NOT VERIFIED; no runtime checks were run. Stopped after the inventory.
+
+## Better Auth migration design (25 October 2026)
+
+- [x] Verify current Better Auth APIs, provider flows, permissions, hooks and Infrastructure evidence.
+- [x] Write `docs/auth-migration/02-design.md` against the inventory and settled decisions.
+- [x] Review the design, source citations and scope; list blocking questions and stop for approval.
+
+Review: PASS for current official documentation/source research, all requested design topics, six valid local links, 67 external source citations, whitespace and documentation-only scope checks. A fresh builder review identified raw HTTP token responses and stale queued/cached job work; both are addressed and re-reviewed. Infrastructure residency/security, strict atomic membership bootstrap, pinned-release compatibility and other launch gates remain explicit. Runtime, schema generation, database, email, provider and browser behaviour NOT VERIFIED. No implementation, schema changes, dependency installation, database reset or deployment; stopped for design approval.
+
 ## Upgrade Next.js and all packages
 
 - [x] Step 1: Update dependencies across monorepo using npm-check-updates and update root overrides/package.json

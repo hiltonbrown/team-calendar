@@ -61,7 +61,7 @@ const { feedIdsForPeople, invalidateFeedCachesForPerson } = await import(
   "./feed-invalidation"
 );
 
-const CLERK_ORG_ID = "org_feeds";
+const ACCOUNT_ID = "org_feeds";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const PERSON_IN_SCOPE = "10000000-0000-4000-8000-000000000001";
 const PERSON_OUT_OF_SCOPE = "10000000-0000-4000-8000-000000000099";
@@ -122,14 +122,14 @@ describe("feed cache invalidation", () => {
   it("invalidates only the feeds whose scope includes the changed person", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personId: PERSON_IN_SCOPE,
       }),
       (db) =>
         invalidateFeedCachesForPerson(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personId: PERSON_IN_SCOPE,
           },
@@ -155,14 +155,14 @@ describe("feed cache invalidation", () => {
   it("does not invalidate any feed for an out-of-scope person", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personId: PERSON_OUT_OF_SCOPE,
       }),
       (db) =>
         invalidateFeedCachesForPerson(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personId: PERSON_OUT_OF_SCOPE,
           },
@@ -177,14 +177,14 @@ describe("feed cache invalidation", () => {
   it("binds feed invalidation reads to the caller account", async () => {
     await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [PERSON_IN_SCOPE],
       }),
       (db) =>
         feedIdsForPeople(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personIds: [PERSON_IN_SCOPE],
           },
@@ -193,21 +193,21 @@ describe("feed cache invalidation", () => {
     );
     expect(tenantTestState.queryRaw).toHaveBeenCalledWith(
       expect.any(Array),
-      CLERK_ORG_ID
+      ACCOUNT_ID
     );
   });
 
-  it("scopes the feed lookup by both clerk org and organisation", async () => {
+  it("scopes the feed lookup by both account and organisation", async () => {
     await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [PERSON_IN_SCOPE],
       }),
       (db) =>
         feedIdsForPeople(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personIds: [PERSON_IN_SCOPE],
           },
@@ -218,7 +218,7 @@ describe("feed cache invalidation", () => {
     expect(mocks.feedFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           OR: [{ organisation_id: ORGANISATION_ID }, { organisation_id: null }],
           status: "active",
         }),
@@ -229,14 +229,14 @@ describe("feed cache invalidation", () => {
   it("returns no feeds when there are no people to match", async () => {
     const feeds = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [],
       }),
       (db) =>
         feedIdsForPeople(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personIds: [],
           },
@@ -251,14 +251,14 @@ describe("feed cache invalidation", () => {
   it("calls loadFeedScopeData once across all active feeds rather than once per feed", async () => {
     await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [PERSON_IN_SCOPE],
       }),
       (db) =>
         feedIdsForPeople(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personIds: [PERSON_IN_SCOPE],
           },
@@ -281,14 +281,14 @@ describe("feed cache invalidation", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           organisationId: ORGANISATION_ID,
           personIds: [PERSON_IN_SCOPE],
         }),
         (db) =>
           feedIdsForPeople(
             {
-              clerkOrgId: CLERK_ORG_ID,
+              accountId: ACCOUNT_ID,
               organisationId: ORGANISATION_ID,
               personIds: [PERSON_IN_SCOPE],
             },
@@ -308,14 +308,14 @@ describe("feed cache invalidation", () => {
 
     const feeds = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [PERSON_IN_SCOPE],
       }),
       (db) =>
         feedIdsForPeople(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personIds: [PERSON_IN_SCOPE],
           },
@@ -343,14 +343,14 @@ describe("feed cache invalidation", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personId: PERSON_IN_SCOPE,
       }),
       (db) =>
         invalidateFeedCachesForPerson(
           {
-            clerkOrgId: CLERK_ORG_ID,
+            accountId: ACCOUNT_ID,
             organisationId: ORGANISATION_ID,
             personId: PERSON_IN_SCOPE,
           },
@@ -391,14 +391,14 @@ it("invalidates every account feed when a company record changes, including depa
   mocks.resolvePeopleForFeed.mockResolvedValue({ ok: true, value: [] });
   const result = await withTestTenantResult(
     tenantTestAccount({
-      clerkOrgId: CLERK_ORG_ID,
+      accountId: ACCOUNT_ID,
       organisationId: ORGANISATION_ID,
       personId: PERSON_OUT_OF_SCOPE,
     }),
     (db) =>
       invalidateFeedCachesForPerson(
         {
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           organisationId: ORGANISATION_ID,
           personId: PERSON_OUT_OF_SCOPE,
         },
@@ -409,7 +409,7 @@ it("invalidates every account feed when a company record changes, including depa
   expect(mocks.feedFindMany).toHaveBeenCalledWith(
     expect.objectContaining({
       where: expect.objectContaining({
-        clerk_org_id: CLERK_ORG_ID,
+        account_id: ACCOUNT_ID,
         OR: [{ organisation_id: ORGANISATION_ID }, { organisation_id: null }],
       }),
     })

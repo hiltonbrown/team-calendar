@@ -1,12 +1,12 @@
 import { appError, planKeys, type Result } from "@repo/core";
 import type { Prisma } from "../../generated/client";
 import { getPlanDefinition } from "../seed/plans";
-import { hasUnresolvedStripeEventForOrg } from "./billing";
+import { hasUnresolvedStripeEventForAccount } from "./billing";
 
 interface PayrollEntitlementClient {
   $queryRaw: Prisma.TransactionClient["$queryRaw"];
-  clerkOrgSubscription: Pick<
-    Prisma.TransactionClient["clerkOrgSubscription"],
+  accountSubscription: Pick<
+    Prisma.TransactionClient["accountSubscription"],
     "findFirst"
   >;
   organisation: Pick<Prisma.TransactionClient["organisation"], "count">;
@@ -15,18 +15,18 @@ interface PayrollEntitlementClient {
 
 /** The caller creates the company in this transaction while the lock is held. */
 export const checkPayrollEntityEntitlement = async (
-  clerkOrgId: string,
+  accountId: string,
   tx: PayrollEntitlementClient
 ): Promise<Result<{ allowed: boolean; current: number; limit: number }>> => {
   try {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payroll-entities:${clerkOrgId}`}, 0))::text`;
-    const subscription = await tx.clerkOrgSubscription.findFirst({
-      where: { clerk_org_id: clerkOrgId },
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`payroll-entities:${accountId}`}, 0))::text`;
+    const subscription = await tx.accountSubscription.findFirst({
+      where: { account_id: accountId },
     });
     const unhealthy =
       process.env.NEXT_PUBLIC_LAUNCH_MODE === "paid" &&
-      (await hasUnresolvedStripeEventForOrg(
-        clerkOrgId,
+      (await hasUnresolvedStripeEventForAccount(
+        accountId,
         subscription?.stripe_event_created_at ?? null
       ));
     const key =
@@ -49,8 +49,8 @@ export const checkPayrollEntityEntitlement = async (
       getPlanDefinition(catalogueKey).limits.payroll_entities;
     const current = await tx.organisation.count({
       where: {
+        account_id: accountId,
         archived_at: null,
-        clerk_org_id: clerkOrgId,
         is_active: true,
         OR: [
           { xero_connection: null },

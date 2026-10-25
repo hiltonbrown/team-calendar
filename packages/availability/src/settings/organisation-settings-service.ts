@@ -1,7 +1,8 @@
+import { hasPermission } from "@repo/auth/permissions";
 import type { TenantDb } from "@repo/database";
 import "server-only";
 
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import {
   assertTenantDb,
   getOrCreateOrganisationSettings,
@@ -21,7 +22,7 @@ export type SettingsServiceError =
   | { code: "validation_error"; message: string };
 
 const GetSettingsSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -39,16 +40,16 @@ export async function getSettings(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     const tenantDb = db;
     return await {
       ok: true,
       value: mapOrganisationSettingsRow(
         await getOrCreateOrganisationSettings(
           {
-            clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+            accountId: parsed.data.accountId as AccountId,
             organisationId: parsed.data.organisationId as OrganisationId,
           },
           tenantDb
@@ -66,25 +67,23 @@ export async function updateSettings(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (
-    !(parsed.data.actingRole === "admin" || parsed.data.actingRole === "owner")
-  ) {
+  if (!hasPermission(parsed.data.actingRole, { settings: ["update"] })) {
     return notAuthorised();
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     tenantDb2: TenantDb
   ): ReturnType<typeof updateSettings> => {
     const before = await getOrCreateOrganisationSettings(
       {
-        clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+        accountId: parsed.data.accountId as AccountId,
         organisationId: parsed.data.organisationId as OrganisationId,
       },
       tenantDb2
     );
     const after = await updateOrganisationSettings(
       {
-        clerkOrgId: parsed.data.clerkOrgId as ClerkOrgId,
+        accountId: parsed.data.accountId as AccountId,
         organisationId: parsed.data.organisationId as OrganisationId,
         patch: mapPatch(parsed.data.patch),
       },
@@ -92,11 +91,11 @@ export async function updateSettings(
     );
     await tenantDb2.auditEvent.create({
       data: {
+        account_id: parsed.data.accountId,
         action: "organisation_settings.updated",
         actor_user_id: parsed.data.actingUserId,
         after_value: mapOrganisationSettingsRow(after),
         before_value: mapOrganisationSettingsRow(before),
-        clerk_org_id: parsed.data.clerkOrgId,
         entity_id: parsed.data.organisationId,
         entity_type: "organisation_settings",
         metadata: {
@@ -116,7 +115,7 @@ export async function updateSettings(
     return { ok: true, value: mapOrganisationSettingsRow(after) };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }

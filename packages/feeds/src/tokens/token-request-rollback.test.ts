@@ -16,8 +16,8 @@ vi.mock("@repo/database/tenant-client", () => ({
 vi.mock("@repo/database", async () => ({
   ...(await vi.importActual("@repo/database/tenant-db")),
   resolveAccountCompanies: async () => [{ id: input.organisationId }],
-  scopedTo: (scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: (scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   }),
 }));
@@ -31,9 +31,9 @@ import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { rotateToken } from "./token-service";
 
 const input = {
+  accountId: "account-A",
   actingRole: "owner",
   actingUserId: "user-1",
-  clerkOrgId: "account-A",
   feedId: "22222222-2222-4222-8222-222222222222",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
@@ -80,7 +80,7 @@ beforeEach(() => {
 });
 test("caller-owned rotation conflict returns its business Result and rolls back revocations", async () => {
   const effect = vi.fn();
-  const result = await withTenantResult(input.clerkOrgId, async (db) => {
+  const result = await withTenantResult(input.accountId, async (db) => {
     afterTenantCommit(db, () => {
       effect();
 

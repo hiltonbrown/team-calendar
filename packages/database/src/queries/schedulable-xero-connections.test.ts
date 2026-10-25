@@ -30,7 +30,7 @@ test("scheduler only selects completed initial imports for active unpaused AU co
 });
 test("scheduler returns a bounded continuation without provider data", async () => {
   const row = {
-    clerk_org_id: "account",
+    account_id: "account",
     disconnected_at: null,
     id: "first",
     last_approval_state_reconciled_at: null,

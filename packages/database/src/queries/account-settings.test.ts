@@ -20,7 +20,7 @@ import { getAccountSettings, updateAccountSettings } from "./account-settings";
 beforeEach(() => {
   vi.clearAllMocks();
   state.read.mockResolvedValue({
-    clerk_org_id: "account-A",
+    account_id: "account-A",
     created_at: new Date(),
     id: "settings-A",
     manager_visibility_scope: "direct_reports_only",
@@ -49,7 +49,7 @@ test("account settings open one owned scope", async () => {
   );
   expect(state.transaction).toHaveBeenCalledOnce();
   expect(state.read).toHaveBeenCalledWith(
-    expect.objectContaining({ where: { clerk_org_id: "account-A" } })
+    expect.objectContaining({ where: { account_id: "account-A" } })
   );
 });
 test("account settings reuse the request client for reads and updates", async () => {
@@ -59,7 +59,7 @@ test("account settings reuse the request client for reads and updates", async ()
   });
   expect(state.transaction).toHaveBeenCalledOnce();
   expect(state.update).toHaveBeenCalledWith(
-    expect.objectContaining({ where: { clerk_org_id: "account-A" } })
+    expect.objectContaining({ where: { account_id: "account-A" } })
   );
 });
 test("another account's client is rejected before any settings access", async () => {
@@ -75,7 +75,7 @@ test("first settings access uses a conflict-safe insert then reload", async () =
     getAccountSettings("account-A", db)
   );
   expect(state.create).toHaveBeenCalledWith({
-    data: { clerk_org_id: "account-A" },
+    data: { account_id: "account-A" },
     skipDuplicates: true,
   });
   expect(state.read).toHaveBeenCalledTimes(2);

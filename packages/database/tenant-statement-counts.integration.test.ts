@@ -23,7 +23,7 @@ import {
   withTenantDb,
 } from "./src/tenant-db";
 
-const clerkOrgId = "statement-recorder-account";
+const accountId = "statement-recorder-account";
 let recording: ReturnType<typeof createRecordingTenantClient> | undefined;
 
 const recorder = () => {
@@ -60,7 +60,7 @@ const expectTransactionStatements = (queryCount: number) => {
   const { statements } = recorder();
   expect(statements).toHaveLength(queryCount + 3);
   expect(statements[0]?.sql.trim()).toBe("BEGIN");
-  expect(statements[1]?.sql).toContain("set_config('app.clerk_org_id'");
+  expect(statements[1]?.sql).toContain("set_config('app.account_id'");
   expect(statements.at(-1)?.sql.trim()).toBe("COMMIT");
   expect(new Set(statements.map(({ connectionId }) => connectionId)).size).toBe(
     1
@@ -81,18 +81,18 @@ test("the PrismaPg adapter sends a plain query through recorded client.query", a
 
 test("one request-scoped query sends four statements", async () => {
   const rows = await withTenantDb(
-    clerkOrgId,
+    accountId,
     (db) => db.$queryRaw`
-    SELECT current_setting('app.clerk_org_id') AS account, 1::int AS value
+    SELECT current_setting('app.account_id') AS account, 1::int AS value
   `
   );
-  expect(rows).toEqual([{ account: clerkOrgId, value: 1 }]);
+  expect(rows).toEqual([{ account: accountId, value: 1 }]);
   expectTransactionStatements(1);
   expect(recorder().statements[2]?.sql).toContain("1::int AS value");
 });
 
 test("three sequential request queries send six statements", async () => {
-  const rows = await withTenantDb(clerkOrgId, async (tx) => {
+  const rows = await withTenantDb(accountId, async (tx) => {
     const first = await tx.$queryRaw`SELECT 1::int AS value`;
     const second = await tx.$queryRaw`SELECT 2::int AS value`;
     const third = await tx.$queryRaw`SELECT 3::int AS value`;
@@ -103,7 +103,7 @@ test("three sequential request queries send six statements", async () => {
 });
 
 test("three request-scoped queries send six statements", async () => {
-  const values = await withTenantDb(clerkOrgId, async (db) => {
+  const values = await withTenantDb(accountId, async (db) => {
     const first = await db.$queryRaw`SELECT 1::int AS value`;
     const second = await db.$queryRaw`SELECT 2::int AS value`;
     const third = await db.$queryRaw`SELECT 3::int AS value`;
@@ -114,7 +114,7 @@ test("three request-scoped queries send six statements", async () => {
 });
 
 test("a mismatched request client sends no statement at assertion time", async () => {
-  await withTenantDb(clerkOrgId, (db) => {
+  await withTenantDb(accountId, (db) => {
     const before = recorder().statements.length;
     expect(() => assertTenantDb(db, "another-account")).toThrow(
       TenantMismatchError
@@ -126,17 +126,17 @@ test("a mismatched request client sends no statement at assertion time", async (
 });
 
 test("Promise.all serialises three tenant queries on one transaction connection", async () => {
-  const rows = await withTenantDb(clerkOrgId, (tx) =>
+  const rows = await withTenantDb(accountId, (tx) =>
     Promise.all([
-      tx.$queryRaw`SELECT 11::int AS value, current_setting('app.clerk_org_id') AS account`,
-      tx.$queryRaw`SELECT 22::int AS value, current_setting('app.clerk_org_id') AS account`,
-      tx.$queryRaw`SELECT 33::int AS value, current_setting('app.clerk_org_id') AS account`,
+      tx.$queryRaw`SELECT 11::int AS value, current_setting('app.account_id') AS account`,
+      tx.$queryRaw`SELECT 22::int AS value, current_setting('app.account_id') AS account`,
+      tx.$queryRaw`SELECT 33::int AS value, current_setting('app.account_id') AS account`,
     ])
   );
   expect(rows).toEqual([
-    [{ account: clerkOrgId, value: 11 }],
-    [{ account: clerkOrgId, value: 22 }],
-    [{ account: clerkOrgId, value: 33 }],
+    [{ account: accountId, value: 11 }],
+    [{ account: accountId, value: 22 }],
+    [{ account: accountId, value: 33 }],
   ]);
   expectTransactionStatements(3);
   expect(

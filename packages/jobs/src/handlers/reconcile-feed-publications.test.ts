@@ -48,7 +48,7 @@ vi.mock("@repo/database", async () => {
     })),
     systemDatabase: exports.database,
     withTenantDb: vi.fn(
-      async (_clerkOrgId: string, callback: (db: unknown) => unknown) =>
+      async (_accountId: string, callback: (db: unknown) => unknown) =>
         callback(exports.database)
     ),
   };
@@ -74,13 +74,13 @@ vi.mock("@repo/observability/log", () => ({
 const { reconcileFeedPublications } = await import(
   "./reconcile-feed-publications"
 );
-const CLERK_ORG_ID = "org_reconcile";
+const ACCOUNT_ID = "org_reconcile";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const PERSON_ID = "10000000-0000-4000-8000-000000000001";
 const RECORD_A = "40000000-0000-4000-8000-000000000001";
 const RECORD_B = "40000000-0000-4000-8000-000000000002";
 function input() {
-  return { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID };
+  return { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID };
 }
 function materialised(changed: boolean) {
   return {
@@ -174,15 +174,15 @@ describe("reconcileFeedPublications", () => {
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           organisation_id: ORGANISATION_ID,
         },
       })
     );
     expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledWith(
       expect.objectContaining({
+        accountId: ACCOUNT_ID,
         availabilityRecordId: RECORD_A,
-        clerkOrgId: CLERK_ORG_ID,
         invalidateCache: false,
         organisationId: ORGANISATION_ID,
       }),
@@ -212,7 +212,7 @@ describe("reconcileFeedPublications", () => {
     }
     expect(mocks.feedIdsForPeople).toHaveBeenCalledWith(
       {
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
         personIds: [PERSON_ID],
       },
@@ -229,7 +229,7 @@ describe("reconcileFeedPublications", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           feedId: "20000000-0000-4000-8000-000000000001",
           organisationId: ORGANISATION_ID,
           reason: "publication_reconciled",
@@ -360,7 +360,7 @@ describe("reconcileFeedPublications", () => {
   });
   it("rejects payloads missing a scope key", async () => {
     const result = await reconcileFeedPublications({
-      clerkOrgId: CLERK_ORG_ID,
+      accountId: ACCOUNT_ID,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {

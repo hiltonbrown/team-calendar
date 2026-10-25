@@ -148,8 +148,8 @@ function mergePayloadWithContext(
 
   return {
     ...payload,
+    account_id: input.account_id,
     app_version: input.app_version,
-    clerk_org_id: input.clerk_org_id,
     current_route: input.current_route,
     environment: input.environment,
     organisation_id: input.organisation_id,

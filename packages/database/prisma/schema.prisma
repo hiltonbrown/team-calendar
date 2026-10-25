@@ -8,6 +8,25 @@ datasource db {
   provider = "postgresql"
 }
 
+enum auth_member_role {
+  owner
+  admin
+  manager
+  viewer
+}
+
+enum auth_provisioning_status {
+  pending
+  ready
+}
+
+enum auth_invitation_status {
+  pending
+  accepted
+  rejected
+  canceled
+}
+
 enum onboarding_step {
   details
   xero
@@ -289,7 +308,7 @@ enum stripe_event_delivery_state {
 
 model Organisation {
   id                      String          @id @default(uuid()) @db.Uuid
-  clerk_org_id            String
+  account_id              String
   name                    String
   country_code            String
   region_code             String?
@@ -332,25 +351,25 @@ model Organisation {
   outbound_operations        OutboundOperation[]
   organisation_settings      OrganisationSettings?
 
-  @@unique([id, clerk_org_id])
-  @@index([clerk_org_id])
+  @@unique([id, account_id])
+  @@index([account_id])
   @@map("organisations")
 }
 
 model AccountSettings {
   id                       String   @id @default(uuid()) @db.Uuid
-  clerk_org_id             String   @unique
+  account_id               String   @unique
   manager_visibility_scope String   @default("direct_reports_only")
   created_at               DateTime @default(now())
   updated_at               DateTime @updatedAt
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@map("account_settings")
 }
 
 model OrganisationSettings {
   id                                    String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id                          String
+  account_id                            String
   organisation_id                       String                    @unique @db.Uuid
   show_pending_on_calendar              Boolean                   @default(true)
   show_declined_on_approvals            Boolean                   @default(true)
@@ -365,13 +384,13 @@ model OrganisationSettings {
 
   organisation Organisation @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@map("organisation_settings")
 }
 
 model Team {
   id                       String   @id @default(uuid()) @db.Uuid
-  clerk_org_id             String
+  account_id               String
   organisation_id          String   @db.Uuid
   name                     String
   /// Minimum people needed available on a working day; null means no minimum.
@@ -382,14 +401,14 @@ model Team {
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   people       Person[]
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@map("teams")
 }
 
 model Location {
   id              String   @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
+  account_id      String
   organisation_id String   @db.Uuid
   name            String
   country_code    String?
@@ -402,14 +421,14 @@ model Location {
   people                     Person[]
   public_holiday_preferences PublicHolidayPreference[]
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@map("locations")
 }
 
 model Person {
   id                          String                      @id @default(uuid()) @db.Uuid
-  clerk_org_id                String
+  account_id                  String
   organisation_id             String                      @db.Uuid
   team_id                     String?                     @db.Uuid
   manager_person_id           String?                     @db.Uuid
@@ -424,7 +443,7 @@ model Person {
   employment_type             employment_type
   is_active                   Boolean                     @default(true)
   display_name                String?
-  clerk_user_id               String?
+  user_id                     String?
   job_title                   String?
   start_date                  DateTime?
   avatar_url                  String?
@@ -452,9 +471,9 @@ model Person {
   notifications          Notification[]
 
   @@unique([organisation_id, source_system, source_person_key])
-  @@unique([organisation_id, clerk_user_id])
+  @@unique([organisation_id, user_id])
   @@unique([organisation_id, xero_employee_id])
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([organisation_id, team_id])
   @@index([organisation_id, manager_person_id])
@@ -465,7 +484,7 @@ model Person {
 
 model AlternativeContact {
   id              String   @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
+  account_id      String
   organisation_id String   @db.Uuid
   person_id       String   @db.Uuid
   name            String
@@ -480,7 +499,7 @@ model AlternativeContact {
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   person       Person       @relation(fields: [person_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([person_id])
   @@index([person_id, display_order])
@@ -521,7 +540,7 @@ model XeroAuthorisation {
 
 model XeroConnection {
   id                                String                 @id @default(uuid()) @db.Uuid
-  clerk_org_id                      String
+  account_id                        String
   organisation_id                   String                 @unique @db.Uuid
   xero_authorisation_id             String?                @db.Uuid
   xero_tenant_id                    String
@@ -559,7 +578,7 @@ model XeroConnection {
   leave_sweep_failed                Boolean                @default(false)
   created_at                        DateTime               @default(now())
   updated_at                        DateTime               @updatedAt
-  organisation                      Organisation           @relation(fields: [organisation_id, clerk_org_id], references: [id, clerk_org_id])
+  organisation                      Organisation           @relation(fields: [organisation_id, account_id], references: [id, account_id])
   authorisation                     XeroAuthorisation?     @relation(fields: [xero_authorisation_id], references: [id])
   sync_cursors                      XeroSyncCursor[]
   leave_balances                    LeaveBalance[]
@@ -567,15 +586,15 @@ model XeroConnection {
 
   @@unique([xero_tenant_id], map: "xero_connections_owned_tenant_key", where: raw("released_at IS NULL"))
   @@unique([remote_connection_id], map: "xero_connections_owned_remote_connection_key", where: raw("released_at IS NULL AND remote_connection_id IS NOT NULL"))
-  @@unique([id, clerk_org_id, organisation_id])
-  @@unique([organisation_id, clerk_org_id])
-  @@index([clerk_org_id])
+  @@unique([id, account_id, organisation_id])
+  @@unique([organisation_id, account_id])
+  @@index([account_id])
   @@map("xero_connections")
 }
 
 model XeroOAuthSession {
   id                      String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id            String
+  account_id              String
   organisation_id         String?                   @db.Uuid
   created_by_user_id      String?
   status                  xero_oauth_session_status @default(pending)
@@ -592,10 +611,10 @@ model XeroOAuthSession {
   expires_at              DateTime
   created_at              DateTime                  @default(now())
   updated_at              DateTime                  @updatedAt
-  organisation            Organisation?             @relation(fields: [organisation_id, clerk_org_id], references: [id, clerk_org_id])
+  organisation            Organisation?             @relation(fields: [organisation_id, account_id], references: [id, account_id])
   authorisation           XeroAuthorisation?        @relation(fields: [xero_authorisation_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([status, expires_at])
   @@map("xero_oauth_sessions")
@@ -603,7 +622,7 @@ model XeroOAuthSession {
 
 model XeroSyncCursor {
   id                 String                  @id @default(uuid()) @db.Uuid
-  clerk_org_id       String
+  account_id         String
   organisation_id    String                  @db.Uuid
   xero_connection_id String                  @db.Uuid
   entity_type        xero_cursor_entity_type
@@ -611,10 +630,10 @@ model XeroSyncCursor {
   created_at         DateTime                @default(now())
   updated_at         DateTime                @updatedAt
   organisation       Organisation            @relation(fields: [organisation_id], references: [id])
-  xero_connection    XeroConnection          @relation(fields: [xero_connection_id, clerk_org_id, organisation_id], references: [id, clerk_org_id, organisation_id])
+  xero_connection    XeroConnection          @relation(fields: [xero_connection_id, account_id, organisation_id], references: [id, account_id, organisation_id])
 
   @@unique([xero_connection_id, entity_type])
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([xero_connection_id])
   @@map("xero_sync_cursors")
@@ -622,7 +641,7 @@ model XeroSyncCursor {
 
 model AvailabilityRecord {
   id                       String                       @id @default(uuid()) @db.Uuid
-  clerk_org_id             String
+  account_id               String
   organisation_id          String                       @db.Uuid
   person_id                String                       @db.Uuid
   record_type              availability_record_type
@@ -677,7 +696,7 @@ model AvailabilityRecord {
   // Preserve the existing active manual-record identity invariant in generated migrations.
   @@unique([organisation_id, person_id, record_type, starts_at, ends_at], map: "availability_records_manual_identity_key", where: raw("source_type = 'manual' AND source_remote_id IS NULL AND archived_at IS NULL"))
   @@unique([organisation_id, source_type, source_remote_id], map: "availability_records_source_identity_key")
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([person_id, starts_at, ends_at])
   @@index([approved_by_person_id])
@@ -691,7 +710,7 @@ model AvailabilityRecord {
 
 model OutboundOperation {
   id                              String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id                    String
+  account_id                      String
   organisation_id                 String                    @db.Uuid
   availability_record_id          String                    @db.Uuid
   action                          outbound_operation_action
@@ -728,7 +747,7 @@ model OutboundOperation {
   organisation        Organisation       @relation(fields: [organisation_id], references: [id])
 
   @@unique([availability_record_id, action])
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([organisation_id, status, updated_at])
   @@map("outbound_operations")
@@ -736,7 +755,7 @@ model OutboundOperation {
 
 model AvailabilityPublication {
   id                     String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id           String
+  account_id             String
   organisation_id        String                    @db.Uuid
   availability_record_id String                    @unique @db.Uuid
   published_uid          String
@@ -754,7 +773,7 @@ model AvailabilityPublication {
   organisation        Organisation       @relation(fields: [organisation_id], references: [id])
   availability_record AvailabilityRecord @relation(fields: [availability_record_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([published_uid])
   @@map("availability_publications")
@@ -762,7 +781,7 @@ model AvailabilityPublication {
 
 model LeaveBalance {
   id                  String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id        String
+  account_id          String
   organisation_id     String                    @db.Uuid
   person_id           String                    @db.Uuid
   // Nullable to support admin-managed manual balances when Xero is not connected.
@@ -791,11 +810,11 @@ model LeaveBalance {
   person          Person          @relation(fields: [person_id], references: [id])
   // Keep the existing Restrict behaviour so the nullable migration is just DROP NOT NULL,
   // rather than Prisma's optional-relation default of SetNull (which would force an FK rewrite).
-  xero_connection XeroConnection? @relation(fields: [xero_connection_id, clerk_org_id, organisation_id], references: [id, clerk_org_id, organisation_id], onDelete: Restrict, onUpdate: Cascade)
+  xero_connection XeroConnection? @relation(fields: [xero_connection_id, account_id, organisation_id], references: [id, account_id, organisation_id], onDelete: Restrict, onUpdate: Cascade)
 
   @@unique([person_id, xero_connection_id, leave_type_xero_id])
   @@unique([person_id, leave_type_xero_id], map: "leave_balances_person_id_leave_type_xero_id_manual_key", where: raw("xero_connection_id IS NULL"))
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([person_id])
   @@index([xero_connection_id])
@@ -803,20 +822,20 @@ model LeaveBalance {
 }
 
 model XeroPersonMatch {
-  id                     String                   @id @default(uuid()) @db.Uuid
-  clerk_org_id           String
-  organisation_id        String                   @db.Uuid
-  xero_person_id         String                   @db.Uuid
-  candidate_person_id    String?                  @db.Uuid
-  detected_reason        String
-  status                 xero_person_match_status @default(pending)
-  resolution_note        String?
-  resolved_person_id     String?                  @db.Uuid
-  resolved_clerk_user_id String?
-  resolved_by_user_id    String?
-  resolved_at            DateTime?
-  created_at             DateTime                 @default(now())
-  updated_at             DateTime                 @updatedAt
+  id                  String                   @id @default(uuid()) @db.Uuid
+  account_id          String
+  organisation_id     String                   @db.Uuid
+  xero_person_id      String                   @db.Uuid
+  candidate_person_id String?                  @db.Uuid
+  detected_reason     String
+  status              xero_person_match_status @default(pending)
+  resolution_note     String?
+  resolved_person_id  String?                  @db.Uuid
+  resolved_user_id    String?
+  resolved_by_user_id String?
+  resolved_at         DateTime?
+  created_at          DateTime                 @default(now())
+  updated_at          DateTime                 @updatedAt
 
   organisation     Organisation @relation(fields: [organisation_id], references: [id])
   xero_person      Person       @relation("XeroMatchSource", fields: [xero_person_id], references: [id])
@@ -824,7 +843,7 @@ model XeroPersonMatch {
   resolved_person  Person?      @relation("XeroMatchResolution", fields: [resolved_person_id], references: [id])
 
   @@unique([xero_person_id, candidate_person_id], map: "xero_person_matches_source_candidate_key")
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([xero_person_id])
   @@index([candidate_person_id])
@@ -834,7 +853,7 @@ model XeroPersonMatch {
 
 model PublicHoliday {
   id                     String                            @id @default(uuid()) @db.Uuid
-  clerk_org_id           String
+  account_id             String
   organisation_id        String                            @db.Uuid
   source                 public_holiday_source
   source_remote_id       String?
@@ -855,7 +874,7 @@ model PublicHoliday {
   organisation Organisation @relation(fields: [organisation_id], references: [id])
 
   @@unique([organisation_id, source, source_remote_id])
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id, holiday_date])
   @@map("public_holidays")
 }
@@ -865,7 +884,7 @@ model PublicHoliday {
 /// applies organisation-wide and is only ever "hidden".
 model PublicHolidayPreference {
   id                 String                 @id @default(uuid()) @db.Uuid
-  clerk_org_id       String
+  account_id         String
   organisation_id    String                 @db.Uuid
   holiday_key        String
   location_id        String?                @db.Uuid
@@ -881,14 +900,14 @@ model PublicHolidayPreference {
   @@unique([organisation_id, holiday_key, location_id])
   // NULL location_ids are distinct in the index above, so organisation-wide rows need their own.
   @@unique([organisation_id, holiday_key], map: "public_holiday_preferences_organisation_wide_key", where: raw("location_id IS NULL"))
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@map("public_holiday_preferences")
 }
 
 model Feed {
   id                        String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id              String
+  account_id                String
   organisation_id           String?                   @db.Uuid
   name                      String
   slug                      String
@@ -910,15 +929,15 @@ model Feed {
   scopes             FeedScope[]
   tokens             FeedToken[]
 
-  @@unique([clerk_org_id, slug])
-  @@index([clerk_org_id])
+  @@unique([account_id, slug])
+  @@index([account_id])
   @@index([organisation_id])
   @@map("feeds")
 }
 
 model FeedEventPublication {
   id                  String   @id @default(uuid()) @db.Uuid
-  clerk_org_id        String
+  account_id          String
   organisation_id     String?  @db.Uuid
   feed_id             String   @db.Uuid
   source_key          String
@@ -933,14 +952,14 @@ model FeedEventPublication {
   feed Feed @relation(fields: [feed_id], references: [id])
 
   @@unique([feed_id, source_key])
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@map("feed_event_publications")
 }
 
 model FeedScope {
   id              String               @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
+  account_id      String
   organisation_id String?              @db.Uuid
   feed_id         String               @db.Uuid
   scope_type      feed_scope_rule_type
@@ -949,7 +968,7 @@ model FeedScope {
 
   feed Feed @relation(fields: [feed_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([feed_id])
   @@index([scope_type, scope_value])
@@ -958,7 +977,7 @@ model FeedScope {
 
 model FeedToken {
   id                    String            @id @default(uuid()) @db.Uuid
-  clerk_org_id          String
+  account_id            String
   organisation_id       String?           @db.Uuid
   feed_id               String            @db.Uuid
   token_hash            String            @unique
@@ -977,7 +996,7 @@ model FeedToken {
   rotated_tokens     FeedToken[]   @relation("FeedTokenRotation")
 
   @@unique([feed_id], map: "feed_tokens_one_active_per_feed_key", where: raw("status = 'active'"))
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([feed_id])
   @@index([rotated_from_token_id])
@@ -986,7 +1005,7 @@ model FeedToken {
 
 model Notification {
   id                  String            @id @default(uuid()) @db.Uuid
-  clerk_org_id        String
+  account_id          String
   organisation_id     String            @db.Uuid
   recipient_user_id   String
   recipient_person_id String?           @db.Uuid
@@ -1006,7 +1025,7 @@ model Notification {
   recipient_person Person?                  @relation(fields: [recipient_person_id], references: [id])
   email_queue      NotificationEmailQueue[]
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([recipient_person_id])
   @@index([recipient_user_id, read_at])
@@ -1018,7 +1037,7 @@ model Notification {
 model NotificationPreference {
   id                String            @id @default(uuid()) @db.Uuid
   user_id           String
-  clerk_org_id      String
+  account_id        String
   organisation_id   String            @db.Uuid
   notification_type notification_type
   in_app_enabled    Boolean           @default(true)
@@ -1029,7 +1048,7 @@ model NotificationPreference {
   organisation Organisation @relation(fields: [organisation_id], references: [id])
 
   @@unique([user_id, organisation_id, notification_type])
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([user_id])
   @@map("notification_preferences")
@@ -1037,7 +1056,7 @@ model NotificationPreference {
 
 model NotificationEmailQueue {
   id                String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id      String
+  account_id        String
   organisation_id   String                    @db.Uuid
   notification_id   String?                   @db.Uuid
   recipient_user_id String
@@ -1060,7 +1079,7 @@ model NotificationEmailQueue {
   organisation Organisation  @relation(fields: [organisation_id], references: [id])
   notification Notification? @relation(fields: [notification_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([notification_id])
   @@index([recipient_user_id, status])
@@ -1070,7 +1089,7 @@ model NotificationEmailQueue {
 
 model SyncRun {
   id                   String                 @id @default(uuid()) @db.Uuid
-  clerk_org_id         String
+  account_id           String
   organisation_id      String                 @db.Uuid
   xero_connection_id   String?                @db.Uuid
   status               sync_run_status        @default(running)
@@ -1092,19 +1111,19 @@ model SyncRun {
   updated_at           DateTime               @updatedAt
 
   organisation    Organisation    @relation(fields: [organisation_id], references: [id])
-  xero_connection XeroConnection? @relation(fields: [xero_connection_id, clerk_org_id, organisation_id], references: [id, clerk_org_id, organisation_id], onDelete: Restrict, onUpdate: Cascade)
+  xero_connection XeroConnection? @relation(fields: [xero_connection_id, account_id, organisation_id], references: [id, account_id, organisation_id], onDelete: Restrict, onUpdate: Cascade)
   failed_records  FailedRecord[]
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([organisation_id, started_at])
-  @@index([clerk_org_id, organisation_id, xero_connection_id, run_type, status, started_at])
+  @@index([account_id, organisation_id, xero_connection_id, run_type, status, started_at])
   @@map("sync_runs")
 }
 
 model FailedRecord {
   id               String                  @id @default(uuid()) @db.Uuid
-  clerk_org_id     String
+  account_id       String
   organisation_id  String                  @db.Uuid
   sync_run_id      String                  @db.Uuid
   entity_type      xero_sync_entity_type
@@ -1120,7 +1139,7 @@ model FailedRecord {
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   sync_run     SyncRun      @relation(fields: [sync_run_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([sync_run_id])
   @@index([sync_run_id, created_at])
@@ -1129,7 +1148,7 @@ model FailedRecord {
 
 model AuditEvent {
   id              String   @id @default(uuid()) @db.Uuid
-  clerk_org_id    String
+  account_id      String
   organisation_id String   @db.Uuid
   actor_user_id   String?
   actor_display   String?
@@ -1148,7 +1167,7 @@ model AuditEvent {
 
   organisation Organisation @relation(fields: [organisation_id], references: [id])
 
-  @@index([clerk_org_id])
+  @@index([account_id])
   @@index([organisation_id])
   @@index([organisation_id, created_at])
   @@index([organisation_id, entity_id])
@@ -1168,8 +1187,8 @@ model Plan {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  limits                  PlanLimit[]
-  clerk_org_subscriptions ClerkOrgSubscription[]
+  limits                PlanLimit[]
+  account_subscriptions AccountSubscription[]
 
   @@map("plans")
 }
@@ -1189,9 +1208,9 @@ model PlanLimit {
   @@map("plan_limits")
 }
 
-model ClerkOrgSubscription {
+model AccountSubscription {
   id                      String    @id @default(uuid()) @db.Uuid
-  clerk_org_id            String    @unique
+  account_id              String    @unique
   plan_key                String
   status                  String
   current_period_end      DateTime?
@@ -1208,13 +1227,13 @@ model ClerkOrgSubscription {
   // breaking billing-service.ts, which reads subscription.plan_key directly.
   plan Plan @relation(fields: [plan_key], references: [key])
 
-  @@index([clerk_org_id])
-  @@map("clerk_org_subscriptions")
+  @@index([account_id])
+  @@map("account_subscriptions")
 }
 
 model UsageCounter {
   id            String           @id @default(uuid()) @db.Uuid
-  clerk_org_id  String
+  account_id    String
   metric_key    String
   counter_type  plan_limit_type?
   current_value Int              @default(0)
@@ -1223,9 +1242,9 @@ model UsageCounter {
   created_at    DateTime         @default(now())
   updated_at    DateTime         @updatedAt
 
-  @@unique([clerk_org_id, metric_key, period_start, period_end])
-  @@unique([clerk_org_id, counter_type])
-  @@index([clerk_org_id])
+  @@unique([account_id, metric_key, period_start, period_end])
+  @@unique([account_id, counter_type])
+  @@index([account_id])
   @@map("usage_counters")
 }
 
@@ -1235,7 +1254,7 @@ model StripeEvent {
   type               String
   delivery_state     stripe_event_delivery_state @default(processed)
   attempt_count      Int                         @default(1)
-  clerk_org_id       String?
+  account_id         String?
   stripe_customer_id String?
   event_created_at   DateTime?
   error_category     String?
@@ -1244,7 +1263,172 @@ model StripeEvent {
   created_at         DateTime                    @default(now())
   updated_at         DateTime                    @updatedAt
 
-  @@index([clerk_org_id, delivery_state, event_created_at])
+  @@index([account_id, delivery_state, event_created_at])
   @@index([delivery_state, updated_at])
   @@map("stripe_events")
+}
+
+// Generated with auth@1.7.12, then mapped to repository storage conventions.
+// Domain auth foreign keys are added at the clean-reset cutover, while Clerk
+// remains the active provider and existing domain account/user IDs are text.
+model AuthUser {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  email          String   @unique
+  email_verified Boolean  @default(false)
+  image          String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now()) @updatedAt
+
+  sessions       AuthSession[]
+  identities     AuthIdentity[]
+  memberships    AuthMember[]
+  invitations    AuthInvitation[]
+  audit_actions  AuthAuditEvent[] @relation("auth_audit_actor")
+  audit_subjects AuthAuditEvent[] @relation("auth_audit_target")
+
+  @@map("auth_users")
+}
+
+model AuthSession {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expires_at        DateTime
+  token             String   @unique
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt
+  ip_address        String?
+  user_agent        String?
+  user_id           String   @db.Uuid
+  active_account_id String?  @db.Uuid
+
+  user           AuthUser          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  active_account AuthOrganization? @relation(fields: [active_account_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id])
+  @@index([active_account_id])
+  @@map("auth_sessions")
+}
+
+model AuthIdentity {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider_subject         String
+  provider_id              String
+  user_id                  String    @db.Uuid
+  access_token             String?
+  refresh_token            String?
+  id_token                 String?
+  access_token_expires_at  DateTime?
+  refresh_token_expires_at DateTime?
+  scope                    String?
+  password                 String?
+  created_at               DateTime  @default(now())
+  updated_at               DateTime  @default(now()) @updatedAt
+
+  user AuthUser @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider_id, provider_subject])
+  @@index([user_id])
+  @@map("auth_identities")
+}
+
+model AuthVerification {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identifier String
+  value      String
+  expires_at DateTime
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@index([identifier])
+  @@map("auth_verifications")
+}
+
+model AuthOrganization {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  slug                String                   @unique
+  logo                String?
+  metadata            String?
+  country_code        payroll_region
+  provisioning_status auth_provisioning_status @default(pending)
+  created_at          DateTime                 @default(now())
+  updated_at          DateTime                 @default(now()) @updatedAt
+
+  members         AuthMember[]
+  invitations     AuthInvitation[]
+  active_sessions AuthSession[]
+  audit_events    AuthAuditEvent[]
+
+  @@map("accounts")
+}
+
+model AuthMember {
+  id         String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id String           @db.Uuid
+  user_id    String           @db.Uuid
+  role       auth_member_role @default(viewer)
+  created_at DateTime         @default(now())
+  updated_at DateTime         @default(now()) @updatedAt
+
+  account AuthOrganization @relation(fields: [account_id], references: [id], onDelete: Restrict)
+  user    AuthUser         @relation(fields: [user_id], references: [id], onDelete: Restrict)
+
+  @@unique([account_id, user_id])
+  @@index([account_id])
+  @@index([user_id])
+  @@map("account_members")
+}
+
+model AuthInvitation {
+  id         String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id String                 @db.Uuid
+  email      String
+  role       auth_member_role
+  status     auth_invitation_status @default(pending)
+  expires_at DateTime
+  created_at DateTime               @default(now())
+  updated_at DateTime               @default(now()) @updatedAt
+  inviter_id String                 @db.Uuid
+
+  account AuthOrganization @relation(fields: [account_id], references: [id], onDelete: Restrict)
+  inviter AuthUser         @relation(fields: [inviter_id], references: [id], onDelete: Restrict)
+
+  @@index([account_id])
+  @@index([email])
+  @@index([inviter_id])
+  @@map("account_invitations")
+}
+
+model AuthRateLimit {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key          String   @unique
+  count        Int
+  last_request BigInt
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now()) @updatedAt
+
+  @@map("auth_rate_limits")
+}
+
+model AuthAuditEvent {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id     String?  @db.Uuid
+  actor_user_id  String?  @db.Uuid
+  target_user_id String?  @db.Uuid
+  event_type     String
+  // Safe lifecycle snapshots defined in docs/auth-migration/02-design.md, section 7.
+  before_value   Json?
+  after_value    Json?
+  request_id     String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now()) @updatedAt
+
+  account AuthOrganization? @relation(fields: [account_id], references: [id], onDelete: Restrict)
+  actor   AuthUser?         @relation("auth_audit_actor", fields: [actor_user_id], references: [id], onDelete: Restrict)
+  target  AuthUser?         @relation("auth_audit_target", fields: [target_user_id], references: [id], onDelete: Restrict)
+
+  @@index([account_id, created_at])
+  @@index([actor_user_id])
+  @@index([target_user_id])
+  @@map("auth_audit_events")
 }

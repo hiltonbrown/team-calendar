@@ -567,3 +567,191 @@ it("requires restricted database URL for production app", () => {
     })
   ).toThrow("DATABASE_APP_URL");
 });
+
+describe("Better Auth production configuration", () => {
+  const betterAuthVars = {
+    ...validAppVars,
+    AUTH_CONTEXT_MODE: "local",
+    AUTH_PROVIDER: "better-auth",
+    BETTER_AUTH_SECRET: "separate-better-auth-test-secret-32-characters",
+    BETTER_AUTH_URL: validAppVars.NEXT_PUBLIC_APP_URL,
+    CLERK_SECRET_KEY: undefined,
+    GOOGLE_CLIENT_ID: "google-id",
+    GOOGLE_CLIENT_SECRET: "google-secret",
+    MICROSOFT_CLIENT_ID: "microsoft-id",
+    MICROSOFT_CLIENT_SECRET: "microsoft-secret",
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: undefined,
+    RESEND_FROM: "accounts@teamcalendar.online",
+    RESEND_TOKEN: "re_auth-test",
+    XERO_AUTH_CLIENT_ID: "sign-in-xero-id",
+    XERO_AUTH_CLIENT_SECRET: "sign-in-xero-secret",
+  };
+
+  it("requires the selected app auth configuration without requiring Clerk", () => {
+    const result = runProductionPreflight({
+      appName: "app",
+      envVars: betterAuthVars,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).toContain("BETTER_AUTH_SECRET");
+    expect(result.checkedVars).not.toContain("CLERK_SECRET_KEY");
+  });
+
+  it("keeps auth secrets and social credentials out of API requirements", () => {
+    const result = runProductionPreflight({
+      appName: "api",
+      envVars: {
+        ...validApiVars,
+        AUTH_CONTEXT_MODE: "remote",
+        AUTH_PROVIDER: "better-auth",
+        CLERK_SECRET_KEY: undefined,
+        CLERK_WEBHOOK_SECRET: undefined,
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: undefined,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).not.toContain("BETTER_AUTH_SECRET");
+    expect(result.checkedVars).not.toContain("GOOGLE_CLIENT_SECRET");
+    expect(result.checkedVars).not.toContain("CLERK_WEBHOOK_SECRET");
+  });
+
+  it("rejects a local auth context in the API", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "api",
+        envVars: { ...validApiVars, AUTH_PROVIDER: "better-auth" },
+      })
+    ).toThrow("AUTH_CONTEXT_MODE must be remote");
+  });
+
+  it("rejects a remote auth context in the app", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, AUTH_CONTEXT_MODE: "remote" },
+      })
+    ).toThrow("AUTH_CONTEXT_MODE");
+  });
+
+  it.each([
+    "BETTER_AUTH_SECRET",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "MICROSOFT_CLIENT_ID",
+    "MICROSOFT_CLIENT_SECRET",
+    "XERO_AUTH_CLIENT_ID",
+    "XERO_AUTH_CLIENT_SECRET",
+    "RESEND_FROM",
+    "RESEND_TOKEN",
+  ])("requires %s on the auth app", (name) => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, [name]: undefined },
+      })
+    ).toThrow(name);
+  });
+
+  it.each([
+    ["XERO_AUTH_CLIENT_ID", "XERO_CLIENT_ID"],
+    ["XERO_AUTH_CLIENT_SECRET", "XERO_CLIENT_SECRET"],
+  ] as const)("rejects payroll reuse for %s", (name, payrollName) => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, [name]: betterAuthVars[payrollName] },
+      })
+    ).toThrow(`${name} must be separate`);
+  });
+
+  it("requires HTTPS even for an otherwise valid local origin", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...betterAuthVars,
+          BETTER_AUTH_URL: "http://localhost:3000",
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+        },
+      })
+    ).toThrow("BETTER_AUTH_URL must use HTTPS in production");
+  });
+
+  it("rejects unknown provider selection", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...validAppVars, AUTH_PROVIDER: "unknown" },
+      })
+    ).toThrow("AUTH_PROVIDER");
+  });
+
+  it("requires the Infrastructure key only after explicit opt-in", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, BETTER_AUTH_INFRA_ENABLED: "true" },
+      })
+    ).toThrow("BETTER_AUTH_API_KEY");
+  });
+
+  it("never echoes an invalid auth secret", () => {
+    const secret = "auth-secret-canary";
+    try {
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, BETTER_AUTH_SECRET: secret },
+      });
+      expect.fail("Expected auth secret rejection");
+    } catch (error) {
+      expect(String(error)).toContain("BETTER_AUTH_SECRET");
+      expect(String(error)).not.toContain(secret);
+    }
+  });
+
+  for (const appName of ["app", "api"] as const) {
+    const preview = {
+      ...(appName === "app" ? betterAuthVars : validApiVars),
+      AUTH_CONTEXT_MODE: appName === "app" ? "local" : "remote",
+      AUTH_PROVIDER: "better-auth",
+      BETTER_AUTH_URL:
+        appName === "app" ? "https://app-preview.vercel.app" : undefined,
+      NEXT_PUBLIC_API_URL: "https://api-preview.vercel.app",
+      NEXT_PUBLIC_APP_URL: "https://app-preview.vercel.app",
+      TC_API_CANDIDATE_URL: "https://api-preview.vercel.app",
+      TC_APP_CANDIDATE_URL: "https://app-preview.vercel.app",
+      VERCEL_ENV: "preview",
+    };
+
+    it(`accepts the exact Preview app/API pair for ${appName}`, () => {
+      expect(runProductionPreflight({ appName, envVars: preview }).ok).toBe(
+        true
+      );
+    });
+
+    it.each(["TC_APP_CANDIDATE_URL", "TC_API_CANDIDATE_URL"])(
+      `rejects missing %s for Preview ${appName}`,
+      (name) => {
+        expect(() =>
+          runProductionPreflight({
+            appName,
+            envVars: { ...preview, [name]: undefined },
+          })
+        ).toThrow("Preview auth requires an exact app/API candidate pair");
+      }
+    );
+
+    it.each([
+      "TC_APP_CANDIDATE_URL",
+      "TC_API_CANDIDATE_URL",
+      "NEXT_PUBLIC_API_URL",
+    ])(`rejects mismatched %s for Preview ${appName}`, (name) => {
+      expect(() =>
+        runProductionPreflight({
+          appName,
+          envVars: { ...preview, [name]: "https://different.vercel.app" },
+        })
+      ).toThrow("Preview auth requires an exact app/API candidate pair");
+    });
+  }
+});

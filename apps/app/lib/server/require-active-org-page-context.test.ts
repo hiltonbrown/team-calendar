@@ -6,14 +6,14 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
-  requireOrg: vi.fn(),
+  requireAccount: vi.fn(),
   resolveAccountCompanies: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: mocks.requireOrg,
+  requireAccount: mocks.requireAccount,
 }));
 
 vi.mock("@repo/database/queries/account-companies", () => ({
@@ -36,7 +36,7 @@ const { requireActiveOrgPageContext } = await import(
   "./require-active-org-page-context"
 );
 
-const clerkOrgId = "org_test_cookie_state";
+const accountId = "org_test_cookie_state";
 const organisationId = "00000000-0000-4000-8000-000000000100";
 
 describe("requireActiveOrgPageContext", () => {
@@ -45,7 +45,7 @@ describe("requireActiveOrgPageContext", () => {
   });
 
   it("resolves missing org from Clerk cookie state without redirecting", async () => {
-    mocks.requireOrg.mockResolvedValue(clerkOrgId);
+    mocks.requireAccount.mockResolvedValue(accountId);
     mocks.resolveAccountCompanies.mockResolvedValue([
       {
         countryCode: "AU",
@@ -57,7 +57,7 @@ describe("requireActiveOrgPageContext", () => {
     ]);
 
     await expect(requireActiveOrgPageContext()).resolves.toEqual({
-      clerkOrgId,
+      accountId,
       organisationId,
       orgQueryValue: null,
       orgSource: "clerk_cookie",
@@ -70,18 +70,18 @@ describe("requireActiveOrgPageContext", () => {
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
       value: {
-        clerkOrgId,
+        accountId,
         organisationId,
       },
     });
 
     await expect(requireActiveOrgPageContext(organisationId)).resolves.toEqual({
-      clerkOrgId,
+      accountId,
       organisationId,
       orgQueryValue: organisationId,
       orgSource: "query",
     });
-    expect(mocks.requireOrg).not.toHaveBeenCalled();
+    expect(mocks.requireAccount).not.toHaveBeenCalled();
   });
 
   it("returns notFound for explicit out-of-scope org values", async () => {
@@ -97,7 +97,7 @@ describe("requireActiveOrgPageContext", () => {
   });
 
   it("returns notFound without creating a company when the account has none", async () => {
-    mocks.requireOrg.mockResolvedValue(clerkOrgId);
+    mocks.requireAccount.mockResolvedValue(accountId);
     mocks.resolveAccountCompanies.mockResolvedValue([]);
     await expect(requireActiveOrgPageContext()).rejects.toThrow(
       "NEXT_NOT_FOUND"

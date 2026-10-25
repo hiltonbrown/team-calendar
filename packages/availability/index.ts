@@ -130,6 +130,7 @@ export {
   type WizardActor,
   type WizardError,
 } from "./src/onboarding/wizard-service";
+export * from "./src/people/account-access-service";
 export * from "./src/people/alternative-contact-service";
 export {
   type AlternativeContactServiceError,
@@ -139,7 +140,6 @@ export {
   updateAlternativeContact,
 } from "./src/people/alternative-contact-service";
 export * from "./src/people/balance-refresh";
-export * from "./src/people/clerk-access-service";
 export * from "./src/people/current-status";
 export {
   type CurrentStatus,
@@ -154,7 +154,7 @@ export type {
 } from "./src/people/current-user-service";
 export {
   ensureCurrentUserPerson,
-  ensureOrganisationForClerk,
+  ensureOrganisationForAccount,
   getInitials,
   listPersonViews,
 } from "./src/people/current-user-service";

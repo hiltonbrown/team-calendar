@@ -42,10 +42,10 @@ export interface NotificationDispatchDatabase {
 }
 
 const DispatchSchema = z.object({
+  accountId: z.string().min(1),
   actionUrl: z.string().min(1).nullable().optional(),
   actorUserId: z.string().min(1).nullable().optional(),
   body: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   objectId: z.string().uuid().nullable().optional(),
   objectType: z.string().min(1).nullable().optional(),
   organisationId: z.string().uuid(),
@@ -73,7 +73,7 @@ export async function dispatchNotification(
   const validated = { ...parsed.data, type: parsed.data.type };
 
   {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     const client = db;
     return await dispatchNotificationWithClient(
       validated,
@@ -111,10 +111,10 @@ async function dispatchNotificationWithClient(
     if (inAppEnabled) {
       const row = await client.notification.create({
         data: {
+          account_id: input.accountId,
           action_url: input.actionUrl ?? null,
           actor_user_id: input.actorUserId ?? null,
           body: input.body,
-          clerk_org_id: input.clerkOrgId,
           object_id: input.objectId ?? null,
           object_type: input.objectType ?? null,
           organisation_id: input.organisationId,
@@ -134,14 +134,14 @@ async function dispatchNotificationWithClient(
       if (options.publishRealtime !== false) {
         const unreadCount = await client.notification.count({
           where: {
-            clerk_org_id: input.clerkOrgId,
-            organisation: { clerk_org_id: input.clerkOrgId },
+            account_id: input.accountId,
+            organisation: { account_id: input.accountId },
             read_at: null,
             recipient_user_id: input.recipientUserId,
           },
         });
         publication = {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           event: {
             payload: {
               actionUrl: input.actionUrl ?? null,
@@ -158,7 +158,7 @@ async function dispatchNotificationWithClient(
             type: "notification.created",
           },
           scope: {
-            clerkOrgId: input.clerkOrgId,
+            accountId: input.accountId,
             userId: input.recipientUserId,
           },
         };
@@ -172,9 +172,9 @@ async function dispatchNotificationWithClient(
       if (recipientEmail) {
         const queued = await enqueueNotificationEmail(
           {
+            accountId: input.accountId,
             actionUrl: input.actionUrl ?? null,
             body: input.body,
-            clerkOrgId: input.clerkOrgId,
             emailTemplate,
             notificationId,
             notificationType,
@@ -219,7 +219,7 @@ async function dispatchNotificationWithClient(
 async function shouldDeliverToChannel(
   client: NotificationDispatchDatabase,
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recipientUserId: string;
     type: notification_type;
@@ -249,7 +249,7 @@ async function shouldDeliverToChannel(
 async function resolveRecipientEmail(
   client: NotificationDispatchDatabase,
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recipientPersonId?: string | null;
     recipientUserId: string;
@@ -258,14 +258,14 @@ async function resolveRecipientEmail(
   const person = await client.person.findFirst({
     select: { email: true },
     where: {
+      account_id: input.accountId,
       archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-      clerk_user_id: input.recipientUserId,
       organisation: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         is_active: true,
       },
+      user_id: input.recipientUserId,
       ...(input.recipientPersonId ? { id: input.recipientPersonId } : {}),
     },
   });
@@ -285,12 +285,12 @@ function validationError(
 }
 
 interface NotificationPublicationInput {
-  clerkOrgId: string;
+  accountId: string;
   notificationId: string;
   organisationId: string;
 }
 export interface PreparedNotificationPublication {
-  clerkOrgId: string;
+  accountId: string;
   event: Parameters<typeof publishNotificationEvent>[1];
   scope: Parameters<typeof publishNotificationEvent>[0];
 }
@@ -300,7 +300,7 @@ export async function publishPersistedNotification(
   input: NotificationPublicationInput
 ): Promise<void> {
   assertNoTenantTransaction("publishPersistedNotification");
-  const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+  const prepared = await withTenantDb(input.accountId, (db) =>
     prepareNotificationPublication(input, db)
   );
   await sendPreparedNotificationPublication(prepared);
@@ -310,7 +310,7 @@ export function prepareNotificationPublication(
   input: NotificationPublicationInput,
   db: TenantDb
 ): Promise<PreparedNotificationPublication | null> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return loadNotificationPublication(input, db);
 }
 
@@ -321,7 +321,7 @@ async function loadNotificationPublication(
   const row = await client.notification.findFirst({
     include: { organisation: { select: { name: true } } },
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       id: input.notificationId,
       organisation_id: input.organisationId,
     },
@@ -331,14 +331,14 @@ async function loadNotificationPublication(
   }
   const unreadCount = await client.notification.count({
     where: {
-      clerk_org_id: input.clerkOrgId,
-      organisation: { clerk_org_id: input.clerkOrgId },
+      account_id: input.accountId,
+      organisation: { account_id: input.accountId },
       read_at: null,
       recipient_user_id: row.recipient_user_id,
     },
   });
   return {
-    clerkOrgId: input.clerkOrgId,
+    accountId: input.accountId,
     event: {
       payload: {
         actionUrl: row.action_url,
@@ -355,7 +355,7 @@ async function loadNotificationPublication(
       type: "notification.created",
     },
     scope: {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       userId: row.recipient_user_id,
     },
   };
@@ -369,7 +369,7 @@ export async function sendPreparedNotificationPublication(
     return;
   }
   invalidateUnreadCount({
-    clerkOrgId: prepared.clerkOrgId,
+    accountId: prepared.accountId,
     userId: prepared.scope.userId,
   });
   await publishNotificationEvent(prepared.scope, prepared.event);

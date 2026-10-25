@@ -234,8 +234,8 @@ describe("xeroFetch", () => {
 });
 describe("external tenant identity regression", () => {
   it("shares keys for one external tenant across internal bindings", () => {
-    const first = { ...rateClass, clerkOrgId: "one", organisationId: "one" };
-    const second = { ...rateClass, clerkOrgId: "two", organisationId: "two" };
+    const first = { ...rateClass, accountId: "one", organisationId: "one" };
+    const second = { ...rateClass, accountId: "two", organisationId: "two" };
     expect(xeroRateKeys(first, "test")).toEqual(xeroRateKeys(second, "test"));
   });
   it("separates tenants despite identical internal bindings", () => {
@@ -1051,7 +1051,7 @@ it("never retries an ambiguous unsupported mutation without recorded identity", 
 describe("scoped credentials at dispatch", () => {
   const context = () => ({
     accessToken: "captured",
-    clerk_org_id: "clerk",
+    account_id: "account-test",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "conn",
     organisation_id: "org",
@@ -1088,8 +1088,8 @@ describe("scoped credentials at dispatch", () => {
     );
     expect(response.status).toBe(200);
     expect(canonicalAccess).toHaveBeenCalledWith({
+      accountId: access.account_id,
       capability: undefined,
-      clerkOrgId: access.clerk_org_id,
       connectionId: access.id,
       deadline: access.deadline,
       organisationId: access.organisation_id,
@@ -1234,7 +1234,7 @@ it("rejects conflicting connected and pending consent access before either resol
       {
         accessContext: {
           accessToken: "captured",
-          clerk_org_id: "clerk",
+          account_id: "account-test",
           deadline: { expiresAtMs: Date.now() + 120_000 },
           id: "conn",
           organisation_id: "org",

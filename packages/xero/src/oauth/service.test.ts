@@ -80,14 +80,14 @@ vi.mock("@repo/database", async () => {
 });
 vi.mock("@repo/database/queries/xero-connections", () => ({
   getScopedXeroConnection: async (input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     connectionId?: string;
   }) => {
     const row = await dbMock.xeroConnection.findFirst({
       include: { authorisation: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
         ...(input.connectionId ? { id: input.connectionId } : {}),
       },
@@ -238,7 +238,7 @@ describe("isPreviewDeployment", () => {
 });
 
 describe("buildXeroOAuthStartUrl", () => {
-  it.each([{ clerkOrgId: "org_1", organisationId: "payroll_1" }])(
+  it.each([{ accountId: "org_1", organisationId: "payroll_1" }])(
     "requires the initiating user before consent: %j",
     async (input) => {
       expect(await buildXeroOAuthStartUrl(input)).toMatchObject({
@@ -252,7 +252,7 @@ describe("buildXeroOAuthStartUrl", () => {
   it("uses business actions for state and configuration failures", async () => {
     expect(
       await completeXeroOAuth({
-        authenticatedClerkOrgId: "org_1",
+        authenticatedAccountId: "org_1",
         authenticatedUserId: "user_1",
         code: "code",
         nonce: "nonce",
@@ -265,7 +265,7 @@ describe("buildXeroOAuthStartUrl", () => {
     delete process.env.XERO_CLIENT_SECRET;
     expect(
       await buildXeroOAuthStartUrl({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: "payroll_1",
         userId: "user_1",
       })
@@ -276,7 +276,7 @@ describe("buildXeroOAuthStartUrl", () => {
   });
   it("requests exactly the minimal four scopes", async () => {
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -290,7 +290,7 @@ describe("buildXeroOAuthStartUrl", () => {
     process.env.VERCEL_ENV = "preview";
 
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -306,7 +306,7 @@ describe("buildXeroOAuthStartUrl", () => {
     delete process.env.XERO_CLIENT_SECRET;
 
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -319,7 +319,7 @@ describe("buildXeroOAuthStartUrl", () => {
 
   it("fails closed when verifying state without the client secret", async () => {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -353,7 +353,7 @@ describe("buildXeroOAuthStartUrl", () => {
 
   it("uses the pre-registered redirect URI when configured", async () => {
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -369,7 +369,7 @@ describe("buildXeroOAuthStartUrl", () => {
 
   it("signs the default local return path", async () => {
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -384,7 +384,7 @@ describe("buildXeroOAuthStartUrl", () => {
 
   it("reads the return path only from a correctly signed state", async () => {
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       returnTo: "/onboarding",
       userId: "user_1",
@@ -396,6 +396,12 @@ describe("buildXeroOAuthStartUrl", () => {
     const state =
       new URL(result.value.redirectUrl).searchParams.get("state") ?? "";
     expect(readOAuthStateReturnTo(state)).toBe("/onboarding");
+    expect(readStatePayload(result.value.redirectUrl)).toMatchObject({
+      clerkOrgId: "org_1",
+    });
+    expect(readStatePayload(result.value.redirectUrl)).not.toHaveProperty(
+      "accountId"
+    );
     const [encoded, signature] = state.split(".");
     const forged = `${Buffer.from(
       JSON.stringify({
@@ -410,7 +416,7 @@ describe("buildXeroOAuthStartUrl", () => {
   it("preserves a valid local return path with a query and fragment", async () => {
     const returnTo = "/calendar?team=people#upcoming";
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       returnTo,
       userId: "user_1",
@@ -434,7 +440,7 @@ describe("buildXeroOAuthStartUrl", () => {
     "/settings\n/integrations",
   ])("rejects the unsafe return path %j", async (returnTo) => {
     const result = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       returnTo,
       userId: "user_1",
@@ -450,7 +456,7 @@ describe("buildXeroOAuthStartUrl", () => {
 describe("completeXeroOAuth", () => {
   it("returns and logs no code, token, state or nonce when the exchange fails", async () => {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -473,7 +479,7 @@ describe("completeXeroOAuth", () => {
       )
     );
     const result = await completeXeroOAuth({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code,
       nonce: start.value.nonce,
@@ -500,7 +506,7 @@ describe("completeXeroOAuth", () => {
 
   it("stores the exact remote connection tuple in the reference-only selection session", async () => {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -545,7 +551,7 @@ describe("completeXeroOAuth", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const result = await completeXeroOAuth({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: start.value.nonce,
@@ -581,7 +587,7 @@ describe("completeXeroOAuth", () => {
 
   it("rejects a missing nonce before exchanging the authorisation code", async () => {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -593,7 +599,7 @@ describe("completeXeroOAuth", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: null,
@@ -609,7 +615,7 @@ describe("completeXeroOAuth", () => {
 
   it("rejects a mismatched nonce before exchanging the authorisation code", async () => {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -621,7 +627,7 @@ describe("completeXeroOAuth", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: "mismatched-nonce",
@@ -653,12 +659,12 @@ describe("isLocalApplicationPath", () => {
 describe("Xero OAuth state", () => {
   it("mints distinct states for identical inputs", async () => {
     const first = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
     const second = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -677,7 +683,7 @@ describe("Xero OAuth state", () => {
     const nowSpy = vi.spyOn(Date, "now");
     nowSpy.mockReturnValue(1_000_000);
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -690,7 +696,7 @@ describe("Xero OAuth state", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: start.value.nonce,
@@ -706,7 +712,7 @@ describe("Xero OAuth state", () => {
 
   it("rejects a tampered state", async () => {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -719,7 +725,7 @@ describe("Xero OAuth state", () => {
       new URL(start.value.redirectUrl).searchParams.get("state") ?? "";
     const [encoded, signature] = state.split(".");
     const result = await completeXeroOAuth({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: start.value.nonce,
@@ -736,7 +742,7 @@ describe("Xero OAuth state", () => {
 describe("canonical callback security", () => {
   async function startCallback() {
     const start = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -744,7 +750,7 @@ describe("canonical callback security", () => {
       throw new Error("Expected start");
     }
     return {
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "code",
       nonce: start.value.nonce,
@@ -752,7 +758,7 @@ describe("canonical callback security", () => {
     };
   }
   it.each([
-    { authenticatedClerkOrgId: "foreign" },
+    { authenticatedAccountId: "foreign" },
     { authenticatedUserId: "foreign" },
   ])(
     "rejects a changed authenticated actor %j before code exchange",
@@ -814,7 +820,7 @@ describe("canonical callback security", () => {
           xero_authorisation_id: null,
         }),
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           created_by_user_id: "user_1",
           status: "pending",
         }),
@@ -924,7 +930,7 @@ describe("canonical callback security", () => {
 
 describe("canonical refresh", () => {
   const input = {
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     connectionId: "conn_1",
     organisationId: "payroll_1",
   };
@@ -1166,7 +1172,7 @@ describe("canonical refresh", () => {
     expect(dbMock.xeroConnection.findFirst).toHaveBeenCalledWith({
       include: { authorisation: true },
       where: {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "conn_1",
         organisation_id: "payroll_1",
       },
@@ -1277,7 +1283,7 @@ describe("canonical refresh", () => {
 
 describe("canonical tenant selection", () => {
   const input = {
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     sessionId: "session_1",
     tenantId: "file_1",
     userId: "user_1",
@@ -1637,7 +1643,7 @@ describe("canonical tenant selection", () => {
     });
     expect(dbMock.xeroConnection.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         organisation_id: "payroll_1",
         payroll_region: "AU",
         remote_connection_id: "remote_1",
@@ -1650,7 +1656,7 @@ describe("canonical tenant selection", () => {
       expect.objectContaining({
         data: expect.objectContaining({ status: "completed" }),
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           created_by_user_id: "user_1",
           status: "selecting",
         }),
@@ -1888,7 +1894,7 @@ describe("canonical tenant selection", () => {
           xero_authorisation_id: "grant_1",
         }),
         where: {
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           id: "conn_1",
           organisation_id: "payroll_1",
         },
@@ -1933,7 +1939,7 @@ describe("canonical housekeeping", () => {
 describe("straight protected OAuth connection", () => {
   async function callbackInput() {
     const started = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       returnTo: "/calendar#upcoming",
       userId: "user_1",
@@ -1942,7 +1948,7 @@ describe("straight protected OAuth connection", () => {
       throw new Error("Expected OAuth start");
     }
     return {
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "code",
       nonce: started.value.nonce,
@@ -2162,7 +2168,7 @@ describe("straight protected OAuth connection", () => {
       { country_code: "AU", id: "payroll_1" },
     ]);
     const started = await buildXeroOAuthStartUrl({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "payroll_1",
       userId: "user_1",
     });
@@ -2221,7 +2227,7 @@ describe("straight protected OAuth connection", () => {
     );
     expect(
       await completeXeroOAuth({
-        authenticatedClerkOrgId: "org_1",
+        authenticatedAccountId: "org_1",
         authenticatedUserId: "user_1",
         code: "code",
         nonce: started.value.nonce,

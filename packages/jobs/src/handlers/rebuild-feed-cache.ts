@@ -15,7 +15,7 @@ import { inngest } from "../client";
 
 const FEED_CACHE_TTL_SECONDS = 3600;
 export const RebuildFeedCacheInputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.uuid().optional(),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid().nullable(),
@@ -71,7 +71,7 @@ async function rebuildFeedCacheInternal(
   }
   const context = parsed.data;
   try {
-    const feed = await withTenantDb(context.clerkOrgId, (db) =>
+    const feed = await withTenantDb(context.accountId, (db) =>
       db.feed.findFirst({
         select: {
           id: true,
@@ -80,8 +80,8 @@ async function rebuildFeedCacheInternal(
           updated_at: true,
         },
         where: {
+          account_id: context.accountId,
           archived_at: null,
-          clerk_org_id: context.clerkOrgId,
           id: context.feedId,
           organisation_id: context.organisationId,
           status: "active",
@@ -99,7 +99,7 @@ async function rebuildFeedCacheInternal(
     }
     await (() => invalidateFeedCache({ feedId: feed.id }))();
     const rendered = await renderFeedBody({
-      clerkOrgId: context.clerkOrgId,
+      accountId: context.accountId,
       feedId: feed.id,
       feedName: feed.name,
       organisationId: context.organisationId,
@@ -107,7 +107,7 @@ async function rebuildFeedCacheInternal(
     });
     if (!rendered.ok) {
       log.error("Failed to render feed body during rebuild", {
-        clerkOrgId: context.clerkOrgId,
+        accountId: context.accountId,
         error: rendered.error,
         feedId: feed.id,
         organisationId: context.organisationId,
@@ -130,11 +130,11 @@ async function rebuildFeedCacheInternal(
     if (!cached.ok) {
       return { error: cached.error, ok: false };
     }
-    await withTenantDb(context.clerkOrgId, (db) =>
+    await withTenantDb(context.accountId, (db) =>
       db.feed.updateMany({
         data: { last_etag: rendered.value.etag, last_rendered_at: new Date() },
         where: {
-          clerk_org_id: context.clerkOrgId,
+          account_id: context.accountId,
           id: feed.id,
           organisation_id: context.organisationId,
           representation_generation: rendered.value.generation,

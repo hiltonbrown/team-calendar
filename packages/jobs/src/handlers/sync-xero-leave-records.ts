@@ -62,7 +62,7 @@ const noUnresolvedSubmitOperationWhere =
     },
   });
 const SyncXeroLeaveRecordsInputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
@@ -225,13 +225,13 @@ async function syncXeroLeaveRecordsInternal(
   let runId: string | null = null;
   try {
     if (
-      !(await withTenantDb(context.clerkOrgId, (db) =>
+      !(await withTenantDb(context.accountId, (db) =>
         isCurrentXeroSyncBinding(context, db)
       ))
     ) {
       return { ok: true, value: emptyResult(null, "ignored") };
     }
-    const runAcquisition = await withTenantDb(context.clerkOrgId, (db) =>
+    const runAcquisition = await withTenantDb(context.accountId, (db) =>
       acquireSyncRun(context, "leave_records", startedAt, db)
     );
     if (runAcquisition.kind === "terminal") {
@@ -309,7 +309,7 @@ async function syncXeroLeaveRecordsInternal(
         });
       }
       for (let index = 0; index < fetched.length; index += BATCH_SIZE) {
-        const runState = await withTenantDb(context.clerkOrgId, (db) =>
+        const runState = await withTenantDb(context.accountId, (db) =>
           db.syncRun.findFirst({
             select: { cancel_requested_at: true },
             where: { ...scoped(context), id: run.id },
@@ -384,7 +384,7 @@ async function syncXeroLeaveRecordsInternal(
         !hasInvalidRecords &&
         failures.length === 0 &&
         traversalOutcome === "completed";
-      await withTenantDb(context.clerkOrgId, (db) =>
+      await withTenantDb(context.accountId, (db) =>
         assertRunActive(context, run.id, db)
       );
       const canArchiveStale = context.mode === "full" && traversalSucceeded;
@@ -392,7 +392,7 @@ async function syncXeroLeaveRecordsInternal(
         log.warn(
           "Skipped stale-archive because the Xero leave fetch was incomplete, truncated, or contained invalid records",
           {
-            clerkOrgId: context.clerkOrgId,
+            accountId: context.accountId,
             complete,
             connectionId: context.connectionId,
             failuresCount: failures.length,
@@ -496,7 +496,7 @@ async function syncXeroLeaveRecordsInternal(
         cursorRecord,
         initialCursorValue,
         nextCursorValue,
-      } = await withTenantDb(context.clerkOrgId, async (db) => {
+      } = await withTenantDb(context.accountId, async (db) => {
         let preparedPeopleToProcess: Array<{
           default_privacy_mode: availability_privacy_mode;
           id: string;
@@ -579,7 +579,7 @@ async function syncXeroLeaveRecordsInternal(
         if (!person) {
           continue;
         }
-        const runState = await withTenantDb(context.clerkOrgId, (db) =>
+        const runState = await withTenantDb(context.accountId, (db) =>
           db.syncRun.findFirst({
             select: { cancel_requested_at: true },
             where: { ...scoped(context), id: run.id },
@@ -628,7 +628,7 @@ async function syncXeroLeaveRecordsInternal(
             };
           }
           log.warn("Per-employee leave records fetch failed", {
-            clerkOrgId: context.clerkOrgId,
+            accountId: context.accountId,
             connectionId: context.connectionId,
             errorCode: employeeLeave.error.code,
             errorMessage: employeeLeave.error.message,
@@ -655,7 +655,7 @@ async function syncXeroLeaveRecordsInternal(
           log.warn(
             "Per-employee leave response was malformed or incomplete; skipping stale archival for person",
             {
-              clerkOrgId: context.clerkOrgId,
+              accountId: context.accountId,
               connectionId: context.connectionId,
               organisationId: context.organisationId,
               personId: person.id,
@@ -877,7 +877,7 @@ async function loadPeopleByEmployeeId(
   context: SyncXeroLeaveRecordsInput,
   employeeIds: string[]
 ) {
-  const people = await withTenantDb(context.clerkOrgId, (db) =>
+  const people = await withTenantDb(context.accountId, (db) =>
     db.person.findMany({
       select: {
         default_privacy_mode: true,
@@ -904,7 +904,7 @@ async function loadExistingRecordsBySourceRemoteId(
   context: SyncXeroLeaveRecordsInput,
   sourceRemoteIds: string[]
 ) {
-  const records = await withTenantDb(context.clerkOrgId, (db) =>
+  const records = await withTenantDb(context.accountId, (db) =>
     db.availabilityRecord.findMany({
       select: {
         approval_status: true,
@@ -1011,8 +1011,8 @@ async function processLeaveRecord(
       });
     }
     const normalised = normaliseInboundLeaveRecord({
+      accountId: context.accountId,
       approvalStatus,
-      clerkOrgId: context.clerkOrgId,
       endsAt,
       organisationId: context.organisationId,
       personId: person.id,
@@ -1039,7 +1039,7 @@ async function processLeaveRecord(
     const freshness = decideRemoteSnapshot(existing, normalised, startedAt);
     if (freshness.kind === "skip") {
       log.info("Skipped inbound Xero leave snapshot", {
-        clerkOrgId: context.clerkOrgId,
+        accountId: context.accountId,
         connectionId,
         organisationId: context.organisationId,
         reason: freshness.reason,
@@ -1136,7 +1136,7 @@ async function processLeaveRecord(
       );
       if (updateResult.count === 0) {
         log.info("Skipped inbound Xero leave snapshot after concurrent write", {
-          clerkOrgId: context.clerkOrgId,
+          accountId: context.accountId,
           connectionId,
           organisationId: context.organisationId,
           reason: "stale_local_snapshot",
@@ -1167,7 +1167,7 @@ async function processLeaveRecord(
         tx.availabilityRecord.create({
           data: {
             ...data,
-            clerk_org_id: context.clerkOrgId,
+            account_id: context.accountId,
             organisation_id: context.organisationId,
             source_remote_id: normalised.sourceRemoteId,
             source_type: normalised.sourceType,
@@ -1364,8 +1364,8 @@ async function materialiseSyncedPublication(
   await afterXeroBindingCommit(context, async (db) => {
     const publication = await materialiseAvailabilityPublication(
       {
+        accountId: context.accountId,
         availabilityRecordId,
-        clerkOrgId: context.clerkOrgId,
         // Sync batches its own rebuilds via enqueueFeedRebuilds, so skip per-record cache
         // invalidation here to avoid churn across a full sync run.
         invalidateCache: false,
@@ -1386,11 +1386,11 @@ async function enqueueFeedRebuilds(
     return;
   }
   const phaseInput1 = {
-    clerkOrgId: context.clerkOrgId,
+    accountId: context.accountId,
     organisationId: context.organisationId,
     personIds,
   } satisfies Parameters<typeof feedIdsForPeople>[0];
-  const feeds = await withTenantDb(phaseInput1.clerkOrgId, (db) =>
+  const feeds = await withTenantDb(phaseInput1.accountId, (db) =>
     feedIdsForPeople(phaseInput1, db)
   );
   const uniqueFeedIds = [...new Set(feeds.map((feed) => feed.id))];
@@ -1400,7 +1400,7 @@ async function enqueueFeedRebuilds(
   await inngest.send(
     uniqueFeedIds.map((feedId) => ({
       data: {
-        clerkOrgId: context.clerkOrgId,
+        accountId: context.accountId,
         feedId,
         organisationId: context.organisationId,
         reason: "xero_leave_records_synced",
@@ -1490,7 +1490,7 @@ async function recordFailure(
     sourceId: string;
   }
 ) {
-  await withTenantDb(context.clerkOrgId, (db) =>
+  await withTenantDb(context.accountId, (db) =>
     db.failedRecord.create({
       data: {
         ...scoped(context),
@@ -1545,7 +1545,7 @@ async function completeRun(
   if (input.status === "succeeded" || input.status === "partial_success") {
     await withXeroBinding(context, persist);
   } else {
-    await withTenantDb(context.clerkOrgId, persist);
+    await withTenantDb(context.accountId, persist);
   }
   await publishRunStatusChanged(context, runId, input.status);
 }
@@ -1567,7 +1567,7 @@ async function publishRunStatusChanged(
     await (() =>
       publishOrganisationNotificationEvent(
         {
-          clerkOrgId: context.clerkOrgId,
+          accountId: context.accountId,
           organisationId: context.organisationId,
         },
         {

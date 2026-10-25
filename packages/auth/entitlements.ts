@@ -13,8 +13,8 @@ import {
   getAuthoritativeUsageCount,
   getPlanFeatures,
   getPlanLimits,
-  getSubscriptionForOrg,
-  hasUnresolvedStripeEventForOrg,
+  getSubscriptionForAccount,
+  hasUnresolvedStripeEventForAccount,
   type TenantDb,
 } from "@repo/database";
 
@@ -25,14 +25,14 @@ const isPlanKey = (value: string): value is PlanKey =>
   (planKeys as readonly string[]).includes(value);
 
 const activePlanKey = async (
-  clerkOrgId: string,
+  accountId: string,
   db: TenantDb
 ): Promise<PlanKey> => {
-  const subscription = await getSubscriptionForOrg(clerkOrgId, db);
+  const subscription = await getSubscriptionForAccount(accountId, db);
   const billingUnhealthy =
     process.env.NEXT_PUBLIC_LAUNCH_MODE === "paid" &&
-    (await hasUnresolvedStripeEventForOrg(
-      clerkOrgId,
+    (await hasUnresolvedStripeEventForAccount(
+      accountId,
       subscription?.stripe_event_created_at ?? null
     ));
   // Fall back to Basic for inactive subscriptions or any unrecognised plan_key
@@ -46,16 +46,16 @@ const activePlanKey = async (
 };
 
 export const withinLimit = async (
-  clerkOrgId: string,
+  accountId: string,
   _organisationId: string,
   limitType: LimitType,
   db: TenantDb
 ): Promise<Result<{ allowed: boolean; current: number; limit: number }>> => {
-  assertTenantDb(db, clerkOrgId);
-  const planKey = await activePlanKey(clerkOrgId, db);
+  assertTenantDb(db, accountId);
+  const planKey = await activePlanKey(accountId, db);
   const [limits, current] = await Promise.all([
     getPlanLimits(planKey),
-    getAuthoritativeUsageCount(clerkOrgId, limitType, db),
+    getAuthoritativeUsageCount(accountId, limitType, db),
   ]);
   const limit = limits[limitType];
   return {
@@ -65,13 +65,13 @@ export const withinLimit = async (
 };
 
 export const hasFeature = async (
-  clerkOrgId: string,
+  accountId: string,
   feature: FeatureKey,
   db: TenantDb
 ): Promise<Result<boolean>> => {
   try {
-    assertTenantDb(db, clerkOrgId);
-    const planKey = await activePlanKey(clerkOrgId, db);
+    assertTenantDb(db, accountId);
+    const planKey = await activePlanKey(accountId, db);
     const features = getPlanFeatures(planKey);
     return { ok: true, value: features[feature] };
   } catch {

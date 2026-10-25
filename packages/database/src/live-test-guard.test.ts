@@ -6,6 +6,47 @@ import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 const originalEnvironment = { ...process.env };
 
+const configureProtectedRemoteRun = () => {
+  const runId = "00000000-0000-4000-8000-000000000001";
+  const ownerUrl =
+    "postgresql://release_owner:owner-private@ep-release.example.neon.tech/release_db";
+  const appUrl =
+    "postgresql://team_calendar_app:app-private@ep-release.example.neon.tech/release_db";
+  const manifestPath = join(
+    mkdtempSync(join(tmpdir(), "tc-restricted-guard-")),
+    "manifest.json"
+  );
+  writeFileSync(
+    manifestPath,
+    JSON.stringify({
+      active: true,
+      consumerIsolation: { kind: "unregistered-inngest-environment" },
+      durableManifestConfirmed: true,
+      namespace: `release:run:${runId}`,
+      runId,
+      target: {
+        database: "release_db",
+        endpointId: "ep-release",
+        hostname: "ep-release.example.neon.tech",
+        role: "release_owner",
+      },
+      version: 1,
+    })
+  );
+  Object.assign(process.env, {
+    ALLOW_LIVE_DATABASE_TESTS: "I_ACKNOWLEDGE_LIVE_MUTATION",
+    DATABASE_APP_URL: appUrl,
+    DATABASE_URL: ownerUrl,
+    NODE_ENV: "test",
+    TC_RELEASE_ACTIVE_RUN_VERIFIED: runId,
+    TC_RELEASE_CONSUMERS_VERIFIED: runId,
+    TC_RELEASE_DURABLE_VERIFIED: runId,
+    TC_RELEASE_MANIFEST: manifestPath,
+    TC_RELEASE_RUN_ID: runId,
+  });
+  return { appUrl, ownerUrl };
+};
+
 beforeEach(() => {
   delete process.env.TC_SOURCE_GATES;
 });
@@ -16,6 +57,57 @@ afterEach(() => {
 });
 
 describe("database unit-test isolation", () => {
+  it("admits the exact configured restricted client under the same protected owner target", () => {
+    const { appUrl, ownerUrl } = configureProtectedRemoteRun();
+    expect(() => assertTestDatabaseConnectionAllowed(ownerUrl)).not.toThrow();
+    expect(() => assertTestDatabaseConnectionAllowed(appUrl)).not.toThrow();
+  });
+
+  it.each([
+    "postgresql://team_calendar_app:other-private@ep-release.example.neon.tech/release_db",
+    "postgresql://another_app:app-private@ep-release.example.neon.tech/release_db",
+  ])("rejects an unconfigured restricted connection: %s", (appUrl) => {
+    configureProtectedRemoteRun();
+    expect(() => assertTestDatabaseConnectionAllowed(appUrl)).toThrow(
+      "protected manifest"
+    );
+  });
+
+  it.each([
+    "postgresql://team_calendar_app:app-private@ep-other.example.neon.tech/release_db",
+    "postgresql://team_calendar_app:app-private@ep-release.example.neon.tech/other_db",
+    "postgresql://team_calendar_app:app-private@ep-release.example.neon.tech:5433/release_db",
+    "postgresql://release_owner:app-private@ep-release.example.neon.tech/release_db",
+  ])(
+    "rejects a configured app URL outside the restricted target: %s",
+    (appUrl) => {
+      configureProtectedRemoteRun();
+      process.env.DATABASE_APP_URL = appUrl;
+      expect(() => assertTestDatabaseConnectionAllowed(appUrl)).toThrow(
+        "protected manifest"
+      );
+    }
+  );
+
+  it("requires the configured owner to match the manifest before admitting the app", () => {
+    const { appUrl } = configureProtectedRemoteRun();
+    process.env.DATABASE_URL =
+      "postgresql://release_owner:owner-private@ep-other.example.neon.tech/release_db";
+    expect(() => assertTestDatabaseConnectionAllowed(appUrl)).toThrow(
+      "protected manifest"
+    );
+  });
+
+  it.each([
+    ["TC_RELEASE_DURABLE_VERIFIED", "protected manifest"],
+    ["TC_RELEASE_ACTIVE_RUN_VERIFIED", "protected manifest"],
+    ["TC_RELEASE_CONSUMERS_VERIFIED", "verified live Inngest inventory"],
+  ])("retains %s proof for the restricted client", (key, message) => {
+    const { appUrl } = configureProtectedRemoteRun();
+    delete process.env[key];
+    expect(() => assertTestDatabaseConnectionAllowed(appUrl)).toThrow(message);
+  });
+
   it.each(["xero-e2e", "unknown-mode"])(
     "rejects foreign manifest mode %s rather than stripping it",
     (mode) => {

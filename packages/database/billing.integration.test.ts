@@ -13,16 +13,16 @@ const fixture = allocateLiveTestFixture(
 
 const { systemDatabase: database } = await import("./index.js");
 const {
-  getSubscriptionForOrg,
+  getSubscriptionForAccount,
   getSubscriptionForStripeCustomer,
   isStripeEventProcessed,
   recordStripeEvent,
   recordStripeEventFailure,
   upsertSubscriptionFromWebhook,
 } = await import("./src/queries/billing.js");
-const testClerkOrgIdA = fixture.tenants[0]?.clerkOrgId as string;
-const testClerkOrgIdB = fixture.tenants[1]?.clerkOrgId as string;
-const testClerkOrgIds = [testClerkOrgIdA, testClerkOrgIdB] as const;
+const testAccountIdA = fixture.tenants[0]?.accountId as string;
+const testAccountIdB = fixture.tenants[1]?.accountId as string;
+const testAccountIds = [testAccountIdA, testAccountIdB] as const;
 
 const testEventIds = [
   fixture.globalKey("stripe_event", 0),
@@ -44,8 +44,8 @@ const planKeys = {
 } as const;
 
 const cleanTestData = async () => {
-  await database.clerkOrgSubscription.deleteMany({
-    where: { clerk_org_id: { in: [...testClerkOrgIds] } },
+  await database.accountSubscription.deleteMany({
+    where: { account_id: { in: [...testAccountIds] } },
   });
   await database.stripeEvent.deleteMany({
     where: { stripe_event_id: { in: [...testEventIds] } },
@@ -86,8 +86,8 @@ describe("billing queries integration", () => {
 
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdA,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdA,
         currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.premium,
@@ -99,8 +99,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdA,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdA,
             currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.premium,
@@ -114,12 +114,12 @@ describe("billing queries integration", () => {
     );
 
     const initial = await withTestTenantDb(
-      tenantTestAccount(testClerkOrgIdA),
-      (db) => getSubscriptionForOrg(testClerkOrgIdA, db)
+      tenantTestAccount(testAccountIdA),
+      (db) => getSubscriptionForAccount(testAccountIdA, db)
     );
     expect(initial).toMatchObject({
+      account_id: testAccountIdA,
       cancel_at_period_end: false,
-      clerk_org_id: testClerkOrgIdA,
       plan_key: planKeys.premium,
       status: "active",
       stripe_customer_id: "cus_066_1",
@@ -130,8 +130,8 @@ describe("billing queries integration", () => {
       Array<{ plan_key: string; stripe_subscription_id: string }>
     >`
       SELECT plan_key, stripe_subscription_id
-      FROM clerk_org_subscriptions
-      WHERE clerk_org_id = ${testClerkOrgIdA}
+      FROM account_subscriptions
+      WHERE account_id = ${testAccountIdA}
     `;
     expect(directRows[0]?.plan_key).toBe(planKeys.premium);
     expect(directRows[0]?.stripe_subscription_id).toBe("sub_066_1");
@@ -139,8 +139,8 @@ describe("billing queries integration", () => {
     // Replay an older event (e.g. out-of-order webhook that would downgrade to basic)
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdA,
         cancelAtPeriodEnd: true,
-        clerkOrgId: testClerkOrgIdA,
         currentPeriodEnd: new Date("2026-09-19T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.basic,
@@ -152,8 +152,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdA,
             cancelAtPeriodEnd: true,
-            clerkOrgId: testClerkOrgIdA,
             currentPeriodEnd: new Date("2026-09-19T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.basic,
@@ -167,12 +167,12 @@ describe("billing queries integration", () => {
     );
 
     const afterReplay = await withTestTenantDb(
-      tenantTestAccount(testClerkOrgIdA),
-      (db) => getSubscriptionForOrg(testClerkOrgIdA, db)
+      tenantTestAccount(testAccountIdA),
+      (db) => getSubscriptionForAccount(testAccountIdA, db)
     );
     expect(afterReplay).toMatchObject({
+      account_id: testAccountIdA,
       cancel_at_period_end: false,
-      clerk_org_id: testClerkOrgIdA,
       plan_key: planKeys.premium,
       status: "active",
       stripe_customer_id: "cus_066_1",
@@ -186,8 +186,8 @@ describe("billing queries integration", () => {
 
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdA,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdA,
         currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.basic,
@@ -199,8 +199,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdA,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdA,
             currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.basic,
@@ -215,8 +215,8 @@ describe("billing queries integration", () => {
 
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdA,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdA,
         currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.enterprise,
@@ -228,8 +228,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdA,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdA,
             currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.enterprise,
@@ -243,11 +243,11 @@ describe("billing queries integration", () => {
     );
 
     const updated = await withTestTenantDb(
-      tenantTestAccount(testClerkOrgIdA),
-      (db) => getSubscriptionForOrg(testClerkOrgIdA, db)
+      tenantTestAccount(testAccountIdA),
+      (db) => getSubscriptionForAccount(testAccountIdA, db)
     );
     expect(updated).toMatchObject({
-      clerk_org_id: testClerkOrgIdA,
+      account_id: testAccountIdA,
       plan_key: planKeys.enterprise,
       status: "active",
       stripe_subscription_id: "sub_066_enterprise",
@@ -258,8 +258,8 @@ describe("billing queries integration", () => {
     // 1. Initial row with null stripe_event_created_at
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdB,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdB,
         currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.basic,
@@ -271,8 +271,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdB,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdB,
             currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.basic,
@@ -286,8 +286,8 @@ describe("billing queries integration", () => {
     );
 
     const initial = await withTestTenantDb(
-      tenantTestAccount(testClerkOrgIdB),
-      (db) => getSubscriptionForOrg(testClerkOrgIdB, db)
+      tenantTestAccount(testAccountIdB),
+      (db) => getSubscriptionForAccount(testAccountIdB, db)
     );
     expect(initial).toMatchObject({
       plan_key: planKeys.basic,
@@ -298,8 +298,8 @@ describe("billing queries integration", () => {
     const datedEventTime = new Date("2026-08-20T12:00:00.000Z");
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdB,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdB,
         currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.premium,
@@ -311,8 +311,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdB,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdB,
             currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.premium,
@@ -326,8 +326,8 @@ describe("billing queries integration", () => {
     );
 
     const afterDated = await withTestTenantDb(
-      tenantTestAccount(testClerkOrgIdB),
-      (db) => getSubscriptionForOrg(testClerkOrgIdB, db)
+      tenantTestAccount(testAccountIdB),
+      (db) => getSubscriptionForAccount(testAccountIdB, db)
     );
     expect(afterDated).toMatchObject({
       plan_key: planKeys.premium,
@@ -337,8 +337,8 @@ describe("billing queries integration", () => {
     // 3. Incoming event with null timestamp updates row where incoming timestamp IS NULL
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdB,
         cancelAtPeriodEnd: true,
-        clerkOrgId: testClerkOrgIdB,
         currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.enterprise,
@@ -350,8 +350,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdB,
             cancelAtPeriodEnd: true,
-            clerkOrgId: testClerkOrgIdB,
             currentPeriodEnd: new Date("2026-10-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.enterprise,
@@ -365,8 +365,8 @@ describe("billing queries integration", () => {
     );
 
     const afterNullFallback = await withTestTenantDb(
-      tenantTestAccount(testClerkOrgIdB),
-      (db) => getSubscriptionForOrg(testClerkOrgIdB, db)
+      tenantTestAccount(testAccountIdB),
+      (db) => getSubscriptionForAccount(testAccountIdB, db)
     );
     expect(afterNullFallback).toMatchObject({
       cancel_at_period_end: true,
@@ -409,8 +409,8 @@ describe("billing queries integration", () => {
   test("getSubscriptionForStripeCustomer resolves subscription by stripe customer id across organisations", async () => {
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdA,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdA,
         currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.basic,
@@ -422,8 +422,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdA,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdA,
             currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.basic,
@@ -438,8 +438,8 @@ describe("billing queries integration", () => {
 
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: testAccountIdB,
         cancelAtPeriodEnd: false,
-        clerkOrgId: testClerkOrgIdB,
         currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
         endedAt: null,
         planKey: planKeys.premium,
@@ -451,8 +451,8 @@ describe("billing queries integration", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: testAccountIdB,
             cancelAtPeriodEnd: false,
-            clerkOrgId: testClerkOrgIdB,
             currentPeriodEnd: new Date("2026-09-20T12:00:00.000Z"),
             endedAt: null,
             planKey: planKeys.premium,
@@ -467,7 +467,7 @@ describe("billing queries integration", () => {
 
     const subA = await getSubscriptionForStripeCustomer("cus_test_org_a");
     expect(subA).toMatchObject({
-      clerk_org_id: testClerkOrgIdA,
+      account_id: testAccountIdA,
       plan_key: planKeys.basic,
       stripe_customer_id: "cus_test_org_a",
       stripe_subscription_id: "sub_test_org_a",
@@ -475,7 +475,7 @@ describe("billing queries integration", () => {
 
     const subB = await getSubscriptionForStripeCustomer("cus_test_org_b");
     expect(subB).toMatchObject({
-      clerk_org_id: testClerkOrgIdB,
+      account_id: testAccountIdB,
       plan_key: planKeys.premium,
       stripe_customer_id: "cus_test_org_b",
       stripe_subscription_id: "sub_test_org_b",
@@ -485,7 +485,7 @@ describe("billing queries integration", () => {
   test("a failed receipt remains retryable and is repaired in place", async () => {
     const eventId = repairEventId;
     const context = {
-      clerkOrgId: testClerkOrgIdA,
+      accountId: testAccountIdA,
       eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
       stripeCustomerId: "cus_repair",
     };
@@ -505,8 +505,8 @@ describe("billing queries integration", () => {
       where: { stripe_event_id: eventId },
     });
     expect(receipt).toMatchObject({
+      account_id: testAccountIdA,
       attempt_count: 2,
-      clerk_org_id: testClerkOrgIdA,
       delivery_state: "processed",
       error_category: null,
       stripe_customer_id: "cus_repair",
@@ -517,7 +517,7 @@ describe("billing queries integration", () => {
   test("a late failing duplicate cannot downgrade a completed receipt", async () => {
     const eventId = lateDuplicateEventId;
     const context = {
-      clerkOrgId: testClerkOrgIdA,
+      accountId: testAccountIdA,
       eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
       stripeCustomerId: "cus_duplicate",
     };
