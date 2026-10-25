@@ -112,8 +112,8 @@ export const GeneralClient = ({
         <CardHeader>
           <CardTitle>Account</CardTitle>
           <CardDescription>
-            Account name is managed in Clerk. The slug is fixed when the account
-            is created.
+            Update your Account name here. The slug is fixed when the Account is
+            created.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

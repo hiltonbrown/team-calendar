@@ -12,8 +12,8 @@ vi.mock("server-only", () => ({}));
 const sentEvents: Array<{
   name: string;
   data: {
-    accountId: string;
-    organisationId: string;
+    account_id: string;
+    organisation_id: string;
     connectionId: string;
     mode?: "full" | "incremental";
     triggerType: string;
@@ -185,10 +185,10 @@ describe("local persistence integration", async () => {
       expect(result.value.dispatched).toBeGreaterThanOrEqual(8); // 4 per tenant
       // Filter sent events for our test tenants
       const tenantAEvents = sentEvents.filter(
-        (e) => e.data.accountId === tenantA.accountId
+        (e) => e.data.account_id === tenantA.accountId
       );
       const tenantBEvents = sentEvents.filter(
-        (e) => e.data.accountId === tenantB.accountId
+        (e) => e.data.account_id === tenantB.accountId
       );
       const expectedRunTypes = [
         "people",
@@ -206,8 +206,8 @@ describe("local persistence integration", async () => {
         expectedEventNames
       );
       for (const evt of tenantAEvents) {
-        expect(evt.data.accountId).toBe(tenantA.accountId);
-        expect(evt.data.organisationId).toBe(tenantA.organisationId);
+        expect(evt.data.account_id).toBe(tenantA.accountId);
+        expect(evt.data.organisation_id).toBe(tenantA.organisationId);
         expect(evt.data.connectionId).toBe(tenantA.connectionId);
         expect(evt.data.connectionId).not.toBe(tenantA.providerTenantId);
         expect(evt.data.triggerType).toBe("scheduled");
@@ -222,8 +222,8 @@ describe("local persistence integration", async () => {
         );
       }
       for (const evt of tenantBEvents) {
-        expect(evt.data.accountId).toBe(tenantB.accountId);
-        expect(evt.data.organisationId).toBe(tenantB.organisationId);
+        expect(evt.data.account_id).toBe(tenantB.accountId);
+        expect(evt.data.organisation_id).toBe(tenantB.organisationId);
         expect(evt.data.connectionId).toBe(tenantB.connectionId);
         expect(evt.data.connectionId).not.toBe(tenantB.providerTenantId);
         expect(evt.data.triggerType).toBe("scheduled");

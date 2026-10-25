@@ -75,7 +75,7 @@ async function loadProfileViewModel(
   if (!(sessionAccountId && role && user)) {
     notFound();
   }
-  // Clerk supplied the authenticated account before opening the SQL scope.
+  // Authentication supplied the authenticated account before opening the SQL scope.
   const accountId = sessionAccountId as AccountId;
   return withTenantDb(
     accountId,

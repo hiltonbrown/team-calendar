@@ -1,5 +1,31 @@
 # Current work
 
+## Clean auth reset tooling, fixture seed and cutover runbook (25 October 2026)
+
+- [x] Implement a dry-run-first Clerk tenant reset with mandatory named Neon branch binding, explicit execution confirmation, dependency-safe deletes and table counts.
+- [x] Seed three separate Better Auth Accounts (AU/NZ/UK), each with all four roles, payroll Organisations, People and a team through genuine auth APIs and scoped domain writes.
+- [x] Write `docs/auth-migration/03-cutover.md` with branch rehearsal, exact environment callback URIs, conditional Infrastructure setup, role smoke tests and deployment/branch restore rollback.
+- [x] Test reset refusal/scope/transaction behaviour and native auth seed invariants; run relevant repository gates and record results.
+
+Stopping condition: deliver tested tooling and the runbook. This task writes the reset command, but does not execute a destructive reset, create a Neon branch, register OAuth applications, switch providers or deploy. Clean reset discards Clerk identities and their tenant data; no remapping, password import or user notification. AU-only public signup/payroll behaviour remains unchanged; NZ/UK seed Accounts are test fixtures.
+
+
+Review: PASS, lint (1,422 files), typecheck (19 tasks), all 4,499 unit tests/455 files across 18 tasks and diff checks. Disposable restored PostgreSQL proof passed real reset SQL (42-table count report, 94 Clerk-scoped rows removed), dry-run non-mutation, shared/NULL-linked grant retention, sole-Clerk grant deletion and cross-scope FK rollback. Native Better Auth/PrismaNeon seed ran twice through the restricted tenant role with stable IDs: three country Accounts, twelve verified role users/memberships, three companies, twelve linked People, three teams and no remaining sessions. No mail/OAuth calls. Neon branch API guard was mocked for this SQL proof and tested independently in 28 reset unit cases; a real named-branch rehearsal was not run. The configured original development database remains unchanged (94 rows, 45 matching migrations); scratch database was removed. No new schema migration, actual named-branch reset, provider switch, OAuth registration, deployment or commit. Runbook: `docs/auth-migration/03-cutover.md`.
+
+## Better Auth UI, account selection and routing (25 October 2026)
+
+- [x] Replace SDK middleware with optimistic cookie routing and enforce server/API authorisation through the neutral helpers.
+- [x] Build design-system authentication pages, social/magic-link flows, user menu and account picker through wrapped Better Auth clients.
+- [x] Atomically provision every new user with an Account membership, preserving invitations and protecting final membership/owner invariants.
+- [x] Complete cookie API/Preview transport and explicit background account context, retaining the Clerk server adapter until cutover.
+- [x] Verify session handling, account switching, API authentication, route protection and rendered auth flows; run applicable source/database gates.
+- [x] Port every inventory organisation call through the checked Better Auth directory, prove webhook equivalents before deleting the Clerk route, and test the full membership role matrix.
+- [x] Record review evidence and remaining release boundaries.
+
+Admission decision: the user explicitly allows public signup to create a new Account owned by that user. Invitation signup joins the invited Account instead. Account creation remains AU-only with validated browser timezone. No provider switch, destructive reset, deployment, commit or merge is authorised by this implementation task.
+
+Review: PASS, all 4,462 unit tests/452 files across 18 tasks, lint (1,415 files), typecheck (19 tasks), release-tool types and release tests (248 passed, five existing skips). Guarded full development integration `a91561b7-c6a4-4102-bafb-9db0dc8c3929` passed all 383 tests/39 files; post-migration RLS `0c5e2d70-2d1c-4c48-a97e-2f394aee66f2` passed 17 tests. Both cleanup/fence receipts pass. Applied migrations 44/45 after fresh restores; all 42 application-table hashes and 94 original rows preserved, auth tables denied to the tenant role, 45 checksums match, no temporary resources remain. Real Better Auth/PrismaNeon restored-database proof covers signup, verification, native cookies, Account selection, invitation acceptance/retry, transaction rollback, audit and owner protection with no external mail/OAuth. Clerk webhook removed after hook-equivalent tests passed; server adapter retained. Live OAuth, mail delivery and browser acceptance NOT VERIFIED. Review and rollback boundaries: `docs/auth-migration/07-ui-and-organisations-review.md`. No provider flag switch, reset, deployment or commit.
+
 ## Better Auth server behind the provider adapter (25 October 2026)
 
 - [x] Verify pinned Better Auth APIs and install server dependencies, preserving Clerk as default.
@@ -7,7 +33,7 @@
 - [x] Implement server configuration, cookie validation adapter, route, mail callbacks and validated environment/preflight configuration.
 - [x] Test all four roles, security boundaries and provider selection; pass source gates and read-only development database checks.
 - [x] Apply the approved migration, verify its backup restore, RLS suite, auth-table grants and final data preservation.
-- [ ] Resolve the full integration run's connection/lock/transaction timeouts and obtain a clean full-suite result.
+- [x] Obtain a clean full-suite result: subsequent guarded run `a91561b7-c6a4-4102-bafb-9db0dc8c3929` passed all 383 tests with cleanup/fence release. No production lock or timeout changes were made.
 - [x] Review the scoped change and record evidence, staged cutover work and remaining external acceptance checks.
 
 Scope: server only, no UI. The user explicitly selects the owner Prisma connection for this stage. Existing Clerk identity/domain data remain intact; UUID domain foreign keys and the clean reset belong to cutover. Infrastructure remains disabled by default pending its residency/security decision. No deployment, reset, commit or merge.

@@ -160,7 +160,7 @@ describe("Plans page server data", () => {
     mocks.getCurrentUser.mockResolvedValue({
       email: "person@example.com",
       id: "user_1",
-      image: "https://img.clerk.com/user.png",
+      image: "https://images.example.test/user.png",
       name: "Test Person",
     });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
@@ -214,7 +214,7 @@ describe("Plans page server data", () => {
         organisationId: "00000000-0000-4000-8000-000000000001",
       },
       {
-        avatarUrl: "https://img.clerk.com/user.png",
+        avatarUrl: "https://images.example.test/user.png",
         displayName: "Test Person",
         email: "person@example.com",
         userId: "user_1",

@@ -26,7 +26,7 @@ export default async function NewPersonPage({
 
   const params = await searchParams;
   const orgParam = typeof params.org === "string" ? params.org : undefined;
-  // Clerk authentication completes before owned company preparation.
+  // Authentication completes before owned company preparation.
   const accountId = (await requireAccount()) as AccountId;
   const { organisationId, orgQueryValue, companies } = await withTenantDb(
     accountId,

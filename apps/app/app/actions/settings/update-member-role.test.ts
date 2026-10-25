@@ -32,7 +32,7 @@ describe("updateMemberRole", () => {
     mocks.updateAccountMemberRole.mockResolvedValue({});
   });
 
-  it("rejects viewers before mutating Clerk memberships", async () => {
+  it("rejects viewers before mutating Account memberships", async () => {
     const result = await updateMemberRole(validInput);
 
     expect(result.ok).toBe(false);

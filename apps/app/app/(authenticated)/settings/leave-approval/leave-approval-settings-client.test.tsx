@@ -24,7 +24,7 @@ vi.mock("./_actions", () => ({
 
 const organisationId = "70000000-0000-4000-8000-000000000001";
 const settings: OrganisationSettings = {
-  accountId: "org_clerk",
+  accountId: "account_fixture",
   createdAt: new Date("2026-08-30T00:00:00.000Z"),
   defaultFeedPrivacyMode: "named",
   defaultLeaveRequestAdvanceDays: 0,

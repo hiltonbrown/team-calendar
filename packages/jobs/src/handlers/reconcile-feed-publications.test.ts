@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readJobEventData } from "../event-context";
 
 const mocks = vi.hoisted(() => ({
   availabilityRecordFindMany: vi.fn(),
@@ -106,7 +107,13 @@ it("throws execution failures with valid input at the queue boundary", async () 
   );
   await expect(
     handler({
-      event: { data: input() },
+      event: {
+        data: {
+          account_id: ACCOUNT_ID,
+          organisation_id: ORGANISATION_ID,
+          ...{},
+        },
+      },
       step: {
         run: (_name: string, execute: () => Promise<unknown>) => execute(),
       },
@@ -158,7 +165,7 @@ describe("reconcileFeedPublications", () => {
     expect(result.ok).toBe(true);
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       expect.objectContaining({
-        data: expect.objectContaining({ organisationId: null }),
+        data: expect.objectContaining({ organisation_id: null }),
       }),
     ]);
   });
@@ -224,14 +231,16 @@ describe("reconcileFeedPublications", () => {
     const dispatched = mocks.inngestSend.mock.calls[0]?.[0];
     expect(dispatched).toHaveLength(1);
     expect(
-      RebuildFeedCacheInputSchema.safeParse(dispatched?.[0]?.data).success
+      RebuildFeedCacheInputSchema.safeParse(
+        readJobEventData(dispatched?.[0]?.data)
+      ).success
     ).toBe(true);
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
-          accountId: ACCOUNT_ID,
+          account_id: ACCOUNT_ID,
           feedId: "20000000-0000-4000-8000-000000000001",
-          organisationId: ORGANISATION_ID,
+          organisation_id: ORGANISATION_ID,
           reason: "publication_reconciled",
         },
         name: "rebuild-feed-cache",

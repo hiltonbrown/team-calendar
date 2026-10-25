@@ -15,7 +15,7 @@ export interface ActiveOrgPageContext {
   accountId: AccountId;
   organisationId: OrganisationId;
   orgQueryValue: string | null;
-  orgSource: "clerk_cookie" | "query";
+  orgSource: "auth_session" | "query";
 }
 
 export async function requireActiveOrgPageContext(
@@ -64,7 +64,7 @@ export async function requireActiveOrgPageContext(
     // The canonical resolver returns owned organisation UUIDs.
     organisationId: organisationId as OrganisationId,
     orgQueryValue: null,
-    orgSource: "clerk_cookie",
+    orgSource: "auth_session",
   };
 }
 
@@ -109,6 +109,6 @@ export async function resolveActiveOrgPageContext(
     accountId,
     organisationId: company.id as OrganisationId,
     orgQueryValue: null,
-    orgSource: "clerk_cookie",
+    orgSource: "auth_session",
   };
 }

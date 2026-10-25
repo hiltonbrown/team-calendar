@@ -613,18 +613,18 @@ describe("leave records stale archival", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
-          accountId: ACCOUNT_ID,
+          account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000001",
-          organisationId: ORGANISATION_ID,
+          organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
         name: "rebuild-feed-cache",
       },
       {
         data: {
-          accountId: ACCOUNT_ID,
+          account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000002",
-          organisationId: ORGANISATION_ID,
+          organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
         name: "rebuild-feed-cache",
@@ -760,18 +760,18 @@ describe("leave records stale archival", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
-          accountId: ACCOUNT_ID,
+          account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000001",
-          organisationId: ORGANISATION_ID,
+          organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
         name: "rebuild-feed-cache",
       },
       {
         data: {
-          accountId: ACCOUNT_ID,
+          account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000002",
-          organisationId: ORGANISATION_ID,
+          organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
         name: "rebuild-feed-cache",

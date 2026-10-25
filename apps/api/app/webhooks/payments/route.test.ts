@@ -154,7 +154,7 @@ describe("Stripe payments webhook", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          organisationId: "30000000-0000-4000-8000-000000000001",
+          organisation_id: "30000000-0000-4000-8000-000000000001",
         }),
         name: "recount-usage",
       })

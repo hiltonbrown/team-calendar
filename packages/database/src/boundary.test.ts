@@ -230,7 +230,10 @@ it("tenant transaction roots stay at entry points and registered phases", async 
 });
 
 const SYSTEM_IMPORT_ALLOWLIST = new Set([
+  "packages/auth/user-lifecycle.ts",
+  "packages/auth/membership-reconciliation.ts",
   "packages/auth/adapters/better-auth-server.ts",
+  "packages/auth/adapters/better-auth-accounts.ts",
   "packages/database/index.ts",
   "packages/database/src/system-client.ts",
   "packages/database/src/xero-locks.ts",
@@ -249,7 +252,6 @@ const SYSTEM_IMPORT_ALLOWLIST = new Set([
   "packages/jobs/src/handlers/recount-usage.ts",
   "packages/jobs/src/handlers/send-notification-emails.ts",
   "apps/api/app/ical/[token]/route.ts",
-  "apps/api/app/webhooks/auth/route.ts",
   "apps/api/app/webhooks/payments/route.ts",
 ]);
 

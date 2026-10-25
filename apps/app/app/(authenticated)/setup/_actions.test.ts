@@ -86,7 +86,7 @@ describe("setup organisation actions", () => {
     mocks.getCurrentUser.mockResolvedValue({
       email: "admin@example.com",
       id: "user_1",
-      image: "https://img.clerk.com/user.png",
+      image: "https://images.example.test/user.png",
       name: "Admin User",
     });
     mocks.ensureOrganisationForAccount.mockResolvedValue({
@@ -119,7 +119,7 @@ describe("setup organisation actions", () => {
         organisationId: "00000000-0000-4000-8000-000000000001",
       },
       {
-        avatarUrl: "https://img.clerk.com/user.png",
+        avatarUrl: "https://images.example.test/user.png",
         displayName: "Admin User",
         email: "admin@example.com",
         userId: "user_1",

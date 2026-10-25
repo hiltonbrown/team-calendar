@@ -32,7 +32,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  // The account comes from Clerk before database preparation.
+  // The account comes from authentication before database preparation.
   const accountId = (await requireAccount()) as AccountId;
   const { role: sessionRole, userId } = (await getSession()) ?? {
     accountId: null,

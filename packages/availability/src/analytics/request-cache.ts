@@ -38,9 +38,8 @@ export function aggregationFingerprint(input: {
   organisationId: string;
   serviceMethod: string;
 }): string {
-  // Keep the established fingerprint representation while the input is neutral.
   return stableStringify({
-    clerkOrgId: input.accountId,
+    accountId: input.accountId,
     dateRangeKey: input.dateRangeKey,
     filterKey: input.filterKey,
     organisationId: input.organisationId,

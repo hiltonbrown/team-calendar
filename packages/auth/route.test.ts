@@ -11,6 +11,52 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("native auth HTTP boundary", () => {
+  it("projects Account picker data and preserves organisation errors without metadata", () => {
+    const account = {
+      countryCode: "AU",
+      id: "account",
+      members: [
+        {
+          id: "member",
+          role: "owner",
+          user: { email: "safe@example.test", id: "user", password: "hash" },
+          userId: "user",
+        },
+      ],
+      metadata: "private",
+      name: "Safe",
+      provisioningStatus: "ready",
+      slug: "safe",
+    };
+    expect(projectAuthResponse("/organization/list", [account])).toEqual([
+      {
+        countryCode: "AU",
+        id: "account",
+        name: "Safe",
+        provisioningStatus: "ready",
+        slug: "safe",
+      },
+    ]);
+    expect(
+      projectAuthResponse("/organization/get-full-organization", account)
+    ).toMatchObject({ members: [{ role: "owner", user: { id: "user" } }] });
+    expect(
+      JSON.stringify(
+        projectAuthResponse("/organization/get-full-organization", account)
+      )
+    ).not.toContain("private");
+    expect(
+      JSON.stringify(
+        projectAuthResponse("/organization/get-full-organization", account)
+      )
+    ).not.toContain("hash");
+    expect(
+      projectAuthResponse("/organization/set-active", {
+        code: "MEMBER_NOT_FOUND",
+        message: "Select an Account",
+      })
+    ).toEqual({ code: "MEMBER_NOT_FOUND", message: "Select an Account" });
+  });
   it("projects sessions without session bearer or provider secrets", () => {
     const value = projectAuthResponse("/get-session", {
       session: {

@@ -31,7 +31,7 @@ describe("removeMember", () => {
     });
   });
 
-  it("rejects viewers before deleting Clerk memberships", async () => {
+  it("rejects viewers before deleting Account memberships", async () => {
     const result = await removeMember(validInput);
 
     expect(result.ok).toBe(false);

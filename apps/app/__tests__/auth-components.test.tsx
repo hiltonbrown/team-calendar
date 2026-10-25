@@ -1,57 +1,36 @@
-import { AuthFormFrame } from "@repo/auth/components/auth-form-frame";
-import { chooseOrganizationTaskRedirectUrl } from "@repo/auth/components/choose-organization-task";
-import { embeddedAuthAppearance } from "@repo/auth/components/embedded-auth-appearance";
-import { signInCopy } from "@repo/auth/components/sign-in";
-import { signUpCopy } from "@repo/auth/components/sign-up";
-import { chooseOrganizationTaskUrl } from "@repo/auth/provider";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { authCopy } from "../components/auth/auth-copy";
+import { AuthFrame, AuthStatus } from "../components/auth/auth-form-elements";
+import { authSearchParam } from "../components/auth/auth-page-params";
 
-describe("auth components", () => {
-  it("routes Account session tasks to the app task page", () => {
-    expect(chooseOrganizationTaskUrl).toBe(
-      "/session-tasks/choose-organization"
-    );
-  });
-
-  it("adds visible sign-in context to the shared auth form frame", () => {
+// Provider SDK widgets and appearance objects no longer form the public UI.
+describe("custom authentication presentation", () => {
+  it("uses the existing brand's hierarchy around custom controls", () => {
     render(
-      <AuthFormFrame {...signInCopy}>
-        <div data-testid="embedded-clerk-form" />
-      </AuthFormFrame>
+      <AuthFrame {...authCopy.signIn}>
+        <div data-testid="custom-form" />
+      </AuthFrame>
     );
-
-    expect(screen.getByRole("heading", { name: "Welcome back" })).toBeDefined();
     expect(
-      screen.getByText(
-        "Sign in to manage leave and availability for your organisation."
-      )
+      screen.getByRole("heading", { level: 1, name: "Welcome back" })
     ).toBeDefined();
-    expect(screen.getByTestId("embedded-clerk-form")).toBeDefined();
+    expect(screen.getByText(authCopy.signIn.description)).toBeDefined();
+    expect(screen.getByTestId("custom-form")).toBeDefined();
   });
-
-  it("guides public sign-up towards organisation onboarding and invitations", () => {
-    render(
-      <AuthFormFrame {...signUpCopy}>
-        <div data-testid="embedded-clerk-form" />
-      </AuthFormFrame>
+  it("announces confirmation through a status region", () => {
+    render(<AuthStatus>Check your email for a sign-in link.</AuthStatus>);
+    expect(screen.getByRole("status").textContent).toContain(
+      "Check your email"
     );
-
-    expect(
-      screen.getByRole("heading", { name: "Create your organisation" })
-    ).toBeDefined();
-    expect(
-      screen.getByText(
-        "Start a new Team Calendar organisation, or accept an invitation from your team email."
-      )
-    ).toBeDefined();
   });
-
-  it("keeps Clerk's duplicate embedded header hidden", () => {
-    expect(embeddedAuthAppearance.elements.header).toBe("hidden");
+  it("keeps Account wording and the Australian signup scope", () => {
+    expect(authCopy.signUp.title).toBe("Create your Account");
+    expect(authCopy.signUp.description).toContain("Australian business");
   });
-
-  it("completes the Account task back into the app", () => {
-    expect(chooseOrganizationTaskRedirectUrl).toBe("/");
+  it("accepts scalar page parameters and rejects duplicate or absent values", () => {
+    expect(authSearchParam({ token: "one" }, "token")).toBe("one");
+    expect(authSearchParam({ token: ["one", "two"] }, "token")).toBeUndefined();
+    expect(authSearchParam({}, "token")).toBeUndefined();
   });
 });

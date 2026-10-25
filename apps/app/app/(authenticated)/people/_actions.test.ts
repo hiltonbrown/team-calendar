@@ -343,7 +343,7 @@ describe("people server actions", () => {
       expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           account_id: accountId,
-          action: "people.clerk_access_reviewed",
+          action: "people.account_access_reviewed",
           actor_user_id: userId,
           entity_id: organisationId,
           metadata: {
@@ -388,7 +388,7 @@ describe("people server actions", () => {
       expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           account_id: accountId,
-          action: "people.clerk_invitations_sent",
+          action: "people.account_invitations_sent",
           actor_user_id: userId,
           metadata: {
             candidateCount: 2,

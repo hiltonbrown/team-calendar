@@ -79,7 +79,7 @@ const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
     )
   );
   if (prepared.kind === "provision") {
-    // First-run company provisioning has Clerk and database phases, outside the page read scope.
+    // First-run company provisioning has auth and database phases, outside the page read scope.
     const initial = await ensureDefaultOrganisation(accountId);
     prepared = await withTenantDb(accountId, (db) =>
       prepareOnboardingPage(

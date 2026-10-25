@@ -1,8 +1,9 @@
 import type { TenantDb } from "@repo/database";
 import { withTenantResult } from "@repo/database";
+import { readJobEventData } from "../event-context";
 import { acquireSyncRun } from "./sync-run-lifecycle";
 import "server-only";
-import { listAccountMembers } from "@repo/auth/accounts";
+import { listAccountMembersForJob } from "@repo/auth/accounts";
 import { hasPermission } from "@repo/auth/permissions";
 import { unclaimedOrExpiredXeroWriteWhere } from "@repo/availability";
 import { type Result, xeroRecoveryMessage } from "@repo/core";
@@ -144,7 +145,9 @@ export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("reconcile-approval-state", async () =>
-        rejectRetryableSyncResult(reconcileXeroApprovalState(event.data))
+        rejectRetryableSyncResult(
+          reconcileXeroApprovalState(readJobEventData(event.data))
+        )
       )
   );
 export function reconcileXeroApprovalState(input: unknown) {
@@ -650,7 +653,7 @@ async function completionRecipients(
     return [context.triggeredByUserId];
   }
   try {
-    const memberships = await listAccountMembers({
+    const memberships = await listAccountMembersForJob({
       accountId: context.accountId,
       limit: 100,
     });

@@ -99,9 +99,9 @@ export async function dispatchSyncEvent(
     const runId = parsed.data.runId ?? randomUUID();
     const sent = await inngest.send({
       data: {
-        accountId: parsed.data.accountId,
+        account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
-        organisationId: parsed.data.organisationId,
+        organisation_id: parsed.data.organisationId,
         personId: parsed.data.personId,
         runId,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
@@ -147,7 +147,11 @@ export async function dispatchCancelSyncRun(
   }
   try {
     await inngest.send({
-      data: parsed.data,
+      data: {
+        account_id: parsed.data.accountId,
+        organisation_id: parsed.data.organisationId,
+        runId: parsed.data.runId,
+      },
       name: "cancel-sync-run",
     });
     return { ok: true, value: { queued: true } };

@@ -20,11 +20,22 @@ export type AuthOrganizationModel = runtime.Types.Result.DefaultSelection<Prisma
 
 export type AggregateAuthOrganization = {
   _count: AuthOrganizationCountAggregateOutputType | null
+  _avg: AuthOrganizationAvgAggregateOutputType | null
+  _sum: AuthOrganizationSumAggregateOutputType | null
   _min: AuthOrganizationMinAggregateOutputType | null
   _max: AuthOrganizationMaxAggregateOutputType | null
 }
 
+export type AuthOrganizationAvgAggregateOutputType = {
+  membership_revision: number | null
+}
+
+export type AuthOrganizationSumAggregateOutputType = {
+  membership_revision: number | null
+}
+
 export type AuthOrganizationMinAggregateOutputType = {
+  membership_revision: number | null
   id: string | null
   name: string | null
   slug: string | null
@@ -37,6 +48,7 @@ export type AuthOrganizationMinAggregateOutputType = {
 }
 
 export type AuthOrganizationMaxAggregateOutputType = {
+  membership_revision: number | null
   id: string | null
   name: string | null
   slug: string | null
@@ -49,6 +61,7 @@ export type AuthOrganizationMaxAggregateOutputType = {
 }
 
 export type AuthOrganizationCountAggregateOutputType = {
+  membership_revision: number
   id: number
   name: number
   slug: number
@@ -62,7 +75,16 @@ export type AuthOrganizationCountAggregateOutputType = {
 }
 
 
+export type AuthOrganizationAvgAggregateInputType = {
+  membership_revision?: true
+}
+
+export type AuthOrganizationSumAggregateInputType = {
+  membership_revision?: true
+}
+
 export type AuthOrganizationMinAggregateInputType = {
+  membership_revision?: true
   id?: true
   name?: true
   slug?: true
@@ -75,6 +97,7 @@ export type AuthOrganizationMinAggregateInputType = {
 }
 
 export type AuthOrganizationMaxAggregateInputType = {
+  membership_revision?: true
   id?: true
   name?: true
   slug?: true
@@ -87,6 +110,7 @@ export type AuthOrganizationMaxAggregateInputType = {
 }
 
 export type AuthOrganizationCountAggregateInputType = {
+  membership_revision?: true
   id?: true
   name?: true
   slug?: true
@@ -137,6 +161,18 @@ export type AuthOrganizationAggregateArgs<ExtArgs extends runtime.Types.Extensio
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    *
+   * Select which fields to average
+  **/
+  _avg?: AuthOrganizationAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   *
+   * Select which fields to sum
+  **/
+  _sum?: AuthOrganizationSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   *
    * Select which fields to find the minimum value
   **/
   _min?: AuthOrganizationMinAggregateInputType
@@ -167,11 +203,14 @@ export type AuthOrganizationGroupByArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   _count?: AuthOrganizationCountAggregateInputType | true
+  _avg?: AuthOrganizationAvgAggregateInputType
+  _sum?: AuthOrganizationSumAggregateInputType
   _min?: AuthOrganizationMinAggregateInputType
   _max?: AuthOrganizationMaxAggregateInputType
 }
 
 export type AuthOrganizationGroupByOutputType = {
+  membership_revision: number
   id: string
   name: string
   slug: string
@@ -182,6 +221,8 @@ export type AuthOrganizationGroupByOutputType = {
   created_at: Date
   updated_at: Date
   _count: AuthOrganizationCountAggregateOutputType | null
+  _avg: AuthOrganizationAvgAggregateOutputType | null
+  _sum: AuthOrganizationSumAggregateOutputType | null
   _min: AuthOrganizationMinAggregateOutputType | null
   _max: AuthOrganizationMaxAggregateOutputType | null
 }
@@ -205,6 +246,7 @@ export type AuthOrganizationWhereInput = {
   AND?: Prisma.AuthOrganizationWhereInput | Prisma.AuthOrganizationWhereInput[]
   OR?: Prisma.AuthOrganizationWhereInput[]
   NOT?: Prisma.AuthOrganizationWhereInput | Prisma.AuthOrganizationWhereInput[]
+  membership_revision?: Prisma.IntFilter<"AuthOrganization"> | number
   id?: Prisma.UuidFilter<"AuthOrganization"> | string
   name?: Prisma.StringFilter<"AuthOrganization"> | string
   slug?: Prisma.StringFilter<"AuthOrganization"> | string
@@ -221,6 +263,7 @@ export type AuthOrganizationWhereInput = {
 }
 
 export type AuthOrganizationOrderByWithRelationInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
@@ -242,6 +285,7 @@ export type AuthOrganizationWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.AuthOrganizationWhereInput | Prisma.AuthOrganizationWhereInput[]
   OR?: Prisma.AuthOrganizationWhereInput[]
   NOT?: Prisma.AuthOrganizationWhereInput | Prisma.AuthOrganizationWhereInput[]
+  membership_revision?: Prisma.IntFilter<"AuthOrganization"> | number
   name?: Prisma.StringFilter<"AuthOrganization"> | string
   logo?: Prisma.StringNullableFilter<"AuthOrganization"> | string | null
   metadata?: Prisma.StringNullableFilter<"AuthOrganization"> | string | null
@@ -256,6 +300,7 @@ export type AuthOrganizationWhereUniqueInput = Prisma.AtLeast<{
 }, "id" | "slug">
 
 export type AuthOrganizationOrderByWithAggregationInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
@@ -266,14 +311,17 @@ export type AuthOrganizationOrderByWithAggregationInput = {
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.AuthOrganizationCountOrderByAggregateInput
+  _avg?: Prisma.AuthOrganizationAvgOrderByAggregateInput
   _max?: Prisma.AuthOrganizationMaxOrderByAggregateInput
   _min?: Prisma.AuthOrganizationMinOrderByAggregateInput
+  _sum?: Prisma.AuthOrganizationSumOrderByAggregateInput
 }
 
 export type AuthOrganizationScalarWhereWithAggregatesInput = {
   AND?: Prisma.AuthOrganizationScalarWhereWithAggregatesInput | Prisma.AuthOrganizationScalarWhereWithAggregatesInput[]
   OR?: Prisma.AuthOrganizationScalarWhereWithAggregatesInput[]
   NOT?: Prisma.AuthOrganizationScalarWhereWithAggregatesInput | Prisma.AuthOrganizationScalarWhereWithAggregatesInput[]
+  membership_revision?: Prisma.IntWithAggregatesFilter<"AuthOrganization"> | number
   id?: Prisma.UuidWithAggregatesFilter<"AuthOrganization"> | string
   name?: Prisma.StringWithAggregatesFilter<"AuthOrganization"> | string
   slug?: Prisma.StringWithAggregatesFilter<"AuthOrganization"> | string
@@ -286,6 +334,7 @@ export type AuthOrganizationScalarWhereWithAggregatesInput = {
 }
 
 export type AuthOrganizationCreateInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -302,6 +351,7 @@ export type AuthOrganizationCreateInput = {
 }
 
 export type AuthOrganizationUncheckedCreateInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -318,6 +368,7 @@ export type AuthOrganizationUncheckedCreateInput = {
 }
 
 export type AuthOrganizationUpdateInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -334,6 +385,7 @@ export type AuthOrganizationUpdateInput = {
 }
 
 export type AuthOrganizationUncheckedUpdateInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -350,6 +402,7 @@ export type AuthOrganizationUncheckedUpdateInput = {
 }
 
 export type AuthOrganizationCreateManyInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -362,6 +415,7 @@ export type AuthOrganizationCreateManyInput = {
 }
 
 export type AuthOrganizationUpdateManyMutationInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -374,6 +428,7 @@ export type AuthOrganizationUpdateManyMutationInput = {
 }
 
 export type AuthOrganizationUncheckedUpdateManyInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -391,6 +446,7 @@ export type AuthOrganizationNullableScalarRelationFilter = {
 }
 
 export type AuthOrganizationCountOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
@@ -402,7 +458,12 @@ export type AuthOrganizationCountOrderByAggregateInput = {
   updated_at?: Prisma.SortOrder
 }
 
+export type AuthOrganizationAvgOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
+}
+
 export type AuthOrganizationMaxOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
@@ -415,6 +476,7 @@ export type AuthOrganizationMaxOrderByAggregateInput = {
 }
 
 export type AuthOrganizationMinOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   slug?: Prisma.SortOrder
@@ -424,6 +486,10 @@ export type AuthOrganizationMinOrderByAggregateInput = {
   provisioning_status?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
+}
+
+export type AuthOrganizationSumOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
 }
 
 export type AuthOrganizationScalarRelationFilter = {
@@ -496,6 +562,7 @@ export type AuthOrganizationUpdateOneWithoutAudit_eventsNestedInput = {
 }
 
 export type AuthOrganizationCreateWithoutActive_sessionsInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -511,6 +578,7 @@ export type AuthOrganizationCreateWithoutActive_sessionsInput = {
 }
 
 export type AuthOrganizationUncheckedCreateWithoutActive_sessionsInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -542,6 +610,7 @@ export type AuthOrganizationUpdateToOneWithWhereWithoutActive_sessionsInput = {
 }
 
 export type AuthOrganizationUpdateWithoutActive_sessionsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -557,6 +626,7 @@ export type AuthOrganizationUpdateWithoutActive_sessionsInput = {
 }
 
 export type AuthOrganizationUncheckedUpdateWithoutActive_sessionsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -572,6 +642,7 @@ export type AuthOrganizationUncheckedUpdateWithoutActive_sessionsInput = {
 }
 
 export type AuthOrganizationCreateWithoutMembersInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -587,6 +658,7 @@ export type AuthOrganizationCreateWithoutMembersInput = {
 }
 
 export type AuthOrganizationUncheckedCreateWithoutMembersInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -618,6 +690,7 @@ export type AuthOrganizationUpdateToOneWithWhereWithoutMembersInput = {
 }
 
 export type AuthOrganizationUpdateWithoutMembersInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -633,6 +706,7 @@ export type AuthOrganizationUpdateWithoutMembersInput = {
 }
 
 export type AuthOrganizationUncheckedUpdateWithoutMembersInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -648,6 +722,7 @@ export type AuthOrganizationUncheckedUpdateWithoutMembersInput = {
 }
 
 export type AuthOrganizationCreateWithoutInvitationsInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -663,6 +738,7 @@ export type AuthOrganizationCreateWithoutInvitationsInput = {
 }
 
 export type AuthOrganizationUncheckedCreateWithoutInvitationsInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -694,6 +770,7 @@ export type AuthOrganizationUpdateToOneWithWhereWithoutInvitationsInput = {
 }
 
 export type AuthOrganizationUpdateWithoutInvitationsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -709,6 +786,7 @@ export type AuthOrganizationUpdateWithoutInvitationsInput = {
 }
 
 export type AuthOrganizationUncheckedUpdateWithoutInvitationsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -724,6 +802,7 @@ export type AuthOrganizationUncheckedUpdateWithoutInvitationsInput = {
 }
 
 export type AuthOrganizationCreateWithoutAudit_eventsInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -739,6 +818,7 @@ export type AuthOrganizationCreateWithoutAudit_eventsInput = {
 }
 
 export type AuthOrganizationUncheckedCreateWithoutAudit_eventsInput = {
+  membership_revision?: number
   id?: string
   name: string
   slug: string
@@ -770,6 +850,7 @@ export type AuthOrganizationUpdateToOneWithWhereWithoutAudit_eventsInput = {
 }
 
 export type AuthOrganizationUpdateWithoutAudit_eventsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -785,6 +866,7 @@ export type AuthOrganizationUpdateWithoutAudit_eventsInput = {
 }
 
 export type AuthOrganizationUncheckedUpdateWithoutAudit_eventsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   slug?: Prisma.StringFieldUpdateOperationsInput | string
@@ -858,6 +940,7 @@ export type AuthOrganizationCountOutputTypeCountAudit_eventsArgs<ExtArgs extends
 
 
 export type AuthOrganizationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   slug?: boolean
@@ -875,6 +958,7 @@ export type AuthOrganizationSelect<ExtArgs extends runtime.Types.Extensions.Inte
 }, ExtArgs["result"]["authOrganization"]>
 
 export type AuthOrganizationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   slug?: boolean
@@ -887,6 +971,7 @@ export type AuthOrganizationSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
 }, ExtArgs["result"]["authOrganization"]>
 
 export type AuthOrganizationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   slug?: boolean
@@ -899,6 +984,7 @@ export type AuthOrganizationSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
 }, ExtArgs["result"]["authOrganization"]>
 
 export type AuthOrganizationSelectScalar = {
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   slug?: boolean
@@ -910,7 +996,7 @@ export type AuthOrganizationSelectScalar = {
   updated_at?: boolean
 }
 
-export type AuthOrganizationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "slug" | "logo" | "metadata" | "country_code" | "provisioning_status" | "created_at" | "updated_at", ExtArgs["result"]["authOrganization"]>
+export type AuthOrganizationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"membership_revision" | "id" | "name" | "slug" | "logo" | "metadata" | "country_code" | "provisioning_status" | "created_at" | "updated_at", ExtArgs["result"]["authOrganization"]>
 export type AuthOrganizationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   members?: boolean | Prisma.AuthOrganization$membersArgs<ExtArgs>
   invitations?: boolean | Prisma.AuthOrganization$invitationsArgs<ExtArgs>
@@ -930,6 +1016,7 @@ export type $AuthOrganizationPayload<ExtArgs extends runtime.Types.Extensions.In
     audit_events: Prisma.$AuthAuditEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
+    membership_revision: number
     id: string
     name: string
     slug: string
@@ -1022,8 +1109,8 @@ export interface AuthOrganizationDelegate<ExtArgs extends runtime.Types.Extensio
    * // Get first 10 AuthOrganizations
    * const authOrganizations = await prisma.authOrganization.findMany({ take: 10 })
    *
-   * // Only select the `id`
-   * const authOrganizationWithIdOnly = await prisma.authOrganization.findMany({ select: { id: true } })
+   * // Only select the `membership_revision`
+   * const authOrganizationWithMembership_revisionOnly = await prisma.authOrganization.findMany({ select: { membership_revision: true } })
    *
    */
   findMany<T extends AuthOrganizationFindManyArgs>(args?: Prisma.SelectSubset<T, AuthOrganizationFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AuthOrganizationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
@@ -1067,9 +1154,9 @@ export interface AuthOrganizationDelegate<ExtArgs extends runtime.Types.Extensio
    *   ]
    * })
    *
-   * // Create many AuthOrganizations and only return the `id`
-   * const authOrganizationWithIdOnly = await prisma.authOrganization.createManyAndReturn({
-   *   select: { id: true },
+   * // Create many AuthOrganizations and only return the `membership_revision`
+   * const authOrganizationWithMembership_revisionOnly = await prisma.authOrganization.createManyAndReturn({
+   *   select: { membership_revision: true },
    *   data: [
    *     // ... provide data here
    *   ]
@@ -1158,9 +1245,9 @@ export interface AuthOrganizationDelegate<ExtArgs extends runtime.Types.Extensio
    *   ]
    * })
    *
-   * // Update zero or more AuthOrganizations and only return the `id`
-   * const authOrganizationWithIdOnly = await prisma.authOrganization.updateManyAndReturn({
-   *   select: { id: true },
+   * // Update zero or more AuthOrganizations and only return the `membership_revision`
+   * const authOrganizationWithMembership_revisionOnly = await prisma.authOrganization.updateManyAndReturn({
+   *   select: { membership_revision: true },
    *   where: {
    *     // ... provide filter here
    *   },
@@ -1366,6 +1453,7 @@ export interface Prisma__AuthOrganizationClient<T, Null = never, ExtArgs extends
  * Fields of the AuthOrganization model
  */
 export interface AuthOrganizationFieldRefs {
+  readonly membership_revision: Prisma.FieldRef<"AuthOrganization", 'Int'>
   readonly id: Prisma.FieldRef<"AuthOrganization", 'String'>
   readonly name: Prisma.FieldRef<"AuthOrganization", 'String'>
   readonly slug: Prisma.FieldRef<"AuthOrganization", 'String'>

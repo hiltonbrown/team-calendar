@@ -114,8 +114,8 @@ export async function dispatchSyncEvent(
     const payload: {
       name: string;
       data: {
-        accountId: string;
-        organisationId: string;
+        account_id: string;
+        organisation_id: string;
         mode?: "full" | "incremental";
         personId?: string;
         runId: string;
@@ -126,9 +126,9 @@ export async function dispatchSyncEvent(
       id?: string;
     } = {
       data: {
-        accountId: parsed.data.accountId,
+        account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
-        organisationId: parsed.data.organisationId,
+        organisation_id: parsed.data.organisationId,
         ...(["people", "leave_records"].includes(parsed.data.runType)
           ? {
               mode:
@@ -186,7 +186,11 @@ export async function dispatchCancelSyncRun(
   }
   try {
     await inngest.send({
-      data: parsed.data,
+      data: {
+        account_id: parsed.data.accountId,
+        organisation_id: parsed.data.organisationId,
+        runId: parsed.data.runId,
+      },
       name: "cancel-sync-run",
     });
     return { ok: true, value: { queued: true } };
@@ -266,9 +270,9 @@ export async function dispatchInitialXeroSync(
       getInitialSyncEventId(parsed.data.connectionId, requestedAt);
     const payload = {
       data: {
-        accountId: parsed.data.accountId,
+        account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
-        organisationId: parsed.data.organisationId,
+        organisation_id: parsed.data.organisationId,
         requestedAt,
         runId: parsed.data.runId ?? randomUUID(),
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,

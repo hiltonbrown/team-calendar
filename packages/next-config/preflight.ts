@@ -332,9 +332,6 @@ export const runProductionPreflight = (
   }
 
   if (appName === "api") {
-    if (authProvider === "clerk") {
-      checkPresent("CLERK_WEBHOOK_SECRET");
-    }
     checkPair("INNGEST_EVENT_KEY", "INNGEST_SIGNING_KEY");
   }
 

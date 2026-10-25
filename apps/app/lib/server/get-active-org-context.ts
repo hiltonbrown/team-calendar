@@ -8,7 +8,7 @@ import { appError } from "@repo/core";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 
 /**
- * Resolves the active organisation context from Clerk getSession and validated params.
+ * Resolves the active organisation context from getSession and validated params.
  * Must be called in server context only.
  *
  * Returns the account_id and organisation_id with full scope validation.

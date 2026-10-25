@@ -1,13 +1,5 @@
-import { ChooseOrganizationTask } from "@repo/auth/components/choose-organization-task";
-import { createMetadata } from "@repo/seo/metadata";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-const title = "Choose an organisation";
-const description =
-  "Create a new Team Calendar organisation or continue with an existing invitation.";
-
-export const metadata: Metadata = createMetadata({ description, title });
-
-const ChooseOrganizationTaskPage = () => <ChooseOrganizationTask />;
+const ChooseOrganizationTaskPage = () => redirect("/select-account");
 
 export default ChooseOrganizationTaskPage;

@@ -2,7 +2,7 @@
 
 import { NotificationsProvider as RawNotificationsProvider } from "@repo/notifications/components/provider";
 import type { ReactNode } from "react";
-import { getPublicApiUrl } from "@/lib/public-api-url";
+import { getBrowserApiUrl } from "@/lib/public-api-url";
 
 interface NotificationsProviderProperties {
   children: ReactNode;
@@ -14,7 +14,7 @@ export const NotificationsProvider = ({
   enabled,
 }: NotificationsProviderProperties) => {
   const streamUrl = enabled
-    ? getPublicApiUrl("/api/notifications/stream")
+    ? getBrowserApiUrl("/api/notifications/stream")
     : null;
 
   return (

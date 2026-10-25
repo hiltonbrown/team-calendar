@@ -44,7 +44,7 @@ describe("requireActiveOrgPageContext", () => {
     vi.clearAllMocks();
   });
 
-  it("resolves missing org from Clerk cookie state without redirecting", async () => {
+  it("resolves missing org from session state without redirecting", async () => {
     mocks.requireAccount.mockResolvedValue(accountId);
     mocks.resolveAccountCompanies.mockResolvedValue([
       {
@@ -60,7 +60,7 @@ describe("requireActiveOrgPageContext", () => {
       accountId,
       organisationId,
       orgQueryValue: null,
-      orgSource: "clerk_cookie",
+      orgSource: "auth_session",
     });
     expect(mocks.getActiveOrgContext).not.toHaveBeenCalled();
     expect(mocks.notFound).not.toHaveBeenCalled();

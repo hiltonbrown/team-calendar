@@ -156,9 +156,9 @@ describe("local persistence integration", async () => {
       expect(mockInngestSend).toHaveBeenCalledWith([
         {
           data: {
-            accountId: tenantA.accountId,
+            account_id: tenantA.accountId,
             feedId: "50000000-0000-4000-8000-000000000010",
-            organisationId: tenantA.organisationId,
+            organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
           name: "rebuild-feed-cache",
@@ -483,9 +483,9 @@ describe("local persistence integration", async () => {
       expect(mockInngestSend).toHaveBeenCalledWith([
         {
           data: {
-            accountId: tenantA.accountId,
+            account_id: tenantA.accountId,
             feedId: expect.any(String),
-            organisationId: tenantA.organisationId,
+            organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
           name: "rebuild-feed-cache",
@@ -906,9 +906,9 @@ describe("local persistence integration", async () => {
       expect(mockInngestSend).toHaveBeenCalledWith([
         {
           data: {
-            accountId: tenantA.accountId,
+            account_id: tenantA.accountId,
             feedId: "50000000-0000-4000-8000-000000000010",
-            organisationId: tenantA.organisationId,
+            organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
           name: "rebuild-feed-cache",

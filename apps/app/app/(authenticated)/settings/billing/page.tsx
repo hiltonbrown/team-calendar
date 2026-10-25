@@ -28,9 +28,8 @@ interface BillingPageProps {
 // S-22 Settings > Billing. Billing, plan limits, and usage are enforced at the
 // Account level. requirePagePermission below admits admins and owners and
 // denies managers and below, so they can view billing status, usage, and any
-// available Stripe self-serve actions. Clerk assigns the org creator admin
-// by default; owner is a distinct higher role, so we resolve the acting role
-// explicitly and pass it through to getBillingSummary.
+// available Stripe self-serve actions. Resolve the acting role explicitly
+// and pass it through to getBillingSummary.
 const BillingPage = async ({ searchParams }: BillingPageProps) => {
   await requirePagePermission({ billing: ["read"] });
   const [user, { org }] = await Promise.all([getCurrentUser(), searchParams]);

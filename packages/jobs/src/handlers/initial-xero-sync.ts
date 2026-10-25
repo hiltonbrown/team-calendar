@@ -1,4 +1,5 @@
 import { withTenantDb } from "@repo/database";
+import { readJobEventData } from "../event-context";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
@@ -120,8 +121,9 @@ export const initialXeroSyncFunction: InngestFunction.Any =
       triggers: { event: "initial-xero-sync" },
     },
     async ({ event, step }) =>
-      executeInitialSync(InputSchema.parse(event.data), (name, operation) =>
-        step.run(name, operation)
+      executeInitialSync(
+        InputSchema.parse(readJobEventData(event.data)),
+        (name, operation) => step.run(name, operation)
       )
   );
 export async function initialXeroSync(

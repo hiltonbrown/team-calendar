@@ -240,3 +240,5 @@ Keep one-off task evidence in that task's review, not here.
 - For this pre-launch app, do not add compatibility parameters or bridges for
   existing internal callers. Migrate the callers to the planned API instead;
   internal source compatibility is not a user or account migration requirement.
+
+- The auth replacement is a clean pre-launch reset: there are no live customers. Do not turn reset tooling or cutover planning into an identity/data migration, ID remap, password import or notification programme. Preserve-data checks apply to verification fixtures until the explicitly named-branch reset command is executed, not to a requirement to migrate Clerk customer data.

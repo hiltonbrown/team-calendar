@@ -33,7 +33,6 @@ const validAppVars = {
 
 const validApiVars = {
   ...validAppVars,
-  CLERK_WEBHOOK_SECRET: "whsec_clerk123",
   EARLY_ACCESS_APPLICATION_HMAC_SECRET: "h".repeat(32),
   EARLY_ACCESS_APPLICATION_RECIPIENT: "admissions@teamcalendar.online",
   INNGEST_EVENT_KEY: "ingest_event_key_123",
@@ -605,7 +604,6 @@ describe("Better Auth production configuration", () => {
         AUTH_CONTEXT_MODE: "remote",
         AUTH_PROVIDER: "better-auth",
         CLERK_SECRET_KEY: undefined,
-        CLERK_WEBHOOK_SECRET: undefined,
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: undefined,
       },
     });

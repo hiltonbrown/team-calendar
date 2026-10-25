@@ -1,4 +1,5 @@
 import type { TenantDb } from "@repo/database";
+import { readJobEventData } from "../event-context";
 import "server-only";
 import {
   type InboundLeaveApprovalStatus,
@@ -196,7 +197,9 @@ export const syncXeroLeaveRecordsFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("sync-leave-records", async () =>
-        rejectRetryableSyncResult(syncXeroLeaveRecords(event.data))
+        rejectRetryableSyncResult(
+          syncXeroLeaveRecords(readJobEventData(event.data))
+        )
       )
   );
 export function syncXeroLeaveRecords(input: unknown) {
@@ -1400,9 +1403,9 @@ async function enqueueFeedRebuilds(
   await inngest.send(
     uniqueFeedIds.map((feedId) => ({
       data: {
-        accountId: context.accountId,
+        account_id: context.accountId,
         feedId,
-        organisationId: context.organisationId,
+        organisation_id: context.organisationId,
         reason: "xero_leave_records_synced",
       },
       name: "rebuild-feed-cache",

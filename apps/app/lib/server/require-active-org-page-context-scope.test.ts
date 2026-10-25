@@ -32,7 +32,7 @@ vi.mock("next/navigation", () => ({
 import { TenantMismatchError, withTenantDb } from "@repo/database";
 import { resolveActiveOrgPageContext } from "./require-active-org-page-context";
 
-// Fixture account models a Clerk identifier already obtained before the database phase.
+// Fixture account models a authenticated Account identifier already obtained before the database phase.
 const account = "account-A" as AccountId;
 const companyId = "11111111-1111-4111-8111-111111111111";
 beforeEach(() => {
@@ -48,7 +48,7 @@ beforeEach(() => {
     }
   );
 });
-test("default company selection reuses the caller's scope without Clerk calls", async () => {
+test("default company selection reuses the caller's scope without auth calls", async () => {
   await withTenantDb(account, async (db) => {
     expect(
       await resolveActiveOrgPageContext(account, undefined, db)

@@ -79,7 +79,7 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     status: parsedFilters.status,
     triggerType: parsedFilters.triggerType,
   };
-  // Clerk supplied the authenticated account identifier.
+  // Authentication supplied the authenticated account identifier.
   const accountId = (await requireAccount()) as AccountId;
   const { organisationId, orgQueryValue, summariesResult, runsResult } =
     await withTenantDb(

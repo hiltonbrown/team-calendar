@@ -128,7 +128,8 @@ describe("sync server actions", () => {
       "https://api.example.com/api/sync/dispatch"
     );
     mocks.getSessionAuthorizationHeaders.mockResolvedValue({
-      authorization: "Bearer session_token",
+      Cookie: "team-calendar-dev-auth.session_token=opaque",
+      Origin: "http://localhost:3000",
     });
     mocks.cancelRun.mockResolvedValue({
       ok: true,
@@ -231,15 +232,16 @@ describe("sync server actions", () => {
         }),
         cache: "no-store",
         headers: {
-          authorization: "Bearer session_token",
+          Cookie: "team-calendar-dev-auth.session_token=opaque",
           "content-type": "application/json",
+          Origin: "http://localhost:3000",
         },
         method: "POST",
       }
     );
   });
 
-  it("does not dispatch without a Clerk session token", async () => {
+  it("does not dispatch without a session cookie", async () => {
     mocks.getSessionAuthorizationHeaders.mockResolvedValueOnce(null);
 
     const result = await dispatchManualSyncAction({

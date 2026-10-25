@@ -81,7 +81,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
   if (!(sessionAccountId && user)) {
     redirect("/");
   }
-  // Clerk supplies the authenticated account before one Result preparation scope.
+  // Authentication supplies the authenticated account before one Result preparation scope.
   const accountId = sessionAccountId as AccountId;
   const canViewTeam = isManagerOrAbove(sessionRole);
   const prepared = await withTenantResult(

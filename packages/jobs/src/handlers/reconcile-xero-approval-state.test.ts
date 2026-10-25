@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   failedRecordCreate: vi.fn(),
   fetchLeaveApplicationStatusForRegion: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
+  listAccountMembersForJob: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
   scopeDatabase: null as Record<string, unknown> | null,
@@ -32,7 +33,9 @@ vi.mock("../client", () => ({
     send: mocks.inngestSend,
   },
 }));
-vi.mock("@repo/auth/accounts", () => ({ listAccountMembers: vi.fn() }));
+vi.mock("@repo/auth/accounts", () => ({
+  listAccountMembersForJob: mocks.listAccountMembersForJob,
+}));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     // Real scope ownership and effects are exercised against this area's delegate fake.
@@ -180,6 +183,10 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       $queryRaw: vi.fn(async () => []),
       $transaction: vi.fn(async (callback) => callback(database)),
     });
+    mocks.listAccountMembersForJob.mockResolvedValue({
+      data: [],
+      totalCount: 0,
+    });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
@@ -205,6 +212,52 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
         status: "REJECTED",
       },
     });
+  });
+  it("loads scheduled completion recipients by explicit Account and admits only sync permissions", async () => {
+    mocks.availabilityRecordFindMany.mockResolvedValue([]);
+    mocks.listAccountMembersForJob.mockResolvedValue({
+      data: ["owner", "admin", "manager", "viewer", null].map(
+        (role, index) => ({ role, userId: `recipient-${index}` })
+      ),
+      totalCount: 5,
+    });
+    const result = await reconcileXeroApprovalState({
+      ...input(),
+      triggerType: "scheduled",
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.listAccountMembersForJob).toHaveBeenCalledWith({
+      accountId: ACCOUNT_ID,
+      limit: 100,
+    });
+    const recipients = mocks.dispatchNotification.mock.calls.map(
+      ([notification]) => notification.recipientUserId
+    );
+    expect(recipients).toEqual(["recipient-0", "recipient-1"]);
+    for (const [notification] of mocks.dispatchNotification.mock.calls) {
+      expect(notification).toMatchObject({
+        accountId: ACCOUNT_ID,
+        organisationId: ORGANISATION_ID,
+        type: "sync_reconciliation_complete",
+      });
+    }
+  });
+  it("uses the explicit triggering user without reading an ambient session or account directory", async () => {
+    mocks.availabilityRecordFindMany.mockResolvedValue([]);
+    const result = await reconcileXeroApprovalState({
+      ...input(),
+      triggeredByUserId: "triggering-user",
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.listAccountMembersForJob).not.toHaveBeenCalled();
+    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountId: ACCOUNT_ID,
+        recipientUserId: "triggering-user",
+      }),
+      undefined,
+      expect.anything()
+    );
   });
   it("counts a stale declined transition as matched without auditing or notifying", async () => {
     mocks.availabilityRecordUpdateMany.mockResolvedValue({ count: 0 });
@@ -327,6 +380,10 @@ describe("reconcile Xero approval state bounding", () => {
       $executeRaw: vi.fn(async () => 1),
       $queryRaw: vi.fn(async () => []),
       $transaction: vi.fn(async (callback) => callback(database)),
+    });
+    mocks.listAccountMembersForJob.mockResolvedValue({
+      data: [],
+      totalCount: 0,
     });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
@@ -796,6 +853,10 @@ describe("regional approval state reconciliation (Plan 105)", () => {
       $executeRaw: vi.fn(async () => 1),
       $queryRaw: vi.fn(async () => []),
       $transaction: vi.fn(async (callback) => callback(database)),
+    });
+    mocks.listAccountMembersForJob.mockResolvedValue({
+      data: [],
+      totalCount: 0,
     });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);

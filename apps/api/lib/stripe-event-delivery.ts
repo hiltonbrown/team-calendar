@@ -293,7 +293,7 @@ async function mirrorSubscription(
     return { accountId, disposition: "processed", ok: true, stripeCustomerId };
   }
   await inngest.send({
-    data: { accountId, organisationId },
+    data: { account_id: accountId, organisation_id: organisationId },
     name: "recount-usage",
   });
   return { accountId, disposition: "processed", ok: true, stripeCustomerId };

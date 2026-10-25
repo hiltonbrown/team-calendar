@@ -370,7 +370,7 @@ async function authenticatedApprovalActor(
   ) {
     return notAuthorised();
   }
-  // Clerk supplied this authenticated account before SQL preparation.
+  // Authentication supplied this authenticated account before SQL preparation.
   return {
     ok: true,
     value: {

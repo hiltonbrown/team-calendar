@@ -13,6 +13,10 @@ import { getSessionAuthorizationHeaders } from "../transport";
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), currentUser: vi.fn() }));
 vi.mock("server-only", () => ({}));
+vi.mock("next/headers", () => ({
+  headers: async () =>
+    new Headers({ cookie: "__session=opaque; unrelated=private" }),
+}));
 vi.mock("@clerk/nextjs/server", () => mocks);
 
 describe("neutral server authentication", () => {
@@ -81,16 +85,13 @@ describe("neutral server authentication", () => {
       value: false,
     });
   });
-  it("keeps token forwarding in the transport boundary", async () => {
-    mocks.auth.mockResolvedValue({
-      getToken: async () => "session-token",
-      isAuthenticated: true,
-    });
+  it("forwards only the selected session cookie in the transport boundary", async () => {
+    vi.stubEnv("AUTH_PROVIDER", "clerk");
     expect(await getSessionAuthorizationHeaders()).toEqual({
-      Authorization: "Bearer session-token",
+      Cookie: "__session=opaque",
+      Origin: "http://localhost:3000",
     });
-    mocks.auth.mockResolvedValue({ isAuthenticated: false });
-    expect(await getSessionAuthorizationHeaders()).toBeNull();
+    vi.unstubAllEnvs();
   });
   it("projects a safe user and uses verified primary email only", async () => {
     mocks.currentUser.mockResolvedValue({

@@ -68,7 +68,7 @@ const SyncRunDetailPage = async ({
     );
   }
 
-  // Clerk supplied the authenticated account identifier.
+  // Authentication supplied the authenticated account identifier.
   const accountId = (await requireAccount()) as AccountId;
   const { organisationId, orgQueryValue, detailResult, summariesResult } =
     await withTenantDb(

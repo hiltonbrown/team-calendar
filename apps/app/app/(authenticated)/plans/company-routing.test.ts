@@ -24,7 +24,7 @@ vi.mock("@repo/database", async () => ({
 vi.mock("@repo/auth/server", () => ({
   getCurrentUser: async () => {
     if (state.open) {
-      throw new Error("Clerk ran inside transaction");
+      throw new Error("Auth ran inside transaction");
     }
     return await { id: "staff-B" };
   },
@@ -183,7 +183,7 @@ test("submission rejects a mismatched client company before Xero", async () => {
   ).toBe(false);
   expect(state.submit).not.toHaveBeenCalled();
 });
-test("Clerk action guard rejects an enclosing SQL scope before authentication", async () => {
+test("Auth action guard rejects an enclosing SQL scope before authentication", async () => {
   await expect(
     withTenantDb("account-A", () => createRecordAction(input))
   ).rejects.toBeInstanceOf(TenantPhaseError);

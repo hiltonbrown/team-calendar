@@ -8,7 +8,7 @@ import {
   isAuthRole,
   type PermissionRequest,
 } from "../permissions";
-import { getBetterAuth } from "./better-auth-server";
+import { ensureUserAccountsReady, getBetterAuth } from "./better-auth-server";
 
 const expectedAccountDenials = new Set([
   "MEMBER_NOT_FOUND",
@@ -35,6 +35,7 @@ export async function readBetterAuthContext(
     return { context: null, responseHeaders };
   }
 
+  await ensureUserAccountsReady(source.user.id);
   const { accountId, role } = await readActiveAccount(
     auth,
     requestHeaders,

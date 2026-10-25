@@ -21,12 +21,28 @@ const publicSessionFields = [
   "updatedAt",
   "activeOrganizationId",
 ];
+const publicAccountFields = [
+  "id",
+  "name",
+  "slug",
+  "logo",
+  "createdAt",
+  "countryCode",
+  "provisioningStatus",
+];
+const publicMemberFields = [
+  "id",
+  "organizationId",
+  "userId",
+  "role",
+  "createdAt",
+];
 const authPathPrefix = /^\/api\/auth/;
 const allowedPaths = [
-  /^\/(?:ok|error|get-session|sign-out|sign-in\/(?:email|social|magic-link)|magic-link\/verify|send-verification-email|verify-email|request-password-reset|reset-password|change-password|link-social|unlink-account|list-accounts|update-user)$/,
+  /^\/(?:ok|error|sign-up\/email|get-session|sign-out|sign-in\/(?:email|social|magic-link)|magic-link\/verify|send-verification-email|verify-email|request-password-reset|reset-password|change-password|link-social|unlink-account|list-accounts|update-user)$/,
   /^\/reset-password\/[^/]+$/,
   /^\/callback\/(?:google|microsoft|xero-auth)$/,
-  /^\/organization\/(?:list|get-full-organization|get-active-member|get-active-member-role|list-members|list-invitations|get-invitation|set-active)$/,
+  /^\/organization\/(?:list|get-full-organization|get-active-member|get-active-member-role|set-active)$/,
 ];
 const record = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -44,8 +60,41 @@ export function projectAuthResponse(path: string, value: unknown): unknown {
   if (value === null) {
     return null;
   }
+  if (path === "/organization/list" && Array.isArray(value)) {
+    return value.map((account) => pick(account, publicAccountFields));
+  }
   if (!record(value)) {
     return null;
+  }
+  if (
+    typeof value.code === "string" ||
+    (!value.id && typeof value.message === "string")
+  ) {
+    return pick(value, ["code", "message"]);
+  }
+  if (
+    [
+      "/organization/get-full-organization",
+      "/organization/set-active",
+    ].includes(path)
+  ) {
+    const account = pick(value, publicAccountFields);
+    if (account && Array.isArray(value.members)) {
+      account.members = value.members.map((member) => {
+        const output = pick(member, publicMemberFields);
+        if (output && record(member)) {
+          output.user = pick(member.user, publicUserFields);
+        }
+        return output;
+      });
+    }
+    return account;
+  }
+  if (path === "/organization/get-active-member") {
+    return pick(value, publicMemberFields);
+  }
+  if (path === "/organization/get-active-member-role") {
+    return pick(value, ["role"]);
   }
   if (path === "/get-session") {
     return {
@@ -53,8 +102,7 @@ export function projectAuthResponse(path: string, value: unknown): unknown {
       user: pick(value.user, publicUserFields),
     };
   }
-  // Organisation read APIs are server-only at this stage. Their native models,
-  // provider identities and arbitrary metadata are never exposed by this route.
+  // All browser DTOs omit arbitrary metadata and provider credentials.
   const output = pick(value, [
     "status",
     "success",
@@ -77,10 +125,7 @@ export async function handleAuthRequest(request: Request): Promise<Response> {
     return Response.json({ message: "Not found" }, { status: 404 });
   }
   const path = new URL(request.url).pathname.replace(authPathPrefix, "");
-  if (
-    !allowedPaths.some((pattern) => pattern.test(path)) ||
-    (path.startsWith("/organization/") && path !== "/organization/set-active")
-  ) {
+  if (!allowedPaths.some((pattern) => pattern.test(path))) {
     return Response.json({ message: "Not found" }, { status: 404 });
   }
   const response = await getBetterAuth().handler(request);

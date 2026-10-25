@@ -27,6 +27,7 @@ vi.mock("@clerk/nextjs/server", () => ({
   currentUser: vi.fn(),
 }));
 vi.mock("./better-auth-server", () => ({
+  ensureUserAccountsReady: vi.fn().mockResolvedValue(undefined),
   getBetterAuth: () => ({ api: mocks }),
 }));
 

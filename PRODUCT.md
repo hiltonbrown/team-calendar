@@ -166,6 +166,8 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 
 ### Auth integration
 
+The Better Auth migration is implemented behind `packages/auth` and selected with `AUTH_PROVIDER=better-auth`; the deployed Clerk configuration remains until a coordinated cutover. Public signup creates an AU Account and owner membership atomically; addressed invitations join the existing Account. Local auth tables use the owner connection, while payroll Organisation defaults and Person links use the restricted tenant client. See `docs/auth-migration/02-design.md` for the approved migration and rollback boundaries. The Clerk details below describe the retained provider until cutover.
+
 - Personal Accounts are disabled in the Clerk dashboard. Every user must belong to at least one Account.
 - Company selectors choose a payroll Organisation inside the current account on company-scoped pages. The calendar company filter defaults to all companies. This differs from switching the top-level Account; Clerk membership and role checks remain the account boundary.
 - Roles are defined once as custom roles in the Clerk dashboard and apply across all Accounts.

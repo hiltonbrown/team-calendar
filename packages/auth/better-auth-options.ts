@@ -1,23 +1,29 @@
+import { getCurrentAdapter } from "@better-auth/core/context";
 import { dash } from "@better-auth/infra";
 import { sendAuthEmail } from "@repo/email";
 import type { BetterAuthOptions } from "better-auth";
 import {
   APIError,
+  addOAuthServerContext,
   createAuthMiddleware,
   getSessionFromCtx,
 } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { genericOAuth, magicLink, organization } from "better-auth/plugins";
+import { withAccountProvisioning } from "./account-provisioning-adapter";
 import { accessControl, organizationRoles } from "./better-auth-permissions";
 import {
   coreSchemaOptions,
   organizationSchema,
   rateLimitSchemaOptions,
 } from "./better-auth-schema";
+import { bootstrapFromCookie, sealBootstrap } from "./bootstrap-proof";
+import { sendAccountInvitationEmail } from "./invitation-email";
 import type { BetterAuthEnvironment } from "./keys";
+import { isControlledAccountMutation } from "./native-mutation-context";
 
-// Lifecycle writes stay closed until admission, atomic bootstrap and retention
-// are implemented and proved. Server sign-in can be rehearsed independently.
+// Unsafe lifecycle and credential-export routes stay closed. Organisation
+// mutations are available only through checked server helpers, never HTTP.
 export const disabledAuthPaths = [
   "/get-access-token",
   "/refresh-token",
@@ -26,23 +32,44 @@ export const disabledAuthPaths = [
   "/revoke-session",
   "/delete-user",
   "/delete-user/callback",
-  "/sign-up/email",
   "/organization/create",
   "/organization/delete",
-  "/organization/update",
   "/organization/add-member",
-  "/organization/remove-member",
-  "/organization/update-member-role",
-  "/organization/leave",
-  "/organization/accept-invitation",
   "/organization/reject-invitation",
-  "/organization/invite-member",
   "/organization/cancel-invitation",
 ];
 
+function readAdmissionCookie(
+  headers: Headers | undefined,
+  origin: string,
+  secret: string
+) {
+  try {
+    return bootstrapFromCookie(headers ?? new Headers(), origin, secret);
+  } catch (cause) {
+    throw new APIError("FORBIDDEN", {
+      cause,
+      message: "Start account setup again",
+    });
+  }
+}
+
+function requireControlledAccountMutation(): Promise<void> {
+  if (!isControlledAccountMutation()) {
+    throw new APIError("FORBIDDEN", {
+      message: "Use the checked Account operation",
+    });
+  }
+  return Promise.resolve();
+}
+
 export function createBetterAuthOptions(
   env: BetterAuthEnvironment,
-  database: BetterAuthOptions["database"]
+  database: BetterAuthOptions["database"],
+  lifecycle: {
+    afterUserCreated?: (userId: string) => Promise<void>;
+    afterUserUpdated?: (userId: string) => Promise<void>;
+  } = {}
 ) {
   const { origin } = new URL(env.BETTER_AUTH_URL);
   const trustedOrigins = [origin];
@@ -91,21 +118,61 @@ export function createBetterAuthOptions(
     appName: "Team Calendar",
     basePath: "/api/auth",
     baseURL: origin,
-    database,
+    database:
+      typeof database === "function"
+        ? withAccountProvisioning(database, origin, env.BETTER_AUTH_SECRET)
+        : database,
     databaseHooks: {
+      session: {
+        create: {
+          before: async (session, context) => {
+            if (!context?.context.adapter) {
+              throw new APIError("FORBIDDEN", {
+                message: "No Account is available for this user",
+              });
+            }
+            const adapter = await getCurrentAdapter(context.context.adapter);
+            const memberships = await adapter.findMany<{
+              organizationId: string;
+              role: string;
+            }>({
+              limit: 2,
+              model: "member",
+              where: [{ field: "userId", value: session.userId }],
+            });
+            if (memberships.length === 0) {
+              throw new APIError("FORBIDDEN", {
+                message: "No Account is available for this user",
+              });
+            }
+            return {
+              data: {
+                ...session,
+                activeOrganizationId:
+                  memberships.length === 1
+                    ? memberships[0].organizationId
+                    : null,
+              },
+            };
+          },
+        },
+      },
       user: {
         create: {
-          before: () => {
-            throw new APIError("FORBIDDEN", {
-              message: "Account admission is not available yet",
-            });
+          after: async (user) => {
+            await lifecycle.afterUserCreated?.(user.id);
+          },
+        },
+        update: {
+          after: async (user) => {
+            await lifecycle.afterUserUpdated?.(user.id);
           },
         },
       },
     },
     disabledPaths: disabledAuthPaths,
     emailAndPassword: {
-      disableSignUp: true,
+      disableSignUp: false,
       enabled: true,
       maxPasswordLength: 128,
       minPasswordLength: 12,
@@ -151,6 +218,18 @@ export function createBetterAuthOptions(
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/sign-up/email") {
+          readAdmissionCookie(ctx.headers, origin, env.BETTER_AUTH_SECRET);
+        }
+        if (ctx.path === "/sign-in/social") {
+          const proof = bootstrapFromCookie(
+            ctx.headers ?? new Headers(),
+            origin,
+            env.BETTER_AUTH_SECRET
+          );
+          await addOAuthServerContext({ accountBootstrap: proof });
+        }
+
         if (disabledAuthPaths.includes(ctx.path)) {
           throw new APIError("FORBIDDEN", {
             message: "This account operation is not available yet",
@@ -189,29 +268,43 @@ export function createBetterAuthOptions(
         allowUserToCreateOrganization: false,
         creatorRole: "owner",
         dynamicAccessControl: { enabled: false },
+        organizationHooks: {
+          beforeAcceptInvitation: requireControlledAccountMutation,
+          beforeCreateInvitation: requireControlledAccountMutation,
+          beforeRemoveMember: requireControlledAccountMutation,
+          beforeUpdateMemberRole: requireControlledAccountMutation,
+          beforeUpdateOrganization: requireControlledAccountMutation,
+        },
         roles: organizationRoles,
         schema: organizationSchema,
-        sendInvitationEmail: async (data) => {
-          await sendAuthEmail({
-            actionLabel: "View invitation",
-            actionUrl: new URL(
-              `/accept-invitation/${encodeURIComponent(data.id)}`,
-              origin
-            ).href,
-            body: `You have been invited to join ${data.organization.name}.`,
-            subject: `Invitation to ${data.organization.name} on Team Calendar`,
-            to: data.email,
-          });
-        },
+        sendInvitationEmail: (data) =>
+          sendAccountInvitationEmail(
+            {
+              accountName: data.organization.name,
+              email: data.email,
+              id: data.id,
+            },
+            origin
+          ),
         teams: { enabled: false },
       }),
       magicLink({
-        disableSignUp: true,
+        disableSignUp: false,
         expiresIn: 300,
-        sendMagicLink: async ({ email, url }) => {
+        sendMagicLink: async ({ email, url }, context) => {
+          const proof = bootstrapFromCookie(
+            context?.headers ?? new Headers(),
+            origin,
+            env.BETTER_AUTH_SECRET
+          );
+          const link = new URL(url);
+          link.searchParams.set(
+            "admission",
+            sealBootstrap({ ...proof, email }, env.BETTER_AUTH_SECRET)
+          );
           await sendAuthEmail({
             actionLabel: "Sign in",
-            actionUrl: url,
+            actionUrl: link.toString(),
             body: "Use this link to sign in. It expires in five minutes and can be used once.",
             subject: "Sign in to Team Calendar",
             to: email,
@@ -225,7 +318,7 @@ export function createBetterAuthOptions(
             clientId: env.XERO_AUTH_CLIENT_ID,
             clientSecret: env.XERO_AUTH_CLIENT_SECRET,
             disableProviderLogout: true,
-            disableSignUp: true,
+            disableSignUp: false,
             discoveryUrl:
               "https://identity.xero.com/.well-known/openid-configuration",
             pkce: true,
@@ -273,12 +366,12 @@ export function createBetterAuthOptions(
       google: {
         clientId: env.GOOGLE_CLIENT_ID,
         clientSecret: env.GOOGLE_CLIENT_SECRET,
-        disableSignUp: true,
+        disableSignUp: false,
       },
       microsoft: {
         clientId: env.MICROSOFT_CLIENT_ID,
         clientSecret: env.MICROSOFT_CLIENT_SECRET,
-        disableSignUp: true,
+        disableSignUp: false,
         tenantId: env.MICROSOFT_TENANT_ID,
       },
     },

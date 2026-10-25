@@ -1,4 +1,5 @@
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
+import { readJobEventData } from "../event-context";
 import "server-only";
 import type { Result } from "@repo/core";
 import { withTenantDb } from "@repo/database";
@@ -47,7 +48,7 @@ export const rebuildFeedCacheFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("rebuild-feed-cache", async () => {
-        const result = await rebuildFeedCache(event.data);
+        const result = await rebuildFeedCache(readJobEventData(event.data));
         if (!result.ok) {
           throw new Error(result.error.message);
         }

@@ -69,7 +69,7 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
     unreadOnly: filters.unreadOnly,
   };
 
-  // Clerk supplied the authenticated account identifier.
+  // Authentication supplied the authenticated account identifier.
   const accountId = (await requireAccount()) as AccountId;
   const {
     organisationId,

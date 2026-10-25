@@ -4,6 +4,7 @@ import {
   disabledAuthPaths,
 } from "./better-auth-options";
 import { parseBetterAuthEnvironment } from "./keys";
+import { collectInvitationEmails } from "./native-mutation-context";
 
 const sendAuthEmail = vi.hoisted(() => vi.fn());
 vi.mock("@repo/email", () => ({ sendAuthEmail }));
@@ -32,6 +33,28 @@ const optionsFor = (url = environment.BETTER_AUTH_URL, extra = {}) =>
   );
 
 describe("Better Auth server policy", () => {
+  it("requires the checked transaction scope for native organisation hooks", async () => {
+    const plugin = optionsFor().plugins.find(
+      (item) => item.id === "organization"
+    );
+    const hooks = plugin?.options.organizationHooks;
+    for (const hook of [
+      hooks?.beforeUpdateOrganization,
+      hooks?.beforeRemoveMember,
+      hooks?.beforeUpdateMemberRole,
+      hooks?.beforeCreateInvitation,
+      hooks?.beforeAcceptInvitation,
+    ]) {
+      expect(hook).toBeTypeOf("function");
+      if (!hook) {
+        throw new Error("Missing organisation guard");
+      }
+      expect(() => hook()).toThrow("Use the checked Account operation");
+      await expect(
+        collectInvitationEmails([], () => hook())
+      ).resolves.toBeUndefined();
+    }
+  });
   beforeEach(() => {
     sendAuthEmail.mockReset();
   });
@@ -138,19 +161,15 @@ describe("Better Auth server policy", () => {
       options.emailVerification.sendVerificationEmail(data)
     ).rejects.toThrow("mail unavailable");
   });
-  it("blocks credential export and lifecycle writes pending atomic provisioning", () => {
+  it("blocks credential export and uncoordinated lifecycle writes", () => {
     expect(disabledAuthPaths).toEqual(
       expect.arrayContaining([
         "/get-access-token",
         "/account-info",
         "/list-sessions",
         "/delete-user",
-        "/organization/leave",
-        "/organization/update-member-role",
       ])
     );
-    expect(() => optionsFor().databaseHooks.user.create.before()).toThrow(
-      "Account admission"
-    );
+    expect(optionsFor().emailAndPassword.disableSignUp).toBe(false);
   });
 });

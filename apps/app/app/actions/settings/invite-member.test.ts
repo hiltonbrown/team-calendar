@@ -29,7 +29,7 @@ describe("inviteMember", () => {
     mocks.inviteAccountMember.mockResolvedValue({});
   });
 
-  it("rejects viewers before creating Clerk invitations", async () => {
+  it("rejects viewers before creating Account invitations", async () => {
     const result = await inviteMember(validInput);
 
     expect(result.ok).toBe(false);

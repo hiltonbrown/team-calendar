@@ -24,7 +24,7 @@ export default async function XeroMatchesPage({
   await requirePagePermission({ xero: ["manage"] });
 
   const { org: orgParam } = await searchParams;
-  // Clerk supplied the authenticated account identifier.
+  // Authentication supplied the authenticated account identifier.
   const accountId = (await requireAccount()) as AccountId;
   const { organisationId, matches } = await withTenantDb(
     accountId,

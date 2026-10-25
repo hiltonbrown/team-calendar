@@ -26,7 +26,7 @@ export default async function DashboardPage({
 
   const params = await searchParams;
   const orgParam = typeof params.org === "string" ? params.org : undefined;
-  // Clerk authentication finishes before dashboard preparation opens its tenant scope.
+  // Authentication finishes before dashboard preparation opens its tenant scope.
   const accountId = (await requireAccount()) as AccountId;
   const companyIds =
     typeof params.companyIds === "string"

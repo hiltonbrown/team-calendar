@@ -20,11 +20,22 @@ export type AuthUserModel = runtime.Types.Result.DefaultSelection<Prisma.$AuthUs
 
 export type AggregateAuthUser = {
   _count: AuthUserCountAggregateOutputType | null
+  _avg: AuthUserAvgAggregateOutputType | null
+  _sum: AuthUserSumAggregateOutputType | null
   _min: AuthUserMinAggregateOutputType | null
   _max: AuthUserMaxAggregateOutputType | null
 }
 
+export type AuthUserAvgAggregateOutputType = {
+  membership_revision: number | null
+}
+
+export type AuthUserSumAggregateOutputType = {
+  membership_revision: number | null
+}
+
 export type AuthUserMinAggregateOutputType = {
+  membership_revision: number | null
   id: string | null
   name: string | null
   email: string | null
@@ -35,6 +46,7 @@ export type AuthUserMinAggregateOutputType = {
 }
 
 export type AuthUserMaxAggregateOutputType = {
+  membership_revision: number | null
   id: string | null
   name: string | null
   email: string | null
@@ -45,6 +57,7 @@ export type AuthUserMaxAggregateOutputType = {
 }
 
 export type AuthUserCountAggregateOutputType = {
+  membership_revision: number
   id: number
   name: number
   email: number
@@ -56,7 +69,16 @@ export type AuthUserCountAggregateOutputType = {
 }
 
 
+export type AuthUserAvgAggregateInputType = {
+  membership_revision?: true
+}
+
+export type AuthUserSumAggregateInputType = {
+  membership_revision?: true
+}
+
 export type AuthUserMinAggregateInputType = {
+  membership_revision?: true
   id?: true
   name?: true
   email?: true
@@ -67,6 +89,7 @@ export type AuthUserMinAggregateInputType = {
 }
 
 export type AuthUserMaxAggregateInputType = {
+  membership_revision?: true
   id?: true
   name?: true
   email?: true
@@ -77,6 +100,7 @@ export type AuthUserMaxAggregateInputType = {
 }
 
 export type AuthUserCountAggregateInputType = {
+  membership_revision?: true
   id?: true
   name?: true
   email?: true
@@ -125,6 +149,18 @@ export type AuthUserAggregateArgs<ExtArgs extends runtime.Types.Extensions.Inter
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    *
+   * Select which fields to average
+  **/
+  _avg?: AuthUserAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   *
+   * Select which fields to sum
+  **/
+  _sum?: AuthUserSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   *
    * Select which fields to find the minimum value
   **/
   _min?: AuthUserMinAggregateInputType
@@ -155,11 +191,14 @@ export type AuthUserGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
   take?: number
   skip?: number
   _count?: AuthUserCountAggregateInputType | true
+  _avg?: AuthUserAvgAggregateInputType
+  _sum?: AuthUserSumAggregateInputType
   _min?: AuthUserMinAggregateInputType
   _max?: AuthUserMaxAggregateInputType
 }
 
 export type AuthUserGroupByOutputType = {
+  membership_revision: number
   id: string
   name: string
   email: string
@@ -168,6 +207,8 @@ export type AuthUserGroupByOutputType = {
   created_at: Date
   updated_at: Date
   _count: AuthUserCountAggregateOutputType | null
+  _avg: AuthUserAvgAggregateOutputType | null
+  _sum: AuthUserSumAggregateOutputType | null
   _min: AuthUserMinAggregateOutputType | null
   _max: AuthUserMaxAggregateOutputType | null
 }
@@ -191,6 +232,7 @@ export type AuthUserWhereInput = {
   AND?: Prisma.AuthUserWhereInput | Prisma.AuthUserWhereInput[]
   OR?: Prisma.AuthUserWhereInput[]
   NOT?: Prisma.AuthUserWhereInput | Prisma.AuthUserWhereInput[]
+  membership_revision?: Prisma.IntFilter<"AuthUser"> | number
   id?: Prisma.UuidFilter<"AuthUser"> | string
   name?: Prisma.StringFilter<"AuthUser"> | string
   email?: Prisma.StringFilter<"AuthUser"> | string
@@ -207,6 +249,7 @@ export type AuthUserWhereInput = {
 }
 
 export type AuthUserOrderByWithRelationInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   email?: Prisma.SortOrder
@@ -228,6 +271,7 @@ export type AuthUserWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.AuthUserWhereInput | Prisma.AuthUserWhereInput[]
   OR?: Prisma.AuthUserWhereInput[]
   NOT?: Prisma.AuthUserWhereInput | Prisma.AuthUserWhereInput[]
+  membership_revision?: Prisma.IntFilter<"AuthUser"> | number
   name?: Prisma.StringFilter<"AuthUser"> | string
   email_verified?: Prisma.BoolFilter<"AuthUser"> | boolean
   image?: Prisma.StringNullableFilter<"AuthUser"> | string | null
@@ -242,6 +286,7 @@ export type AuthUserWhereUniqueInput = Prisma.AtLeast<{
 }, "id" | "email">
 
 export type AuthUserOrderByWithAggregationInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   email?: Prisma.SortOrder
@@ -250,14 +295,17 @@ export type AuthUserOrderByWithAggregationInput = {
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.AuthUserCountOrderByAggregateInput
+  _avg?: Prisma.AuthUserAvgOrderByAggregateInput
   _max?: Prisma.AuthUserMaxOrderByAggregateInput
   _min?: Prisma.AuthUserMinOrderByAggregateInput
+  _sum?: Prisma.AuthUserSumOrderByAggregateInput
 }
 
 export type AuthUserScalarWhereWithAggregatesInput = {
   AND?: Prisma.AuthUserScalarWhereWithAggregatesInput | Prisma.AuthUserScalarWhereWithAggregatesInput[]
   OR?: Prisma.AuthUserScalarWhereWithAggregatesInput[]
   NOT?: Prisma.AuthUserScalarWhereWithAggregatesInput | Prisma.AuthUserScalarWhereWithAggregatesInput[]
+  membership_revision?: Prisma.IntWithAggregatesFilter<"AuthUser"> | number
   id?: Prisma.UuidWithAggregatesFilter<"AuthUser"> | string
   name?: Prisma.StringWithAggregatesFilter<"AuthUser"> | string
   email?: Prisma.StringWithAggregatesFilter<"AuthUser"> | string
@@ -268,6 +316,7 @@ export type AuthUserScalarWhereWithAggregatesInput = {
 }
 
 export type AuthUserCreateInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -284,6 +333,7 @@ export type AuthUserCreateInput = {
 }
 
 export type AuthUserUncheckedCreateInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -300,6 +350,7 @@ export type AuthUserUncheckedCreateInput = {
 }
 
 export type AuthUserUpdateInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -316,6 +367,7 @@ export type AuthUserUpdateInput = {
 }
 
 export type AuthUserUncheckedUpdateInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -332,6 +384,7 @@ export type AuthUserUncheckedUpdateInput = {
 }
 
 export type AuthUserCreateManyInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -342,6 +395,7 @@ export type AuthUserCreateManyInput = {
 }
 
 export type AuthUserUpdateManyMutationInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -352,6 +406,7 @@ export type AuthUserUpdateManyMutationInput = {
 }
 
 export type AuthUserUncheckedUpdateManyInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -362,6 +417,7 @@ export type AuthUserUncheckedUpdateManyInput = {
 }
 
 export type AuthUserCountOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   email?: Prisma.SortOrder
@@ -371,7 +427,12 @@ export type AuthUserCountOrderByAggregateInput = {
   updated_at?: Prisma.SortOrder
 }
 
+export type AuthUserAvgOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
+}
+
 export type AuthUserMaxOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   email?: Prisma.SortOrder
@@ -382,6 +443,7 @@ export type AuthUserMaxOrderByAggregateInput = {
 }
 
 export type AuthUserMinOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   email?: Prisma.SortOrder
@@ -389,6 +451,10 @@ export type AuthUserMinOrderByAggregateInput = {
   image?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
+}
+
+export type AuthUserSumOrderByAggregateInput = {
+  membership_revision?: Prisma.SortOrder
 }
 
 export type AuthUserScalarRelationFilter = {
@@ -490,6 +556,7 @@ export type AuthUserUpdateOneWithoutAudit_subjectsNestedInput = {
 }
 
 export type AuthUserCreateWithoutSessionsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -505,6 +572,7 @@ export type AuthUserCreateWithoutSessionsInput = {
 }
 
 export type AuthUserUncheckedCreateWithoutSessionsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -536,6 +604,7 @@ export type AuthUserUpdateToOneWithWhereWithoutSessionsInput = {
 }
 
 export type AuthUserUpdateWithoutSessionsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -551,6 +620,7 @@ export type AuthUserUpdateWithoutSessionsInput = {
 }
 
 export type AuthUserUncheckedUpdateWithoutSessionsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -566,6 +636,7 @@ export type AuthUserUncheckedUpdateWithoutSessionsInput = {
 }
 
 export type AuthUserCreateWithoutIdentitiesInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -581,6 +652,7 @@ export type AuthUserCreateWithoutIdentitiesInput = {
 }
 
 export type AuthUserUncheckedCreateWithoutIdentitiesInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -612,6 +684,7 @@ export type AuthUserUpdateToOneWithWhereWithoutIdentitiesInput = {
 }
 
 export type AuthUserUpdateWithoutIdentitiesInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -627,6 +700,7 @@ export type AuthUserUpdateWithoutIdentitiesInput = {
 }
 
 export type AuthUserUncheckedUpdateWithoutIdentitiesInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -642,6 +716,7 @@ export type AuthUserUncheckedUpdateWithoutIdentitiesInput = {
 }
 
 export type AuthUserCreateWithoutMembershipsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -657,6 +732,7 @@ export type AuthUserCreateWithoutMembershipsInput = {
 }
 
 export type AuthUserUncheckedCreateWithoutMembershipsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -688,6 +764,7 @@ export type AuthUserUpdateToOneWithWhereWithoutMembershipsInput = {
 }
 
 export type AuthUserUpdateWithoutMembershipsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -703,6 +780,7 @@ export type AuthUserUpdateWithoutMembershipsInput = {
 }
 
 export type AuthUserUncheckedUpdateWithoutMembershipsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -718,6 +796,7 @@ export type AuthUserUncheckedUpdateWithoutMembershipsInput = {
 }
 
 export type AuthUserCreateWithoutInvitationsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -733,6 +812,7 @@ export type AuthUserCreateWithoutInvitationsInput = {
 }
 
 export type AuthUserUncheckedCreateWithoutInvitationsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -764,6 +844,7 @@ export type AuthUserUpdateToOneWithWhereWithoutInvitationsInput = {
 }
 
 export type AuthUserUpdateWithoutInvitationsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -779,6 +860,7 @@ export type AuthUserUpdateWithoutInvitationsInput = {
 }
 
 export type AuthUserUncheckedUpdateWithoutInvitationsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -794,6 +876,7 @@ export type AuthUserUncheckedUpdateWithoutInvitationsInput = {
 }
 
 export type AuthUserCreateWithoutAudit_actionsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -809,6 +892,7 @@ export type AuthUserCreateWithoutAudit_actionsInput = {
 }
 
 export type AuthUserUncheckedCreateWithoutAudit_actionsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -829,6 +913,7 @@ export type AuthUserCreateOrConnectWithoutAudit_actionsInput = {
 }
 
 export type AuthUserCreateWithoutAudit_subjectsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -844,6 +929,7 @@ export type AuthUserCreateWithoutAudit_subjectsInput = {
 }
 
 export type AuthUserUncheckedCreateWithoutAudit_subjectsInput = {
+  membership_revision?: number
   id?: string
   name: string
   email: string
@@ -875,6 +961,7 @@ export type AuthUserUpdateToOneWithWhereWithoutAudit_actionsInput = {
 }
 
 export type AuthUserUpdateWithoutAudit_actionsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -890,6 +977,7 @@ export type AuthUserUpdateWithoutAudit_actionsInput = {
 }
 
 export type AuthUserUncheckedUpdateWithoutAudit_actionsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -916,6 +1004,7 @@ export type AuthUserUpdateToOneWithWhereWithoutAudit_subjectsInput = {
 }
 
 export type AuthUserUpdateWithoutAudit_subjectsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -931,6 +1020,7 @@ export type AuthUserUpdateWithoutAudit_subjectsInput = {
 }
 
 export type AuthUserUncheckedUpdateWithoutAudit_subjectsInput = {
+  membership_revision?: Prisma.IntFieldUpdateOperationsInput | number
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1022,6 +1112,7 @@ export type AuthUserCountOutputTypeCountAudit_subjectsArgs<ExtArgs extends runti
 
 
 export type AuthUserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   email?: boolean
@@ -1039,6 +1130,7 @@ export type AuthUserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
 }, ExtArgs["result"]["authUser"]>
 
 export type AuthUserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   email?: boolean
@@ -1049,6 +1141,7 @@ export type AuthUserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
 }, ExtArgs["result"]["authUser"]>
 
 export type AuthUserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   email?: boolean
@@ -1059,6 +1152,7 @@ export type AuthUserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
 }, ExtArgs["result"]["authUser"]>
 
 export type AuthUserSelectScalar = {
+  membership_revision?: boolean
   id?: boolean
   name?: boolean
   email?: boolean
@@ -1068,7 +1162,7 @@ export type AuthUserSelectScalar = {
   updated_at?: boolean
 }
 
-export type AuthUserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "email" | "email_verified" | "image" | "created_at" | "updated_at", ExtArgs["result"]["authUser"]>
+export type AuthUserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"membership_revision" | "id" | "name" | "email" | "email_verified" | "image" | "created_at" | "updated_at", ExtArgs["result"]["authUser"]>
 export type AuthUserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   sessions?: boolean | Prisma.AuthUser$sessionsArgs<ExtArgs>
   identities?: boolean | Prisma.AuthUser$identitiesArgs<ExtArgs>
@@ -1092,6 +1186,7 @@ export type $AuthUserPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     audit_subjects: Prisma.$AuthAuditEventPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
+    membership_revision: number
     id: string
     name: string
     email: string
@@ -1182,8 +1277,8 @@ export interface AuthUserDelegate<ExtArgs extends runtime.Types.Extensions.Inter
    * // Get first 10 AuthUsers
    * const authUsers = await prisma.authUser.findMany({ take: 10 })
    *
-   * // Only select the `id`
-   * const authUserWithIdOnly = await prisma.authUser.findMany({ select: { id: true } })
+   * // Only select the `membership_revision`
+   * const authUserWithMembership_revisionOnly = await prisma.authUser.findMany({ select: { membership_revision: true } })
    *
    */
   findMany<T extends AuthUserFindManyArgs>(args?: Prisma.SelectSubset<T, AuthUserFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AuthUserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
@@ -1227,9 +1322,9 @@ export interface AuthUserDelegate<ExtArgs extends runtime.Types.Extensions.Inter
    *   ]
    * })
    *
-   * // Create many AuthUsers and only return the `id`
-   * const authUserWithIdOnly = await prisma.authUser.createManyAndReturn({
-   *   select: { id: true },
+   * // Create many AuthUsers and only return the `membership_revision`
+   * const authUserWithMembership_revisionOnly = await prisma.authUser.createManyAndReturn({
+   *   select: { membership_revision: true },
    *   data: [
    *     // ... provide data here
    *   ]
@@ -1318,9 +1413,9 @@ export interface AuthUserDelegate<ExtArgs extends runtime.Types.Extensions.Inter
    *   ]
    * })
    *
-   * // Update zero or more AuthUsers and only return the `id`
-   * const authUserWithIdOnly = await prisma.authUser.updateManyAndReturn({
-   *   select: { id: true },
+   * // Update zero or more AuthUsers and only return the `membership_revision`
+   * const authUserWithMembership_revisionOnly = await prisma.authUser.updateManyAndReturn({
+   *   select: { membership_revision: true },
    *   where: {
    *     // ... provide filter here
    *   },
@@ -1528,6 +1623,7 @@ export interface Prisma__AuthUserClient<T, Null = never, ExtArgs extends runtime
  * Fields of the AuthUser model
  */
 export interface AuthUserFieldRefs {
+  readonly membership_revision: Prisma.FieldRef<"AuthUser", 'Int'>
   readonly id: Prisma.FieldRef<"AuthUser", 'String'>
   readonly name: Prisma.FieldRef<"AuthUser", 'String'>
   readonly email: Prisma.FieldRef<"AuthUser", 'String'>

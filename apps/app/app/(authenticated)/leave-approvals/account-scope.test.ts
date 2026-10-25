@@ -34,7 +34,7 @@ vi.mock("@repo/database", async () => {
 vi.mock("@repo/auth/server", () => ({
   getCurrentUser: async () => {
     if (state.open) {
-      throw new Error("Clerk called inside SQL scope");
+      throw new Error("Auth called inside SQL scope");
     }
     return await { id: "user-1" };
   },
@@ -223,7 +223,7 @@ test("a manager cannot dispatch an account-wide sync", async () => {
   expect(state.transaction).not.toHaveBeenCalled();
   expect(state.send).not.toHaveBeenCalled();
 });
-test("phased action rejects an enclosing transaction before Clerk authentication", async () => {
+test("phased action rejects an enclosing transaction before authentication", async () => {
   await expect(
     withTenantDb("account-A", () => approveAction({ recordId }))
   ).rejects.toBeInstanceOf(TenantPhaseError);

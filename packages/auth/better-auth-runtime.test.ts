@@ -101,7 +101,7 @@ describe("pinned Better Auth native runtime", () => {
     const now = new Date();
     // Fixture writes deliberately bypass the blocked admission hook. The real
     // handler still uses its native validation, cookies and mapped adapter.
-    await context.adapter.create({
+    await memoryAdapter(storage)(configured).create({
       data: {
         createdAt: now,
         email,
@@ -113,7 +113,7 @@ describe("pinned Better Auth native runtime", () => {
       forceAllowId: true,
       model: "user",
     });
-    await context.adapter.create({
+    await memoryAdapter(storage)(configured).create({
       data: {
         accountId: userId,
         createdAt: now,
@@ -126,7 +126,7 @@ describe("pinned Better Auth native runtime", () => {
       forceAllowId: true,
       model: "account",
     });
-    await context.adapter.create({
+    await memoryAdapter(storage)(configured).create({
       data: {
         countryCode: "AU",
         createdAt: now,
@@ -138,7 +138,7 @@ describe("pinned Better Auth native runtime", () => {
       forceAllowId: true,
       model: "organization",
     });
-    await context.adapter.create({
+    await memoryAdapter(storage)(configured).create({
       data: {
         createdAt: now,
         id: "55555555-5555-4555-8555-555555555554",

@@ -73,7 +73,7 @@ describe("updateOrg", () => {
     mocks.updateAccount.mockResolvedValue({});
   });
 
-  it("rejects viewers before touching the database or Clerk", async () => {
+  it("rejects viewers before touching the database or auth provider", async () => {
     const result = await updateOrg(validInput);
 
     expect(result.ok).toBe(false);
@@ -104,7 +104,7 @@ describe("updateOrg", () => {
     expect(mocks.updateAccount).toHaveBeenCalled();
   });
 
-  it("bails out before updating Clerk when no organisation row matches", async () => {
+  it("bails out before updating the Account when no organisation row matches", async () => {
     mocks.getSession.mockResolvedValue({
       accountId: "org_1",
       role: "admin",

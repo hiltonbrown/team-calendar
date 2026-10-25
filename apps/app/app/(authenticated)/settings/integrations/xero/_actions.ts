@@ -80,7 +80,23 @@ export async function connectXeroAction(input: {
     return context;
   }
   const env = coreKeys();
-  const baseUrl = env.NEXT_PUBLIC_API_URL ?? env.NEXT_PUBLIC_APP_URL;
+  const appOrigin = env.NEXT_PUBLIC_APP_URL
+    ? new URL(env.NEXT_PUBLIC_APP_URL)
+    : null;
+  const apiOrigin = env.NEXT_PUBLIC_API_URL
+    ? new URL(env.NEXT_PUBLIC_API_URL)
+    : null;
+  const unrelatedPreview =
+    appOrigin?.protocol === "https:" &&
+    apiOrigin &&
+    appOrigin.hostname !== apiOrigin.hostname &&
+    !(
+      appOrigin.origin === "https://app.teamcalendar.online" &&
+      apiOrigin.origin === "https://api.teamcalendar.online"
+    );
+  const baseUrl = unrelatedPreview
+    ? env.NEXT_PUBLIC_APP_URL
+    : (env.NEXT_PUBLIC_API_URL ?? env.NEXT_PUBLIC_APP_URL);
   const redirectUrl = new URL("/api/xero/oauth/start", baseUrl);
   redirectUrl.searchParams.set("accountId", context.value.accountId);
   if (parsed.data.organisationId) {

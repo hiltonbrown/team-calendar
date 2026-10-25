@@ -478,7 +478,7 @@ async function runFeedWrite<T>(
     return await withTenantResult(
       actor.accountId,
       async (db): Promise<FeedActionResult<T>> => {
-        // The IDs come from Clerk getSession and validated action schemas; query ownership is checked in this scope.
+        // The IDs come from getSession and validated action schemas; query ownership is checked in this scope.
         const company = await getOrganisationById(
           actor.accountId as AccountId,
           actor.organisationId as OrganisationId,

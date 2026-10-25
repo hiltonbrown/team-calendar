@@ -79,8 +79,15 @@ describe("one durable full initial import", () => {
     });
     const stages: string[] = [];
     const handler = Reflect.get(initialXeroSyncFunction, "fn");
+    const { accountId, organisationId, ...data } = input;
     await handler({
-      event: { data: input },
+      event: {
+        data: {
+          ...data,
+          account_id: accountId,
+          organisation_id: organisationId,
+        },
+      },
       step: {
         run: (name: string, operation: () => Promise<unknown>) => {
           stages.push(name);

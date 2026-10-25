@@ -2,6 +2,7 @@ import {
   TENANT_READ_TRANSACTION_OPTIONS,
   withTenantResult,
 } from "@repo/database";
+import { readJobEventData } from "../event-context";
 import "server-only";
 import type { Result } from "@repo/core";
 import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
@@ -53,7 +54,9 @@ export const reconcileFeedPublicationsFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("reconcile-feed-publications", async () => {
-        const result = await reconcileFeedPublications(event.data);
+        const result = await reconcileFeedPublications(
+          readJobEventData(event.data)
+        );
         if (!result.ok) {
           throw new Error(result.error.message);
         }
@@ -178,9 +181,9 @@ export async function sendPreparedFeedRebuilds(
     await inngest.send(
       feeds.map((feed) => ({
         data: {
-          accountId: context.accountId,
+          account_id: context.accountId,
           feedId: feed.id,
-          organisationId: feed.organisationId,
+          organisation_id: feed.organisationId,
           reason: "publication_reconciled",
         },
         name: "rebuild-feed-cache" as const,

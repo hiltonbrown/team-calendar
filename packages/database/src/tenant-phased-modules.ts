@@ -1,6 +1,30 @@
 // Register functions individually. Other exports in the same module can use TenantDb.
 export const PHASED_TENANT_EXPORTS = [
   {
+    exports: ["seedAuthDevelopmentFixtures"],
+    path: "packages/database/src/seed/auth-fixtures.ts",
+    reason:
+      "Development-only native auth commits precede restricted tenant fixture creation and owner readiness updates",
+  },
+  {
+    exports: ["completeAuthUserLifecycle"],
+    path: "packages/auth/user-lifecycle.ts",
+    reason:
+      "Committed auth identity and durable audit discovery surround tenant-scoped provisioning and verified Person reconciliation; analytics follows closed database scopes",
+  },
+  {
+    exports: ["ensureUserAccountsReady"],
+    path: "packages/auth/adapters/better-auth-server.ts",
+    reason:
+      "Auth Account discovery precedes scoped default-company provisioning and readiness follows durable commit",
+  },
+  {
+    exports: ["reconcileAccountPeople", "clearAccountPeople"],
+    path: "packages/auth/membership-reconciliation.ts",
+    reason:
+      "Verified membership identity precedes scoped existing-Person reconciliation; auth tables never use the tenant client",
+  },
+  {
     exports: ["resolveWriteEmployeeId", "resolveWriteLeaveTypeId"],
     path: "packages/xero/src/adapter/xero-write-adapter.ts",
     reason:
@@ -88,16 +112,6 @@ export const PHASED_TENANT_EXPORTS = [
     exports: ["captureInitialSyncCompleted"],
     path: "packages/jobs/src/activation.ts",
     reason: "C6: activation snapshot closes before analytics capture and flush",
-  },
-  {
-    exports: [
-      "POST",
-      "handleOrganizationMembershipCreated",
-      "handleOrganizationMembershipDeleted",
-    ],
-    path: "apps/api/app/webhooks/auth/route.ts",
-    reason:
-      "C6: webhook/auth/provider work remains outside tenant persistence phases",
   },
   {
     exports: ["POST"],

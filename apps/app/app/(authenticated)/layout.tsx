@@ -1,5 +1,3 @@
-import { requireAccount } from "@repo/auth/helpers";
-import { getCurrentUser, getSession } from "@repo/auth/server";
 import { isOnboardingAdmin, loadWelcomeEligibility } from "@repo/availability";
 import type { AccountId } from "@repo/core";
 import { type TenantDb, withTenantDb } from "@repo/database";
@@ -12,6 +10,7 @@ import {
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { requireAccountPage } from "@/lib/auth/require-account-page";
 import { resolveOnboardingRedirect } from "@/lib/server/onboarding-gate";
 import { CommandMenu } from "./components/command-menu";
 import { NotificationsProvider } from "./components/notifications-provider";
@@ -22,27 +21,11 @@ interface AppLayoutProperties {
 }
 
 const AppLayout = async ({ children }: AppLayoutProperties) => {
-  const user = await getCurrentUser();
-  const { role: sessionRole } = (await getSession()) ?? {
-    accountId: null,
-    role: null,
-    sessionId: null,
-    userId: null,
-  };
+  const { user, accountId, session } = await requireAccountPage();
+  const sessionRole = session.role;
   const pathname = (await headers()).get("x-pathname") ?? "/";
   const betaFeature = process.env.SHOW_BETA_FEATURE === "true";
 
-  if (!user) {
-    return redirect("/sign-in");
-  }
-
-  let accountId: AccountId | null = null;
-  try {
-    // requireAccount guarantees this string is the active Account ID.
-    accountId = (await requireAccount()) as AccountId;
-  } catch {
-    accountId = null;
-  }
   let firstRunRedirect: "/onboarding" | "/welcome" | null = null;
   if (accountId) {
     const account = accountId;

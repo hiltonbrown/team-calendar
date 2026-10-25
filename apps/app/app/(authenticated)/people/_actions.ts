@@ -492,7 +492,7 @@ async function resolveAuthenticatedPeopleActor(): Promise<
   if (!(sessionAccountId && role && user)) {
     return notAuthorised();
   }
-  // The account comes from the authenticated Clerk session.
+  // The account comes from the authenticated session.
   return {
     ok: true,
     value: {
@@ -621,7 +621,7 @@ export async function loadAccountAccessCandidates(
     db.auditEvent.create({
       data: {
         account_id: context.value.accountId,
-        action: "people.clerk_access_reviewed",
+        action: "people.account_access_reviewed",
         actor_user_id: context.value.actingUserId,
         entity_id: context.value.organisationId,
         entity_type: "people",
@@ -671,7 +671,7 @@ export async function inviteAccountAccessCandidates(
     db.auditEvent.create({
       data: {
         account_id: context.value.accountId,
-        action: "people.clerk_invitations_sent",
+        action: "people.account_invitations_sent",
         actor_user_id: context.value.actingUserId,
         entity_id: context.value.organisationId,
         entity_type: "people",

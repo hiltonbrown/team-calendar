@@ -2,6 +2,7 @@ import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
+import { readJobEventData } from "../event-context";
 
 const RecountUsageSchema = z.object({
   accountId: z.string().min(1),
@@ -69,7 +70,8 @@ export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
     triggers: { event: "recount-usage" },
   },
   async ({ event, step }) =>
-    await step.run("recount-usage", async () =>
-      withTenantDb(event.data.accountId, (db) => recountUsage(event.data, db))
-    )
+    await step.run("recount-usage", () => {
+      const context = readJobEventData(event.data);
+      return withTenantDb(context.accountId, (db) => recountUsage(context, db));
+    })
 );

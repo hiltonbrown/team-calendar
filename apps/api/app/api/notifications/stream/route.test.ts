@@ -1,17 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentUser: vi.fn(),
+  getRequestAuthContext: vi.fn(),
   logError: vi.fn(),
   logWarn: vi.fn(),
   organisationFindFirst: vi.fn(),
   pollNotificationStream: vi.fn(),
-  requireAccount: vi.fn(),
 }));
 
-vi.mock("@repo/auth/helpers", () => ({
-  getCurrentUser: mocks.getCurrentUser,
-  requireAccount: mocks.requireAccount,
+vi.mock("@repo/auth/transport", () => ({
+  getRequestAuthContext: mocks.getRequestAuthContext,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -55,8 +53,14 @@ describe("notifications stream route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
-    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireAccount.mockResolvedValue("org_1");
+    mocks.getRequestAuthContext.mockResolvedValue({
+      context: {
+        expiresAt: null,
+        session: { accountId: "org_1", role: "owner", userId: "user_1" },
+        user: { emailVerified: true, id: "user_1" },
+      },
+      responseHeaders: new Headers(),
+    });
     mocks.organisationFindFirst.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000001",
     });
@@ -78,7 +82,10 @@ describe("notifications stream route", () => {
   });
 
   it("rejects missing authenticated account context", async () => {
-    mocks.requireAccount.mockRejectedValue(new Error("Not authenticated"));
+    mocks.getRequestAuthContext.mockResolvedValue({
+      context: null,
+      responseHeaders: new Headers(),
+    });
 
     const response = await GET(
       new Request(
@@ -157,6 +164,69 @@ describe("notifications stream route", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
     await response.body?.cancel();
+  });
+
+  it.each(["revoked", "account switched", "role changed"])(
+    "closes before reading more notifications when the session is %s",
+    async (change) => {
+      vi.useFakeTimers();
+      const response = await GET(
+        new Request("http://api.test/api/notifications/stream")
+      );
+      const reader = response.body?.getReader();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
+      const context =
+        change === "revoked"
+          ? null
+          : {
+              expiresAt: null,
+              session: {
+                accountId:
+                  change === "account switched" ? "other-account" : "org_1",
+                role: change === "role changed" ? "viewer" : "owner",
+                userId: "user_1",
+              },
+              user: { emailVerified: true, id: "user_1" },
+            };
+      mocks.getRequestAuthContext.mockResolvedValue({
+        context,
+        responseHeaders: new Headers(),
+      });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
+      await reader?.read();
+      expect(await reader?.read()).toEqual({ done: true, value: undefined });
+    }
+  );
+
+  it("closes at the original session expiry even if a later lookup might renew it", async () => {
+    vi.useFakeTimers();
+    mocks.getRequestAuthContext.mockResolvedValue({
+      context: {
+        expiresAt: new Date(Date.now() + 1500).toISOString(),
+        session: { accountId: "org_1", role: "owner", userId: "user_1" },
+        user: { emailVerified: true, id: "user_1" },
+      },
+      responseHeaders: new Headers(),
+    });
+    const response = await GET(
+      new Request("http://api.test/api/notifications/stream")
+    );
+    const reader = response.body?.getReader();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
+    await reader?.read();
+    expect(await reader?.read()).toEqual({ done: true, value: undefined });
+  });
+
+  it("propagates resolver outages instead of returning a signed-out response", async () => {
+    const error = new Error("Auth resolver unavailable");
+    mocks.getRequestAuthContext.mockRejectedValue(error);
+    await expect(
+      GET(new Request("http://api.test/api/notifications/stream"))
+    ).rejects.toBe(error);
   });
 
   it("stops polling and clears timers when the stream is cancelled", async () => {

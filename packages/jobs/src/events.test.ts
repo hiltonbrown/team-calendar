@@ -157,9 +157,9 @@ describe("jobs events", () => {
     expect(mocks.send).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          accountId: "org_1",
+          account_id: "org_1",
           connectionId: "00000000-0000-4000-8000-000000000010",
-          organisationId: "00000000-0000-4000-8000-000000000001",
+          organisation_id: "00000000-0000-4000-8000-000000000001",
           runId: expect.any(String),
           triggeredByUserId: "user_1",
           triggerType: "manual",

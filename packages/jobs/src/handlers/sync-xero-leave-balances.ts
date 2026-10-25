@@ -1,5 +1,6 @@
 import type { TenantDb } from "@repo/database";
 import { withTenantDb } from "@repo/database";
+import { readJobEventData } from "../event-context";
 import "server-only";
 import type { Result } from "@repo/core";
 import { scopedTo as scoped } from "@repo/database";
@@ -119,7 +120,9 @@ export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("sync-leave-balances", async () =>
-        rejectRetryableSyncResult(syncXeroLeaveBalances(event.data))
+        rejectRetryableSyncResult(
+          syncXeroLeaveBalances(readJobEventData(event.data))
+        )
       )
   );
 export function syncXeroLeaveBalances(input: unknown) {

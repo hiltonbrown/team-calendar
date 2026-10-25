@@ -34,15 +34,3 @@ export const readCurrentUser = async (): Promise<AuthUser | null> => {
       null,
   };
 };
-
-export const readSessionAuthorizationHeaders = async (): Promise<Record<
-  string,
-  string
-> | null> => {
-  const source = await auth();
-  if (!source.isAuthenticated) {
-    return null;
-  }
-  const token = await source.getToken();
-  return token ? { Authorization: `Bearer ${token}` } : null;
-};

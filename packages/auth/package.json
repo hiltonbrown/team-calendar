@@ -15,22 +15,6 @@
       "types": "./components/auth-form-frame.tsx",
       "default": "./components/auth-form-frame.tsx"
     },
-    "./components/choose-organization-task": {
-      "types": "./components/choose-organization-task.tsx",
-      "default": "./components/choose-organization-task.tsx"
-    },
-    "./components/embedded-auth-appearance": {
-      "types": "./components/embedded-auth-appearance.ts",
-      "default": "./components/embedded-auth-appearance.ts"
-    },
-    "./components/sign-in": {
-      "types": "./components/sign-in.tsx",
-      "default": "./components/sign-in.tsx"
-    },
-    "./components/sign-up": {
-      "types": "./components/sign-up.tsx",
-      "default": "./components/sign-up.tsx"
-    },
     "./helpers": {
       "types": "./helpers.ts",
       "default": "./helpers.ts"
@@ -74,6 +58,22 @@
     "./context": {
       "types": "./context.ts",
       "default": "./context.ts"
+    },
+    "./redirects": {
+      "types": "./redirects.ts",
+      "default": "./redirects.ts"
+    },
+    "./bootstrap-context": {
+      "types": "./bootstrap-context.ts",
+      "default": "./bootstrap-context.ts"
+    },
+    "./components/account-picker": {
+      "types": "./components/account-picker.tsx",
+      "default": "./components/account-picker.tsx"
+    },
+    "./invitation-route": {
+      "types": "./invitation-route.ts",
+      "default": "./invitation-route.ts"
     }
   },
   "scripts": {
@@ -82,15 +82,17 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@better-auth/core": "1.7.12",
     "@better-auth/infra": "0.4.22",
     "@clerk/nextjs": "^7.9.20",
-    "@clerk/themes": "^2.4.57",
+    "@repo/analytics": "*",
     "@repo/core": "*",
     "@repo/database": "*",
+    "@repo/design-system": "*",
     "@repo/email": "*",
+    "@repo/observability": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
     "better-auth": "1.7.12",
-    "next-themes": "^0.4.6",
     "react": "19.3.1",
     "server-only": "^0.0.1",
     "zod": "^4.6.7"

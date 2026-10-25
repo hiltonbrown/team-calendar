@@ -106,7 +106,13 @@ it("throws execution failures with valid input at the queue boundary", async () 
   });
   await expect(
     handler({
-      event: { data: input() },
+      event: {
+        data: {
+          account_id: ACCOUNT_ID,
+          organisation_id: ORGANISATION_ID,
+          ...{ feedId: FEED_ID },
+        },
+      },
       step: {
         run: (_name: string, execute: () => Promise<unknown>) => execute(),
       },

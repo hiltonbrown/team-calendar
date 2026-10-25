@@ -360,7 +360,10 @@ describe("onboarding actions", () => {
           error: "That email address is already a member of this organisation",
           ok: false,
         })
-        .mockResolvedValueOnce({ error: "Clerk API 500 internal", ok: false });
+        .mockResolvedValueOnce({
+          error: "Account API 500 internal",
+          ok: false,
+        });
       const result = await sendInvitesAction({
         organisationId,
         rows: [

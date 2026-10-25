@@ -1,4 +1,5 @@
 import type { TenantDb } from "@repo/database";
+import { readJobEventData } from "../event-context";
 import "server-only";
 import { reconcileXeroPerson } from "@repo/availability";
 import type { Result } from "@repo/core";
@@ -79,7 +80,7 @@ export const syncXeroPeopleFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("sync-people", async () =>
-        rejectRetryableSyncResult(syncXeroPeople(event.data))
+        rejectRetryableSyncResult(syncXeroPeople(readJobEventData(event.data)))
       )
   );
 export function syncXeroPeople(input: unknown) {

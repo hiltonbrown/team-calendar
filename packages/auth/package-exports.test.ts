@@ -25,10 +25,9 @@ describe("auth package public exports", () => {
       "testing",
       "transport",
       "components/auth-form-frame",
-      "components/choose-organization-task",
-      "components/embedded-auth-appearance",
-      "components/sign-in",
-      "components/sign-up",
+      "components/account-picker",
+      "redirects",
+      "invitation-route",
     ]) {
       expect(existsSync(resolveModule(`@repo/auth/${subpath}`))).toBe(true);
     }

@@ -1272,13 +1272,14 @@ model StripeEvent {
 // Domain auth foreign keys are added at the clean-reset cutover, while Clerk
 // remains the active provider and existing domain account/user IDs are text.
 model AuthUser {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name           String
-  email          String   @unique
-  email_verified Boolean  @default(false)
-  image          String?
-  created_at     DateTime @default(now())
-  updated_at     DateTime @default(now()) @updatedAt
+  membership_revision Int      @default(0)
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String
+  email               String   @unique
+  email_verified      Boolean  @default(false)
+  image               String?
+  created_at          DateTime @default(now())
+  updated_at          DateTime @default(now()) @updatedAt
 
   sessions       AuthSession[]
   identities     AuthIdentity[]
@@ -1344,6 +1345,7 @@ model AuthVerification {
 }
 
 model AuthOrganization {
+  membership_revision Int                      @default(0)
   id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                String
   slug                String                   @unique

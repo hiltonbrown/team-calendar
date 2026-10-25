@@ -4320,6 +4320,7 @@ export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[key
 
 
 export const AuthUserScalarFieldEnum = {
+  membership_revision: 'membership_revision',
   id: 'id',
   name: 'name',
   email: 'email',
@@ -4379,6 +4380,7 @@ export type AuthVerificationScalarFieldEnum = (typeof AuthVerificationScalarFiel
 
 
 export const AuthOrganizationScalarFieldEnum = {
+  membership_revision: 'membership_revision',
   id: 'id',
   name: 'name',
   slug: 'slug',
