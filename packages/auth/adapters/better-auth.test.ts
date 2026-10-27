@@ -57,7 +57,6 @@ function source() {
 describe("Better Auth neutral adapter", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "local");
     mocks.getSession.mockResolvedValue(source());
     mocks.getActiveMember.mockResolvedValue({

@@ -8,7 +8,6 @@ const api = "https://candidate-api.vercel.app";
 const cookie = "__Secure-team-calendar-auth.session_token=opaque";
 describe("fixed same-origin API proxy", () => {
   beforeEach(() => {
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("VERCEL_ENV", "preview");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", app);
     vi.stubEnv("NEXT_PUBLIC_API_URL", api);

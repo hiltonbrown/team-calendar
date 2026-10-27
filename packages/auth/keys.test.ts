@@ -19,7 +19,6 @@ describe("Better Auth environment", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("keeps Clerk as the default without requiring Better Auth credentials", () => {
-    vi.stubEnv("AUTH_PROVIDER", undefined);
     expect(keys().AUTH_PROVIDER).toBe("clerk");
   });
 

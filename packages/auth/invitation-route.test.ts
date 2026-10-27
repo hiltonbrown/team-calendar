@@ -22,7 +22,6 @@ const request = (requestOrigin: string = origin) =>
 
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.stubEnv("AUTH_PROVIDER", "better-auth");
   vi.stubEnv("AUTH_CONTEXT_MODE", "local");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", origin);
   vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3002");
@@ -52,9 +51,7 @@ describe("controlled invitation acceptance endpoint", () => {
     );
   });
   it("is unavailable for the retained provider or API host", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "clerk");
     expect((await POST(request(), context)).status).toBe(404);
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     expect((await POST(request(), context)).status).toBe(404);
     expect(mocks.accept).not.toHaveBeenCalled();

@@ -13,7 +13,6 @@ vi.mock("./adapters/better-auth-server", () => ({
 describe("auth context resolver", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "local");
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("VERCEL_ENV", "development");
@@ -33,11 +32,9 @@ describe("auth context resolver", () => {
       method: "POST",
     });
   it("is unavailable for Clerk or on the remote API runtime", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "clerk");
     expect(
       (await GET(new Request("http://localhost:3000/api/auth-context"))).status
     ).toBe(404);
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     expect(
       (await GET(new Request("http://localhost:3000/api/auth-context"))).status

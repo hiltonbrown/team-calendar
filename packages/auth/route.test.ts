@@ -86,7 +86,6 @@ describe("native auth HTTP boundary", () => {
     });
   });
   it("retains status, redirects and all cookies while stripping JSON tokens", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     handler.mockResolvedValueOnce(
       Response.json(
         { token: "secret", user: { email: "user@example.test", id: "user" } },
@@ -125,7 +124,6 @@ describe("native auth HTTP boundary", () => {
     expect(redirect.headers.get("location")).toBe("/calendar");
   });
   it("keeps the server dormant for Clerk and denies unknown credential/admin paths", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "clerk");
     expect(
       (
         await handleAuthRequest(
@@ -133,7 +131,6 @@ describe("native auth HTTP boundary", () => {
         )
       ).status
     ).toBe(404);
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     for (const path of [
       "/get-access-token",
       "/list-sessions",

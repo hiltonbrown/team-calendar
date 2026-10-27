@@ -15,11 +15,9 @@ describe("fixed auth transport boundary", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
   it("keeps Clerk/local defaults and rejects unknown provider selections", () => {
-    vi.stubEnv("AUTH_PROVIDER", undefined);
     vi.stubEnv("AUTH_CONTEXT_MODE", undefined);
     expect(authProvider()).toBe("clerk");
     expect(authContextMode()).toBe("local");
-    vi.stubEnv("AUTH_PROVIDER", "unknown");
     expect(authProvider).toThrow();
     vi.stubEnv("AUTH_CONTEXT_MODE", "unknown");
     expect(authContextMode).toThrow();

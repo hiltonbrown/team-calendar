@@ -13,7 +13,6 @@ const cookie = "team-calendar-dev-auth.session_token=opaque";
 
 describe("Better Auth optimistic proxy", () => {
   beforeEach(() => {
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("VERCEL_ENV", "development");

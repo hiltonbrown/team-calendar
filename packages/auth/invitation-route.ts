@@ -8,13 +8,13 @@ import {
 } from "./adapters/better-auth-accounts";
 import { consumeAuthContextRateLimit } from "./adapters/better-auth-server";
 import { getAuthOrigins } from "./cookie-transport";
-import { authContextMode, authProvider } from "./selection";
+import { authContextMode } from "./selection";
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ invitationId: string }> }
 ): Promise<Response> {
-  if (authProvider() !== "better-auth" || authContextMode() !== "local") {
+  if (authContextMode() !== "local") {
     return new Response(null, { status: 404 });
   }
   if (request.headers.get("origin") !== getAuthOrigins().appOrigin) {

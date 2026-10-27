@@ -5,10 +5,10 @@ import { consumeAuthContextRateLimit } from "./adapters/better-auth-server";
 import { permissionRequestSchema } from "./context-contract";
 import { forwardAuthCookies, getAuthOrigins } from "./cookie-transport";
 import type { PermissionRequest } from "./permissions";
-import { authContextMode, authProvider } from "./selection";
+import { authContextMode } from "./selection";
 
 async function dispatchContext(request: Request): Promise<Response> {
-  if (authProvider() !== "better-auth" || authContextMode() !== "local") {
+  if (authContextMode() !== "local") {
     return new Response(null, { status: 404 });
   }
   const { appOrigin, apiOrigin } = getAuthOrigins();

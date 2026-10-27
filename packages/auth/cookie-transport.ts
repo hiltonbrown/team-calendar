@@ -51,12 +51,8 @@ export function getAuthOrigins(
 }
 
 export function authSessionCookieNames(
-  appOrigin: string,
-  provider: "clerk" | "better-auth" = "better-auth"
+  appOrigin: string
 ): ReadonlySet<string> {
-  if (provider === "clerk") {
-    return new Set(["__session"]);
-  }
   const secure = new URL(appOrigin).protocol === "https:";
   const prefix = secure ? "team-calendar-auth" : "team-calendar-dev-auth";
   return new Set([`${secure ? "__Secure-" : ""}${prefix}.session_token`]);
@@ -64,8 +60,7 @@ export function authSessionCookieNames(
 
 export function forwardAuthCookies(
   requestHeaders: Headers,
-  appOrigin: string,
-  provider: "clerk" | "better-auth" = "better-auth"
+  appOrigin: string
 ): Headers {
   const result = new Headers();
   const cookie = requestHeaders.get("cookie");
@@ -75,7 +70,7 @@ export function forwardAuthCookies(
   if (cookie.length > 16_384) {
     throw new Error("Auth cookie header exceeds the permitted size");
   }
-  const allowed = authSessionCookieNames(appOrigin, provider);
+  const allowed = authSessionCookieNames(appOrigin);
   const seen = new Set<string>();
   const forwarded: string[] = [];
   for (const part of cookie.split(";")) {

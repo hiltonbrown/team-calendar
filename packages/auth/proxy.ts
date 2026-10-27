@@ -5,7 +5,7 @@ import {
   NextResponse,
 } from "next/server";
 import { authSessionCookieNames, getAuthOrigins } from "./cookie-transport";
-import { authContextMode, authProvider } from "./selection";
+import { authContextMode } from "./selection";
 
 export interface RoutingContext {
   requireSessionCookie: () => void;
@@ -50,7 +50,7 @@ export const authProxy =
                 return;
               }
             }
-            const names = authSessionCookieNames(appOrigin, authProvider());
+            const names = authSessionCookieNames(appOrigin);
             if (![...names].some((name) => request.cookies.get(name)?.value)) {
               throw new SessionCookieRequired();
             }

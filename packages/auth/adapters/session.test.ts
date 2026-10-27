@@ -86,7 +86,6 @@ describe("neutral server authentication", () => {
     });
   });
   it("forwards only the selected session cookie in the transport boundary", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "clerk");
     expect(await getSessionAuthorizationHeaders()).toEqual({
       Cookie: "__session=opaque",
       Origin: "http://localhost:3000",

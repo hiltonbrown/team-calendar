@@ -41,7 +41,6 @@ const incoming = () =>
 describe("online API auth validation", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("VERCEL_ENV", "development");

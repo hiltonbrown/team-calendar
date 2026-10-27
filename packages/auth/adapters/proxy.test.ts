@@ -11,7 +11,6 @@ afterEach(() => {
 
 describe("optimistic routing proxy", () => {
   it("checks cookie presence without authenticating or calling the network", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("AUTH_CONTEXT_MODE", "local");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3002");
@@ -50,7 +49,6 @@ describe("optimistic routing proxy", () => {
     ).toBe(false);
   });
   it("can recognise the retained Clerk cookie without importing its middleware", async () => {
-    vi.stubEnv("AUTH_PROVIDER", "clerk");
     vi.stubEnv("AUTH_CONTEXT_MODE", "local");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3002");

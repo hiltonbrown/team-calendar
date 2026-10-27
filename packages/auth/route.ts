@@ -2,7 +2,7 @@ import "server-only";
 
 import { toNextJsHandler } from "better-auth/next-js";
 import { getBetterAuth } from "./adapters/better-auth-server";
-import { authProviderSchema } from "./keys";
+import { authContextMode } from "./selection";
 
 const publicUserFields = [
   "id",
@@ -118,12 +118,7 @@ export function projectAuthResponse(path: string, value: unknown): unknown {
 }
 
 export async function handleAuthRequest(request: Request): Promise<Response> {
-  if (
-    authProviderSchema.parse(process.env.AUTH_PROVIDER ?? "clerk") !==
-    "better-auth"
-  ) {
-    return Response.json({ message: "Not found" }, { status: 404 });
-  }
+  if (authContextMode() !== "local") return Response.json({ message: "Not found" }, { status: 404 });
   const path = new URL(request.url).pathname.replace(authPathPrefix, "");
   if (!allowedPaths.some((pattern) => pattern.test(path))) {
     return Response.json({ message: "Not found" }, { status: 404 });

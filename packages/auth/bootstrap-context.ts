@@ -7,10 +7,10 @@ import {
   sealBootstrap,
 } from "./bootstrap-proof";
 import { parseBetterAuthEnvironment } from "./keys";
-import { authContextMode, authProvider } from "./selection";
+import { authContextMode } from "./selection";
 
 export async function POST(request: Request): Promise<Response> {
-  if (authProvider() !== "better-auth" || authContextMode() !== "local") {
+  if (authContextMode() !== "local") {
     return new Response(null, { status: 404 });
   }
   const env = parseBetterAuthEnvironment();

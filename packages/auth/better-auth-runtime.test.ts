@@ -50,7 +50,6 @@ const request = (
 
 describe("pinned Better Auth native runtime", () => {
   beforeEach(() => {
-    vi.stubEnv("AUTH_PROVIDER", "better-auth");
     vi.stubEnv("VERCEL", "1");
     mocks.sendAuthEmail.mockReset();
     mocks.handler.mockReset();

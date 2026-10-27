@@ -6,7 +6,6 @@ import {
   forwardAuthCookies,
   getAuthOrigins,
 } from "./cookie-transport";
-import { authProvider } from "./selection";
 
 const routes: readonly { methods: readonly string[]; path: RegExp }[] = [
   { methods: ["GET"], path: /^\/api\/notifications\/stream$/ },
@@ -59,9 +58,6 @@ function resolveProxyRequest(request: Request):
       incoming: URL;
     }
   | Response {
-  if (authProvider() !== "better-auth") {
-    return new Response(null, { status: 404 });
-  }
   const { appOrigin, apiOrigin } = getAuthOrigins();
   const incoming = new URL(request.url);
   const app = new URL(appOrigin);

@@ -1,39 +1,26 @@
 import "server-only";
 
 import { appError, type Result } from "@repo/core";
-import { readCurrentUser, readSession } from "./adapters/clerk";
+import { readLocalAuthContext } from "./adapters/better-auth";
+import { readRemoteAuthContext } from "./adapters/remote-context";
 import {
   type AuthRole,
   isAuthRole,
   type PermissionRequest,
-  hasPermission as roleHasPermission,
 } from "./permissions";
-import { authContextMode, authProvider } from "./selection";
+import { authContextMode } from "./selection";
 import type { AuthSession, AuthUser } from "./types";
 
 export type { AuthSession, AuthUser } from "./types";
 
-async function betterAuthContext(permissions?: PermissionRequest) {
-  if (authContextMode() === "remote") {
-    const { readRemoteAuthContext } = await import(
-      "./adapters/remote-context.js"
-    );
-    return readRemoteAuthContext(permissions);
-  }
-  const { readLocalAuthContext } = await import("./adapters/better-auth.js");
-  return readLocalAuthContext(permissions);
+async function authContext(permissions?: PermissionRequest) {
+  return authContextMode() === "remote" ? readRemoteAuthContext(permissions) : readLocalAuthContext(permissions);
 }
-
 export async function getSession(): Promise<AuthSession | null> {
-  return authProvider() === "clerk"
-    ? readSession()
-    : ((await betterAuthContext())?.session ?? null);
+  return (await authContext())?.session ?? null;
 }
-
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  return authProvider() === "clerk"
-    ? readCurrentUser()
-    : ((await betterAuthContext())?.user ?? null);
+  return (await authContext())?.user ?? null;
 }
 
 export async function requireAccount(): Promise<string> {
@@ -71,13 +58,7 @@ export async function requireRole(role: AuthRole): Promise<boolean> {
 export async function hasPermission(
   request: PermissionRequest
 ): Promise<boolean> {
-  if (authProvider() === "better-auth") {
-    return (await betterAuthContext(request))?.allowed === true;
-  }
-  const session = await getSession();
-  return Boolean(
-    session?.accountId && roleHasPermission(session.role, request)
-  );
+  return (await authContext(request))?.allowed === true;
 }
 
 export async function hasRoleResult(role: AuthRole): Promise<Result<boolean>> {
