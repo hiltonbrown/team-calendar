@@ -1,5 +1,18 @@
 # Current work
 
+## Better Auth migration completion plan (28 October 2026)
+
+- [x] Review all nine documents in `docs/auth-migration`, distinguishing historical evidence from current requirements.
+- [x] Check reported gaps against current source and identify conflicting acceptance criteria.
+- [x] Write a prioritised Superpowers implementation plan covering code, configuration, documentation and verification.
+- [x] Check requirement coverage, file references, dependencies and planning-only scope; record the review.
+
+Stopping condition: deliver the reviewed plan for completing the migration. Do not implement fixes, install dependencies, run application/database/provider verification, reset data, change deployed configuration, deploy, commit or merge. Preserve the separate build/runtime task and all existing work.
+
+### Review
+
+PASS: planning deliverable saved to `docs/superpowers/plans/2026-10-28-auth-migration-completion.md`. Twelve ordered tasks cover all 43 audit checks plus the design's auth-audit projection, UUID relations and stale cached-job requirements. Five local document links and 47 existing referenced files resolve; proposed modules are labelled; whitespace and language checks pass. The historical 11 PASS/23 FAIL/9 UNABLE TO VERIFY audit is not presented as a fresh run. Owner versus restricted final auth storage remains an explicit user decision; other contradictory acceptance wording has proposed resolutions. This task only writes the plan and this checklist. Concurrent build/runtime source changes are preserved and identified for reuse, without claiming their verification. No application/database/browser/provider tests, dependency installation, reset, hosted changes, deployment, commit or merge were performed by this planning task.
+
 ## Clean auth reset tooling, fixture seed and cutover runbook (25 October 2026)
 
 - [x] Implement a dry-run-first Clerk tenant reset with mandatory named Neon branch binding, explicit execution confirmation, dependency-safe deletes and table counts.
