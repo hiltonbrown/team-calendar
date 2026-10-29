@@ -13,6 +13,17 @@ Stopping condition: deliver the reviewed plan for completing the migration. Do n
 
 PASS: planning deliverable saved to `docs/superpowers/plans/2026-10-28-auth-migration-completion.md`. Twelve ordered tasks cover all 43 audit checks plus the design's auth-audit projection, UUID relations and stale cached-job requirements. Five local document links and 47 existing referenced files resolve; proposed modules are labelled; whitespace and language checks pass. The historical 11 PASS/23 FAIL/9 UNABLE TO VERIFY audit is not presented as a fresh run. Owner versus restricted final auth storage remains an explicit user decision; other contradictory acceptance wording has proposed resolutions. This task only writes the plan and this checklist. Concurrent build/runtime source changes are preserved and identified for reuse, without claiming their verification. No application/database/browser/provider tests, dependency installation, reset, hosted changes, deployment, commit or merge were performed by this planning task.
 
+## Build and runtime error fixes (28 October 2026)
+
+- [ ] Reproduce build, source-gate and startup failures; identify their root causes.
+- [ ] Fix confirmed errors with focused regression coverage where behaviour changes.
+- [ ] Run the build, lint, typecheck, unit and integration gates, and smoke-test available runtime routes.
+- [ ] Review the final diff and record results and verification limits.
+
+Stopping condition: confirmed build/runtime defects are fixed and the relevant checks have been run. Preserve existing work; no deployment, destructive data reset, provider switch, commit or push.
+
+Review: in progress.
+
 ## Clean auth reset tooling, fixture seed and cutover runbook (25 October 2026)
 
 - [x] Implement a dry-run-first Clerk tenant reset with mandatory named Neon branch binding, explicit execution confirmation, dependency-safe deletes and table counts.

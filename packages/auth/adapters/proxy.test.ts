@@ -48,7 +48,7 @@ describe("optimistic routing proxy", () => {
       matches(new NextRequest("http://localhost/api/contact/private"))
     ).toBe(false);
   });
-  it("can recognise the retained Clerk cookie without importing its middleware", async () => {
+  it("redirects a legacy Clerk cookie to sign-in with the original return path", async () => {
     vi.stubEnv("AUTH_CONTEXT_MODE", "local");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "http://localhost:3000");
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3002");
@@ -57,15 +57,15 @@ describe("optimistic routing proxy", () => {
       context.requireSessionCookie();
       return new Response("route");
     });
-    expect(
-      (
-        await proxy(
-          new NextRequest("http://localhost:3000/calendar", {
-            headers: { cookie: "__session=opaque" },
-          }),
-          event
-        )
-      )?.status
-    ).toBe(200);
+    const response = await proxy(
+      new NextRequest("http://localhost:3000/calendar?company=selected", {
+        headers: { cookie: "__session=opaque" },
+      }),
+      event
+    );
+    expect(response?.status).toBe(307);
+    expect(response?.headers.get("location")).toBe(
+      "http://localhost:3000/sign-in?returnTo=%2Fcalendar%3Fcompany%3Dselected"
+    );
   });
 });

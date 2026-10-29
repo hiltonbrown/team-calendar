@@ -4,7 +4,7 @@ import {
   forwardAuthCookies,
   getAuthOrigins,
 } from "./cookie-transport";
-import { authContextMode, authProvider } from "./selection";
+import { authContextMode } from "./selection";
 
 describe("fixed auth transport boundary", () => {
   beforeEach(() => {
@@ -14,11 +14,11 @@ describe("fixed auth transport boundary", () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3002");
   });
   afterEach(() => vi.unstubAllEnvs());
-  it("keeps Clerk/local defaults and rejects unknown provider selections", () => {
+  it("defaults to local auth and accepts only supported context modes", () => {
     vi.stubEnv("AUTH_CONTEXT_MODE", undefined);
-    expect(authProvider()).toBe("clerk");
     expect(authContextMode()).toBe("local");
-    expect(authProvider).toThrow();
+    vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
+    expect(authContextMode()).toBe("remote");
     vi.stubEnv("AUTH_CONTEXT_MODE", "unknown");
     expect(authContextMode).toThrow();
   });

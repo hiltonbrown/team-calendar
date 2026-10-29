@@ -1,5 +1,4 @@
 import {
-  authProviderSchema,
   betterAuthServerEnvironmentSchema,
   validateBetterAuthPreviewOrigins,
 } from "@repo/auth/keys";
@@ -141,17 +140,6 @@ export const runProductionPreflight = (
   const { appName, envVars = process.env, launchMode: explicitMode } = options;
   const errors: string[] = [];
   const checkedVars: string[] = [];
-  const parsedProvider = authProviderSchema
-    .default("clerk")
-    .safeParse(envVars.AUTH_PROVIDER);
-  const authProvider = parsedProvider.success ? parsedProvider.data : "clerk";
-  if (appName !== "web") {
-    checkedVars.push("AUTH_PROVIDER");
-    if (!parsedProvider.success) {
-      errors.push('AUTH_PROVIDER must be "clerk" or "better-auth"');
-    }
-  }
-
   const rawMode = envVars.NEXT_PUBLIC_LAUNCH_MODE?.trim();
   const parsedMode = launchModeSchema.safeParse(rawMode);
 
@@ -268,10 +256,7 @@ export const runProductionPreflight = (
     ) {
       errors.push("XERO_REDIRECT_URI must be a valid HTTPS URL");
     }
-    if (authProvider === "clerk") {
-      checkPresent("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
-      checkPresent("CLERK_SECRET_KEY");
-    } else if (appName === "app") {
+    if (appName === "app") {
       checkedVars.push(
         "AUTH_CONTEXT_MODE",
         "BETTER_AUTH_SECRET",
@@ -304,7 +289,7 @@ export const runProductionPreflight = (
         errors.push("AUTH_CONTEXT_MODE must be remote for the Better Auth API");
       }
     }
-    if (authProvider === "better-auth" && envVars.VERCEL_ENV === "preview") {
+    if (envVars.VERCEL_ENV === "preview") {
       checkedVars.push(
         "VERCEL_ENV",
         "TC_APP_CANDIDATE_URL",
@@ -335,10 +320,7 @@ export const runProductionPreflight = (
     checkPair("INNGEST_EVENT_KEY", "INNGEST_SIGNING_KEY");
   }
 
-  if (
-    appName === "api" ||
-    (appName === "app" && authProvider === "better-auth")
-  ) {
+  if (appName === "app" || appName === "api") {
     if (checkPresent("RESEND_TOKEN")) {
       const resendToken = envVars.RESEND_TOKEN?.trim();
       if (!resendToken?.startsWith("re_")) {

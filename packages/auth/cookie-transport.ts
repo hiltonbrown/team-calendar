@@ -50,9 +50,7 @@ export function getAuthOrigins(
   return { apiOrigin, appOrigin };
 }
 
-export function authSessionCookieNames(
-  appOrigin: string
-): ReadonlySet<string> {
+export function authSessionCookieNames(appOrigin: string): ReadonlySet<string> {
   const secure = new URL(appOrigin).protocol === "https:";
   const prefix = secure ? "team-calendar-auth" : "team-calendar-dev-auth";
   return new Set([`${secure ? "__Secure-" : ""}${prefix}.session_token`]);

@@ -31,15 +31,16 @@ describe("auth context resolver", () => {
       headers: { "content-type": "application/json", origin },
       method: "POST",
     });
-  it("is unavailable for Clerk or on the remote API runtime", async () => {
-    expect(
-      (await GET(new Request("http://localhost:3000/api/auth-context"))).status
-    ).toBe(404);
+  it("is unavailable on the remote API runtime", async () => {
     vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     expect(
       (await GET(new Request("http://localhost:3000/api/auth-context"))).status
     ).toBe(404);
+    expect(
+      (await POST(request({ permissions: { member: ["create"] } }))).status
+    ).toBe(404);
     expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.limit).not.toHaveBeenCalled();
   });
   it("returns a non-cacheable projection and carries all refresh cookies", async () => {
     const responseHeaders = new Headers();

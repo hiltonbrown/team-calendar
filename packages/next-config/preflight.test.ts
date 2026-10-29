@@ -18,14 +18,23 @@ const validAppVars = {
   XERO_APP_TIER: "starter",
   XERO_REDIRECT_URI: "https://api.teamcalendar.online/oauth/callback",
   ...validCommonVars,
-  CLERK_SECRET_KEY: "clerk_sec_123456",
+  AUTH_CONTEXT_MODE: "local",
+  BETTER_AUTH_SECRET: "separate-better-auth-test-secret-32-characters",
+  BETTER_AUTH_URL: validCommonVars.NEXT_PUBLIC_APP_URL,
   DATABASE_APP_URL:
     "postgresql://team_calendar_app:test@localhost:5432/teamcalendar",
   DATABASE_URL:
     "postgresql://postgres:secretpassword@localhost:5432/teamcalendar",
+  GOOGLE_CLIENT_ID: "google-id",
+  GOOGLE_CLIENT_SECRET: "google-secret",
   KV_REST_API_TOKEN: "kv_token_123",
   KV_REST_API_URL: "https://kv.upstash.io",
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123456",
+  MICROSOFT_CLIENT_ID: "microsoft-id",
+  MICROSOFT_CLIENT_SECRET: "microsoft-secret",
+  RESEND_FROM: "accounts@teamcalendar.online",
+  RESEND_TOKEN: "re_auth-test",
+  XERO_AUTH_CLIENT_ID: "sign-in-xero-id",
+  XERO_AUTH_CLIENT_SECRET: "sign-in-xero-secret",
   XERO_CLIENT_ID: "xero_client_id_123",
   XERO_CLIENT_SECRET: "xero_client_secret_123",
   XERO_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
@@ -33,12 +42,21 @@ const validAppVars = {
 
 const validApiVars = {
   ...validAppVars,
+  AUTH_CONTEXT_MODE: "remote",
+  BETTER_AUTH_SECRET: undefined,
+  BETTER_AUTH_URL: undefined,
   EARLY_ACCESS_APPLICATION_HMAC_SECRET: "h".repeat(32),
   EARLY_ACCESS_APPLICATION_RECIPIENT: "admissions@teamcalendar.online",
+  GOOGLE_CLIENT_ID: undefined,
+  GOOGLE_CLIENT_SECRET: undefined,
   INNGEST_EVENT_KEY: "ingest_event_key_123",
   INNGEST_SIGNING_KEY: "signkey-prod-123",
+  MICROSOFT_CLIENT_ID: undefined,
+  MICROSOFT_CLIENT_SECRET: undefined,
   RESEND_FROM: "noreply@teamcalendar.online",
   RESEND_TOKEN: "re_123456789",
+  XERO_AUTH_CLIENT_ID: undefined,
+  XERO_AUTH_CLIENT_SECRET: undefined,
 };
 
 const validWebVars = {
@@ -568,31 +586,16 @@ it("requires restricted database URL for production app", () => {
 });
 
 describe("Better Auth production configuration", () => {
-  const betterAuthVars = {
-    ...validAppVars,
-    AUTH_CONTEXT_MODE: "local",
-    AUTH_PROVIDER: "better-auth",
-    BETTER_AUTH_SECRET: "separate-better-auth-test-secret-32-characters",
-    BETTER_AUTH_URL: validAppVars.NEXT_PUBLIC_APP_URL,
-    CLERK_SECRET_KEY: undefined,
-    GOOGLE_CLIENT_ID: "google-id",
-    GOOGLE_CLIENT_SECRET: "google-secret",
-    MICROSOFT_CLIENT_ID: "microsoft-id",
-    MICROSOFT_CLIENT_SECRET: "microsoft-secret",
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: undefined,
-    RESEND_FROM: "accounts@teamcalendar.online",
-    RESEND_TOKEN: "re_auth-test",
-    XERO_AUTH_CLIENT_ID: "sign-in-xero-id",
-    XERO_AUTH_CLIENT_SECRET: "sign-in-xero-secret",
-  };
+  const betterAuthVars = validAppVars;
 
-  it("requires the selected app auth configuration without requiring Clerk", () => {
+  it("requires app auth configuration without a provider flag or Clerk keys", () => {
     const result = runProductionPreflight({
       appName: "app",
       envVars: betterAuthVars,
     });
     expect(result.ok).toBe(true);
     expect(result.checkedVars).toContain("BETTER_AUTH_SECRET");
+    expect(result.checkedVars).not.toContain("AUTH_PROVIDER");
     expect(result.checkedVars).not.toContain("CLERK_SECRET_KEY");
   });
 
@@ -601,10 +604,6 @@ describe("Better Auth production configuration", () => {
       appName: "api",
       envVars: {
         ...validApiVars,
-        AUTH_CONTEXT_MODE: "remote",
-        AUTH_PROVIDER: "better-auth",
-        CLERK_SECRET_KEY: undefined,
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: undefined,
       },
     });
     expect(result.ok).toBe(true);
@@ -617,7 +616,7 @@ describe("Better Auth production configuration", () => {
     expect(() =>
       runProductionPreflight({
         appName: "api",
-        envVars: { ...validApiVars, AUTH_PROVIDER: "better-auth" },
+        envVars: { ...validApiVars, AUTH_CONTEXT_MODE: "local" },
       })
     ).toThrow("AUTH_CONTEXT_MODE must be remote");
   });
@@ -675,13 +674,19 @@ describe("Better Auth production configuration", () => {
     ).toThrow("BETTER_AUTH_URL must use HTTPS in production");
   });
 
-  it("rejects unknown provider selection", () => {
+  it("does not let a stale provider flag bypass Better Auth requirements", () => {
     expect(() =>
       runProductionPreflight({
         appName: "app",
-        envVars: { ...validAppVars, AUTH_PROVIDER: "unknown" },
+        envVars: {
+          ...validAppVars,
+          AUTH_PROVIDER: "clerk",
+          BETTER_AUTH_SECRET: undefined,
+          CLERK_SECRET_KEY: "legacy-clerk-key",
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_legacy",
+        },
       })
-    ).toThrow("AUTH_PROVIDER");
+    ).toThrow("BETTER_AUTH_SECRET");
   });
 
   it("requires the Infrastructure key only after explicit opt-in", () => {
@@ -711,7 +716,6 @@ describe("Better Auth production configuration", () => {
     const preview = {
       ...(appName === "app" ? betterAuthVars : validApiVars),
       AUTH_CONTEXT_MODE: appName === "app" ? "local" : "remote",
-      AUTH_PROVIDER: "better-auth",
       BETTER_AUTH_URL:
         appName === "app" ? "https://app-preview.vercel.app" : undefined,
       NEXT_PUBLIC_API_URL: "https://api-preview.vercel.app",

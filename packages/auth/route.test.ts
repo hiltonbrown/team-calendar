@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleAuthRequest, projectAuthResponse } from "./route";
 
 const handler = vi.hoisted(() => vi.fn());
@@ -6,6 +6,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("./adapters/better-auth-server", () => ({
   getBetterAuth: () => ({ handler }),
 }));
+beforeEach(() => vi.stubEnv("AUTH_CONTEXT_MODE", "local"));
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.clearAllMocks();
@@ -123,7 +124,8 @@ describe("native auth HTTP boundary", () => {
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get("location")).toBe("/calendar");
   });
-  it("keeps the server dormant for Clerk and denies unknown credential/admin paths", async () => {
+  it("keeps the native server dormant on the remote API runtime", async () => {
+    vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     expect(
       (
         await handleAuthRequest(
@@ -131,6 +133,9 @@ describe("native auth HTTP boundary", () => {
         )
       ).status
     ).toBe(404);
+    expect(handler).not.toHaveBeenCalled();
+  });
+  it("denies unknown credential and unchecked admin paths", async () => {
     for (const path of [
       "/get-access-token",
       "/list-sessions",

@@ -18,8 +18,17 @@ const valid = {
 describe("Better Auth environment", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("keeps Clerk as the default without requiring Better Auth credentials", () => {
-    expect(keys().AUTH_PROVIDER).toBe("clerk");
+  it("defaults shared configuration to local auth and supports the remote runtime", () => {
+    vi.stubEnv("AUTH_CONTEXT_MODE", undefined);
+    expect(keys().AUTH_CONTEXT_MODE).toBe("local");
+    vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
+    expect(keys().AUTH_CONTEXT_MODE).toBe("remote");
+  });
+
+  it("requires local context when initialising the native auth server", () => {
+    expect(() =>
+      parseBetterAuthEnvironment({ ...valid, AUTH_CONTEXT_MODE: "remote" })
+    ).toThrow("AUTH_CONTEXT_MODE");
   });
 
   it("defaults to multi-tenant Entra with Infrastructure and telemetry disabled", () => {

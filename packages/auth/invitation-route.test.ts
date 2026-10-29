@@ -50,11 +50,11 @@ describe("controlled invitation acceptance endpoint", () => {
       expect.any(Headers)
     );
   });
-  it("is unavailable for the retained provider or API host", async () => {
-    expect((await POST(request(), context)).status).toBe(404);
+  it("is unavailable on the remote API runtime", async () => {
     vi.stubEnv("AUTH_CONTEXT_MODE", "remote");
     expect((await POST(request(), context)).status).toBe(404);
     expect(mocks.accept).not.toHaveBeenCalled();
+    expect(mocks.limit).not.toHaveBeenCalled();
   });
   it("rejects foreign or missing origins before auth work", async () => {
     expect(

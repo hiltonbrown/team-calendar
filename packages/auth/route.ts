@@ -118,7 +118,9 @@ export function projectAuthResponse(path: string, value: unknown): unknown {
 }
 
 export async function handleAuthRequest(request: Request): Promise<Response> {
-  if (authContextMode() !== "local") return Response.json({ message: "Not found" }, { status: 404 });
+  if (authContextMode() !== "local") {
+    return Response.json({ message: "Not found" }, { status: 404 });
+  }
   const path = new URL(request.url).pathname.replace(authPathPrefix, "");
   if (!allowedPaths.some((pattern) => pattern.test(path))) {
     return Response.json({ message: "Not found" }, { status: 404 });

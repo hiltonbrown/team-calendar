@@ -22,7 +22,9 @@ describe("auth package public exports", () => {
       "provider",
       "proxy",
       "server",
-      "testing",
+      "route",
+      "context",
+      "bootstrap-context",
       "transport",
       "components/auth-form-frame",
       "components/account-picker",
@@ -33,7 +35,14 @@ describe("auth package public exports", () => {
     }
   });
 
-  it("does not export provider adapters", () => {
-    expect(() => resolveModule("@repo/auth/adapters/clerk.ts")).toThrow();
+  it("keeps adapters and the removed provider testing entry private", () => {
+    for (const subpath of [
+      "adapters/clerk.ts",
+      "adapters/better-auth",
+      "adapters/better-auth-accounts",
+      "testing",
+    ]) {
+      expect(() => resolveModule(`@repo/auth/${subpath}`)).toThrow();
+    }
   });
 });

@@ -13,8 +13,10 @@ import type { AuthSession, AuthUser } from "./types";
 
 export type { AuthSession, AuthUser } from "./types";
 
-async function authContext(permissions?: PermissionRequest) {
-  return authContextMode() === "remote" ? readRemoteAuthContext(permissions) : readLocalAuthContext(permissions);
+function authContext(permissions?: PermissionRequest) {
+  return authContextMode() === "remote"
+    ? readRemoteAuthContext(permissions)
+    : readLocalAuthContext(permissions);
 }
 export async function getSession(): Promise<AuthSession | null> {
   return (await authContext())?.session ?? null;

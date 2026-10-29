@@ -161,6 +161,10 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Working with the operator
 
+- When the user names a working branch, verify it before further edits and keep
+  all task work on that branch. For auth migration work, use
+  `better-auth-migration` when specified.
+
 - The configured remote Neon database is the owner's development database. An explicit request to verify integration and RLS authorises completing its migration/runtime-role setup and guarded owned-fixture run; a localhost-only guard rejection is a runner issue to resolve, not the end of verification. Do not reclassify it as production or request the same authority again.
 
 - Keep verification within the user's current scope. Update affected fixtures

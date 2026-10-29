@@ -9,10 +9,7 @@ export async function getSessionAuthorizationHeaders(): Promise<Record<
   string
 > | null> {
   const { appOrigin } = getAuthOrigins();
-  const forwarded = forwardAuthCookies(
-    await headers(),
-    appOrigin
-  );
+  const forwarded = forwardAuthCookies(await headers(), appOrigin);
   const cookie = forwarded.get("cookie");
   return cookie ? { Cookie: cookie, Origin: appOrigin } : null;
 }
