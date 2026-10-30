@@ -1,5 +1,30 @@
 # Current work
 
+## Better Auth migration: Database migrations and RLS audit (30 October 2026)
+
+- [x] Task 13.1: Audit database migration history and status: confirmed 45 migrations applied and schema up to date via `prisma migrate status`.
+- [x] Task 13.2: Verify Row-Level Security architecture: verified 29 tenant tables with `tenant_isolation` policy checking `account_id = current_setting('app.account_id', true)` and company ownership subqueries.
+- [x] Task 13.3: Verify role boundary and table privilege isolation: confirmed `DATABASE_APP_URL` uses restricted `team_calendar_app` non-owner role via `assertRestrictedDatabaseRole`; confirmed 12 auth and system tables are completely denied to `team_calendar_app` (error 42501 on live DB); confirmed reference tables (`plans`, `plan_limits`) are read-only; verified uncontexted tenant queries fail closed (0 rows).
+- [x] Task 13.4: Verify custom PostgreSQL triggers and security definer functions: verified all 12 custom triggers and functions (`tc_manager_belongs_to_account`, `auth_*`) in PostgreSQL catalogue.
+
+Stopping condition: Complete verification and documentation of database migrations and RLS enforcement.
+
+Review: PASS.
+1. Database migrations:
+   - All 45 migrations verified from `00000000000000_init` to `20261025160000_auth_lifecycle_audit`.
+   - Live database catalogue checked via `prisma migrate status` (Prisma 7.10.1): schema is completely up to date.
+2. Row-Level Security and role privilege isolation:
+   - Runtime role check passed: `DATABASE_APP_URL` uses restricted `team_calendar_app` non-owner role without superuser, `BYPASSRLS`, or table ownership.
+   - 29 tenant tables enforce `relrowsecurity = true` and `tenant_isolation` policy scoped to `app.account_id`.
+   - 12 auth and system tables are completely denied to `team_calendar_app` (verified SQLSTATE 42501 on live DB).
+   - 2 reference tables (`plans`, `plan_limits`) are read-only to `team_calendar_app`.
+   - Uncontexted tenant queries return 0 rows (fail closed).
+   - Transaction-local `set_config('app.account_id', ..., true)` sets context only for the transaction and clears on completion, preventing connection-pooling leaks.
+3. PostgreSQL triggers and functions:
+   - All 12 custom triggers verified active in `pg_trigger`.
+   - `public.tc_manager_belongs_to_account` verified `SECURITY DEFINER` with search path `pg_catalog`, executable by `team_calendar_app`.
+   - All `auth_*` trigger functions verified `SECURITY DEFINER` with search path `pg_catalog, public`, revoked from PUBLIC and restricted from `team_calendar_app`.
+
 ## Better Auth migration: Verification reconciliation (Task 12) (30 October 2026)
 
 - [x] Task 12.1: Reconcile all 43 acceptance checks in `docs/auth-migration/04-verification.md` Section 6 with current implementation, test evidence, and accepted architectural dispositions.
