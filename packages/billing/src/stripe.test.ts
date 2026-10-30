@@ -181,7 +181,11 @@ describe("createCheckoutSession", () => {
     });
 
     expect(mocks.checkoutCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: undefined }),
+      expect.objectContaining({
+        customer: undefined,
+        metadata: { account_id: "org_new" },
+        subscription_data: { metadata: { account_id: "org_new" } },
+      }),
       { idempotencyKey: expect.any(String) }
     );
   });

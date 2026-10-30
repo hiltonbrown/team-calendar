@@ -75,7 +75,7 @@ function subscriptionEvent(overrides: Record<string, unknown> = {}) {
         customer: "cus_1",
         id: "sub_1",
         items: { data: [{ price: { id: "price_basic" } }] },
-        metadata: { clerk_org_id: "org_1" },
+        metadata: { account_id: "org_1" },
         status: "active",
         ...overrides,
       },
@@ -178,7 +178,7 @@ describe("Stripe payments webhook", () => {
       ok: true,
       value: subscriptionEvent({
         customer: "cus_different",
-        metadata: { clerk_org_id: "org_1" },
+        metadata: { account_id: "org_1" },
       }),
     });
     mocks.getSubscriptionForAccount.mockResolvedValue({
@@ -216,7 +216,7 @@ describe("Stripe payments webhook", () => {
       ok: true,
       value: subscriptionEvent({
         customer: "cus_1",
-        metadata: { clerk_org_id: "org_different" },
+        metadata: { account_id: "org_different" },
       }),
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
@@ -251,7 +251,7 @@ describe("Stripe payments webhook", () => {
       ok: true,
       value: subscriptionEvent({
         customer: "cus_1",
-        metadata: { clerk_org_id: "org_1" },
+        metadata: { account_id: "org_1" },
       }),
     });
     mocks.getSubscriptionForAccount.mockResolvedValue({
@@ -288,7 +288,7 @@ describe("Stripe payments webhook", () => {
       ok: true,
       value: subscriptionEvent({
         customer: "cus_1",
-        metadata: { clerk_org_id: "org_1" },
+        metadata: { account_id: "org_1" },
       }),
     });
     mocks.getSubscriptionForAccount.mockResolvedValue({
@@ -325,7 +325,7 @@ describe("Stripe payments webhook", () => {
               customer: "cus_1",
               id: "sub_1",
               items: { data: [{ price: { id: "price_basic" } }] },
-              metadata: { clerk_org_id: "org_conflict" },
+              metadata: { account_id: "org_conflict" },
               status: "active",
             },
           },
@@ -401,7 +401,7 @@ describe("Stripe payments webhook", () => {
         data: {
           object: {
             customer: "cus_1",
-            metadata: { clerk_org_id: "org_1" },
+            metadata: { account_id: "org_1" },
             subscription: "sub_1",
           },
         },
@@ -436,7 +436,7 @@ describe("Stripe payments webhook", () => {
     );
   });
 
-  it("fails subscription events missing clerk_org_id metadata for retry", async () => {
+  it("fails subscription events missing account identity metadata for retry", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
       value: subscriptionEvent({ metadata: null }),
@@ -448,6 +448,21 @@ describe("Stripe payments webhook", () => {
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
       expect.objectContaining({ errorCategory: "invalid_payload" })
+    );
+  });
+
+  it("resolves account identity from legacy clerk_org_id metadata for backward compatibility", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: subscriptionEvent({ metadata: { clerk_org_id: "org_1" } }),
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: "org_1" }),
+      expect.anything()
     );
   });
 
@@ -720,7 +735,7 @@ describe("Stripe payments webhook", () => {
   it("assigns conflicting metadata failures to the verified customer tenant", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
-      value: subscriptionEvent({ metadata: { clerk_org_id: "org_foreign" } }),
+      value: subscriptionEvent({ metadata: { account_id: "org_foreign" } }),
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
       account_id: "org_verified",

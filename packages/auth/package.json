@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
+    "./account-audit": {
+      "types": "./account-audit.ts",
+      "default": "./account-audit.ts"
+    },
     "./accounts": {
       "types": "./accounts.ts",
       "default": "./accounts.ts"

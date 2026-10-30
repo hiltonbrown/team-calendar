@@ -104,11 +104,11 @@ export const betterAuthServerEnvironmentSchema = z
         path: ["BETTER_AUTH_URL"],
       });
     }
-    if (values.BETTER_AUTH_INFRA_ENABLED && !values.BETTER_AUTH_API_KEY) {
+    if (values.BETTER_AUTH_INFRA_ENABLED) {
       context.addIssue({
         code: "custom",
-        message: "is required when BETTER_AUTH_INFRA_ENABLED is true",
-        path: ["BETTER_AUTH_API_KEY"],
+        message: "is disabled pending data residency and security approval",
+        path: ["BETTER_AUTH_INFRA_ENABLED"],
       });
     }
     const payrollCredentials = [

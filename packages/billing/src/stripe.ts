@@ -111,10 +111,9 @@ export const createCheckoutSession = async (
       cancel_url: cancel.value,
       customer: subscription?.stripe_customer_id ?? undefined,
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      // Existing Stripe objects and webhook events use this metadata key.
-      metadata: { clerk_org_id: accountId },
+      metadata: { account_id: accountId },
       mode: "subscription",
-      subscription_data: { metadata: { clerk_org_id: accountId } },
+      subscription_data: { metadata: { account_id: accountId } },
       success_url: success.value,
     },
     {

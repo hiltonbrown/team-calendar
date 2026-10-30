@@ -16,9 +16,12 @@ import { inngest } from "@repo/jobs/src/client";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 
-// Stripe metadata retains its existing wire key for stored provider objects.
+// Stripe metadata uses neutral account_id with backward-compatible clerk_org_id fallback.
 const MetadataSchema = z
-  .object({ clerk_org_id: z.string().min(1).optional() })
+  .object({
+    account_id: z.string().min(1).optional(),
+    clerk_org_id: z.string().min(1).optional(),
+  })
   .nullable();
 const StripeRef = z.union([z.string(), z.object({ id: z.string() })]);
 const SessionSchema = z.object({
@@ -74,21 +77,14 @@ interface EventIdentity {
   stripeCustomerId?: string | null;
 }
 
-async function resolveEventIdentity(
+function extractSubscriptionId(
   value: unknown,
-  subscriptionId?: string | null
-): Promise<EventIdentity> {
+  explicitSubscriptionId?: string | null
+): string | null {
+  if (explicitSubscriptionId) {
+    return explicitSubscriptionId;
+  }
   const loose = z
-    .object({
-      customer: StripeRef.nullable().optional(),
-      metadata: MetadataSchema.optional(),
-    })
-    .safeParse(value);
-  const stripeCustomerId = loose.success ? objectId(loose.data.customer) : null;
-  const metadataOrgId = loose.success
-    ? loose.data.metadata?.clerk_org_id
-    : undefined;
-  const looseSubscription = z
     .object({
       id: z.string().optional(),
       parent: z
@@ -103,17 +99,34 @@ async function resolveEventIdentity(
       subscription: StripeRef.nullable().optional(),
     })
     .safeParse(value);
-  const resolvedSubscriptionId =
-    subscriptionId ??
-    (looseSubscription.success
-      ? (objectId(
-          looseSubscription.data.subscription ??
-            looseSubscription.data.parent?.subscription_details?.subscription
-        ) ??
-        (looseSubscription.data.id?.startsWith("sub_")
-          ? looseSubscription.data.id
-          : null))
-      : null);
+  if (!loose.success) {
+    return null;
+  }
+  const sub = objectId(
+    loose.data.subscription ??
+      loose.data.parent?.subscription_details?.subscription
+  );
+  if (sub) {
+    return sub;
+  }
+  return loose.data.id?.startsWith("sub_") ? loose.data.id : null;
+}
+
+async function resolveEventIdentity(
+  value: unknown,
+  subscriptionId?: string | null
+): Promise<EventIdentity> {
+  const loose = z
+    .object({
+      customer: StripeRef.nullable().optional(),
+      metadata: MetadataSchema.optional(),
+    })
+    .safeParse(value);
+  const stripeCustomerId = loose.success ? objectId(loose.data.customer) : null;
+  const metadataOrgId = loose.success
+    ? (loose.data.metadata?.account_id ?? loose.data.metadata?.clerk_org_id)
+    : undefined;
+  const resolvedSubscriptionId = extractSubscriptionId(value, subscriptionId);
   const [customerBinding, subscriptionBinding] = await Promise.all([
     stripeCustomerId
       ? getSubscriptionForStripeCustomer(stripeCustomerId)
@@ -175,7 +188,8 @@ async function mirrorSubscription(
 ): Promise<MirrorResult> {
   const identity = await resolveEventIdentity(data, data.id);
   const { accountId } = identity;
-  const metadataOrgId = data.metadata?.clerk_org_id;
+  const metadataOrgId =
+    data.metadata?.account_id ?? data.metadata?.clerk_org_id;
   if (identity.conflict) {
     log.error("Stripe subscription tenant cross-check conflict detected.", {
       metadataOrgId: metadataOrgId ?? null,

@@ -129,7 +129,8 @@ const {
 const { resolveXeroAccess } = await import("./authorisation");
 const ORIGINAL_ENV = { ...process.env };
 interface OAuthTestStatePayload {
-  clerkOrgId: string;
+  accountId: string;
+  clerkOrgId?: string;
   issuedAt: number;
   nonce: string;
   organisationId: string | null;
@@ -397,11 +398,8 @@ describe("buildXeroOAuthStartUrl", () => {
       new URL(result.value.redirectUrl).searchParams.get("state") ?? "";
     expect(readOAuthStateReturnTo(state)).toBe("/onboarding");
     expect(readStatePayload(result.value.redirectUrl)).toMatchObject({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
     });
-    expect(readStatePayload(result.value.redirectUrl)).not.toHaveProperty(
-      "accountId"
-    );
     const [encoded, signature] = state.split(".");
     const forged = `${Buffer.from(
       JSON.stringify({
@@ -411,6 +409,37 @@ describe("buildXeroOAuthStartUrl", () => {
     ).toString("base64url")}.${signature}`;
     expect(readOAuthStateReturnTo(forged)).toBeNull();
     expect(readOAuthStateReturnTo("not-a-state")).toBeNull();
+  });
+
+  it("verifies and accepts legacy OAuth state signed with clerkOrgId for backward compatibility", async () => {
+    const signingKey = Buffer.from(
+      (await import("node:crypto")).hkdfSync(
+        "sha256",
+        process.env.XERO_CLIENT_SECRET ?? "",
+        "",
+        "team-calendar:xero-oauth-state:v1",
+        32
+      )
+    );
+    const legacyPayload = {
+      clerkOrgId: "org_legacy",
+      issuedAt: Date.now(),
+      nonce: "test_nonce",
+      organisationId: "payroll_1",
+      returnTo: "/calendar",
+      sessionId: "session_1",
+      userId: "user_1",
+    };
+    const encoded = Buffer.from(JSON.stringify(legacyPayload)).toString(
+      "base64url"
+    );
+    const signature = (await import("node:crypto"))
+      .createHmac("sha256", signingKey)
+      .update(encoded)
+      .digest("base64url");
+    const legacyState = `${encoded}.${signature}`;
+
+    expect(readOAuthStateReturnTo(legacyState)).toBe("/calendar");
   });
 
   it("preserves a valid local return path with a query and fragment", async () => {

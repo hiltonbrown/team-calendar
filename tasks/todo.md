@@ -1,5 +1,42 @@
 # Current work
 
+## Better Auth migration: Task 7 implementation (30 October 2026)
+
+- [x] Task 7.1: Neutral Stripe metadata wire format: Emit `account_id` in `packages/billing/src/stripe.ts` checkout session metadata and subscription data; update `apps/api/lib/stripe-event-delivery.ts` to accept `account_id` as primary with `clerk_org_id` fallback; update `stripe.test.ts` and `route.test.ts`.
+- [x] Task 7.2: Neutral payroll OAuth state: Emit `accountId` in signed OAuth state in `packages/xero/src/oauth/service.ts`; accept both `accountId` and `clerkOrgId` during verification; update regressions in `service.test.ts`.
+- [x] Task 7.3: Infrastructure policy and rate limit pinning: Reject `BETTER_AUTH_INFRA_ENABLED=true` in `packages/auth/keys.ts` while approval is unresolved; pin 3/60s rate limit for password reset and email verification in `better-auth-options.ts`; update tests in `keys.test.ts`, `better-auth-options.test.ts`, and `preflight.test.ts`.
+- [x] Task 7.4: Auth audit visibility: Implement `AccountAuthAuditEvent` and `listAccountAuthAuditEvents` in `packages/auth/account-audit.ts` scoped by session account and `audit:read` permission; export from package and server index; add unit tests in `account-audit.test.ts` and allowlist in `packages/database/src/boundary.test.ts`.
+- [x] Task 7.5: Unified audit log UI: Update settings audit log page (`apps/app/app/(authenticated)/settings/audit-log/page.tsx` and `audit-log-client.tsx`) to combine auth and domain audit events discriminating `source: "auth" | "domain"`, with deterministic sorting, multi-source cursor pagination, and rendering when no company is attached. Add `page.test.tsx`.
+- [x] Task 7.6: Run verification gates: `bun run check`, `bun run typecheck`, and full monorepo test suite `bun run test`.
+
+Stopping condition: Complete Task 7 (wire names, audit visibility, Infrastructure policy). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Stripe wire names:
+   - Emits `metadata: { account_id: accountId }` and `subscription_data: { metadata: { account_id: accountId } }` in `packages/billing/src/stripe.ts`.
+   - Accepts both `account_id` and legacy `clerk_org_id` in `apps/api/lib/stripe-event-delivery.ts`. Extracted `extractSubscriptionId` to reduce cognitive complexity.
+   - Verified in `packages/billing/src/stripe.test.ts` (16 passed) and `apps/api/app/webhooks/payments/route.test.ts` (33 passed).
+2. Xero OAuth state wire names:
+   - Emits `accountId: payload.accountId` in signed OAuth state in `packages/xero/src/oauth/service.ts`.
+   - Accepts `accountId` and backwards-compatible `clerkOrgId` during verification.
+   - Verified in `packages/xero/src/oauth/service.test.ts` (95 passed).
+3. Infrastructure policy and rate limits:
+   - Rejects `BETTER_AUTH_INFRA_ENABLED=true` in `packages/auth/keys.ts` with "is disabled pending data residency and security approval" even with a key.
+   - Pinned 3 per 60s rate limits for `/request-password-reset` and `/send-verification-email` in `better-auth-options.ts`.
+   - Verified in `keys.test.ts`, `better-auth-options.test.ts`, and `preflight.test.ts` (97 passed).
+4. Auth audit visibility:
+   - Implemented `AccountAuthAuditEvent` and `listAccountAuthAuditEvents` in `packages/auth/account-audit.ts`, reading from `systemDatabase.authAuditEvent`, scoped by active session account and `audit:read` permission.
+   - Sanitizes before/after to strip secrets/tokens/credentials. Supports limit and cursor pagination.
+   - Registered `packages/auth/account-audit.ts` in `SYSTEM_IMPORT_ALLOWLIST` in `packages/database/src/boundary.test.ts`.
+   - Verified in `packages/auth/account-audit.test.ts` (4 passed) and `packages/database/src/boundary.test.ts` (10 passed).
+5. Unified audit log UI:
+   - In `apps/app/app/(authenticated)/settings/audit-log/page.tsx` and `audit-log-client.tsx`, merged auth and domain events with explicit `source: "auth" | "domain"` discriminator, deterministic sort (`createdAt desc, id desc`), combined cursor encoding/decoding, and graceful rendering when no company exists.
+   - Created `apps/app/app/(authenticated)/settings/audit-log/page.test.tsx` (3 passed).
+6. Gates verified:
+   - `bun run check`: Checked 1,421 files in 1.7s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 7.3s.
+   - `bun run test`: All 18 monorepo test tasks passed (>4,500 tests across all packages).
+
 ## Better Auth migration completion plan (28 October 2026)
 
 - [x] Review all nine documents in `docs/auth-migration`, distinguishing historical evidence from current requirements.

@@ -373,10 +373,9 @@ function deriveStateSigningKey(clientSecret: string): Buffer {
 }
 
 function signState(payload: OAuthStatePayload, clientSecret: string): string {
-  // Preserve the signed wire field so existing OAuth state remains valid.
   const encoded = Buffer.from(
     JSON.stringify({
-      clerkOrgId: payload.accountId,
+      accountId: payload.accountId,
       issuedAt: payload.issuedAt,
       nonce: payload.nonce,
       organisationId: payload.organisationId,
@@ -425,10 +424,17 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
   try {
     const payload = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8")
-    ) as Partial<Omit<OAuthStatePayload, "accountId"> & { clerkOrgId: string }>;
+    ) as Partial<OAuthStatePayload & { clerkOrgId?: string }>;
+    let accountId: string | null = null;
+    const { accountId: rawAccountId, clerkOrgId } = payload;
+    if (typeof rawAccountId === "string" && rawAccountId) {
+      accountId = rawAccountId;
+    } else if (typeof clerkOrgId === "string" && clerkOrgId) {
+      accountId = clerkOrgId;
+    }
     if (
       typeof payload.sessionId !== "string" ||
-      typeof payload.clerkOrgId !== "string" ||
+      !accountId ||
       typeof payload.returnTo !== "string" ||
       typeof payload.nonce !== "string" ||
       (payload.organisationId !== null &&
@@ -448,7 +454,7 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
     return {
       ok: true,
       value: {
-        accountId: payload.clerkOrgId,
+        accountId,
         issuedAt: payload.issuedAt,
         nonce: payload.nonce,
         organisationId: payload.organisationId,

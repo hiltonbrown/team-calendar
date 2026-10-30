@@ -14,6 +14,7 @@ describe("auth package public exports", () => {
 
   it("preserves the public runtime and component subpaths", () => {
     for (const subpath of [
+      "account-audit",
       "accounts",
       "client",
       "helpers",

@@ -128,16 +128,21 @@ describe("Better Auth server policy", () => {
     expect(local.advanced.useSecureCookies).toBe(false);
     expect(local.advanced.cookiePrefix).not.toBe(prod.advanced.cookiePrefix);
   });
-  it("omits Infrastructure completely unless explicitly enabled with its key", () => {
+  it("omits Infrastructure dash plugin completely", () => {
     expect(optionsFor().plugins.some((plugin) => plugin.id === "dash")).toBe(
       false
     );
-    const enabled = optionsFor(environment.BETTER_AUTH_URL, {
-      BETTER_AUTH_API_KEY: "test-only-infra-key",
-      BETTER_AUTH_INFRA_ENABLED: "true",
+    expect(optionsFor().plugins.at(-1)?.id).toBe("next-cookies");
+  });
+  it("pins rate limits to 3 per 60s for password reset and verification email", () => {
+    const options = optionsFor();
+    expect(options.rateLimit).toMatchObject({
+      customRules: expect.objectContaining({
+        "/request-password-reset": { max: 3, window: 60 },
+        "/send-verification-email": { max: 3, window: 60 },
+      }),
+      enabled: true,
     });
-    expect(enabled.plugins.some((plugin) => plugin.id === "dash")).toBe(true);
-    expect(enabled.plugins.at(-1)?.id).toBe("next-cookies");
   });
   it("passes supplied verification and reset URLs to the repository mailer", async () => {
     const options = optionsFor();

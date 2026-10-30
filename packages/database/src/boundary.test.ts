@@ -230,6 +230,7 @@ it("tenant transaction roots stay at entry points and registered phases", async 
 });
 
 const SYSTEM_IMPORT_ALLOWLIST = new Set([
+  "packages/auth/account-audit.ts",
   "packages/auth/user-lifecycle.ts",
   "packages/auth/membership-reconciliation.ts",
   "packages/auth/adapters/better-auth-server.ts",

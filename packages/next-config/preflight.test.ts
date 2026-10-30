@@ -701,13 +701,15 @@ describe("Better Auth production configuration", () => {
     ).toThrow("BETTER_AUTH_SECRET");
   });
 
-  it("requires the Infrastructure key only after explicit opt-in", () => {
+  it("rejects Infrastructure enablement pending approval even with an opt-in", () => {
     expect(() =>
       runProductionPreflight({
         appName: "app",
         envVars: { ...betterAuthVars, BETTER_AUTH_INFRA_ENABLED: "true" },
       })
-    ).toThrow("BETTER_AUTH_API_KEY");
+    ).toThrow(
+      "BETTER_AUTH_INFRA_ENABLED is disabled pending data residency and security approval"
+    );
   });
 
   it("never echoes an invalid auth secret", () => {

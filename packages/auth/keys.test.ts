@@ -61,26 +61,25 @@ describe("Better Auth environment", () => {
     ).toThrow("XERO_AUTH_CLIENT_SECRET must be separate");
   });
 
-  it.each(["true", "1", "yes", "FALSE"])(
-    "rejects invalid Infrastructure setting %s without a key",
-    (value) => {
-      expect(() =>
-        parseBetterAuthEnvironment({
-          ...valid,
-          BETTER_AUTH_INFRA_ENABLED: value,
-        })
-      ).toThrow();
-    }
-  );
-
-  it("accepts an explicit Infrastructure opt-in with its server key", () => {
+  it("defaults Infrastructure to disabled when omitted", () => {
     expect(
+      parseBetterAuthEnvironment({
+        ...valid,
+        BETTER_AUTH_INFRA_ENABLED: undefined,
+      }).BETTER_AUTH_INFRA_ENABLED
+    ).toBe(false);
+  });
+
+  it("rejects Infrastructure enablement pending residency and security approval even with a key", () => {
+    expect(() =>
       parseBetterAuthEnvironment({
         ...valid,
         BETTER_AUTH_API_KEY: "private-infrastructure-key",
         BETTER_AUTH_INFRA_ENABLED: "true",
-      }).BETTER_AUTH_INFRA_ENABLED
-    ).toBe(true);
+      })
+    ).toThrow(
+      "BETTER_AUTH_INFRA_ENABLED is disabled pending data residency and security approval"
+    );
   });
 
   it.each([

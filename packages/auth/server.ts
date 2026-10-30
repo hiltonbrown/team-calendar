@@ -1,5 +1,10 @@
 import "server-only";
 
+export {
+  type AccountAuthAuditEvent,
+  type ListAccountAuthAuditEventsInput,
+  listAccountAuthAuditEvents,
+} from "./account-audit";
 export { hasFeature, withinLimit } from "./entitlements";
 export {
   getAccountId,
