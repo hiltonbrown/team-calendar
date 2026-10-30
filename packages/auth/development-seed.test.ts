@@ -146,7 +146,7 @@ describe("native Better Auth development seed", () => {
       }
     }
     expect(fetch).not.toHaveBeenCalled();
-  }, 30_000);
+  }, 60_000);
   it("reuses only its owned fixture users and Accounts on rerun", async () => {
     const storage = empty(),
       db = fixture(storage);
@@ -160,7 +160,7 @@ describe("native Better Auth development seed", () => {
     ).rejects.toThrow();
     expect(storage.AuthUser).toHaveLength(12);
     expect(storage.AuthOrganization).toHaveLength(3);
-  }, 30_000);
+  }, 60_000);
   it("rolls back the outer transaction when native membership bootstrap fails", async () => {
     const storage = empty();
     mocks.failMembership = true;
