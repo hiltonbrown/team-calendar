@@ -105,7 +105,7 @@ export async function PATCH(
       );
     }
     const { organisationId, ...patch } = parseResult.data;
-    // Safe branded cast: accountId is verified by Clerk requireAccount(), organisationId and recordId are validated by Zod UUID schemas
+    // Safe branded cast: accountId is verified by requireAccount(), organisationId and recordId are validated by Zod UUID schemas
     const scopedAccountId = accountId as AccountId;
     const scopedOrgId = organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
@@ -264,7 +264,7 @@ export async function DELETE(
       );
     }
     const { data } = parseResult;
-    // Safe branded cast: accountId is verified by Clerk requireAccount(), organisationId and recordId are validated by Zod UUID schemas
+    // Safe branded cast: accountId is verified by requireAccount(), organisationId and recordId are validated by Zod UUID schemas
     const scopedAccountId = accountId as AccountId;
     const scopedOrgId = data.organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;

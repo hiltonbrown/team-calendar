@@ -75,7 +75,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const { data } = parseResult;
-    // Safe branded cast: accountId is verified by Clerk requireAccount(), organisationId is validated by Zod UUID schema
+    // Safe branded cast: accountId is verified by requireAccount(), organisationId is validated by Zod UUID schema
     const scopedAccountId = accountId as AccountId;
     const scopedOrgId = data.organisationId as OrganisationId;
     const authResult = (await getSession()) ?? {

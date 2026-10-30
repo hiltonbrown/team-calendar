@@ -166,7 +166,7 @@ describe("support GitHub issue route", () => {
     expect(mocks.createSupportGitHubIssue).not.toHaveBeenCalled();
   });
 
-  it("returns unauthorised when Clerk org getSession is missing", async () => {
+  it("returns unauthorised when account getSession is missing", async () => {
     mocks.requireAccount.mockRejectedValue(new Error("missing org"));
 
     const response = await POST(
@@ -287,7 +287,7 @@ describe("support GitHub issue route", () => {
     expect(mocks.createSupportGitHubIssue).not.toHaveBeenCalled();
   });
 
-  it("returns forbidden when the organisation context is not valid for the Clerk org", async () => {
+  it("returns forbidden when the organisation context is not valid for the account", async () => {
     mocks.getOrganisationById.mockResolvedValue({
       error: { code: "not_found", message: "Organisation not found" },
       ok: false,

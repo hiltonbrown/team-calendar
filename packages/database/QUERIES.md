@@ -281,15 +281,13 @@ The authenticated app (`apps/app`) should:
 Example flow:
 ```typescript
 // app/app/(authenticated)/layout.tsx
-import { requireAccount } from "@repo/auth";
-import { useOrganization } from "@clerk/nextjs";
+import { requireAccount } from "@repo/auth/server";
 
-export default function AuthLayout() {
-  const accountId = requireAccount(); // Server-side enforcement
-  const { organization } = useOrganization(); // Client-side context
+export default async function AuthLayout() {
+  const accountId = await requireAccount(); // Server-side enforcement
   
   return (
-    <OrganisationProvider accountId={accountId} organisation={organization}>
+    <OrganisationProvider accountId={accountId}>
       <Outlet />
     </OrganisationProvider>
   );

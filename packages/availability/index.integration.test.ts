@@ -662,7 +662,7 @@ describe("current user person identity", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            avatarUrl: "https://img.clerk.com/avatar.png",
+            avatarUrl: "https://avatar.example.com/avatar.png",
             displayName: "New User",
             email: "New.User@example.com",
             userId: "user_new",
@@ -688,7 +688,7 @@ describe("current user person identity", () => {
       })
     ).resolves.toEqual({
       account_id: tenantA.accountId,
-      avatar_url: "https://img.clerk.com/avatar.png",
+      avatar_url: "https://avatar.example.com/avatar.png",
       email: "new.user@example.com",
       organisation_id: tenantA.organisationId,
       source_system: "MANUAL",

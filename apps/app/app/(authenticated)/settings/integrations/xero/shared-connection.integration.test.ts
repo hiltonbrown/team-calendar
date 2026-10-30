@@ -380,7 +380,7 @@ async function savedGrant() {
   });
 }
 
-describe("shared Organisation Xero authorisation across Clerk members", () => {
+describe("shared Organisation Xero authorisation across Account members", () => {
   it("connects through the real admin action and OAuth lifecycle, stores encrypted canonical credentials and shares actual payroll reads", async () => {
     const connected = await connect();
     const connection = await savedConnection(),
