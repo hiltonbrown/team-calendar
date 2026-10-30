@@ -158,6 +158,7 @@ describe("local persistence integration", async () => {
           data: {
             account_id: tenantA.accountId,
             feedId: "50000000-0000-4000-8000-000000000010",
+            identity_generation: "gen_v1",
             organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
@@ -485,6 +486,7 @@ describe("local persistence integration", async () => {
           data: {
             account_id: tenantA.accountId,
             feedId: expect.any(String),
+            identity_generation: "gen_v1",
             organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
@@ -908,6 +910,7 @@ describe("local persistence integration", async () => {
           data: {
             account_id: tenantA.accountId,
             feedId: "50000000-0000-4000-8000-000000000010",
+            identity_generation: "gen_v1",
             organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
