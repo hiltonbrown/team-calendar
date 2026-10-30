@@ -14,6 +14,7 @@ import {
 import { log } from "@repo/observability/log";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
+import { currentJobIdentityGeneration } from "../../keys";
 import { inngest } from "../client";
 
 const BATCH_SIZE = 100;
@@ -52,16 +53,16 @@ export const reconcileFeedPublicationsFunction: InngestFunction.Any =
       id: "reconcile-feed-publications",
       triggers: { event: "reconcile-feed-publications" },
     },
-    async ({ event, step }) =>
-      await step.run("reconcile-feed-publications", async () => {
-        const result = await reconcileFeedPublications(
-          readJobEventData(event.data)
-        );
+    async ({ event, step }) => {
+      const data = readJobEventData(event.data);
+      return await step.run("reconcile-feed-publications", async () => {
+        const result = await reconcileFeedPublications(data);
         if (!result.ok) {
           throw new Error(result.error.message);
         }
         return result.value;
-      })
+      });
+    }
   );
 export async function reconcileFeedPublications(input: unknown) {
   assertNoTenantTransaction("reconcileFeedPublications");
@@ -183,6 +184,7 @@ export async function sendPreparedFeedRebuilds(
         data: {
           account_id: context.accountId,
           feedId: feed.id,
+          identity_generation: currentJobIdentityGeneration(),
           organisation_id: feed.organisationId,
           reason: "publication_reconciled",
         },

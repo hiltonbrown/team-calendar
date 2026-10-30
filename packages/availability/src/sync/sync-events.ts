@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Result } from "@repo/core";
+import { currentJobIdentityGeneration, type Result } from "@repo/core";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { Inngest } from "inngest";
 import { z } from "zod";
@@ -101,6 +101,7 @@ export async function dispatchSyncEvent(
       data: {
         account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: parsed.data.organisationId,
         personId: parsed.data.personId,
         runId,
@@ -149,6 +150,7 @@ export async function dispatchCancelSyncRun(
     await inngest.send({
       data: {
         account_id: parsed.data.accountId,
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: parsed.data.organisationId,
         runId: parsed.data.runId,
       },

@@ -46,14 +46,16 @@ export const rebuildFeedCacheFunction: InngestFunction.Any =
       id: "rebuild-feed-cache",
       triggers: { event: "rebuild-feed-cache" },
     },
-    async ({ event, step }) =>
-      await step.run("rebuild-feed-cache", async () => {
-        const result = await rebuildFeedCache(readJobEventData(event.data));
+    async ({ event, step }) => {
+      const data = readJobEventData(event.data);
+      return await step.run("rebuild-feed-cache", async () => {
+        const result = await rebuildFeedCache(data);
         if (!result.ok) {
           throw new Error(result.error.message);
         }
         return result.value;
-      })
+      });
+    }
   );
 export async function rebuildFeedCache(input: unknown) {
   assertNoTenantTransaction("rebuildFeedCache");

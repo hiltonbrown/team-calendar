@@ -1,3 +1,4 @@
+import { currentJobIdentityGeneration } from "@repo/core";
 import { describe, expect, it, vi } from "vitest";
 import { dispatchCancelSyncRun, dispatchSyncEvent } from "./sync-events";
 
@@ -30,6 +31,7 @@ describe("domain sync event tenancy", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           account_id: "account",
+          identity_generation: currentJobIdentityGeneration(),
           organisation_id: company,
         }),
       })
@@ -37,6 +39,7 @@ describe("domain sync event tenancy", () => {
     const data = mocks.send.mock.calls.at(-1)?.[0]?.data;
     expect(data).not.toHaveProperty("accountId");
     expect(data).not.toHaveProperty("organisationId");
+    expect(data).not.toHaveProperty("identityGeneration");
   });
   it("includes the same explicit context in cancellation events", async () => {
     await dispatchCancelSyncRun({
@@ -47,6 +50,7 @@ describe("domain sync event tenancy", () => {
     expect(mocks.send).toHaveBeenLastCalledWith({
       data: {
         account_id: "account",
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: company,
         runId: "00000000-0000-4000-8000-000000000003",
       },

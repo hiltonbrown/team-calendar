@@ -90,6 +90,10 @@ export {
   recordQueryWindow,
   zonedStartOfDay,
 } from "./src/date-keys";
+export {
+  currentJobIdentityGeneration,
+  DEFAULT_JOB_IDENTITY_GENERATION,
+} from "./src/job-generation";
 export type {
   ApproveLeaveInput,
   DeclineLeaveInput,

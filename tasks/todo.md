@@ -1,5 +1,43 @@
 # Current work
 
+## Better Auth migration: Task 8 implementation (30 October 2026)
+
+- [x] Task 8.1: Define `JOB_IDENTITY_GENERATION` configuration: Implemented `currentJobIdentityGeneration()` in `packages/core/src/job-generation.ts`, exported from package root, added tests in `job-generation.test.ts`. Configured `JOB_IDENTITY_GENERATION: z.string().min(1).default(DEFAULT_JOB_IDENTITY_GENERATION)` in `packages/jobs/keys.ts`, re-exported helper, added tests in `keys.test.ts`. Updated `turbo.json` globalEnv, `apps/api/.env.example`, `apps/app/.env.example`, `packages/next-config/preflight.ts` and `preflight.test.ts`.
+- [x] Task 8.2: Enforce generation fencing in `packages/jobs/src/event-context.ts`: Require `identity_generation: z.string().min(1)` in wireContextSchema; reject absent generation, mismatched obsolete generation, and camelCase identityGeneration injection with `NonRetriableError`; return `identityGeneration`. Export `assertJobIdentityGeneration`. Added comprehensive unit tests in `event-context.test.ts`.
+- [x] Task 8.3: Update event producers and scheduled event IDs: Incorporated generation into `getScheduledSyncEventId` and `getInitialSyncEventId` in `packages/jobs/src/events.ts`. Attached `identity_generation` to `dispatchSyncEvent`, `dispatchCancelSyncRun`, and `dispatchInitialXeroSync` in `packages/jobs/src/events.ts`, `packages/availability/src/sync/sync-events.ts`, `apps/api/lib/stripe-event-delivery.ts`, `reconcile-feed-publications.ts`, and `sync-xero-leave-records.ts`. Updated tests in `events.test.ts`, `sync-events.test.ts`, `reconcile-feed-publications.test.ts`, `sync-xero-leave-records.test.ts`, and `payments/route.test.ts`.
+- [x] Task 8.4: Add generation fences outside resumable cached steps: Evaluated `readJobEventData` outside `step.run` in all handlers (`rebuild-feed-cache`, `reconcile-feed-publications`, `reconcile-xero-approval-state`, `recount-usage`, `sync-xero-leave-balances`, `sync-xero-leave-records`, `sync-xero-people`). In `initial-xero-sync.ts`, asserted generation outside steps and rechecked between durable phases in `executeInitialSync`. Added regression tests in `initial-xero-sync.test.ts`.
+- [x] Task 8.5: Document provider-backed queue closure and quarantine: Added operational runbook guidance in `docs/auth-migration/03-cutover.md` covering Inngest pause, run cancellation/quarantine, generation bump on cutover, and rollback quarantine.
+- [x] Task 8.6: Run verification gates: `bun run check`, `bun run typecheck`, and full monorepo test suite `bun run test`.
+
+Stopping condition: Complete Task 8 (job identity generation fencing, producer updates, handler fences, queue closure documentation). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Job identity generation configuration:
+   - Implemented `currentJobIdentityGeneration()` in `packages/core/src/job-generation.ts` and exported from package index.
+   - Enforced `JOB_IDENTITY_GENERATION: z.string().min(1).default(DEFAULT_JOB_IDENTITY_GENERATION)` in `packages/jobs/keys.ts`.
+   - Verified in `packages/core/src/job-generation.test.ts` (3 passed) and `packages/jobs/keys.test.ts` (3 passed).
+   - Documented in `apps/api/.env.example` and `apps/app/.env.example`; added to `turbo.json` globalEnv.
+   - Validated non-empty string in `packages/next-config/preflight.ts` and `preflight.test.ts` (110 passed).
+2. Event context and generation fencing:
+   - Required `identity_generation: z.string().min(1)` in `wireContextSchema` in `packages/jobs/src/event-context.ts`.
+   - Rejected missing generation, mismatched generation, and camelCase injection with `NonRetriableError`.
+   - Exported `assertJobIdentityGeneration` and `readJobEventData` from `packages/jobs/index.ts`.
+   - Verified 14 tests in `packages/jobs/src/event-context.test.ts`.
+3. Event producers and scheduled IDs:
+   - Generated IDs `scheduled-sync:${generation}:${connectionId}:${runType}:${slot}` and `initial-sync:${generation}:${connectionId}:${requestedAt}` to prevent deduplication across generations.
+   - Attached `identity_generation` to all dispatchers: `packages/jobs/src/events.ts`, `packages/availability/src/sync/sync-events.ts`, `apps/api/lib/stripe-event-delivery.ts`, `reconcile-feed-publications.ts`, and `sync-xero-leave-records.ts`.
+   - Verified in `events.test.ts` (8 passed), `sync-events.test.ts` (2 passed), `reconcile-feed-publications.test.ts` (13 passed), `sync-xero-leave-records.test.ts` (51 passed), and `payments/route.test.ts` (33 passed).
+4. Handler fences outside resumable steps:
+   - Moved `readJobEventData` evaluation outside `step.run` in `rebuild-feed-cache`, `reconcile-feed-publications`, `reconcile-xero-approval-state`, `recount-usage`, `sync-xero-leave-balances`, `sync-xero-leave-records`, `sync-xero-people`.
+   - In `initial-xero-sync.ts`, verified generation before steps and between multi-page phases in `executeInitialSync`.
+   - Verified in `initial-xero-sync.test.ts` (9 passed).
+5. Operational queue closure documentation:
+   - Documented Inngest pause, cancel/quarantine, generation advance, and rollback quarantine in `docs/auth-migration/03-cutover.md`.
+6. Gates verified:
+   - `bun run check`: Checked 1,424 files, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages, 0 errors.
+   - `bun run test`: All 18 monorepo test tasks passed (>4,500 tests across all packages).
+
 ## Better Auth migration: Task 7 implementation (30 October 2026)
 
 - [x] Task 7.1: Neutral Stripe metadata wire format: Emit `account_id` in `packages/billing/src/stripe.ts` checkout session metadata and subscription data; update `apps/api/lib/stripe-event-delivery.ts` to accept `account_id` as primary with `clerk_org_id` fallback; update `stripe.test.ts` and `route.test.ts`.

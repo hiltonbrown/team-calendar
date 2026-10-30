@@ -69,9 +69,10 @@ export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
     id: "recount-usage",
     triggers: { event: "recount-usage" },
   },
-  async ({ event, step }) =>
-    await step.run("recount-usage", () => {
-      const context = readJobEventData(event.data);
-      return withTenantDb(context.accountId, (db) => recountUsage(context, db));
-    })
+  async ({ event, step }) => {
+    const context = readJobEventData(event.data);
+    return await step.run("recount-usage", () =>
+      withTenantDb(context.accountId, (db) => recountUsage(context, db))
+    );
+  }
 );

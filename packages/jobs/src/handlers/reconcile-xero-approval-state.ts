@@ -143,12 +143,12 @@ export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
       id: "reconcile-xero-approval-state",
       triggers: { event: "reconcile-xero-approval-state" },
     },
-    async ({ event, step }) =>
-      await step.run("reconcile-approval-state", async () =>
-        rejectRetryableSyncResult(
-          reconcileXeroApprovalState(readJobEventData(event.data))
-        )
-      )
+    async ({ event, step }) => {
+      const data = readJobEventData(event.data);
+      return await step.run("reconcile-approval-state", async () =>
+        rejectRetryableSyncResult(reconcileXeroApprovalState(data))
+      );
+    }
   );
 export function reconcileXeroApprovalState(input: unknown) {
   assertNoTenantTransaction("reconcileXeroApprovalState");

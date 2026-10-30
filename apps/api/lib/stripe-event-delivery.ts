@@ -1,4 +1,5 @@
 import { resolvePlanKey, retrieveStripeSubscription } from "@repo/billing";
+import { currentJobIdentityGeneration } from "@repo/core";
 import {
   getFirstActiveOrganisationIdForAccount,
   getSubscriptionForAccount,
@@ -307,7 +308,11 @@ async function mirrorSubscription(
     return { accountId, disposition: "processed", ok: true, stripeCustomerId };
   }
   await inngest.send({
-    data: { account_id: accountId, organisation_id: organisationId },
+    data: {
+      account_id: accountId,
+      identity_generation: currentJobIdentityGeneration(),
+      organisation_id: organisationId,
+    },
     name: "recount-usage",
   });
   return { accountId, disposition: "processed", ok: true, stripeCustomerId };

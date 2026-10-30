@@ -86,6 +86,16 @@ bun run preflight api
 
 Run database integration/RLS verification through the existing guarded remote-development runner, binding the new branch, owned fixtures, paused/isolated consumers, verified restore evidence and cleanup receipt. Do not use the localhost-only opt-in to bypass the remote guard. Record tested source/deployment IDs and actual browser/provider evidence separately from unit tests.
 
+### Job queue closure and identity generation quarantine
+
+Before executing a clean reset or cutover deployment:
+
+1. **Pause function execution:** In the Inngest dashboard, pause all function runs for the environment.
+2. **Cancel/quarantine pending work:** Cancel all currently running, queued, retry and cached executions. Note that stopping workers is an operational provider gate; local code cannot guarantee running cloud executions have terminated.
+3. **Advance identity generation:** Bump `JOB_IDENTITY_GENERATION` to the coordinated release value (e.g. `JOB_IDENTITY_GENERATION="gen_v2"`). Every new event carries this generation in its payload, and scheduled sync event IDs incorporate the generation to prevent deduplication against quarantined runs.
+4. **Enforce generation fencing:** Any obsolete event from a previous generation that arrives at a deployed handler is rejected immediately outside resumable steps by `readJobEventData()` and `assertJobIdentityGeneration()`, throwing `NonRetriableError` without retrying or opening tenant databases.
+5. **Rollback quarantine:** If cutover is rolled back to a database restore point, bump `JOB_IDENTITY_GENERATION` again (e.g. `gen_v3`) to quarantine all candidate execution residue and prevent deduplication against prior generation event IDs.
+
 ## 5. Better Auth Infrastructure, conditional
 
 **Residency/security approval remains unresolved. Keep `BETTER_AUTH_INFRA_ENABLED=false` and omit the plugin.** The setup and dashboard documentation reviewed on 25 October 2026 do not establish the required API/KV/audit/dashboard storage, backup/support countries or complete processor boundary. Core self-hosted auth must work without Infrastructure. Follow the open vendor/market-specific assessment in design section 9; a cloud hostname or DPA alone is not a completed residency assessment. [Infrastructure setup](https://better-auth.com/docs/infrastructure/getting-started), [dashboard options](https://better-auth.com/docs/infrastructure/plugins/dashboard).

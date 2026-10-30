@@ -3,6 +3,7 @@ import type { Result } from "@repo/core";
 import { assertNoTenantTransaction, withTenantDb } from "@repo/database";
 import { ensureXeroInitialSyncRequested } from "@repo/database/queries/xero-sync-cursors";
 import { z } from "zod";
+import { currentJobIdentityGeneration } from "../keys";
 import { inngest } from "./client";
 export const syncEventNames = {
   approval_state_reconciliation: "reconcile-xero-approval-state",
@@ -65,10 +66,11 @@ export function getUtcCadenceSlot(
 export function getScheduledSyncEventId(
   connectionId: string,
   runType: RegisteredSyncRunType,
-  date: Date = new Date()
+  date: Date = new Date(),
+  identityGeneration: string = currentJobIdentityGeneration()
 ): string {
   const slot = getUtcCadenceSlot(runType, date);
-  return `scheduled-sync:${connectionId}:${runType}:${slot}`;
+  return `scheduled-sync:${identityGeneration}:${connectionId}:${runType}:${slot}`;
 }
 export interface DispatchSyncEventOptions {
   eventId?: string;
@@ -115,19 +117,21 @@ export async function dispatchSyncEvent(
       name: string;
       data: {
         account_id: string;
+        connectionId: string;
+        identity_generation: string;
         organisation_id: string;
         mode?: "full" | "incremental";
         personId?: string;
         runId: string;
         triggeredByUserId: string | null;
         triggerType: "scheduled" | "manual" | "webhook";
-        connectionId: string;
       };
       id?: string;
     } = {
       data: {
         account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: parsed.data.organisationId,
         ...(["people", "leave_records"].includes(parsed.data.runType)
           ? {
@@ -188,6 +192,7 @@ export async function dispatchCancelSyncRun(
     await inngest.send({
       data: {
         account_id: parsed.data.accountId,
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: parsed.data.organisationId,
         runId: parsed.data.runId,
       },
@@ -207,9 +212,10 @@ export async function dispatchCancelSyncRun(
 export const initialXeroSyncEventName = "initial-xero-sync";
 export function getInitialSyncEventId(
   connectionId: string,
-  requestedAt: string
+  requestedAt: string,
+  identityGeneration: string = currentJobIdentityGeneration()
 ): string {
-  return `initial-sync:${connectionId}:${requestedAt}`;
+  return `initial-sync:${identityGeneration}:${connectionId}:${requestedAt}`;
 }
 const InitialXeroSyncEventSchema = z.object({
   accountId: z.string().min(1),
@@ -272,6 +278,7 @@ export async function dispatchInitialXeroSync(
       data: {
         account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: parsed.data.organisationId,
         requestedAt,
         runId: parsed.data.runId ?? randomUUID(),

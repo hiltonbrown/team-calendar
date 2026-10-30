@@ -110,6 +110,7 @@ it("throws execution failures with valid input at the queue boundary", async () 
       event: {
         data: {
           account_id: ACCOUNT_ID,
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           ...{},
         },
@@ -240,6 +241,7 @@ describe("reconcileFeedPublications", () => {
         data: {
           account_id: ACCOUNT_ID,
           feedId: "20000000-0000-4000-8000-000000000001",
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           reason: "publication_reconciled",
         },

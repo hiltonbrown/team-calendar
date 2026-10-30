@@ -30,6 +30,7 @@ import {
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
+import { currentJobIdentityGeneration } from "../../keys";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
 import {
@@ -195,12 +196,12 @@ export const syncXeroLeaveRecordsFunction: InngestFunction.Any =
       id: "sync-xero-leave-records",
       triggers: { event: "sync-xero-leave-records" },
     },
-    async ({ event, step }) =>
-      await step.run("sync-leave-records", async () =>
-        rejectRetryableSyncResult(
-          syncXeroLeaveRecords(readJobEventData(event.data))
-        )
-      )
+    async ({ event, step }) => {
+      const data = readJobEventData(event.data);
+      return await step.run("sync-leave-records", async () =>
+        rejectRetryableSyncResult(syncXeroLeaveRecords(data))
+      );
+    }
   );
 export function syncXeroLeaveRecords(input: unknown) {
   assertNoTenantTransaction("syncXeroLeaveRecords");
@@ -1405,6 +1406,7 @@ async function enqueueFeedRebuilds(
       data: {
         account_id: context.accountId,
         feedId,
+        identity_generation: currentJobIdentityGeneration(),
         organisation_id: context.organisationId,
         reason: "xero_leave_records_synced",
       },

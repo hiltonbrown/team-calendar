@@ -118,12 +118,12 @@ export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
       id: "sync-xero-leave-balances",
       triggers: { event: "sync-xero-leave-balances" },
     },
-    async ({ event, step }) =>
-      await step.run("sync-leave-balances", async () =>
-        rejectRetryableSyncResult(
-          syncXeroLeaveBalances(readJobEventData(event.data))
-        )
-      )
+    async ({ event, step }) => {
+      const data = readJobEventData(event.data);
+      return await step.run("sync-leave-balances", async () =>
+        rejectRetryableSyncResult(syncXeroLeaveBalances(data))
+      );
+    }
   );
 export function syncXeroLeaveBalances(input: unknown) {
   assertNoTenantTransaction("syncXeroLeaveBalances");

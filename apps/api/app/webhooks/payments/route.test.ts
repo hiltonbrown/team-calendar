@@ -43,6 +43,7 @@ vi.mock("@repo/database", async () => ({
   upsertSubscriptionFromWebhook: mocks.upsertSubscriptionFromWebhook,
 }));
 vi.mock("@repo/jobs", () => ({
+  currentJobIdentityGeneration: vi.fn(() => "gen_v1"),
   inngest: { send: mocks.inngestSend },
 }));
 vi.mock("@repo/jobs/src/client", () => ({
@@ -154,6 +155,8 @@ describe("Stripe payments webhook", () => {
     expect(mocks.inngestSend).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          account_id: "org_1",
+          identity_generation: "gen_v1",
           organisation_id: "30000000-0000-4000-8000-000000000001",
         }),
         name: "recount-usage",

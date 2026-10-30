@@ -182,6 +182,22 @@ describe("production preflight validation", () => {
     );
   });
 
+  it("rejects blank JOB_IDENTITY_GENERATION when supplied on app or api", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...validAppVars, JOB_IDENTITY_GENERATION: "   " },
+      })
+    ).toThrow("JOB_IDENTITY_GENERATION must not be empty");
+
+    expect(() =>
+      runProductionPreflight({
+        appName: "api",
+        envVars: { ...validApiVars, JOB_IDENTITY_GENERATION: "" },
+      })
+    ).toThrow("JOB_IDENTITY_GENERATION must not be empty");
+  });
+
   it("fails paid mode when Stripe keys are missing", () => {
     expect(() =>
       runProductionPreflight({

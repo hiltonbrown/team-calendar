@@ -78,10 +78,12 @@ export const syncXeroPeopleFunction: InngestFunction.Any =
       id: "sync-xero-people",
       triggers: { event: "sync-xero-people" },
     },
-    async ({ event, step }) =>
-      await step.run("sync-people", async () =>
-        rejectRetryableSyncResult(syncXeroPeople(readJobEventData(event.data)))
-      )
+    async ({ event, step }) => {
+      const data = readJobEventData(event.data);
+      return await step.run("sync-people", async () =>
+        rejectRetryableSyncResult(syncXeroPeople(data))
+      );
+    }
   );
 export function syncXeroPeople(input: unknown) {
   assertNoTenantTransaction("syncXeroPeople");

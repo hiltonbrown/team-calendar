@@ -109,6 +109,7 @@ it("throws execution failures with valid input at the queue boundary", async () 
       event: {
         data: {
           account_id: ACCOUNT_ID,
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           ...{ feedId: FEED_ID },
         },

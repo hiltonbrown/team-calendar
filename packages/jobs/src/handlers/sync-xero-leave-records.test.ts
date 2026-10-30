@@ -615,6 +615,7 @@ describe("leave records stale archival", () => {
         data: {
           account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000001",
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
@@ -624,6 +625,7 @@ describe("leave records stale archival", () => {
         data: {
           account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000002",
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
@@ -762,6 +764,7 @@ describe("leave records stale archival", () => {
         data: {
           account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000001",
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },
@@ -771,6 +774,7 @@ describe("leave records stale archival", () => {
         data: {
           account_id: ACCOUNT_ID,
           feedId: "90000000-0000-4000-8000-000000000002",
+          identity_generation: "gen_v1",
           organisation_id: ORGANISATION_ID,
           reason: "xero_leave_records_synced",
         },

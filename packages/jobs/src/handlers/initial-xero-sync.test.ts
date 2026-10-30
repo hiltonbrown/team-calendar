@@ -1,3 +1,4 @@
+import { NonRetriableError } from "inngest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -30,9 +31,8 @@ vi.mock("./sync-xero-leave-balances", () => ({
 vi.mock("./xero-sync-access", () => ({
   isCurrentXeroSyncBinding: mocks.binding,
 }));
-const { initialXeroSync, initialXeroSyncFunction } = await import(
-  "./initial-xero-sync"
-);
+const { executeInitialSync, initialXeroSync, initialXeroSyncFunction } =
+  await import("./initial-xero-sync");
 const input = {
   accountId: "org_1",
   connectionId: "33333333-3333-4333-8333-333333333333",
@@ -85,6 +85,7 @@ describe("one durable full initial import", () => {
         data: {
           ...data,
           account_id: accountId,
+          identity_generation: "gen_v1",
           organisation_id: organisationId,
         },
       },
@@ -128,6 +129,62 @@ describe("one durable full initial import", () => {
     mocks.complete.mockResolvedValue(null);
     expect((await initialXeroSync(input)).ok).toBe(false);
     expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
+  it("rejects event missing identity_generation without executing any step", async () => {
+    const handler = Reflect.get(initialXeroSyncFunction, "fn");
+    const { accountId, organisationId, ...data } = input;
+    await expect(
+      handler({
+        event: {
+          data: {
+            ...data,
+            account_id: accountId,
+            organisation_id: organisationId,
+          },
+        },
+        step: {
+          run: vi.fn(),
+        },
+      })
+    ).rejects.toThrow(NonRetriableError);
+    expect(mocks.binding).not.toHaveBeenCalled();
+    expect(mocks.people).not.toHaveBeenCalled();
+  });
+
+  it("rejects event with obsolete identity_generation before executing any step", async () => {
+    const handler = Reflect.get(initialXeroSyncFunction, "fn");
+    const { accountId, organisationId, ...data } = input;
+    await expect(
+      handler({
+        event: {
+          data: {
+            ...data,
+            account_id: accountId,
+            identity_generation: "gen_obsolete_v0",
+            organisation_id: organisationId,
+          },
+        },
+        step: {
+          run: vi.fn(),
+        },
+      })
+    ).rejects.toThrow(NonRetriableError);
+    expect(mocks.binding).not.toHaveBeenCalled();
+    expect(mocks.people).not.toHaveBeenCalled();
+  });
+
+  it("executeInitialSync rejects mismatched identityGeneration between phases", async () => {
+    await expect(
+      executeInitialSync(
+        {
+          ...input,
+          identityGeneration: "gen_mismatched",
+        },
+        vi.fn()
+      )
+    ).rejects.toThrow(NonRetriableError);
+    expect(mocks.people).not.toHaveBeenCalled();
   });
 });
 

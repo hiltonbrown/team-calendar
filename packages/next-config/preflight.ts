@@ -315,6 +315,14 @@ export const runProductionPreflight = (
     checkPair("INNGEST_EVENT_KEY", "INNGEST_SIGNING_KEY");
   }
 
+  if (
+    (appName === "app" || appName === "api") &&
+    envVars.JOB_IDENTITY_GENERATION !== undefined &&
+    envVars.JOB_IDENTITY_GENERATION.trim().length === 0
+  ) {
+    errors.push("JOB_IDENTITY_GENERATION must not be empty");
+  }
+
   if (appName === "app" || appName === "api") {
     if (checkPresent("RESEND_TOKEN")) {
       const resendToken = envVars.RESEND_TOKEN?.trim();
