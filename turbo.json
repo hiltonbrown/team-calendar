@@ -5,7 +5,6 @@
   "envMode": "loose",
   "globalEnv": [
     "AUTH_CONTEXT_MODE",
-    "AUTH_PROVIDER",
     "BETTER_AUTH_SECRET",
     "BETTER_AUTH_URL",
     "BETTER_AUTH_INFRA_ENABLED",

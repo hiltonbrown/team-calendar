@@ -9,10 +9,6 @@ vi.mock("next/headers", () => ({
     new Headers({ cookie: "team-calendar-dev-auth.session_token=opaque" }),
 }));
 vi.mock("./better-auth", () => ({ readLocalAuthContext: mocks.local }));
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
-}));
 
 const userId = "10000000-0000-4000-8000-000000000003";
 const context = () => ({

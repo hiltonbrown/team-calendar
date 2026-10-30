@@ -14,7 +14,6 @@ const ids = {
   user: "10000000-0000-4000-8000-000000000003",
 };
 const mocks = vi.hoisted(() => ({
-  clerkSession: vi.fn(),
   getActiveMember: vi.fn(),
   getOrganization: vi.fn(),
   getSession: vi.fn(),
@@ -22,10 +21,6 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: mocks.clerkSession,
-  currentUser: vi.fn(),
-}));
 vi.mock("./better-auth-server", () => ({
   ensureUserAccountsReady: vi.fn().mockResolvedValue(undefined),
   getBetterAuth: () => ({ api: mocks }),
@@ -91,7 +86,6 @@ describe("Better Auth neutral adapter", () => {
       query: { disableCookieCache: true },
       returnHeaders: true,
     });
-    expect(mocks.clerkSession).not.toHaveBeenCalled();
   });
   it("checks current membership and readiness on every call", async () => {
     expect(await getSession()).toMatchObject({ role: "owner" });
@@ -137,11 +131,10 @@ describe("Better Auth neutral adapter", () => {
     );
     expect(await getSession()).toMatchObject({ accountId: null, role: null });
   });
-  it("propagates auth-store errors and never falls back to Clerk", async () => {
+  it("propagates auth-store errors and fails cleanly", async () => {
     const error = new Error("auth store unavailable");
     mocks.getActiveMember.mockRejectedValue(error);
     await expect(getSession()).rejects.toBe(error);
-    expect(mocks.clerkSession).not.toHaveBeenCalled();
   });
   it("requires the native permission result and preserves exact-role semantics", async () => {
     expect(await requireRole("admin")).toBe(false);
