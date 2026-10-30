@@ -299,3 +299,18 @@ Tasks 1, 3, 4 and 5 touch disjoint files and can run in parallel. Task 2 waits f
 7. Any new finding from Task 2 or Task 6 is resolved, or explicitly deferred with the owner's agreement.
 8. PR description filled in; Task 7 Results section lists evidence for F1-F6.
 9. Owner sign-off on the 30s re-check window (given 2026-10-31) and on the Task 6 Step 3 measurement outcome.
+
+---
+
+## New findings from CI run 41140715790 (Task 2)
+
+| ID | Priority | Finding |
+|---|---|---|
+| F8 | P2 | In CI run 41140715790 (commit `47b5e75`), package boundaries, migrate deploy, restricted-role provisioning, and drift check all succeeded. In `Run unit tests`, `@repo/auth#test` failed due to Vitest test timeouts under concurrency on the 2-core CI runner: `better-auth-runtime.test.ts:242` timed out at default 5000ms (5 scrypt password hashing iterations in sign-in bucket test), and `development-seed.test.ts:114,150` timed out at explicit 15000ms (12 and 24 native user seeds with password hashing). `packages/auth` lacked a `vitest.config.mts` setting `testTimeout: 30_000` (which `packages/jobs` and `packages/database` both configure). |
+
+### Remediation Plan for F8 (Task 2.1)
+
+1. Add `packages/auth/vitest.config.mts` matching `packages/jobs/vitest.config.mts` with `testTimeout: 30_000`, `environment: "node"`, `conditions: ["react-server", "node"]` and `server-only` alias.
+2. In `packages/auth/development-seed.test.ts`, update explicit `15_000` timeouts on lines 149 and 163 to `30_000` so they match the package standard and do not cap the timeout below 30s on slow CI workers.
+3. Verify `bun run --cwd packages/auth test` passes locally.
+4. Commit as `fix(auth): configure vitest 30s timeout for password hashing tests`.
