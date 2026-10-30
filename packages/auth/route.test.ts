@@ -119,7 +119,7 @@ describe("native auth HTTP boundary", () => {
       })
     );
     const redirect = await handleAuthRequest(
-      new Request("http://localhost:3000/api/auth/callback/google")
+      new Request("http://localhost:3000/api/auth/callback/xero-auth")
     );
     expect(redirect.status).toBe(302);
     expect(redirect.headers.get("location")).toBe("/calendar");

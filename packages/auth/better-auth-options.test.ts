@@ -58,12 +58,9 @@ describe("Better Auth server policy", () => {
   beforeEach(() => {
     sendAuthEmail.mockReset();
   });
-  it("configures all sign-in providers and independent Xero OIDC", () => {
+  it("configures sign-in providers and independent Xero OIDC", () => {
     const options = optionsFor();
-    expect(options.socialProviders).toMatchObject({
-      google: { clientId: "google-id" },
-      microsoft: { tenantId: "organizations" },
-    });
+    expect(options.socialProviders).toEqual({});
     const generic = options.plugins.find(
       (plugin) => plugin.id === "generic-oauth"
     );

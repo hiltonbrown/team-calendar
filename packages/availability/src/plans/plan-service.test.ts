@@ -676,6 +676,28 @@ describe("plan-service", () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
         ...actionInput,
+        actingRole: "manager",
+      }),
+      (db) =>
+        archiveRecord(
+          {
+            ...actionInput,
+            actingRole: "manager",
+          },
+          db
+        )
+    );
+    expect(result).toMatchObject({ ok: true });
+  });
+  it("denies a linked viewer direct manager from archiving their report's record", async () => {
+    const managerPersonId = "00000000-0000-4000-8000-000000000031";
+    mocks.availabilityFindFirst.mockResolvedValue(
+      scopedRecordFixture({ managerPersonId })
+    );
+    mocks.personFindFirst.mockResolvedValue({ id: managerPersonId });
+    const result = await withTestTenantResult(
+      tenantTestAccount({
+        ...actionInput,
         actingRole: "viewer",
       }),
       (db) =>
@@ -687,7 +709,10 @@ describe("plan-service", () => {
           db
         )
     );
-    expect(result).toMatchObject({ ok: true });
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
   });
   it("allows a linked person to archive their own record", async () => {
     mocks.personFindFirst.mockResolvedValue({ id: baseInput.personId });

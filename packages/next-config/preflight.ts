@@ -264,11 +264,6 @@ export const runProductionPreflight = (
         "BETTER_AUTH_INFRA_ENABLED",
         "BETTER_AUTH_API_KEY",
         "BETTER_AUTH_TELEMETRY",
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
-        "MICROSOFT_CLIENT_ID",
-        "MICROSOFT_CLIENT_SECRET",
-        "MICROSOFT_TENANT_ID",
         "XERO_AUTH_CLIENT_ID",
         "XERO_AUTH_CLIENT_SECRET"
       );

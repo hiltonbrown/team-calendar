@@ -54,11 +54,7 @@ const resetSchema = z
     message: "Passwords must match.",
     path: ["confirmPassword"],
   });
-const providers = [
-  { id: "google", label: "Google" },
-  { id: "microsoft", label: "Microsoft" },
-  { id: "xero-auth", label: "Xero" },
-] as const;
+const providers = [{ id: "xero-auth", label: "Xero" }] as const;
 
 interface Destination {
   invitationId?: string;

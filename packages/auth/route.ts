@@ -41,7 +41,7 @@ const authPathPrefix = /^\/api\/auth/;
 const allowedPaths = [
   /^\/(?:ok|error|sign-up\/email|get-session|sign-out|sign-in\/(?:email|social|magic-link)|magic-link\/verify|send-verification-email|verify-email|request-password-reset|reset-password|change-password|link-social|unlink-account|list-accounts|update-user)$/,
   /^\/reset-password\/[^/]+$/,
-  /^\/callback\/(?:google|microsoft|xero-auth)$/,
+  /^\/callback\/(?:xero-auth)$/,
   /^\/organization\/(?:list|get-full-organization|get-active-member|get-active-member-role|set-active)$/,
 ];
 const record = (value: unknown): value is Record<string, unknown> =>

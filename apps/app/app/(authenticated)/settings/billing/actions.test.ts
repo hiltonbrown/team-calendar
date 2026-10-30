@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createCheckoutSession: vi.fn(),
   createPortalSession: vi.fn(),
+  hasPermission: vi.fn(),
   redirect: vi.fn(),
+  requireAccountResult: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePagePermission: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/require-page-permission", () => ({
-  requirePagePermission: mocks.requirePagePermission,
+vi.mock("@repo/auth/server", () => ({
+  hasPermission: mocks.hasPermission,
+  requireAccountResult: mocks.requireAccountResult,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -32,7 +34,11 @@ describe("billing actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
-    mocks.requirePagePermission.mockResolvedValue(undefined);
+    mocks.requireAccountResult.mockResolvedValue({
+      ok: true,
+      value: accountId,
+    });
+    mocks.hasPermission.mockResolvedValue(true);
     mocks.requireActiveOrgPageContext.mockResolvedValue({ accountId });
     mocks.createCheckoutSession.mockResolvedValue({
       ok: true,
@@ -50,47 +56,82 @@ describe("billing actions", () => {
   describe("early access mode gating", () => {
     it("rejects checkout in early access mode", async () => {
       vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "early_access");
-      await expect(startCheckout("basic")).rejects.toThrow(
-        "Paid billing operations are disabled during early access."
-      );
+      const result = await startCheckout("basic");
+      expect(result).toEqual({
+        error: expect.objectContaining({
+          code: "bad_request",
+          message: "Paid billing operations are disabled during early access.",
+        }),
+        ok: false,
+      });
       expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
+      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
     });
 
     it("rejects portal in early access mode", async () => {
       vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "early_access");
-      await expect(startPortal()).rejects.toThrow(
-        "Paid billing operations are disabled during early access."
-      );
+      const result = await startPortal();
+      expect(result).toEqual({
+        error: expect.objectContaining({
+          code: "bad_request",
+          message: "Paid billing operations are disabled during early access.",
+        }),
+        ok: false,
+      });
       expect(mocks.createPortalSession).not.toHaveBeenCalled();
+      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
     });
   });
 
   describe("startCheckout", () => {
-    it("does not create a checkout session or redirect when unauthorised", async () => {
-      mocks.requirePagePermission.mockRejectedValue(
-        new Error("Permission denied")
-      );
+    it("returns unauthorised Result when signed out", async () => {
+      mocks.requireAccountResult.mockResolvedValue({
+        error: {
+          code: "unauthorised",
+          message: "Not authenticated or no account selected",
+        },
+        ok: false,
+      });
 
-      await expect(startCheckout("basic")).rejects.toThrow("Permission denied");
+      const result = await startCheckout("basic");
+      expect(result).toEqual({
+        error: expect.objectContaining({
+          code: "unauthorised",
+          message: "Not authenticated or no account selected",
+        }),
+        ok: false,
+      });
 
+      expect(mocks.hasPermission).not.toHaveBeenCalled();
+      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
       expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     });
 
-    it("does not resolve organisation context when the role gate rejects", async () => {
-      mocks.requirePagePermission.mockRejectedValue(
-        new Error("Permission denied")
-      );
+    it("returns forbidden Result when role does not have checkout permission", async () => {
+      mocks.hasPermission.mockResolvedValue(false);
 
-      await expect(startCheckout("basic")).rejects.toThrow("Permission denied");
+      const result = await startCheckout("basic");
+      expect(result).toEqual({
+        error: expect.objectContaining({
+          code: "forbidden",
+          message: "Permission denied",
+        }),
+        ok: false,
+      });
 
+      expect(mocks.hasPermission).toHaveBeenCalledWith({
+        billing: ["checkout"],
+      });
       expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
+      expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
+      expect(mocks.redirect).not.toHaveBeenCalled();
     });
 
     it("redirects to Stripe after the role gate permits checkout", async () => {
       await expect(startCheckout("premium")).rejects.toThrow("NEXT_REDIRECT");
 
-      expect(mocks.requirePagePermission).toHaveBeenCalledWith({
+      expect(mocks.hasPermission).toHaveBeenCalledWith({
         billing: ["checkout"],
       });
       expect(mocks.createCheckoutSession).toHaveBeenCalledWith(
@@ -100,59 +141,88 @@ describe("billing actions", () => {
       expect(mocks.redirect).toHaveBeenCalledWith(redirectUrl);
     });
 
-    it("throws the billing error without redirecting when checkout fails", async () => {
+    it("returns billing Result failure without redirecting when checkout fails", async () => {
       mocks.createCheckoutSession.mockResolvedValue({
-        error: { message: "Checkout unavailable" },
+        error: { code: "internal", message: "Checkout unavailable" },
         ok: false,
       });
 
-      await expect(startCheckout("basic")).rejects.toThrow(
-        "Checkout unavailable"
-      );
+      const result = await startCheckout("basic");
+      expect(result).toEqual({
+        error: { code: "internal", message: "Checkout unavailable" },
+        ok: false,
+      });
 
       expect(mocks.redirect).not.toHaveBeenCalled();
     });
   });
 
   describe("startPortal", () => {
-    it("does not create a portal session or redirect when unauthorised", async () => {
-      mocks.requirePagePermission.mockRejectedValue(
-        new Error("Permission denied")
-      );
+    it("returns unauthorised Result when signed out", async () => {
+      mocks.requireAccountResult.mockResolvedValue({
+        error: {
+          code: "unauthorised",
+          message: "Not authenticated or no account selected",
+        },
+        ok: false,
+      });
 
-      await expect(startPortal()).rejects.toThrow("Permission denied");
+      const result = await startPortal();
+      expect(result).toEqual({
+        error: expect.objectContaining({
+          code: "unauthorised",
+          message: "Not authenticated or no account selected",
+        }),
+        ok: false,
+      });
 
+      expect(mocks.hasPermission).not.toHaveBeenCalled();
+      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
       expect(mocks.createPortalSession).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     });
 
-    it("does not resolve organisation context when the role gate rejects", async () => {
-      mocks.requirePagePermission.mockRejectedValue(
-        new Error("Permission denied")
-      );
+    it("returns forbidden Result when role does not have portal permission", async () => {
+      mocks.hasPermission.mockResolvedValue(false);
 
-      await expect(startPortal()).rejects.toThrow("Permission denied");
+      const result = await startPortal();
+      expect(result).toEqual({
+        error: expect.objectContaining({
+          code: "forbidden",
+          message: "Permission denied",
+        }),
+        ok: false,
+      });
 
+      expect(mocks.hasPermission).toHaveBeenCalledWith({
+        billing: ["portal"],
+      });
       expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
+      expect(mocks.createPortalSession).not.toHaveBeenCalled();
+      expect(mocks.redirect).not.toHaveBeenCalled();
     });
 
     it("redirects to Stripe after the role gate permits portal access", async () => {
       await expect(startPortal()).rejects.toThrow("NEXT_REDIRECT");
 
-      expect(mocks.requirePagePermission).toHaveBeenCalledWith({
+      expect(mocks.hasPermission).toHaveBeenCalledWith({
         billing: ["portal"],
       });
       expect(mocks.createPortalSession).toHaveBeenCalledWith(accountId);
       expect(mocks.redirect).toHaveBeenCalledWith(redirectUrl);
     });
 
-    it("throws the billing error without redirecting when portal creation fails", async () => {
+    it("returns billing Result failure without redirecting when portal creation fails", async () => {
       mocks.createPortalSession.mockResolvedValue({
-        error: { message: "Portal unavailable" },
+        error: { code: "internal", message: "Portal unavailable" },
         ok: false,
       });
 
-      await expect(startPortal()).rejects.toThrow("Portal unavailable");
+      const result = await startPortal();
+      expect(result).toEqual({
+        error: { code: "internal", message: "Portal unavailable" },
+        ok: false,
+      });
 
       expect(mocks.redirect).not.toHaveBeenCalled();
     });

@@ -1854,17 +1854,16 @@ async function canActOnPerson(
   db: TenantDb
 ): Promise<boolean> {
   assertTenantDb(db, accountId);
-  if (
-    isAdminOrOwner(actingRole) ||
-    targetPerson.id === actingPersonId ||
-    (actingPersonId && targetPerson.manager_person_id === actingPersonId)
-  ) {
+  if (isAdminOrOwner(actingRole) || targetPerson.id === actingPersonId) {
     return true;
   }
   if (
     !(hasPermission(actingRole, { plans: ["manageReports"] }) && actingPersonId)
   ) {
     return false;
+  }
+  if (targetPerson.manager_person_id === actingPersonId) {
+    return true;
   }
   return (
     await managerScopePersonIds({ accountId, actingPersonId }, db)

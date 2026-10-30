@@ -85,16 +85,23 @@ describe("Better Auth environment", () => {
 
   it.each([
     "BETTER_AUTH_SECRET",
-    "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET",
-    "MICROSOFT_CLIENT_ID",
-    "MICROSOFT_CLIENT_SECRET",
     "XERO_AUTH_CLIENT_ID",
     "XERO_AUTH_CLIENT_SECRET",
   ])("requires %s for the selected server", (name) => {
     expect(() =>
       parseBetterAuthEnvironment({ ...valid, [name]: undefined })
     ).toThrow(name);
+  });
+
+  it("treats Google and Microsoft credentials as optional", () => {
+    const withoutProviders = parseBetterAuthEnvironment({
+      ...valid,
+      GOOGLE_CLIENT_ID: undefined,
+      GOOGLE_CLIENT_SECRET: undefined,
+      MICROSOFT_CLIENT_ID: undefined,
+      MICROSOFT_CLIENT_SECRET: undefined,
+    });
+    expect(withoutProviders.BETTER_AUTH_SECRET).toBe(valid.BETTER_AUTH_SECRET);
   });
 
   it.each(["https://api.teamcalendar.online", "http://localhost:3002"])(

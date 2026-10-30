@@ -1248,4 +1248,59 @@ describe("submit-service", () => {
       expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
     });
   });
+
+  describe("role scoping and viewer direct-manager boundary", () => {
+    it("denies a viewer from submitting leave for another person even if linked as direct manager", async () => {
+      const managerPersonId = "00000000-0000-4000-8000-000000000031";
+      mocks.personFindFirst.mockResolvedValue({ id: managerPersonId });
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: "draft",
+        person: {
+          ...record.person,
+          id: "00000000-0000-4000-8000-000000000099",
+          manager_person_id: managerPersonId,
+          user_id: "other_user",
+        },
+      });
+      const viewerInput = {
+        ...input,
+        actingRole: "viewer",
+        actingUserId: "viewer_user",
+      };
+      const result = await submitDraftRecord(viewerInput, mockPort);
+      expect(result).toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("allows a manager to submit leave for their direct report", async () => {
+      const managerPersonId = "00000000-0000-4000-8000-000000000031";
+      mocks.personFindFirst.mockResolvedValue({ id: managerPersonId });
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: "draft",
+        person: {
+          ...record.person,
+          id: "00000000-0000-4000-8000-000000000099",
+          manager_person_id: managerPersonId,
+          user_id: "other_user",
+        },
+      });
+      const managerInput = {
+        ...input,
+        actingRole: "manager",
+        actingUserId: "manager_user",
+      };
+      const result = await submitDraftRecord(managerInput, mockPort);
+      expect(result.ok).toBe(true);
+      expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ approval_status: "submitted" }),
+        })
+      );
+    });
+  });
 });

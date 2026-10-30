@@ -632,10 +632,6 @@ describe("Better Auth production configuration", () => {
 
   it.each([
     "BETTER_AUTH_SECRET",
-    "GOOGLE_CLIENT_ID",
-    "GOOGLE_CLIENT_SECRET",
-    "MICROSOFT_CLIENT_ID",
-    "MICROSOFT_CLIENT_SECRET",
     "XERO_AUTH_CLIENT_ID",
     "XERO_AUTH_CLIENT_SECRET",
     "RESEND_FROM",
@@ -647,6 +643,22 @@ describe("Better Auth production configuration", () => {
         envVars: { ...betterAuthVars, [name]: undefined },
       })
     ).toThrow(name);
+  });
+
+  it("does not require Google or Microsoft credentials", () => {
+    const result = runProductionPreflight({
+      appName: "app",
+      envVars: {
+        ...betterAuthVars,
+        GOOGLE_CLIENT_ID: undefined,
+        GOOGLE_CLIENT_SECRET: undefined,
+        MICROSOFT_CLIENT_ID: undefined,
+        MICROSOFT_CLIENT_SECRET: undefined,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).not.toContain("GOOGLE_CLIENT_ID");
+    expect(result.checkedVars).not.toContain("MICROSOFT_CLIENT_ID");
   });
 
   it.each([

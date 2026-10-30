@@ -122,24 +122,29 @@ describe("email sign-in", () => {
     finish?.({ error: null });
     await waitFor(() => expect(mocks.replace).toHaveBeenCalled());
   });
-  it.each([
-    ["Google", "google"],
-    ["Microsoft", "microsoft"],
-    ["Xero", "xero-auth"],
-  ])("starts %s using the neutral social method", async (label, provider) => {
-    render(<SignInForm returnTo="https://untrusted.example/path" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: `Continue with ${label}` })
-    );
-    await waitFor(() =>
-      expect(mocks.signInSocial).toHaveBeenCalledWith(
-        expect.objectContaining({
-          callbackURL: "/select-account?returnTo=%2F",
-          provider,
-        })
-      )
-    );
-  });
+  it.each([["Xero", "xero-auth"]])(
+    "starts %s using the neutral social method",
+    async (label, provider) => {
+      render(<SignInForm returnTo="https://untrusted.example/path" />);
+      expect(
+        screen.queryByRole("button", { name: "Continue with Google" })
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Continue with Microsoft" })
+      ).toBeNull();
+      fireEvent.click(
+        screen.getByRole("button", { name: `Continue with ${label}` })
+      );
+      await waitFor(() =>
+        expect(mocks.signInSocial).toHaveBeenCalledWith(
+          expect.objectContaining({
+            callbackURL: "/select-account?returnTo=%2F",
+            provider,
+          })
+        )
+      );
+    }
+  );
 });
 
 describe("signup and mailbox verification", () => {

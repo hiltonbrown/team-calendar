@@ -1342,7 +1342,8 @@ async function loadAndAuthorise(
     const isOwner = record.person.user_id === input.actingUserId;
     const isManager =
       Boolean(actingPerson) &&
-      record.person.manager_person_id === actingPerson?.id;
+      record.person.manager_person_id === actingPerson?.id &&
+      hasPermission(input.actingRole, { plans: ["manageReports"] });
     const isAllowed =
       isAdminOrOwner(input.actingRole) ||
       isOwner ||

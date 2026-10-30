@@ -362,19 +362,7 @@ export function createBetterAuthOptions(
       freshAge: 24 * 60 * 60,
       updateAge: 24 * 60 * 60,
     },
-    socialProviders: {
-      google: {
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        disableSignUp: false,
-      },
-      microsoft: {
-        clientId: env.MICROSOFT_CLIENT_ID,
-        clientSecret: env.MICROSOFT_CLIENT_SECRET,
-        disableSignUp: false,
-        tenantId: env.MICROSOFT_TENANT_ID,
-      },
-    },
+    socialProviders: {},
     telemetry: { enabled: false },
     trustedOrigins,
     user: {

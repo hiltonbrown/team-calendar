@@ -57,11 +57,14 @@ export const betterAuthServerEnvironmentSchema = z
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_TELEMETRY: z.literal("0").default("0"),
     BETTER_AUTH_URL: authOriginSchema,
-    GOOGLE_CLIENT_ID: z.string().min(1),
-    GOOGLE_CLIENT_SECRET: z.string().min(1),
-    MICROSOFT_CLIENT_ID: z.string().min(1),
-    MICROSOFT_CLIENT_SECRET: z.string().min(1),
-    MICROSOFT_TENANT_ID: z.literal("organizations").default("organizations"),
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    MICROSOFT_CLIENT_ID: z.string().min(1).optional(),
+    MICROSOFT_CLIENT_SECRET: z.string().min(1).optional(),
+    MICROSOFT_TENANT_ID: z
+      .literal("organizations")
+      .default("organizations")
+      .optional(),
     NEXT_PUBLIC_API_URL: authOriginSchema.optional(),
     NEXT_PUBLIC_APP_URL: authOriginSchema,
     TC_API_CANDIDATE_URL: authOriginSchema.optional(),

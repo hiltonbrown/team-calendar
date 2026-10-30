@@ -271,7 +271,7 @@ describe("pinned Better Auth native runtime", () => {
       where: [{ field: "id", value: userId }],
     });
     const denied = await handleAuthRequest(
-      request("/link-social", { provider: "google" }, cookie)
+      request("/link-social", { provider: "xero-auth" }, cookie)
     );
     expect(denied.status).toBe(403);
     expect(await denied.json()).toMatchObject({
@@ -297,7 +297,7 @@ describe("pinned Better Auth native runtime", () => {
             accessToken: "untrusted-provider-token",
             token: "untrusted-id-token",
           },
-          provider: "google",
+          provider: "xero-auth",
         },
         cookie
       )

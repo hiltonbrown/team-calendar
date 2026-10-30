@@ -13,6 +13,39 @@ Stopping condition: deliver the reviewed plan for completing the migration. Do n
 
 PASS: planning deliverable saved to `docs/superpowers/plans/2026-10-28-auth-migration-completion.md`. Twelve ordered tasks cover all 43 audit checks plus the design's auth-audit projection, UUID relations and stale cached-job requirements. Five local document links and 47 existing referenced files resolve; proposed modules are labelled; whitespace and language checks pass. The historical 11 PASS/23 FAIL/9 UNABLE TO VERIFY audit is not presented as a fresh run. Owner versus restricted final auth storage remains an explicit user decision; other contradictory acceptance wording has proposed resolutions. This task only writes the plan and this checklist. Concurrent build/runtime source changes are preserved and identified for reuse, without claiming their verification. No application/database/browser/provider tests, dependency installation, reset, hosted changes, deployment, commit or merge were performed by this planning task.
 
+## Better Auth migration: Task 3 implementation (30 October 2026)
+
+- [x] Task 3.1: Leave approvals page scoping: pass real role (do not convert manager to admin), deny managers without linked Person, restrict reconciliation controls to admin/owner.
+- [x] Task 3.2: Add and update regression tests in apps/app/app/(authenticated)/leave-approvals/account-scope.test.ts and create page.test.tsx.
+- [x] Task 3.3: Viewer direct-manager boundary: enforce that viewers cannot manage or submit leave for other people in packages/availability/src/plans/plan-service.ts (canActOnPerson) and submit-service.ts (loadAndAuthorise).
+- [x] Task 3.4: Add/update regressions in packages/availability for viewer direct-manager leave operations.
+- [x] Task 3.5: Billing actions Result safety: refactor startCheckout and startPortal in apps/app/app/(authenticated)/settings/billing/actions.ts to return Result<never, AppError> on expected failures. Update BillingClient to display returned errors.
+- [x] Task 3.6: Update billing actions unit tests and BillingClient tests.
+- [x] Task 3.7: Run verification gates: bun run check, bun run typecheck, bun run test.
+
+Stopping condition: Complete Task 3 (role scoping in approvals, viewer direct-manager boundary in availability, and Result-safe billing actions). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Leave approvals page scoping:
+   - In `apps/app/app/(authenticated)/leave-approvals/page.tsx`, removed `can(role, { approvals: ["review"] }) ? "admin"` promotion. Passes genuine `AuthRole` (`owner`, `admin`, or `manager`), denies viewers, denies managers without a linked Person, and restricts reconciliation actions to `owner` and `admin`.
+   - Created `apps/app/app/(authenticated)/leave-approvals/page.test.tsx` testing viewer denial, manager report scoping, unlinked manager denial, and admin/owner reconciliation dispatch.
+   - Verified `leave-approvals/account-scope.test.ts` (9 tests) and all 34 tests in `apps/app/app/(authenticated)/leave-approvals`.
+2. Viewer direct-manager boundary:
+   - In `packages/availability/src/plans/plan-service.ts` (`canActOnPerson`) and `submit-service.ts` (`loadAndAuthorise`), enforced that managing/submitting leave for other employees requires `hasPermission(actingRole, { plans: ["manageReports"] })`. Viewers who are direct managers retain manual availability management (`manualAvailability: ["manageDirectReports"]`) but cannot manage, create, update, archive, or submit leave for their reports.
+   - Updated and added regression tests in `plan-service.test.ts` and `submit-service.test.ts`. All 725 tests in `packages/availability` pass.
+3. Billing actions Result safety:
+   - In `apps/app/app/(authenticated)/settings/billing/actions.ts`, refactored `startCheckout` and `startPortal` to return `Promise<Result<never, AppError>>`. Replaced throwing `requirePagePermission` with non-throwing `requireAccountResult()` and `hasPermission()`. Returns `{ ok: false, error: appError("unauthorised", ...) }` when signed out, `appError("forbidden", "Permission denied")` when unauthorized, `appError("bad_request", "Paid billing operations are disabled during early access.")` in early access, and provider Result on failure. Redirects via Next.js `redirect()` on success.
+   - In `billing-client.tsx`, added action error display using `Alert`, wrapped server action invocations in transitions, and safely propagated `NEXT_REDIRECT` exceptions without swallowing navigation.
+   - Updated `actions.test.ts` (10 tests) and `billing-client.test.tsx` (3 tests).
+4. Google & Microsoft sign-in methods removal (per user directive):
+   - Removed Google and Microsoft social login buttons from `auth-forms.tsx` and updated `auth-forms.test.tsx`.
+   - Removed Google and Microsoft from `better-auth-options.ts`, updated callback route regex in `route.ts`, and made keys optional in `packages/auth/keys.ts`.
+   - Removed Google and Microsoft from mandatory environment preflight in `packages/next-config/preflight.ts`.
+5. Gates verified:
+   - `bun run check`: Checked 1,419 files in 1.7s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 9.9s.
+   - `bun run test`: All 18 packages passed (over 4,500 tests across 455 test files). No regressions.
+
 ## Better Auth migration: Task 1 and Task 2 implementation (30 October 2026)
 
 - [x] Task 1.1: Clarify storage decision (systemDatabase owner connection approved for current stage; launch restricted role team_calendar_auth pending for Task 6), 3/60 rate limits, 4-role custom ACL policy, and launch retention in docs/auth-migration/02-design.md.

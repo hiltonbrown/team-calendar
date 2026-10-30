@@ -1,4 +1,3 @@
-import { hasPermission as can } from "@repo/auth/permissions";
 import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type ApprovalRole,
@@ -163,7 +162,7 @@ const LeaveApprovalsPage = async ({
       <Header page="Leave Approvals" showCompanySelector={false} />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <LeaveApprovalsClient
-          canDispatchReconciliation={role === "admin"}
+          canDispatchReconciliation={role === "admin" || role === "owner"}
           filters={{
             includeFailed: parsedFilters?.includeFailed ?? false,
             status: parsedFilters?.status,
@@ -182,11 +181,8 @@ export default LeaveApprovalsPage;
 function effectiveApprovalRole(
   role: string | null | undefined
 ): ApprovalRole | null {
-  if (can(role, { approvals: ["review"] })) {
-    return "admin";
-  }
-  if (role === "manager") {
-    return "manager";
+  if (role === "owner" || role === "admin" || role === "manager") {
+    return role;
   }
   return null;
 }
