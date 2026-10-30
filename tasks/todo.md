@@ -1,5 +1,26 @@
 # Current work
 
+## Better Auth migration: Verification reconciliation (Task 12) (30 October 2026)
+
+- [x] Task 12.1: Reconcile all 43 acceptance checks in `docs/auth-migration/04-verification.md` Section 6 with current implementation, test evidence, and accepted architectural dispositions.
+- [x] Task 12.2: Verify clean monorepo delivery gates: `bun install --frozen-lockfile` (0 changes), `bun run check` (1,424 files, 0 errors), `bun run typecheck` (19 tasks, 0 errors), `bun run test` (all packages passed), `bun run build` (all 4 production apps compiled successfully), `bun run test:release-tools` (28 files, 248 passed, 0 failed).
+- [x] Task 12.3: Document execution boundaries for Tasks 10 and 11: preserve development database per mandatory safety requirements; verified seed idempotency in `development-seed.test.ts` (6 passed) and reset safety contract in `reset-auth-data-core.test.ts` (28 passed).
+
+Stopping condition: Reconcile `04-verification.md` with fresh test and source evidence for all 43 checks; pass all repository delivery gates; preserve existing database and development environment.
+
+Review: PASS.
+1. All 43 checks reconciled in `docs/auth-migration/04-verification.md` Section 6:
+   - Checks 1-38, 42-43 verified PASS against current codebase.
+   - Checks 39-41 verified PASS at unit/harness level, with external deployment/inbox execution prerequisites documented.
+2. Verified delivery gates:
+   - `bun install --frozen-lockfile`: 1,707 installs checked, zero changes.
+   - `bun run check`: Checked 1,424 files, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages, 0 errors.
+   - `bun run test`: All package tests passed (>4,500 tests across 18 packages).
+   - `bun run build`: All 4 production apps compiled successfully (`app`, `api`, `web`, `database`).
+   - `bun run test:release-tools`: 28 files passed (248 passed, 5 skipped, 0 failed).
+   - `bun run typecheck:release-tools`: 0 errors.
+
 ## Better Auth migration: Task 9 implementation (30 October 2026)
 
 - [x] Task 9.1: Reconcile `AGENTS.md` and `PRODUCT.md`: Replace Clerk auth descriptions with Better Auth (self-hosted PostgreSQL adapter; accounts and members tables), update tenancy model concepts, package maps, and security invariants. Remove legacy `org_id` and custom workspace claims.
