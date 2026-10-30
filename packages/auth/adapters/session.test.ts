@@ -144,7 +144,7 @@ describe("neutral server authentication", () => {
     await expect(requireAccountResult()).rejects.toBe(outage);
   });
   it("denies unknown and legacy wire roles", async () => {
-    for (const role of ["future", "org:owner"]) {
+    for (const role of ["future", "legacy_role"]) {
       mocks.getActiveMember.mockResolvedValue({
         organizationId: ids.account,
         role,

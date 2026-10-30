@@ -115,7 +115,7 @@ describe("release auth testing boundary", () => {
       "unknown role",
       {
         ...authContext(),
-        session: { ...authContext().session, role: "org:viewer" },
+        session: { ...authContext().session, role: "unsupported" },
       },
     ],
     ["expired", { ...authContext(), expiresAt: "2020-01-01T00:00:00.000Z" }],

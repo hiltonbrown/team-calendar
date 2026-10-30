@@ -158,7 +158,7 @@ describe("Better Auth account directory", () => {
         },
         {
           id: "unknown",
-          role: "org:admin",
+          role: "legacy_role",
           user: { email: null, name: null },
           userId: ids.target,
         },

@@ -13,6 +13,34 @@ Stopping condition: deliver the reviewed plan for completing the migration. Do n
 
 PASS: planning deliverable saved to `docs/superpowers/plans/2026-10-28-auth-migration-completion.md`. Twelve ordered tasks cover all 43 audit checks plus the design's auth-audit projection, UUID relations and stale cached-job requirements. Five local document links and 47 existing referenced files resolve; proposed modules are labelled; whitespace and language checks pass. The historical 11 PASS/23 FAIL/9 UNABLE TO VERIFY audit is not presented as a fresh run. Owner versus restricted final auth storage remains an explicit user decision; other contradictory acceptance wording has proposed resolutions. This task only writes the plan and this checklist. Concurrent build/runtime source changes are preserved and identified for reuse, without claiming their verification. No application/database/browser/provider tests, dependency installation, reset, hosted changes, deployment, commit or merge were performed by this planning task.
 
+## Better Auth migration: Task 4 implementation (30 October 2026)
+
+- [x] Task 4.1: Remove obsolete legacy route `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx`.
+- [x] Task 4.2: Remove obsolete `org:` prefixed role literals from tests in `packages/auth/adapters/{accounts,session,playwright}.test.ts`.
+- [x] Task 4.3: Fix `testMatch: /.*\.spec\.ts/` in `tooling/release/playwright.config.ts` to prevent loading Vitest unit test files; verify Playwright test discovery discovers all 51 release journey tests.
+- [x] Task 4.4: Verify browser auth harness (`packages/auth/testing/playwright.ts` and `playwright.test.ts`) and transport test suites (`cookie-transport.test.ts`, `api-proxy.test.ts`, `context.test.ts`, `adapters/remote-context.test.ts`).
+- [x] Task 4.5: Run verification gates: `bun run check`, `bun run typecheck`, `bun run typecheck:release-tools`, `bun run test:release-tools`.
+
+Stopping condition: Complete Task 4 (Clerk browser harness replacement verification, cleanup of legacy routes/mocks/literals, and cookie transport contracts). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Legacy route removal:
+   - Deleted obsolete `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx` and removed its directory.
+   - Rebuilt `apps/app` to regenerate `.next/types/validator.ts`.
+2. Org-prefixed role literal removal:
+   - Replaced remaining `org:` test strings in `packages/auth/adapters/session.test.ts`, `accounts.test.ts`, and `playwright.test.ts` with neutral invalid/legacy test roles. Zero `org:` references remain across `packages/auth`.
+3. Playwright test discovery:
+   - Updated `tooling/release/playwright.config.ts` project `chromium-core` with `testMatch: /.*\.spec\.ts/` so Vitest unit tests in `tooling/release/e2e/` are not matched.
+   - Verified `playwright test --list` discovers all 51 candidate release tests across setup, chromium, firefox, webkit, and responsive matrix projects.
+4. Transport and wrapper contracts:
+   - Verified `packages/auth/testing/playwright.ts` and `playwright.test.ts` (12 tests) enforce genuine password sign-in and session/cookie verification without `@clerk/testing` or `window.Clerk`.
+   - Verified all 35 transport tests in `cookie-transport.test.ts`, `api-proxy.test.ts`, `context.test.ts`, and `adapters/remote-context.test.ts`.
+5. Gates verified:
+   - `bun run check`: Checked 1,418 files in 1.7s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 5.5s.
+   - `bun run typecheck:release-tools`: 0 errors.
+   - `bun run test:release-tools`: 28 test files passed (248 tests passed, 5 skipped).
+
 ## Better Auth migration: Task 3 implementation (30 October 2026)
 
 - [x] Task 3.1: Leave approvals page scoping: pass real role (do not convert manager to admin), deny managers without linked Person, restrict reconciliation controls to admin/owner.
