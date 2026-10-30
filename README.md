@@ -142,7 +142,7 @@ Authentication and cookie-session API transport run with Better Auth (`AUTH_CONT
    characters) through a private environment file or secret manager. Then run:
 
    ```bash
-   bun run --cwd packages/database seed
+   bun run --cwd packages/auth seed
    ```
 
    This creates three separate Better Auth test Accounts (AU, NZ and UK), each

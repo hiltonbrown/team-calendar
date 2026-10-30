@@ -141,6 +141,10 @@
     "./is-local-database": {
       "types": "./src/is-local-database.ts",
       "default": "./src/is-local-database.ts"
+    },
+    "./seed/development-seed-runner": {
+      "types": "./src/seed/development-seed-runner.ts",
+      "default": "./src/seed/development-seed-runner.ts"
     }
   },
   "main": "./index.ts",
@@ -149,7 +153,6 @@
     "analyze": "prisma generate --no-hints --schema=./prisma/schema.prisma",
     "build": "prisma generate --no-hints --schema=./prisma/schema.prisma",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "seed": "bun --conditions=react-server run seed.ts",
     "test": "NODE_ENV=test vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "ALLOW_LOCAL_DATABASE_TESTS=1 NODE_ENV=test vitest run .integration.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"

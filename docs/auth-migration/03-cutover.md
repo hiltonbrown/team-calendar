@@ -45,7 +45,7 @@ The reset deletes local tenant rows tied to Clerk `org_` Account IDs in dependen
 Run the dry-run again and require zero remaining Clerk tenant rows. The reset has no ID conversion step. Run the development seed using the selected branch's two database roles and the supplied fixture password:
 
 ```bash
-NODE_ENV=development bun --conditions=react-server --env-file="$AUTH_CUTOVER_ENV_FILE" packages/database/seed.ts
+NODE_ENV=development bun --conditions=react-server --env-file="$AUTH_CUTOVER_ENV_FILE" packages/auth/scripts/seed-development.ts
 ```
 
 The seed creates fresh Better Auth identities through native server APIs: three separate Accounts, one each for AU, NZ and UK, with an owner, admin, manager and viewer in each. It also creates country-matching payroll Organisations, People and domain teams. Native auth teams remain disabled. Fixture identities use reserved test addresses; they do not send real verification/invitation mail or exercise OAuth. The seed reuses its owned fixtures on repeat with the same password and refuses unrelated existing identities or password mismatches. Repeating it does not rotate passwords.

@@ -1,13 +1,21 @@
 import { createHash } from "node:crypto";
-import {
-  type DevelopmentSeedAccount,
-  seedDevelopmentAuthAccounts,
-} from "../../../auth/development-seed";
-import type { PrismaClient } from "../../generated/client";
+import type { PrismaClient, payroll_region } from "../../generated/client";
 import { referenceDatabase } from "../tenant-client";
 import { withTenantDb } from "../tenant-db";
 import { assertNoTenantTransaction } from "../tenant-guard";
 import { syncPlansFromCatalogue } from "./plan-sync";
+
+export interface DevelopmentTenantAccount {
+  accountId: string;
+  country: payroll_region;
+  timeZone: string;
+  users: readonly { email: string; role: string; userId: string }[];
+}
+
+export type SeedAuthAccounts = (
+  owner: PrismaClient,
+  password: string
+) => Promise<readonly DevelopmentTenantAccount[]>;
 
 function fixtureId(country: string, resource: string): string {
   const hex = createHash("sha256")
@@ -22,7 +30,7 @@ function fixtureId(country: string, resource: string): string {
 }
 
 async function seedAccountDomain(
-  account: DevelopmentSeedAccount
+  account: DevelopmentTenantAccount
 ): Promise<void> {
   const organisationId = fixtureId(account.country, "company");
   const teamId = fixtureId(account.country, "team");
@@ -104,10 +112,11 @@ async function seedAccountDomain(
 /** Standalone fixture flow; auth commits before restricted tenant provisioning. */
 export async function seedAuthDevelopmentFixtures(
   owner: PrismaClient,
-  password: string
+  password: string,
+  seedAuthAccounts: SeedAuthAccounts
 ) {
   assertNoTenantTransaction("seedAuthDevelopmentFixtures");
-  const accounts = await seedDevelopmentAuthAccounts(owner, { password });
+  const accounts = await seedAuthAccounts(owner, password);
   const plans = await syncPlansFromCatalogue(owner);
   for (const account of accounts) {
     await seedAccountDomain(account);

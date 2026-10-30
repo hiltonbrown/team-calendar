@@ -78,6 +78,7 @@
   },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "seed": "bun --conditions=react-server run scripts/seed-development.ts",
     "test": "NODE_ENV=test vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
