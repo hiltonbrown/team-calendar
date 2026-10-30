@@ -11,6 +11,7 @@ const IDLE_POLL_DELAY_MS = 10_000;
 const IDLE_THRESHOLD_MS = 60_000;
 const KEEP_ALIVE_INTERVAL_MS = 25_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
+const SESSION_REVALIDATE_INTERVAL_MS = 30_000;
 
 const REDIS_STREAM_ID_PATTERN = /^\d+-\d+$/;
 
@@ -77,6 +78,7 @@ class NotificationStreamSession {
   private keepAliveTimer: ReturnType<typeof setInterval> | null;
   private lastEventAt: number;
   private lastId: string;
+  private lastRevalidatedAt: number;
   private pollTimer: ReturnType<typeof setTimeout> | null;
   private polling: boolean;
 
@@ -91,6 +93,7 @@ class NotificationStreamSession {
     this.keepAliveTimer = null;
     this.lastEventAt = Date.now();
     this.lastId = context.initialLastId;
+    this.lastRevalidatedAt = Date.now();
     this.pollTimer = null;
     this.polling = false;
   }
@@ -165,14 +168,24 @@ class NotificationStreamSession {
 
   private async performPoll(): Promise<void> {
     if (
-      (this.context.expiresAt !== null &&
-        Date.now() >= this.context.expiresAt) ||
-      !(await this.context.revalidate())
+      this.context.expiresAt !== null &&
+      Date.now() >= this.context.expiresAt
     ) {
       this.cleanup();
       this.controller.close();
       return;
     }
+
+    if (Date.now() - this.lastRevalidatedAt >= SESSION_REVALIDATE_INTERVAL_MS) {
+      const valid = await this.context.revalidate();
+      if (!valid) {
+        this.cleanup();
+        this.controller.close();
+        return;
+      }
+      this.lastRevalidatedAt = Date.now();
+    }
+
     const events = await pollNotificationStream(
       {
         accountId: this.context.accountId,

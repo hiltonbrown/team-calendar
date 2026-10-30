@@ -166,8 +166,20 @@ describe("notifications stream route", () => {
     await response.body?.cancel();
   });
 
+  it("re-checks the session remotely at most once every 30 seconds while polling", async () => {
+    vi.useFakeTimers();
+    const response = await GET(
+      new Request("http://api.test/api/notifications/stream")
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(mocks.getRequestAuthContext).toHaveBeenCalledTimes(3);
+    expect(mocks.pollNotificationStream.mock.calls.length).toBeGreaterThan(25);
+    await response.body?.cancel();
+  });
+
   it.each(["revoked", "account switched", "role changed"])(
-    "closes before reading more notifications when the session is %s",
+    "closes within 30 seconds, before reading more notifications, when the session is %s",
     async (change) => {
       vi.useFakeTimers();
       const response = await GET(
@@ -193,10 +205,16 @@ describe("notifications stream route", () => {
         context,
         responseHeaders: new Headers(),
       });
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
-      await reader?.read();
-      expect(await reader?.read()).toEqual({ done: true, value: undefined });
+      await vi.advanceTimersByTimeAsync(29_000);
+      const polled = mocks.pollNotificationStream.mock.calls.length;
+      expect(polled).toBeGreaterThan(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(polled);
+      let next = await reader?.read();
+      while (!next?.done) {
+        next = await reader?.read();
+      }
+      expect(next).toEqual({ done: true, value: undefined });
     }
   );
 
