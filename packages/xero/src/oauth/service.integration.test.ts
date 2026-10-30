@@ -218,6 +218,12 @@ async function grant(
   });
 }
 async function organisation(slot = primary) {
+  const existing = await database.organisation.findUnique({
+    where: { id: slot.organisationId },
+  });
+  if (existing) {
+    return existing;
+  }
   return await database.organisation.create({
     data: {
       account_id: slot.accountId,
@@ -229,18 +235,35 @@ async function organisation(slot = primary) {
 }
 async function connection() {
   await organisation();
-  await grant();
-  return database.xeroConnection.create({
-    data: {
-      account_id: fixture.accountId,
-      id: fixture.connectionId,
-      organisation_id: fixture.organisationId,
-      payroll_region: "AU",
-      remote_connection_id: fixture.remoteId,
-      tenant_name: "Payroll",
-      xero_authorisation_id: fixture.authorisationId,
-      xero_tenant_id: fixture.externalId,
-    },
+  return await database.$transaction(async (tx) => {
+    const existing = await tx.xeroAuthorisation.findUnique({
+      where: { id: fixture.authorisationId },
+    });
+    if (!existing) {
+      await tx.xeroAuthorisation.create({
+        data: {
+          id: fixture.authorisationId,
+          provider_app_id: allocation.globalKey("provider_app"),
+          xero_user_id: allocation.id("xero-user"),
+          ...tokens(),
+          access_token_expires_at: new Date(Date.now() - 60_000),
+          granted_scopes: GRANTED_SCOPES,
+          last_refreshed_at: new Date(),
+        },
+      });
+    }
+    return tx.xeroConnection.create({
+      data: {
+        account_id: fixture.accountId,
+        id: fixture.connectionId,
+        organisation_id: fixture.organisationId,
+        payroll_region: "AU",
+        remote_connection_id: fixture.remoteId,
+        tenant_name: "Payroll",
+        xero_authorisation_id: fixture.authorisationId,
+        xero_tenant_id: fixture.externalId,
+      },
+    });
   });
 }
 const scope = () => ({
