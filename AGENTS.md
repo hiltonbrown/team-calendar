@@ -121,7 +121,7 @@ Task Management
 | Runtime / package manager | Bun |
 | Database | PostgreSQL (Neon serverless) |
 | ORM | Prisma 7 with `@prisma/adapter-neon` |
-| Auth | Clerk (Organisations feature; no custom workspace table) |
+| Auth | Better Auth (self-hosted PostgreSQL adapter; Accounts and Members tables) |
 | Job queue | Inngest |
 | Email | Resend + React Email |
 | Monitoring | Sentry |
@@ -188,7 +188,7 @@ bun run preflight          # Production environment preflight check
 | Package | Purpose |
 |---|---|
 | `packages/database` | Prisma schema, migrations, generated client, query helpers |
-| `packages/auth` | `requireAccount()`, `requireRole()`, `getAccountId()`, re-exported Clerk hooks |
+| `packages/auth` | `requireAccount()`, `requireRole()`, `getAccountId()`, neutral auth hooks and helpers |
 | `packages/billing` | Stripe billing integration, checkout and customer portal sessions, webhook handling |
 | `packages/analytics` | PostHog and Vercel analytics, client and server instrumentation |
 | `packages/design-system` | Shared React components, Tailwind CSS, shadcn/ui |
@@ -223,10 +223,10 @@ Account (account_id)   : one per customer account; one country code; billing anc
 - One Organisation owns at most one XeroConnection (`UNIQUE` on `organisation_id`).
 - An active XeroConnection references its canonical XeroAuthorisation; credentials are never copied into the connection.
 - An Account with two Xero files has two Organisation rows, two scoped XeroConnections.
-- Membership and roles are managed entirely by Clerk. No custom membership or role tables.
+- Membership and roles are managed through Better Auth Accounts and Members tables in PostgreSQL.
 - Personal Accounts are disabled. Every user must belong to at least one Account.
 - Billing enforced at the Account level via `account_subscriptions`.
-- A company selector on company-scoped pages chooses a payroll Organisation inside the account; the calendar company filter defaults to all companies. Company selection differs from switching the top-level Account. `CustomUserButton` still exposes Clerk's organisation profile, with account membership managed by Clerk.
+- A company selector on company-scoped pages chooses a payroll Organisation inside the account; the calendar company filter defaults to all companies. Company selection differs from switching the top-level Account. Account switching uses the AccountUserMenu and account picker, with membership managed by Better Auth.
 
 ### Auth helpers (`packages/auth`)
 
@@ -254,7 +254,7 @@ Permissions are defined in `packages/auth/permissions.ts`. Domain services use i
 | manager | Team and direct-report access |
 | viewer | Filtered reads and own-record self-service |
 
-The application roles are `owner`, `admin`, `manager` and `viewer`. Clerk remains the active provider; its adapter translates provider role values into these neutral roles. Unknown roles fail closed. No application or domain consumer imports a provider SDK.
+The application roles are `owner`, `admin`, `manager` and `viewer`. Better Auth manages these neutral roles directly in local member tables; unknown roles fail closed. No application or domain consumer imports a provider SDK.
 
 ### Database runtime roles and RLS
 
@@ -473,7 +473,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 - Account isolation on every query (`account_id` from `(await getSession())?.accountId`).
 - Organisation scoping on all data access (`organisation_id` within the Account).
-- Clerk auth on all authenticated routes.
+- Better Auth authentication and optimistic proxy routing on all authenticated routes.
 - Xero tokens encrypted at rest using AES-256-GCM; never stored in plaintext.
 - Feed tokens signed and revocable; plaintext never persisted. The complete active subscribe URL is intentionally returned to authorised viewers.
 - Audit logs for all admin actions.
@@ -491,8 +491,10 @@ Optional variables with format constraints must be absent (commented out), not `
 |---|---|---|
 | `DATABASE_URL` | `packages/database` | Owner connection for migrations and allowlisted system operations |
 | `DATABASE_APP_URL` | `packages/database` | Restricted `team_calendar_app` connection for every tenant operation |
-| `CLERK_SECRET_KEY` | `packages/auth` | Clerk server-side auth |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `packages/auth` | Clerk client-side auth |
+| `BETTER_AUTH_SECRET` | `packages/auth` | Self-hosted Better Auth encryption secret (app only) |
+| `BETTER_AUTH_URL` | `packages/auth` | Canonical auth URL (app only) |
+| `AUTH_CONTEXT_MODE` | `packages/auth` | Auth context mode: `local` for apps/app, `remote` for apps/api |
+| `JOB_IDENTITY_GENERATION` | `packages/jobs` | Job identity generation string for stale job event fencing |
 | `RESEND_TOKEN` | `packages/email` | Resend API key |
 | `RESEND_FROM` | `packages/email` | Sender address |
 | `NEXT_PUBLIC_SENTRY_DSN` | `packages/observability` | Sentry error tracking (client DSN) |

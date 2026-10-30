@@ -120,7 +120,7 @@ Slack notifications, Teams integration, HTML calendar views, and additional prov
 | Runtime | Bun | Package manager and script runner |
 | Database | PostgreSQL (Neon serverless) | |
 | ORM | Prisma 7 | With `@prisma/adapter-neon` |
-| Auth | Clerk | Organisations feature; no custom workspace table |
+| Auth | Better Auth | Self-hosted PostgreSQL adapter; Accounts and Members tables |
 | Job queue | Inngest | Durable execution, scheduling, retries |
 | Email | Resend + React Email | Transactional email only |
 | Monitoring | Sentry | Error tracking and performance |
@@ -142,12 +142,12 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 
 | Concept | Role |
 |---|---|
-| Account | Top-level tenant boundary; billing anchor. Identified by Clerk's `org_id` (stored as `account_id`). One Account = one country code. |
+| Account | Top-level tenant boundary; billing anchor. Identified by `account_id`. One Account = one country code. |
 | Organisation | Legal or payroll entity within a Account (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns at most one XeroConnection and its own People. Account feeds span the account; company feeds may retain a company scope. |
 | XeroConnection | One per Organisation. Contains both tenancy keys, external tenant and remote connection IDs, payroll region, status and sync health/progress; references its canonical authorisation. |
 | XeroAuthorisation | One per verified Xero user and provider app. Sole AES-256-GCM encrypted token owner; may support several scoped connections. |
-| User | Authenticated identity via Clerk. Managed entirely by Clerk; no local users table. |
-| Membership | User-to-Account relationship. Managed entirely by Clerk; no custom membership table. |
+| User | Authenticated identity via Better Auth. Stored in local `auth_users` table. |
+| Membership | User-to-Account relationship. Stored in local `auth_members` table with role. |
 | Team | Grouping of people within an Organisation. |
 | Location | Work location within an Organisation; used for feed scoping and timezone/holiday handling. |
 
@@ -166,13 +166,13 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 
 ### Auth integration
 
-The Better Auth migration is implemented behind `packages/auth` and selected with `AUTH_PROVIDER=better-auth`; the deployed Clerk configuration remains until a coordinated cutover. Public signup creates an AU Account and owner membership atomically; addressed invitations join the existing Account. Local auth tables use the owner connection, while payroll Organisation defaults and Person links use the restricted tenant client. See `docs/auth-migration/02-design.md` for the approved migration and rollback boundaries. The Clerk details below describe the retained provider until cutover.
+The runtime is exclusively self-hosted Better Auth behind `packages/auth`, configured via `AUTH_CONTEXT_MODE=local` (for `apps/app`) and `AUTH_CONTEXT_MODE=remote` (for `apps/api`). Public signup creates an AU Account and owner membership atomically; addressed invitations join the existing Account. Local auth tables use the owner connection, while payroll Organisation defaults and Person links use the restricted tenant client.
 
-- Personal Accounts are disabled in the Clerk dashboard. Every user must belong to at least one Account.
-- Company selectors choose a payroll Organisation inside the current account on company-scoped pages. The calendar company filter defaults to all companies. This differs from switching the top-level Account; Clerk membership and role checks remain the account boundary.
-- Roles are defined once as custom roles in the Clerk dashboard and apply across all Accounts.
-- `packages/auth` exposes neutral session/user DTOs and helpers (`getSession`, `requireAccount`, `requireAccountResult`, `getAccountId`, `requireRole`, `hasPermission`, `hasRoleResult`, `getCurrentUser`). Clerk SDK calls and role translation stay inside its adapter. Client consumers use `useSession` and `AccountUserMenu`; account operations use the neutral account directory.
-- Inngest and background jobs carry explicit account and user context and never read sessions. Session-backed server-to-API calls obtain bearer headers through `@repo/auth/transport`.
+- Personal Accounts are disabled: every user must belong to at least one Account.
+- Company selectors choose a payroll Organisation inside the current account on company-scoped pages. The calendar company filter defaults to all companies. Company selection differs from switching the top-level Account; Account switching uses the AccountUserMenu and account picker.
+- Roles are the four application roles: `owner`, `admin`, `manager`, `viewer`, configured with explicit permissions in `packages/auth/permissions.ts`.
+- `packages/auth` exposes neutral session/user DTOs and helpers (`getSession`, `requireAccount`, `requireAccountResult`, `getAccountId`, `requireRole`, `hasPermission`, `hasRoleResult`, `getCurrentUser`). Client consumers use `useSession` and `AccountUserMenu`; account operations use the neutral account directory.
+- Inngest and background jobs carry explicit account context and identity generation (`identity_generation`) and never read sessions. Session-backed server-to-API calls obtain bearer headers through `@repo/auth/transport`.
 
 ### Roles
 
@@ -183,7 +183,7 @@ The Better Auth migration is implemented behind `packages/auth` and selected wit
 | manager | Team and direct-report access |
 | viewer | Filtered reads and own-record self-service |
 
-The four application roles are `owner`, `admin`, `manager` and `viewer`. `packages/auth/permissions.ts` defines their permission statements and grants. Role helpers use exact matching; permission checks use `hasPermission`, together with existing ownership, reporting, company, privacy and state constraints. Unknown roles fail closed. No custom roles or permissions tables are required while Clerk remains active.
+The four application roles are `owner`, `admin`, `manager` and `viewer`. `packages/auth/permissions.ts` defines their permission statements and grants. Role helpers use exact matching; permission checks use `hasPermission`, together with existing ownership, reporting, company, privacy and state constraints. Unknown roles fail closed.
 
 ---
 
@@ -199,7 +199,7 @@ team-calendar/
 │  └─ email/                  # notification templates (dev preview only; not deployed) (port 3003)
 ├─ packages/
 │  ├─ database/               # Prisma schema, migrations, queries
-│  ├─ auth/                   # Clerk helpers, requireAccount(), requireRole(), getAccountId()
+│  ├─ auth/                   # Better Auth helpers, requireAccount(), requireRole(), getAccountId()
 │  ├─ design-system/          # shared UI components (shadcn/ui, Tailwind)
 │  ├─ core/                   # shared types, enums, Result pattern, utilities
 │  ├─ xero/                   # Xero OAuth, tenant sync, region mapping, write operations
@@ -264,13 +264,13 @@ React Email template development environment for transactional notification emai
 
 ### `packages/auth`
 
-Provides provider-neutral authentication and account-scoping utilities used across `apps/app` and `apps/api`, backed by a Clerk adapter.
+Provides provider-neutral authentication and account-scoping utilities used across `apps/app` and `apps/api`, backed by self-hosted Better Auth.
 
 - `requireAccount()`: returns the active account ID or throws when unauthenticated or no account is selected.
 - `requireRole(role)`: returns a boolean for an exact neutral role match. `hasRoleResult(role)` preserves the unauthorised `Result` for missing identity or active account.
 - `getAccountId()`: returns the current `account_id` for use in database queries.
 - `getSession()` and `getCurrentUser()` project safe, provider-neutral DTOs. `hasPermission(request)` checks the central permission matrix. SDK exports stay private to `packages/auth`.
-- Contains no custom membership or role tables.
+- Manages local Account and Member domain tables.
 
 ### `packages/xero`
 
@@ -382,7 +382,7 @@ The full Prisma schema is the authoritative reference and lives at `packages/dat
 
 ### Tenant isolation
 
-Every tenant-scoped table carries `account_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. Application filters and PostgreSQL RLS both enforce this boundary. Tenant clients use `DATABASE_APP_URL`, a non-owner role, and transaction-local `app.account_id`; missing context denies access. `DATABASE_URL` is reserved for migrations and narrowly allowlisted system discovery/grant operations.
+Every tenant-scoped table carries `account_id` (text, not null, indexed). All queries must filter by this column. Application filters and PostgreSQL RLS both enforce this boundary. Tenant clients use `DATABASE_APP_URL`, a non-owner role, and transaction-local `app.account_id`; missing context denies access. `DATABASE_URL` is reserved for migrations and narrowly allowlisted system discovery/grant operations.
 
 The join tables `feed_tokens`, `feed_scopes`, and `availability_publications` now carry their own `account_id` column for direct tenant isolation.
 
@@ -753,7 +753,7 @@ Revoked or expired tokens return `410 Gone`.
 
 - Account isolation on every query (filter by `account_id`).
 - Organisation scoping on all data access (filter by `organisation_id` within the Account).
-- Clerk auth on all authenticated routes.
+- Better Auth authentication and optimistic proxy routing on all authenticated routes.
 - Xero OAuth tokens encrypted at rest using AES-256-GCM. The encryption key is stored in `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded). Tokens are never stored in plaintext.
 - Feed tokens signed and revocable; plaintext never persisted. The complete active subscribe URL is intentionally returned to authorised viewers. Revoked and expired tokens return 404 without a cached body.
 - Audit logs for all admin actions.
@@ -791,8 +791,8 @@ Each step produces a deployable, testable vertical slice.
 - TypeScript strict mode throughout.
 - Zod validation on all external input.
 - Clean separation between Xero-specific logic (`packages/xero`) and canonical domain logic (`packages/availability`).
-- No custom workspace table; tenant isolation is via Clerk `org_id`.
-- No custom membership or role tables; managed entirely by Clerk.
+- No custom workspace table; tenant isolation is via Account `account_id`.
+- Membership and roles are managed via Better Auth local tables (`auth_accounts`, `auth_members`).
 - One Organisation owns at most one XeroConnection (unique on `organisation_id`).
 - An active XeroConnection references its canonical verified XeroAuthorisation; connection and session rows contain no credentials.
 - `account_id` must be present on every query that touches tenant data.

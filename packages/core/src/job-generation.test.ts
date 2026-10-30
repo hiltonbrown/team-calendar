@@ -22,7 +22,7 @@ describe("currentJobIdentityGeneration", () => {
       envHolder.process.env = {};
     }
     if (originalEnv === undefined) {
-      delete envHolder.process.env.JOB_IDENTITY_GENERATION;
+      Reflect.deleteProperty(envHolder.process.env, "JOB_IDENTITY_GENERATION");
     } else {
       envHolder.process.env.JOB_IDENTITY_GENERATION = originalEnv;
     }
@@ -30,7 +30,7 @@ describe("currentJobIdentityGeneration", () => {
 
   it("returns default generation when env var is unset", () => {
     if (envHolder.process?.env) {
-      delete envHolder.process.env.JOB_IDENTITY_GENERATION;
+      Reflect.deleteProperty(envHolder.process.env, "JOB_IDENTITY_GENERATION");
     }
     expect(currentJobIdentityGeneration()).toBe(
       DEFAULT_JOB_IDENTITY_GENERATION

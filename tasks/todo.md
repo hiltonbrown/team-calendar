@@ -1,5 +1,34 @@
 # Current work
 
+## Better Auth migration: Task 9 implementation (30 October 2026)
+
+- [x] Task 9.1: Reconcile `AGENTS.md` and `PRODUCT.md`: Replace Clerk auth descriptions with Better Auth (self-hosted PostgreSQL adapter; accounts and members tables), update tenancy model concepts, package maps, and security invariants. Remove legacy `org_id` and custom workspace claims.
+- [x] Task 9.2: Reconcile `README.md` and `SECURITY.md`: Update auth description, remove references to `AUTH_PROVIDER=better-auth` and retained Clerk server adapter, update environment variables (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AUTH_CONTEXT_MODE`, `JOB_IDENTITY_GENERATION`), remove Clerk prerequisites, update browser release suite description to native Better Auth flow, document intermediate `systemDatabase` owner storage approval in `SECURITY.md`.
+- [x] Task 9.3: Reconcile `docs/auth-migration/03-cutover.md`: Clarify runtime auth mode (`AUTH_CONTEXT_MODE=local` on app, `remote` on API) and retire obsolete `AUTH_PROVIDER` variable.
+- [x] Task 9.4: Fix formatting and lint in `packages/core/src/job-generation.test.ts`: Replace `delete` operator with `Reflect.deleteProperty` for clean unsetting of environment variables, pass Biome/Ultracite checks.
+- [x] Task 9.5: Run verification gates: `bun run check`, `bun run typecheck`, full monorepo test suite `bun run test`.
+
+Stopping condition: Complete Task 9 (reconcile product, agent, security, cutover and release documentation to be consistent with Better Auth single-provider runtime). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. `AGENTS.md` and `PRODUCT.md` guidance:
+   - Replaced all Clerk references in `AGENTS.md` and `PRODUCT.md` with Better Auth and local `auth_accounts` / `auth_members` domain tables.
+   - Verified zero occurrences of "clerk" in both files.
+2. `README.md` and `SECURITY.md` guidance:
+   - Updated tech stack and local setup instructions to Better Auth (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AUTH_CONTEXT_MODE`, `JOB_IDENTITY_GENERATION`).
+   - Removed obsolete `AUTH_PROVIDER` and legacy Clerk table rows.
+   - Updated browser release suite documentation to native Better Auth flow.
+   - Documented intermediate `systemDatabase` owner storage approval and `team_calendar_auth` restricted-role plan in `SECURITY.md`.
+   - Verified zero occurrences of "clerk" or "AUTH_PROVIDER" in `README.md` and `SECURITY.md`.
+3. `docs/auth-migration/03-cutover.md` runbook:
+   - Removed `Keep AUTH_PROVIDER=better-auth consistent` and clarified single-provider `AUTH_CONTEXT_MODE=local` on app and `remote` on API.
+4. Lint and unit fixes:
+   - Fixed `job-generation.test.ts` to use `Reflect.deleteProperty` for clean unsetting of environment variables.
+5. Gates verified:
+   - `bun run check`: Checked 1,424 files, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages, 0 errors.
+   - `bun run test`: All 18 packages tested.
+
 ## Better Auth migration: Task 8 implementation (30 October 2026)
 
 - [x] Task 8.1: Define `JOB_IDENTITY_GENERATION` configuration: Implemented `currentJobIdentityGeneration()` in `packages/core/src/job-generation.ts`, exported from package root, added tests in `job-generation.test.ts`. Configured `JOB_IDENTITY_GENERATION: z.string().min(1).default(DEFAULT_JOB_IDENTITY_GENERATION)` in `packages/jobs/keys.ts`, re-exported helper, added tests in `keys.test.ts`. Updated `turbo.json` globalEnv, `apps/api/.env.example`, `apps/app/.env.example`, `packages/next-config/preflight.ts` and `preflight.test.ts`.

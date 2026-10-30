@@ -61,7 +61,7 @@ Team Calendar is a Turborepo monorepo built on modern serverless primitives:
 - **Framework:** Next.js (App Router) on next-forge
 - **Runtime and package manager:** Bun
 - **Database:** PostgreSQL (Neon serverless) via Prisma 7 with `@prisma/adapter-neon`
-- **Authentication:** Self-hosted Better Auth behind `packages/auth`, with the Clerk server adapter retained until cutover
+- **Authentication:** Self-hosted Better Auth behind `packages/auth`
 - **Background jobs:** Inngest (durable execution for sync, reconciliation, and feed rebuilds)
 - **Caching:** Vercel KV (Redis-compatible feed and ETag caching)
 - **Email:** Resend with React Email
@@ -78,7 +78,7 @@ Slack and Teams notifications, HTML calendar views, and additional payroll conne
 
 Team Calendar is under active development and pre-launch. Core infrastructure, provider-neutral Account tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate architecture, verification and review rulings are recorded in the [final Xero audit](docs/reports/2026-10-07-xero-final-architecture-audit.md) and `tasks/todo.md`. Live provider, browser and deployment evidence is recorded separately from source checks.
 
-The new auth pages and cookie-session API transport run with `AUTH_PROVIDER=better-auth` on the paired app/API deployments. This source change does not switch any deployed provider. The Clerk server adapter remains in the repository; rollback uses the preceding Clerk deployment, including its matching UI and middleware. Public signup creates an AU Account owned by the new user; invitation signup joins its addressed Account. See the [auth migration design](docs/auth-migration/02-design.md).
+Authentication and cookie-session API transport run with Better Auth (`AUTH_CONTEXT_MODE=local` on `app`, `remote` on `api`). Public signup creates an AU Account owned by the new user; invitation signup joins its addressed Account. See the [auth migration design](docs/auth-migration/02-design.md).
 
 ## Production URLs
 
@@ -111,7 +111,7 @@ The new auth pages and cookie-session API transport run with `AUTH_PROVIDER=bett
    cp apps/app/.env.example apps/app/.env.local
    cp apps/web/.env.example apps/web/.env.local
    ```
-   Fill in `DATABASE_URL`, `DATABASE_APP_URL`, `CLERK_SECRET_KEY`, and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as a minimum. `app` and `api` also need the same `XERO_TOKEN_ENCRYPTION_KEY`; generate one with `openssl rand -base64 32`. Copy `packages/database/.env.example` to `packages/database/.env` for migrations and seeding.
+   Fill in `DATABASE_URL`, `DATABASE_APP_URL`, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL` as a minimum. `app` and `api` also need the same `XERO_TOKEN_ENCRYPTION_KEY`; generate one with `openssl rand -base64 32`. Copy `packages/database/.env.example` to `packages/database/.env` for migrations and seeding.
 
    **Optional GitHub support issue integration (`apps/api/.env.local`):**
    ```bash
@@ -222,14 +222,13 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `XERO_TOKEN_ENCRYPTION_KEY` | `app`, `api` | Required | Required |
 | `XERO_CLIENT_ID` / `XERO_CLIENT_SECRET` | `app`, `api` | Required | Required |
 | `XERO_APP_TIER` / `XERO_REDIRECT_URI` | `app`, `api` | Required commercial allowance / registered HTTPS callback | Required commercial allowance / registered HTTPS callback |
-| `AUTH_PROVIDER` | `app`, `api` | Select `better-auth` together for the new flow | Select `better-auth` together for the new flow |
 | `AUTH_CONTEXT_MODE` | `app`, `api` | `local` on app, `remote` on API | `local` on app, `remote` on API |
 | `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL` | `app` | Required secret / exact app origin | Required secret / exact app origin |
+| `JOB_IDENTITY_GENERATION` | `app`, `api` | Job queue identity generation fence (default `gen_v1`) | Job queue identity generation fence (default `gen_v1`) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | `app` | Required | Required |
 | `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` / `MICROSOFT_TENANT_ID` | `app` | Required credentials / `organizations` tenant | Required credentials / `organizations` tenant |
 | `XERO_AUTH_CLIENT_ID` / `XERO_AUTH_CLIENT_SECRET` | `app` | Required, separate from payroll credentials | Required, separate from payroll credentials |
 | `BETTER_AUTH_INFRA_ENABLED` / `BETTER_AUTH_API_KEY` | `app` | Disabled by default pending residency review; key required only if enabled | Disabled by default pending residency review; key required only if enabled |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` | Legacy Clerk deployment | Required only with the retained Clerk provider | Required only with the retained Clerk provider |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | `app`, `api` | Required pair | Required pair |
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | `api` | Required pair | Required pair |
 | `RESEND_TOKEN` / `RESEND_FROM` | `app`, `api` | Required for auth and transactional mail | Required for auth and transactional mail |
@@ -267,7 +266,7 @@ private `EARLY_ACCESS_APPLICATION_RECIPIENT`. Required credential pairs must be 
 `INNGEST_EVENT_KEY`/`INNGEST_SIGNING_KEY` fails preflight.
 
 GitHub-backed support settings remain optional and API-only. The web project
-does not need database, Clerk, Xero, Inngest, or KV variables. To publish live
+does not need database, Better Auth, Xero, Inngest, or KV variables. To publish live
 service health, configure the optional Better Stack API key, status-page ID,
 and HTTPS public status-page URL together. The Better Stack page must contain
 exactly five public resources named `App access`, `Xero connection and
@@ -287,9 +286,8 @@ explicit HTTPS candidate deployments. It requires `TC_APP_CANDIDATE_URL`,
 `TC_DEPLOYED_CANDIDATE_SHA`, and the D1 `TC_RELEASE_MANIFEST`. The manifest,
 deployed SHA assertion, and local checkout must identify the same commit.
 
-The retained Clerk browser harness applies to the preceding Clerk deployment,
-not the new Better Auth UI. It requires Clerk test-instance keys plus `TC_E2E_OWNER_EMAIL`,
-`TC_E2E_ADMIN_EMAIL`, `TC_E2E_MANAGER_EMAIL`, and `TC_E2E_VIEWER_EMAIL` for
+The browser release suite exercises the Better Auth authentication flow. It requires `TC_E2E_OWNER_EMAIL`,
+`TC_E2E_ADMIN_EMAIL`, `TC_E2E_MANAGER_EMAIL`, and `TC_E2E_VIEWER_EMAIL` with configured credentials for
 isolated role sessions. Controlled fixture inputs are
 `TC_E2E_APPROVE_EMPLOYEE_NAME`, `TC_E2E_DECLINE_EMPLOYEE_NAME`,
 `TC_E2E_FOREIGN_PERSON_ID`, `TC_E2E_FEED_ID`,
@@ -298,7 +296,7 @@ isolated role sessions. Controlled fixture inputs are
 than skipping it. The suite runs cleanup from the protected manifest even after
 test failure and fails if owned residue remains.
 
-Use Clerk development/test credentials and controlled Xero organisations only.
+Use dedicated development/test credentials and controlled Xero organisations only.
 The suite does not mock authentication or provider success.
 
 ```bash
@@ -318,4 +316,4 @@ Xero requires every OAuth redirect URI to be pre-registered on the Xero app, and
 
 ### AU early access applications
 
-The public application and private-mailbox retention rule are documented in [docs/early-access-admission.md](docs/early-access-admission.md). Better Auth owner admission follows public signup in the [auth migration design](docs/auth-migration/02-design.md); it does not require manual Clerk admission. The API requires `EARLY_ACCESS_APPLICATION_RECIPIENT` and a private `EARLY_ACCESS_APPLICATION_HMAC_SECRET` of at least 32 characters, plus the configured KV pair used for abuse controls and retry receipts.
+The public application and private-mailbox retention rule are documented in [docs/early-access-admission.md](docs/early-access-admission.md). Better Auth owner admission follows public signup in the [auth migration design](docs/auth-migration/02-design.md); it does not require manual admission. The API requires `EARLY_ACCESS_APPLICATION_RECIPIENT` and a private `EARLY_ACCESS_APPLICATION_HMAC_SECRET` of at least 32 characters, plus the configured KV pair used for abuse controls and retry receipts.

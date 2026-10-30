@@ -72,7 +72,7 @@ Payroll OAuth remains separate: its `XERO_REDIRECT_URI` belongs to the existing 
 
 ## 4. Configure the paired app/API deployment
 
-Apply migrations and run preflight against the branch before deployment. Configure the app with its own strong `BETTER_AUTH_SECRET`, exact `BETTER_AUTH_URL`, email transport and the provider variables above. Configure the API to resolve sessions through that fixed app origin (`AUTH_CONTEXT_MODE=remote`); the app uses local auth context. Keep `AUTH_PROVIDER=better-auth` consistent across app/API/jobs. Do not place `BETTER_AUTH_SECRET` or OAuth client secrets in public environment variables.
+Apply migrations and run preflight against the branch before deployment. Configure the app with its own strong `BETTER_AUTH_SECRET`, exact `BETTER_AUTH_URL`, email transport and the provider variables above. Configure the API to resolve sessions through that fixed app origin (`AUTH_CONTEXT_MODE=remote`); the app uses local auth context (`AUTH_CONTEXT_MODE=local`). Do not place `BETTER_AUTH_SECRET` or OAuth client secrets in public environment variables.
 
 Local origins are app `http://localhost:3000`, API `http://localhost:3002`, web `http://localhost:3001`. Production uses `https://app.teamcalendar.online`, `https://api.teamcalendar.online` and `https://teamcalendar.online`. Preview requires matching exact `TC_APP_CANDIDATE_URL`, `TC_API_CANDIDATE_URL`, `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_API_URL`; browser API/SSE calls use the app proxy when hosts cannot share cookies. Production cookies use the approved `teamcalendar.online` domain; Preview cookies stay host-only. Never set a cookie domain of `vercel.app`.
 
