@@ -1,6 +1,6 @@
 # Self-hosted Better Auth design
 
-Status: proposed, awaiting approval. Checked 25 October 2026 against [the dependency inventory](01-inventory.md), current repository behaviour, live official Better Auth documentation and identified upstream source. This is a design, not authorisation to install dependencies, edit source/schema, reset a database or deploy.
+Status: approved and implemented in stages (25–30 October 2026). See [reconciliation addendum of 30 October 2026](#13-reconciliation-addendum-30-october-2026) for settled acceptance criteria, storage boundaries, single-provider configuration, and active-source criteria. Checked 25 October 2026 against [the dependency inventory](01-inventory.md), current repository behaviour, live official Better Auth documentation and identified upstream source. This is a design, not authorisation to install dependencies, edit source/schema, reset a database or deploy.
 
 ## Decisions and boundaries
 
@@ -380,3 +380,25 @@ The data reset, dedicated Xero sign-in app, sign-in-method set, fixed roles, dis
 The design maps the inventory's imports/API calls, role guards, persistence/RLS, keys, webhook effects, bearer/background flows, tests/copy and deployment boundaries. Official documentation/source research is evidence of API contracts; no browser, provider, database, generated-schema or concurrency behaviour has been verified. Implementation acceptance must include the repository's four gates plus the named auth/role/RLS/browser flows, raw HTTP secret-projection tests and stale queued/cached-step rejection, using existing protected database/release safeguards.
 
 Stop after static review of this document. Await approval of the design and resolution/acceptance of its listed gates before an implementation plan or any code, schema, dependency, reset or deployment work.
+
+## 13. Reconciliation addendum (30 October 2026)
+
+This addendum records explicit dispositions settled during implementation planning and acceptance review:
+
+1. **Storage model and database connection:**
+   - *Current implementation stage:* Uses `prismaAdapter(systemDatabase)` (the owner connection) as reviewed and approved in `06-server-review.md`. This bypasses `TenantDb` and avoids running auth operations under tenant RLS.
+   - *Launch boundary (Task 6):* The final launch model requires a dedicated restricted auth role `team_calendar_auth` using `DATABASE_AUTH_URL` (with CRUD on auth tables and SELECT/INSERT on auth audit, no domain/payroll access). If retained as owner connection by explicit launch decision, that residual privilege exposure must be formally documented as a risk exception.
+2. **Single-provider runtime:**
+   - The runtime is exclusively Better Auth. The `AUTH_PROVIDER` runtime selector flag has been removed from application source, configuration examples, and `turbo.json`.
+   - Runtime transport is configured strictly via `AUTH_CONTEXT_MODE=local` (on `apps/app`) and `AUTH_CONTEXT_MODE=remote` (on `apps/api`).
+   - Rollback capability does not rely on a runtime code toggle; rollback restores the coherent preceding deployment SHA, configuration, and database recovery point.
+3. **Rate limits:**
+   - The implemented rate limit of **3 requests per 60 seconds** for password reset and email verification in `packages/auth/better-auth-options.ts` is confirmed as the authoritative policy (stricter than the initially proposed 5/60s).
+4. **Access control and role statements:**
+   - The four static application roles (`owner`, `admin`, `manager`, `viewer`) use the explicit 43-action permission matrix defined in `packages/auth/permissions.ts`.
+   - Better Auth native organization teams and dynamic roles remain disabled.
+5. **Infrastructure and data residency:**
+   - `BETTER_AUTH_INFRA_ENABLED` remains disabled (`false`) by default. Enablement is rejected pending resolution of residency, subprocessor, and data transfer assessments for AU, NZ, and UK markets. Core self-hosted authentication remains fully functional without Infrastructure.
+6. **Active-source vs historical records:**
+   - Active source code, runtime dependencies, environment schemas, and live type definitions must contain zero Clerk references.
+   - Historical planning and review documents (e.g. `01-inventory.md`, `04-verification.md`), migration replay history, and negative-test assertions are recognised historical exceptions that must not be altered.

@@ -6891,3 +6891,27 @@ node_modules/.bun/inngest-cli@1.44.0+3844822a191571ee/node_modules/inngest-cli/b
 node_modules/.bun/inngest-cli@1.45.1+3844822a191571ee/node_modules/inngest-cli/bin/inngest
 node_modules/.bun/inngest-cli@1.49.0+3844822a191571ee/node_modules/inngest-cli/bin/inngest
 ```
+
+## 5. Acceptance reconciliation addendum (30 October 2026)
+
+This addendum records the explicit acceptance dispositions for criteria evaluated in this verification report, distinguishing substantive security enforcement from historical artefacts:
+
+1. **Active-source removal criteria vs justified historical exceptions (Checks 1, 2, 8, 42, 43):**
+   - The acceptance condition for provider removal requires zero Clerk SDK imports, dependencies, environment schemas, wire handlers, and active runtime types across first-party code (`apps/`, `packages/`, `scripts/`, `tooling/`).
+   - Historical inventory/planning documents (`01-inventory.md`, this verification report `04-verification.md`), committed historical database migrations (preserved for migration replay integrity), and negative-test assertions verifying rejection of legacy context/tokens are recognized and justified exceptions. Erasing historical audit records to satisfy a lexical zero check is explicitly prohibited.
+
+2. **Tenant RLS context vs pre-Account trigger functions (Check 6):**
+   - The requirement for `app.account_id` transaction context applies strictly to tenant-scoped tables, domain policies, and tenant helper functions.
+   - The six auth trigger functions in migrations `20261025150000_auth_membership_invariants` and `20261025160000_auth_lifecycle_audit` govern user creation, session tracking, and initial Account membership bootstrapping prior to Account selection. They operate safely on row identity and trusted auth actor context, which is the correct architecture for pre-Account lifecycle operations.
+
+3. **Reset branch safety and execution contract (Check 33):**
+   - The reset CLI (`reset-auth-data-core.ts`) deliberately permits branch-bound `--dry-run` without `--confirm` so that operators can safely inspect affected table row counts.
+   - Actual deletion strictly enforces both `--execute` and `--confirm`. The refusal-without-confirm assertion applies exclusively to mutating execution.
+
+4. **Storage connection and launch boundary (Checks 10, 28, 35):**
+   - The intermediate implementation uses `systemDatabase` (owner Prisma connection) as approved in `06-server-review.md`.
+   - The launch boundary requires dedicated restricted role `team_calendar_auth` via `DATABASE_AUTH_URL` (Task 6 of the completion plan). If owner storage is retained for launch, it must be formally recorded as an accepted risk exception.
+
+5. **Rate-limit policy and custom ACL disposition (Checks 13, 15):**
+   - 3 requests per 60 seconds (implemented in `better-auth-options.ts`) is the adopted security limit for password reset and email verification.
+   - The custom 4-role (`owner`, `admin`, `manager`, `viewer`) static permission matrix replaces Better Auth default organisation statements; teams and dynamic roles remain disabled.

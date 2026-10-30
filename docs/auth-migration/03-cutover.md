@@ -20,7 +20,7 @@ Save branch-specific variables in a private environment file, represented below 
 | `DATABASE_APP_URL` | Seed/domain smoke tests | Same branch/database, `team_calendar_app`, without owner/BYPASSRLS privileges |
 | `NEON_API_KEY` | Reset branch verification | Server/operator secret authorised to read the connected project/branch; never logged |
 | `SEED_AUTH_PASSWORD` | Fixture seed | Explicit test password satisfying the seed validator; never print it or commit it |
-| `AUTH_PROVIDER` | Rehearsal app/API/jobs | `better-auth` consistently across the paired deployment |
+| `AUTH_CONTEXT_MODE` | Runtime auth mode | `local` for apps/app; `remote` for apps/api. Note: obsolete `AUTH_PROVIDER` variable is retired. |
 
 ## 2. Rehearse the reset and seed
 
