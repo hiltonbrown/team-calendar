@@ -650,7 +650,7 @@ describe("native organisation API behind guarded Account facade", () => {
     ).toHaveLength(1);
     expect(accountId).not.toBe(invitedAccountId);
   });
-  it("rejects native final-owner demotion and leave before any write", async () => {
+  it("rejects native final-owner demotion, removal and leave before any write", async () => {
     const { accountId, actorId, storage } = await fixture("owner");
     for (const member of storage.AuthMember) {
       if (member.user_id !== actorId) {
@@ -660,6 +660,9 @@ describe("native organisation API behind guarded Account facade", () => {
     await expect(
       updateAccountMemberRole({ accountId, role: "admin", userId: actorId })
     ).rejects.toMatchObject({ status: "BAD_REQUEST" });
+    await expect(
+      removeAccountMember({ accountId, userId: actorId })
+    ).rejects.toMatchObject({ status: "BAD_REQUEST" });
     await expect(leaveAccount(accountId)).rejects.toMatchObject({
       status: "BAD_REQUEST",
     });
@@ -667,6 +670,41 @@ describe("native organisation API behind guarded Account facade", () => {
       storage.AuthMember.find((member) => member.user_id === actorId)?.role
     ).toBe("owner");
     expect(mocks.clear).not.toHaveBeenCalled();
+  });
+  it("allows removing an owner when another owner exists and target has other memberships", async () => {
+    const { accountId, storage, targetId } = await fixture("owner");
+    const targetMember = storage.AuthMember.find(
+      (member) => member.user_id === targetId
+    );
+    if (!targetMember) {
+      throw new Error("Missing target member");
+    }
+    targetMember.role = "owner";
+
+    const secondAccountId = randomUUID();
+    storage.AuthMember.push({
+      account_id: secondAccountId,
+      createdAt: new Date(),
+      id: randomUUID(),
+      role: "viewer",
+      user_id: targetId,
+    });
+
+    await removeAccountMember({ accountId, userId: targetId });
+
+    expect(
+      storage.AuthMember.some(
+        (member) =>
+          member.account_id === accountId && member.user_id === targetId
+      )
+    ).toBe(false);
+    expect(
+      storage.AuthMember.some(
+        (member) =>
+          member.account_id === secondAccountId && member.user_id === targetId
+      )
+    ).toBe(true);
+    expect(mocks.clear).toHaveBeenCalledWith(accountId, targetId);
   });
   it("rejects unverified identities and a switched account re-read under lock", async () => {
     const first = await fixture("owner");

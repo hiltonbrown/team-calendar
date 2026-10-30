@@ -653,16 +653,40 @@ async function completionRecipients(
     return [context.triggeredByUserId];
   }
   try {
-    const memberships = await listAccountMembersForJob({
-      accountId: context.accountId,
-      limit: 100,
-    });
-    return memberships.data
-      .filter((membership) =>
-        hasPermission(membership.role, { xero: ["sync"] })
-      )
-      .map((membership) => membership.userId)
-      .filter((userId): userId is string => Boolean(userId));
+    const recipients = new Set<string>();
+    const pageSize = 100;
+    let offset = 0;
+
+    let hasMore = true;
+    while (hasMore) {
+      const page = await listAccountMembersForJob({
+        accountId: context.accountId,
+        limit: pageSize,
+        offset,
+      });
+
+      if (!page.data.length) {
+        hasMore = false;
+        break;
+      }
+
+      for (const membership of page.data) {
+        if (
+          membership.role &&
+          hasPermission(membership.role, { xero: ["sync"] }) &&
+          membership.userId
+        ) {
+          recipients.add(membership.userId);
+        }
+      }
+
+      offset += page.data.length;
+      if (offset >= page.totalCount || page.data.length < pageSize) {
+        hasMore = false;
+      }
+    }
+
+    return Array.from(recipients);
   } catch (error) {
     if (
       error instanceof XeroBindingChangedError ||

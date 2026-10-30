@@ -13,6 +13,28 @@ Stopping condition: deliver the reviewed plan for completing the migration. Do n
 
 PASS: planning deliverable saved to `docs/superpowers/plans/2026-10-28-auth-migration-completion.md`. Twelve ordered tasks cover all 43 audit checks plus the design's auth-audit projection, UUID relations and stale cached-job requirements. Five local document links and 47 existing referenced files resolve; proposed modules are labelled; whitespace and language checks pass. The historical 11 PASS/23 FAIL/9 UNABLE TO VERIFY audit is not presented as a fresh run. Owner versus restricted final auth storage remains an explicit user decision; other contradictory acceptance wording has proposed resolutions. This task only writes the plan and this checklist. Concurrent build/runtime source changes are preserved and identified for reuse, without claiming their verification. No application/database/browser/provider tests, dependency installation, reset, hosted changes, deployment, commit or merge were performed by this planning task.
 
+## Better Auth migration: Task 5 implementation (30 October 2026)
+
+- [x] Task 5.1: In `packages/jobs/src/handlers/reconcile-xero-approval-state.ts`, paginate completion recipient discovery beyond the 100-member boundary, filtering roles and de-duplicating recipient user IDs.
+- [x] Task 5.2: In `packages/jobs/src/handlers/reconcile-xero-approval-state.test.ts`, add regression test asserting multi-page member pagination, recipient de-duplication, and admission of sync-permitted roles across pages.
+- [x] Task 5.3: In `packages/auth/adapters/better-auth-accounts.test.ts`, add regression tests asserting rejection of final-owner removal (`removeAccountMember`), and permitted removal when another owner exists and target has other memberships.
+- [x] Task 5.4: Run verification gates: `bun run check`, `bun run typecheck`, `bun run --cwd packages/auth test`, `bun run --cwd packages/jobs test`.
+
+Stopping condition: Complete Task 5 (membership edge coverage and paginated job recipients). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Paginated job recipients:
+   - In `packages/jobs/src/handlers/reconcile-xero-approval-state.ts`, updated `completionRecipients` to loop through all pages of `listAccountMembersForJob` (100 per page) with safe termination conditions (breaks on empty data, page count < pageSize, or offset >= totalCount). Filters roles with `{ xero: ["sync"] }` and de-duplicates recipient user IDs via `Set`.
+   - Added test `paginates beyond 100 members, de-duplicates recipient IDs, and admits eligible owners/admins across multiple pages` in `reconcile-xero-approval-state.test.ts`. All 28 tests pass.
+2. Final owner removal edge cases:
+   - In `packages/auth/adapters/better-auth-accounts.test.ts`, added assertion verifying `removeAccountMember` on the sole remaining owner is rejected with `BAD_REQUEST` before any write.
+   - Added test verifying an owner can be removed when another owner exists, confirming that the removed member's membership in other accounts remains intact and `clearAccountPeople` is called. All 29 tests pass.
+3. Gates verified:
+   - `bun run check`: Checked 1,418 files in 1.6s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 7.4s.
+   - `packages/auth` unit tests: 28 test files, 422 tests passed.
+   - `packages/jobs` unit tests: 21 test files, 217 tests passed.
+
 ## Better Auth migration: Task 4 implementation (30 October 2026)
 
 - [x] Task 4.1: Remove obsolete legacy route `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx`.

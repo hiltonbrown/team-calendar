@@ -229,6 +229,7 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     expect(mocks.listAccountMembersForJob).toHaveBeenCalledWith({
       accountId: ACCOUNT_ID,
       limit: 100,
+      offset: 0,
     });
     const recipients = mocks.dispatchNotification.mock.calls.map(
       ([notification]) => notification.recipientUserId
@@ -241,6 +242,58 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
         type: "sync_reconciliation_complete",
       });
     }
+  });
+  it("paginates beyond 100 members, de-duplicates recipient IDs, and admits eligible owners/admins across multiple pages", async () => {
+    mocks.availabilityRecordFindMany.mockResolvedValue([]);
+    const page1Data = Array.from({ length: 100 }, (_, i) => ({
+      role: i === 0 ? "owner" : "viewer",
+      userId: `user-p1-${i}`,
+    }));
+    const page2Data = Array.from({ length: 50 }, (_, i) => {
+      let userId = `user-p2-${i}`;
+      if (i === 0) {
+        userId = "user-p2-admin";
+      } else if (i === 1) {
+        userId = "user-p1-0";
+      }
+      return {
+        role: i === 0 ? "admin" : "viewer",
+        userId,
+      };
+    });
+
+    mocks.listAccountMembersForJob
+      .mockResolvedValueOnce({
+        data: page1Data,
+        totalCount: 150,
+      })
+      .mockResolvedValueOnce({
+        data: page2Data,
+        totalCount: 150,
+      });
+
+    const result = await reconcileXeroApprovalState({
+      ...input(),
+      triggerType: "scheduled",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.listAccountMembersForJob).toHaveBeenCalledTimes(2);
+    expect(mocks.listAccountMembersForJob).toHaveBeenNthCalledWith(1, {
+      accountId: ACCOUNT_ID,
+      limit: 100,
+      offset: 0,
+    });
+    expect(mocks.listAccountMembersForJob).toHaveBeenNthCalledWith(2, {
+      accountId: ACCOUNT_ID,
+      limit: 100,
+      offset: 100,
+    });
+
+    const recipients = mocks.dispatchNotification.mock.calls.map(
+      ([notification]) => notification.recipientUserId
+    );
+    expect(recipients).toEqual(["user-p1-0", "user-p2-admin"]);
   });
   it("uses the explicit triggering user without reading an ambient session or account directory", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([]);
