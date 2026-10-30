@@ -19,9 +19,9 @@ export { proxyApiRequest } from "./api-proxy";
 /** Streaming handlers revalidate explicit request cookies after headers are sent. */
 export async function getRequestAuthContext(requestHeaders: Headers) {
   if (authContextMode() === "remote") {
-    const { readRemoteContext } = await import("./adapters/remote-context.js");
+    const { readRemoteContext } = await import("./adapters/remote-context");
     return readRemoteContext(requestHeaders);
   }
-  const { readBetterAuthContext } = await import("./adapters/better-auth.js");
+  const { readBetterAuthContext } = await import("./adapters/better-auth");
   return readBetterAuthContext(requestHeaders);
 }

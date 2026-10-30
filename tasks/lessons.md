@@ -246,3 +246,11 @@ Keep one-off task evidence in that task's review, not here.
   internal source compatibility is not a user or account migration requirement.
 
 - The auth replacement is a clean pre-launch reset: there are no live customers. Do not turn reset tooling or cutover planning into an identity/data migration, ID remap, password import or notification programme. Preserve-data checks apply to verification fixtures until the explicitly named-branch reset command is executed, not to a requirement to migrate Clerk customer data.
+
+## Development environment and tooling
+
+- In Tailwind CSS v4, avoid broad parent glob patterns like `@source "../**/*.{ts,tsx}"` in shared packages. Tailwind v4's Rust Oxide scanner crawls matching paths recursively without ignoring `node_modules` unless explicitly scoped. Scope `@source` directives strictly to component subdirectories (e.g. `../components/**/*.{ts,tsx}`).
+- In monorepos using symlinks (e.g. Bun workspaces), removing a dependency from `package.json` can leave orphaned symlinks in package-local `node_modules`. Combined with recursive filesystem scanners or deep module resolution, these orphan symlinks form cyclic directory loops that exhaust V8 heap and Rust memory. Prune orphan workspace symlinks after package removals.
+- Node.js 24 + Webpack fast arrays crash with `RangeError: Invalid array length` when recursive directory traversal causes dynamic array allocations to exceed maximum array size limits during module graph construction.
+- Dynamic imports in monorepo packages consuming TypeScript source directly must omit `.js` extensions (or match bundler resolution rules) so Next.js and Turbopack can resolve TypeScript modules without runtime module-not-found errors.
+- Heavy database-seeding or transactional tests in Vitest should declare explicit timeouts (e.g. 15000ms) rather than relying on the 5000ms default when run concurrently across multiple workers on ARM64 Linux hosts.

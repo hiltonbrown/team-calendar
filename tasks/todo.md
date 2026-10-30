@@ -1441,3 +1441,18 @@ Stopping condition: repair the demonstrated people-sync failure without bypassin
 - Integration and full live people-import completion remain NOT VERIFIED. Reused this session's unchanged remote-database integration guard failure; no live sync was dispatched, no provider call was made and no database guard was bypassed.
 
 - PASS: final `bun run test`, 18 successful tasks including all 730 Xero tests.
+
+## 2026-10-30 Development environment stabilisation and memory remediation
+
+- [x] Phase 1: Establish diagnostic baseline (Git status, package.json, versions, WSL memory/swap/CPU/disk, .wslconfig, Next.js config, active processes, system logs, diff vs main)
+- [x] Phase 2: Investigate application compilation and memory consumption (sign-in route [[...sign-in]], Webpack RangeError: Invalid array length, Turbopack resource consumption, turbopackPluginRuntimeStrategy override, recursive dependency loops/symlinks)
+- [x] Phase 3: Controlled reproduction and memory profiling (bounded memory limits, run isolated app server, profile memory/heap/RSS, test sign-in route compilation)
+- [x] Phase 4: Implement permanent corrections (remove unsafe worker-thread overrides, fix Webpack RangeError/compilation defect on sign-in route, fix development email transport handling in Inngest, ensure clean shutdown and process isolation)
+- [x] Phase 5: Restore full development workflow (validate apps/app, apps/web, apps/api, packages/email, Inngest, test root bun run dev, verify HTTP responses and resource stability)
+- [x] Phase 6: Establish lightweight future-proof diagnostics and documentation (troubleshooting runbook at docs/development/troubleshooting.md, diagnostic script for environment/process health)
+- [x] Phase 7: Regression testing and final deliverables (typecheck, lint, unit tests, integration test check, generate comprehensive report and update lessons.md)
+
+### Review
+
+PASS: Full investigation, remediation, and verification completed. The excessive memory consumption (~14 GiB OOM crash) and Webpack `RangeError: Invalid array length` were traced to an unbounded Tailwind CSS v4 `@source "../**/*.{ts,tsx}"` in `packages/design-system/styles/globals.css` combined with an orphan workspace symlink `packages/design-system/node_modules/@repo/auth -> ../../../auth` left behind from a previous refactor. This caused the Tailwind Rust Oxide scanner and Webpack AST traversal to enter an infinite directory loop into `node_modules`, rapidly exhausting memory. Scoped `@source` to specific component directories (`components`, `hooks`, `lib`, `providers`, `index.tsx`) and pruned orphan symlinks. Fixed dynamic module resolution in `packages/auth/transport.ts` (removed `.js` extensions). Confirmed `turbopackPluginRuntimeStrategy: "workerThreads"` in `packages/next-config/index.ts`. Added missing `RESEND_FROM` to `apps/api/.env.local` to resolve the Inngest email transport failure. Increased timeouts on heavy seed tests in `packages/auth/development-seed.test.ts`. Created automated diagnostic scripts `scripts/dev-doctor.sh` and `scripts/dev-profile.sh`, and permanent troubleshooting guide `docs/development/troubleshooting.md`. Verified all services (`app`, `web`, `api`, `email`, `inngest`) run concurrently under `bun run dev` with total system memory at ~4.1 GiB (11 GiB available, 0 swap, PSI = 0.00). Route `/sign-in` compiles in ~2.4s and returns HTTP 200 with ~850MB process RSS. All CI gates PASS: `bun run check` (1,418 files), `bun run typecheck` (19 tasks), `bun run build` (all apps), and `bun run test` (all 18 monorepo tasks, 4,499+ tests). No data or databases were reset; all existing branch work preserved.
+
