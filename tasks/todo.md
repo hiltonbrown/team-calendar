@@ -1,5 +1,34 @@
 # Current work
 
+## Vercel build failure remediation (31 October 2026)
+
+- [x] Task 1: Identify root causes of Vercel build failure (OOM / SIGKILL 137 on Turbopack build and Next.js App Router entrypoint type violations).
+- [x] Task 2: Fix App Router entrypoint type errors in `apps/web/app/rss.xml/route.ts` (remove non-route export) and `apps/web/app/status/page.tsx` (extract `StatusContent` component).
+- [x] Task 3: Pin Node runtime to Node 22 (Active LTS) across root and app `package.json` engines and `.nvmrc` / `.node-version` to prevent Next.js from disabling Turbopack `workerThreads` and falling back to memory-leaking `childProcesses`.
+- [x] Task 4: Run full verification suite: `bun run check`, `bun run typecheck`, `bun run test`, `bun run build`.
+
+Stopping condition: resolve Vercel build failure causes (OOM during Next.js Turbopack build and App Router entrypoint type violations), pass all gates (`check`, `typecheck`, `test`, `build`).
+
+Review: PASS.
+1. Root cause analysis:
+   - Root `package.json` had `"node": "22 || >=24.0.0"`. Vercel automatically picked Node 24 (`v24.22.2`).
+   - Next.js 16.4.3 disables `turbopackPluginRuntimeStrategy = 'workerThreads'` on Node `>=24.13.1` (due to upstream Node.js bug #65100 with worker-thread teardown) and falls back to `'childProcesses'`.
+   - On Vercel's 2-core 8GB build container, Turbopack child processes accumulated memory beyond the 8GB ceiling during `Creating an optimized production build...`, triggering kernel `SIGKILL` (exit code 137, OOM) after ~2m20s.
+   - On Node 22 (Active LTS), the bug does not exist; Next.js runs `workerThreads` natively with peak RSS under 620MB and builds in ~4.5 seconds.
+2. Node runtime pinning:
+   - Pinned root `package.json` `engines.node` to `22.x`.
+   - Added `.nvmrc` and `.node-version` specifying `22` at repository root.
+   - Added `engines.node: "22.x"` to `apps/web/package.json`, `apps/app/package.json`, and `apps/api/package.json`.
+3. App Router entrypoint type violations resolved:
+   - `apps/web/app/rss.xml/route.ts`: removed `export` from `escapeXml` so only route handlers and segment configs are exported.
+   - `apps/web/app/status/page.tsx`: extracted `StatusContent` component and types to `apps/web/app/status/status-content.tsx` while preserving route module CSS loading.
+   - Updated `status.test.tsx` and `app/styles/style-loading.test.ts` to reflect the new component location while preserving CSS module contract tests.
+4. Gates verified:
+   - `bun run check`: Checked 1,425 files in 2s, 0 errors.
+   - `bun run typecheck`: 19/19 Turbo tasks successful in 5.7s, 0 errors.
+   - `bun run test`: All 18 monorepo test suites passed (>4,500 tests across apps and packages).
+   - `bun run build`: All 4 production builds (`app`, `api`, `web`, `database`) succeeded in 16.8s.
+
 ## Better Auth migration: Database migrations and RLS audit (30 October 2026)
 
 - [x] Task 13.1: Audit database migration history and status: confirmed 45 migrations applied and schema up to date via `prisma migrate status`.

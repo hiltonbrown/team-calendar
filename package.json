@@ -74,7 +74,7 @@
   },
   "packageManager": "bun@1.4.0",
   "engines": {
-    "node": "22 || >=24.0.0"
+    "node": "22.x"
   },
   "patchedDependencies": {
     "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
