@@ -50,7 +50,7 @@ export interface AuthActionData {
   user?: AuthUser;
 }
 export type AuthActionResult = AuthClientResult<AuthActionData>;
-export type AuthSocialProvider = "google" | "microsoft" | "xero-auth";
+export type AuthSocialProvider = "xero-auth";
 
 const record = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));

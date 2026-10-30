@@ -1269,8 +1269,8 @@ model StripeEvent {
 }
 
 // Generated with auth@1.7.12, then mapped to repository storage conventions.
-// Domain auth foreign keys are added at the clean-reset cutover, while Clerk
-// remains the active provider and existing domain account/user IDs are text.
+// Tenant tables reference Accounts by text account_id without a foreign key.
+// Auth tables have no grants for the restricted team_calendar_app role.
 model AuthUser {
   membership_revision Int      @default(0)
   id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
