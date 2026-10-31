@@ -14,7 +14,7 @@ import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedTo } from "../tenant-query";
 
 interface TenantScope {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }
 
@@ -46,7 +46,7 @@ export async function listTeamsWithCoverageMinimum(
   db: TenantDb
 ): Promise<Result<TeamCoverageMinimumRow[]>> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tenantDb = db;
 
     const scope = scopedTo(input);
@@ -86,7 +86,7 @@ export async function setTeamCoverageMinimum(
   db: TenantDb
 ): Promise<Result<TeamCoverageMinimumChange>> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
     const where = { ...scopedTo(input), id: input.teamId };
     const team = await client.team.findFirst({
@@ -144,7 +144,7 @@ export async function countAwayPeopleByTeamAndDay(
   db: TenantDb
 ): Promise<Result<AwayPeopleByTeamAndDay>> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tenantDb2 = db;
 
     if (!AwayCountInputSchema.safeParse(input).success) {

@@ -26,7 +26,7 @@ export type AggregateXeroPersonMatch = {
 
 export type XeroPersonMatchMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   xero_person_id: string | null
   candidate_person_id: string | null
@@ -34,7 +34,7 @@ export type XeroPersonMatchMinAggregateOutputType = {
   status: $Enums.xero_person_match_status | null
   resolution_note: string | null
   resolved_person_id: string | null
-  resolved_clerk_user_id: string | null
+  resolved_user_id: string | null
   resolved_by_user_id: string | null
   resolved_at: Date | null
   created_at: Date | null
@@ -43,7 +43,7 @@ export type XeroPersonMatchMinAggregateOutputType = {
 
 export type XeroPersonMatchMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   xero_person_id: string | null
   candidate_person_id: string | null
@@ -51,7 +51,7 @@ export type XeroPersonMatchMaxAggregateOutputType = {
   status: $Enums.xero_person_match_status | null
   resolution_note: string | null
   resolved_person_id: string | null
-  resolved_clerk_user_id: string | null
+  resolved_user_id: string | null
   resolved_by_user_id: string | null
   resolved_at: Date | null
   created_at: Date | null
@@ -60,7 +60,7 @@ export type XeroPersonMatchMaxAggregateOutputType = {
 
 export type XeroPersonMatchCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   xero_person_id: number
   candidate_person_id: number
@@ -68,7 +68,7 @@ export type XeroPersonMatchCountAggregateOutputType = {
   status: number
   resolution_note: number
   resolved_person_id: number
-  resolved_clerk_user_id: number
+  resolved_user_id: number
   resolved_by_user_id: number
   resolved_at: number
   created_at: number
@@ -79,7 +79,7 @@ export type XeroPersonMatchCountAggregateOutputType = {
 
 export type XeroPersonMatchMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   xero_person_id?: true
   candidate_person_id?: true
@@ -87,7 +87,7 @@ export type XeroPersonMatchMinAggregateInputType = {
   status?: true
   resolution_note?: true
   resolved_person_id?: true
-  resolved_clerk_user_id?: true
+  resolved_user_id?: true
   resolved_by_user_id?: true
   resolved_at?: true
   created_at?: true
@@ -96,7 +96,7 @@ export type XeroPersonMatchMinAggregateInputType = {
 
 export type XeroPersonMatchMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   xero_person_id?: true
   candidate_person_id?: true
@@ -104,7 +104,7 @@ export type XeroPersonMatchMaxAggregateInputType = {
   status?: true
   resolution_note?: true
   resolved_person_id?: true
-  resolved_clerk_user_id?: true
+  resolved_user_id?: true
   resolved_by_user_id?: true
   resolved_at?: true
   created_at?: true
@@ -113,7 +113,7 @@ export type XeroPersonMatchMaxAggregateInputType = {
 
 export type XeroPersonMatchCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   xero_person_id?: true
   candidate_person_id?: true
@@ -121,7 +121,7 @@ export type XeroPersonMatchCountAggregateInputType = {
   status?: true
   resolution_note?: true
   resolved_person_id?: true
-  resolved_clerk_user_id?: true
+  resolved_user_id?: true
   resolved_by_user_id?: true
   resolved_at?: true
   created_at?: true
@@ -203,7 +203,7 @@ export type XeroPersonMatchGroupByArgs<ExtArgs extends runtime.Types.Extensions.
 
 export type XeroPersonMatchGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   candidate_person_id: string | null
@@ -211,7 +211,7 @@ export type XeroPersonMatchGroupByOutputType = {
   status: $Enums.xero_person_match_status
   resolution_note: string | null
   resolved_person_id: string | null
-  resolved_clerk_user_id: string | null
+  resolved_user_id: string | null
   resolved_by_user_id: string | null
   resolved_at: Date | null
   created_at: Date
@@ -241,7 +241,7 @@ export type XeroPersonMatchWhereInput = {
   OR?: Prisma.XeroPersonMatchWhereInput[]
   NOT?: Prisma.XeroPersonMatchWhereInput | Prisma.XeroPersonMatchWhereInput[]
   id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
-  clerk_org_id?: Prisma.StringFilter<"XeroPersonMatch"> | string
+  account_id?: Prisma.StringFilter<"XeroPersonMatch"> | string
   organisation_id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
   xero_person_id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
   candidate_person_id?: Prisma.UuidNullableFilter<"XeroPersonMatch"> | string | null
@@ -249,7 +249,7 @@ export type XeroPersonMatchWhereInput = {
   status?: Prisma.Enumxero_person_match_statusFilter<"XeroPersonMatch"> | $Enums.xero_person_match_status
   resolution_note?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_person_id?: Prisma.UuidNullableFilter<"XeroPersonMatch"> | string | null
-  resolved_clerk_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
+  resolved_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_by_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_at?: Prisma.DateTimeNullableFilter<"XeroPersonMatch"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"XeroPersonMatch"> | Date | string
@@ -262,7 +262,7 @@ export type XeroPersonMatchWhereInput = {
 
 export type XeroPersonMatchOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_person_id?: Prisma.SortOrder
   candidate_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -270,7 +270,7 @@ export type XeroPersonMatchOrderByWithRelationInput = {
   status?: Prisma.SortOrder
   resolution_note?: Prisma.SortOrderInput | Prisma.SortOrder
   resolved_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
-  resolved_clerk_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  resolved_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   resolved_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   resolved_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
@@ -287,7 +287,7 @@ export type XeroPersonMatchWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.XeroPersonMatchWhereInput | Prisma.XeroPersonMatchWhereInput[]
   OR?: Prisma.XeroPersonMatchWhereInput[]
   NOT?: Prisma.XeroPersonMatchWhereInput | Prisma.XeroPersonMatchWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"XeroPersonMatch"> | string
+  account_id?: Prisma.StringFilter<"XeroPersonMatch"> | string
   organisation_id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
   xero_person_id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
   candidate_person_id?: Prisma.UuidNullableFilter<"XeroPersonMatch"> | string | null
@@ -295,7 +295,7 @@ export type XeroPersonMatchWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.Enumxero_person_match_statusFilter<"XeroPersonMatch"> | $Enums.xero_person_match_status
   resolution_note?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_person_id?: Prisma.UuidNullableFilter<"XeroPersonMatch"> | string | null
-  resolved_clerk_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
+  resolved_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_by_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_at?: Prisma.DateTimeNullableFilter<"XeroPersonMatch"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"XeroPersonMatch"> | Date | string
@@ -308,7 +308,7 @@ export type XeroPersonMatchWhereUniqueInput = Prisma.AtLeast<{
 
 export type XeroPersonMatchOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_person_id?: Prisma.SortOrder
   candidate_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -316,7 +316,7 @@ export type XeroPersonMatchOrderByWithAggregationInput = {
   status?: Prisma.SortOrder
   resolution_note?: Prisma.SortOrderInput | Prisma.SortOrder
   resolved_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
-  resolved_clerk_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  resolved_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   resolved_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   resolved_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
@@ -331,7 +331,7 @@ export type XeroPersonMatchScalarWhereWithAggregatesInput = {
   OR?: Prisma.XeroPersonMatchScalarWhereWithAggregatesInput[]
   NOT?: Prisma.XeroPersonMatchScalarWhereWithAggregatesInput | Prisma.XeroPersonMatchScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"XeroPersonMatch"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"XeroPersonMatch"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"XeroPersonMatch"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"XeroPersonMatch"> | string
   xero_person_id?: Prisma.UuidWithAggregatesFilter<"XeroPersonMatch"> | string
   candidate_person_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroPersonMatch"> | string | null
@@ -339,7 +339,7 @@ export type XeroPersonMatchScalarWhereWithAggregatesInput = {
   status?: Prisma.Enumxero_person_match_statusWithAggregatesFilter<"XeroPersonMatch"> | $Enums.xero_person_match_status
   resolution_note?: Prisma.StringNullableWithAggregatesFilter<"XeroPersonMatch"> | string | null
   resolved_person_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroPersonMatch"> | string | null
-  resolved_clerk_user_id?: Prisma.StringNullableWithAggregatesFilter<"XeroPersonMatch"> | string | null
+  resolved_user_id?: Prisma.StringNullableWithAggregatesFilter<"XeroPersonMatch"> | string | null
   resolved_by_user_id?: Prisma.StringNullableWithAggregatesFilter<"XeroPersonMatch"> | string | null
   resolved_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroPersonMatch"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"XeroPersonMatch"> | Date | string
@@ -348,11 +348,11 @@ export type XeroPersonMatchScalarWhereWithAggregatesInput = {
 
 export type XeroPersonMatchCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -365,7 +365,7 @@ export type XeroPersonMatchCreateInput = {
 
 export type XeroPersonMatchUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   candidate_person_id?: string | null
@@ -373,7 +373,7 @@ export type XeroPersonMatchUncheckedCreateInput = {
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -382,11 +382,11 @@ export type XeroPersonMatchUncheckedCreateInput = {
 
 export type XeroPersonMatchUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -399,7 +399,7 @@ export type XeroPersonMatchUpdateInput = {
 
 export type XeroPersonMatchUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -407,7 +407,7 @@ export type XeroPersonMatchUncheckedUpdateInput = {
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -416,7 +416,7 @@ export type XeroPersonMatchUncheckedUpdateInput = {
 
 export type XeroPersonMatchCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   candidate_person_id?: string | null
@@ -424,7 +424,7 @@ export type XeroPersonMatchCreateManyInput = {
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -433,11 +433,11 @@ export type XeroPersonMatchCreateManyInput = {
 
 export type XeroPersonMatchUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -446,7 +446,7 @@ export type XeroPersonMatchUpdateManyMutationInput = {
 
 export type XeroPersonMatchUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -454,7 +454,7 @@ export type XeroPersonMatchUncheckedUpdateManyInput = {
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -478,7 +478,7 @@ export type XeroPersonMatchXero_person_idCandidate_person_idCompoundUniqueInput 
 
 export type XeroPersonMatchCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_person_id?: Prisma.SortOrder
   candidate_person_id?: Prisma.SortOrder
@@ -486,7 +486,7 @@ export type XeroPersonMatchCountOrderByAggregateInput = {
   status?: Prisma.SortOrder
   resolution_note?: Prisma.SortOrder
   resolved_person_id?: Prisma.SortOrder
-  resolved_clerk_user_id?: Prisma.SortOrder
+  resolved_user_id?: Prisma.SortOrder
   resolved_by_user_id?: Prisma.SortOrder
   resolved_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
@@ -495,7 +495,7 @@ export type XeroPersonMatchCountOrderByAggregateInput = {
 
 export type XeroPersonMatchMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_person_id?: Prisma.SortOrder
   candidate_person_id?: Prisma.SortOrder
@@ -503,7 +503,7 @@ export type XeroPersonMatchMaxOrderByAggregateInput = {
   status?: Prisma.SortOrder
   resolution_note?: Prisma.SortOrder
   resolved_person_id?: Prisma.SortOrder
-  resolved_clerk_user_id?: Prisma.SortOrder
+  resolved_user_id?: Prisma.SortOrder
   resolved_by_user_id?: Prisma.SortOrder
   resolved_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
@@ -512,7 +512,7 @@ export type XeroPersonMatchMaxOrderByAggregateInput = {
 
 export type XeroPersonMatchMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_person_id?: Prisma.SortOrder
   candidate_person_id?: Prisma.SortOrder
@@ -520,7 +520,7 @@ export type XeroPersonMatchMinOrderByAggregateInput = {
   status?: Prisma.SortOrder
   resolution_note?: Prisma.SortOrder
   resolved_person_id?: Prisma.SortOrder
-  resolved_clerk_user_id?: Prisma.SortOrder
+  resolved_user_id?: Prisma.SortOrder
   resolved_by_user_id?: Prisma.SortOrder
   resolved_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
@@ -701,11 +701,11 @@ export type Enumxero_person_match_statusFieldUpdateOperationsInput = {
 
 export type XeroPersonMatchCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -717,14 +717,14 @@ export type XeroPersonMatchCreateWithoutOrganisationInput = {
 
 export type XeroPersonMatchUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   xero_person_id: string
   candidate_person_id?: string | null
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -762,7 +762,7 @@ export type XeroPersonMatchScalarWhereInput = {
   OR?: Prisma.XeroPersonMatchScalarWhereInput[]
   NOT?: Prisma.XeroPersonMatchScalarWhereInput | Prisma.XeroPersonMatchScalarWhereInput[]
   id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
-  clerk_org_id?: Prisma.StringFilter<"XeroPersonMatch"> | string
+  account_id?: Prisma.StringFilter<"XeroPersonMatch"> | string
   organisation_id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
   xero_person_id?: Prisma.UuidFilter<"XeroPersonMatch"> | string
   candidate_person_id?: Prisma.UuidNullableFilter<"XeroPersonMatch"> | string | null
@@ -770,7 +770,7 @@ export type XeroPersonMatchScalarWhereInput = {
   status?: Prisma.Enumxero_person_match_statusFilter<"XeroPersonMatch"> | $Enums.xero_person_match_status
   resolution_note?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_person_id?: Prisma.UuidNullableFilter<"XeroPersonMatch"> | string | null
-  resolved_clerk_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
+  resolved_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_by_user_id?: Prisma.StringNullableFilter<"XeroPersonMatch"> | string | null
   resolved_at?: Prisma.DateTimeNullableFilter<"XeroPersonMatch"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"XeroPersonMatch"> | Date | string
@@ -779,11 +779,11 @@ export type XeroPersonMatchScalarWhereInput = {
 
 export type XeroPersonMatchCreateWithoutXero_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -795,14 +795,14 @@ export type XeroPersonMatchCreateWithoutXero_personInput = {
 
 export type XeroPersonMatchUncheckedCreateWithoutXero_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   candidate_person_id?: string | null
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -821,11 +821,11 @@ export type XeroPersonMatchCreateManyXero_personInputEnvelope = {
 
 export type XeroPersonMatchCreateWithoutCandidate_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -837,14 +837,14 @@ export type XeroPersonMatchCreateWithoutCandidate_personInput = {
 
 export type XeroPersonMatchUncheckedCreateWithoutCandidate_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -863,11 +863,11 @@ export type XeroPersonMatchCreateManyCandidate_personInputEnvelope = {
 
 export type XeroPersonMatchCreateWithoutResolved_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -879,14 +879,14 @@ export type XeroPersonMatchCreateWithoutResolved_personInput = {
 
 export type XeroPersonMatchUncheckedCreateWithoutResolved_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   candidate_person_id?: string | null
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -953,14 +953,14 @@ export type XeroPersonMatchUpdateManyWithWhereWithoutResolved_personInput = {
 
 export type XeroPersonMatchCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   xero_person_id: string
   candidate_person_id?: string | null
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -969,11 +969,11 @@ export type XeroPersonMatchCreateManyOrganisationInput = {
 
 export type XeroPersonMatchUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -985,14 +985,14 @@ export type XeroPersonMatchUpdateWithoutOrganisationInput = {
 
 export type XeroPersonMatchUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1001,14 +1001,14 @@ export type XeroPersonMatchUncheckedUpdateWithoutOrganisationInput = {
 
 export type XeroPersonMatchUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1017,14 +1017,14 @@ export type XeroPersonMatchUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type XeroPersonMatchCreateManyXero_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   candidate_person_id?: string | null
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -1033,14 +1033,14 @@ export type XeroPersonMatchCreateManyXero_personInput = {
 
 export type XeroPersonMatchCreateManyCandidate_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
   resolved_person_id?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -1049,14 +1049,14 @@ export type XeroPersonMatchCreateManyCandidate_personInput = {
 
 export type XeroPersonMatchCreateManyResolved_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_person_id: string
   candidate_person_id?: string | null
   detected_reason: string
   status?: $Enums.xero_person_match_status
   resolution_note?: string | null
-  resolved_clerk_user_id?: string | null
+  resolved_user_id?: string | null
   resolved_by_user_id?: string | null
   resolved_at?: Date | string | null
   created_at?: Date | string
@@ -1065,11 +1065,11 @@ export type XeroPersonMatchCreateManyResolved_personInput = {
 
 export type XeroPersonMatchUpdateWithoutXero_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1081,14 +1081,14 @@ export type XeroPersonMatchUpdateWithoutXero_personInput = {
 
 export type XeroPersonMatchUncheckedUpdateWithoutXero_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1097,14 +1097,14 @@ export type XeroPersonMatchUncheckedUpdateWithoutXero_personInput = {
 
 export type XeroPersonMatchUncheckedUpdateManyWithoutXero_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1113,11 +1113,11 @@ export type XeroPersonMatchUncheckedUpdateManyWithoutXero_personInput = {
 
 export type XeroPersonMatchUpdateWithoutCandidate_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1129,14 +1129,14 @@ export type XeroPersonMatchUpdateWithoutCandidate_personInput = {
 
 export type XeroPersonMatchUncheckedUpdateWithoutCandidate_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1145,14 +1145,14 @@ export type XeroPersonMatchUncheckedUpdateWithoutCandidate_personInput = {
 
 export type XeroPersonMatchUncheckedUpdateManyWithoutCandidate_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1161,11 +1161,11 @@ export type XeroPersonMatchUncheckedUpdateManyWithoutCandidate_personInput = {
 
 export type XeroPersonMatchUpdateWithoutResolved_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1177,14 +1177,14 @@ export type XeroPersonMatchUpdateWithoutResolved_personInput = {
 
 export type XeroPersonMatchUncheckedUpdateWithoutResolved_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1193,14 +1193,14 @@ export type XeroPersonMatchUncheckedUpdateWithoutResolved_personInput = {
 
 export type XeroPersonMatchUncheckedUpdateManyWithoutResolved_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_person_id?: Prisma.StringFieldUpdateOperationsInput | string
   candidate_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   detected_reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.Enumxero_person_match_statusFieldUpdateOperationsInput | $Enums.xero_person_match_status
   resolution_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  resolved_clerk_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  resolved_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1211,7 +1211,7 @@ export type XeroPersonMatchUncheckedUpdateManyWithoutResolved_personInput = {
 
 export type XeroPersonMatchSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_person_id?: boolean
   candidate_person_id?: boolean
@@ -1219,7 +1219,7 @@ export type XeroPersonMatchSelect<ExtArgs extends runtime.Types.Extensions.Inter
   status?: boolean
   resolution_note?: boolean
   resolved_person_id?: boolean
-  resolved_clerk_user_id?: boolean
+  resolved_user_id?: boolean
   resolved_by_user_id?: boolean
   resolved_at?: boolean
   created_at?: boolean
@@ -1232,7 +1232,7 @@ export type XeroPersonMatchSelect<ExtArgs extends runtime.Types.Extensions.Inter
 
 export type XeroPersonMatchSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_person_id?: boolean
   candidate_person_id?: boolean
@@ -1240,7 +1240,7 @@ export type XeroPersonMatchSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   status?: boolean
   resolution_note?: boolean
   resolved_person_id?: boolean
-  resolved_clerk_user_id?: boolean
+  resolved_user_id?: boolean
   resolved_by_user_id?: boolean
   resolved_at?: boolean
   created_at?: boolean
@@ -1253,7 +1253,7 @@ export type XeroPersonMatchSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
 
 export type XeroPersonMatchSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_person_id?: boolean
   candidate_person_id?: boolean
@@ -1261,7 +1261,7 @@ export type XeroPersonMatchSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   status?: boolean
   resolution_note?: boolean
   resolved_person_id?: boolean
-  resolved_clerk_user_id?: boolean
+  resolved_user_id?: boolean
   resolved_by_user_id?: boolean
   resolved_at?: boolean
   created_at?: boolean
@@ -1274,7 +1274,7 @@ export type XeroPersonMatchSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
 
 export type XeroPersonMatchSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_person_id?: boolean
   candidate_person_id?: boolean
@@ -1282,14 +1282,14 @@ export type XeroPersonMatchSelectScalar = {
   status?: boolean
   resolution_note?: boolean
   resolved_person_id?: boolean
-  resolved_clerk_user_id?: boolean
+  resolved_user_id?: boolean
   resolved_by_user_id?: boolean
   resolved_at?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type XeroPersonMatchOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_person_id" | "candidate_person_id" | "detected_reason" | "status" | "resolution_note" | "resolved_person_id" | "resolved_clerk_user_id" | "resolved_by_user_id" | "resolved_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroPersonMatch"]>
+export type XeroPersonMatchOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "xero_person_id" | "candidate_person_id" | "detected_reason" | "status" | "resolution_note" | "resolved_person_id" | "resolved_user_id" | "resolved_by_user_id" | "resolved_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroPersonMatch"]>
 export type XeroPersonMatchInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
@@ -1319,7 +1319,7 @@ export type $XeroPersonMatchPayload<ExtArgs extends runtime.Types.Extensions.Int
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     xero_person_id: string
     candidate_person_id: string | null
@@ -1327,7 +1327,7 @@ export type $XeroPersonMatchPayload<ExtArgs extends runtime.Types.Extensions.Int
     status: $Enums.xero_person_match_status
     resolution_note: string | null
     resolved_person_id: string | null
-    resolved_clerk_user_id: string | null
+    resolved_user_id: string | null
     resolved_by_user_id: string | null
     resolved_at: Date | null
     created_at: Date
@@ -1760,7 +1760,7 @@ export interface Prisma__XeroPersonMatchClient<T, Null = never, ExtArgs extends 
  */
 export interface XeroPersonMatchFieldRefs {
   readonly id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
+  readonly account_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
   readonly organisation_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
   readonly xero_person_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
   readonly candidate_person_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
@@ -1768,7 +1768,7 @@ export interface XeroPersonMatchFieldRefs {
   readonly status: Prisma.FieldRef<"XeroPersonMatch", 'xero_person_match_status'>
   readonly resolution_note: Prisma.FieldRef<"XeroPersonMatch", 'String'>
   readonly resolved_person_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
-  readonly resolved_clerk_user_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
+  readonly resolved_user_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
   readonly resolved_by_user_id: Prisma.FieldRef<"XeroPersonMatch", 'String'>
   readonly resolved_at: Prisma.FieldRef<"XeroPersonMatch", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"XeroPersonMatch", 'DateTime'>

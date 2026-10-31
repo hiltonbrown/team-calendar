@@ -1,12 +1,12 @@
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import type { notification_type } from "../../generated/enums";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 
 export interface NotificationData {
+  accountId: string;
   actionUrl: string | null;
   body: string;
-  clerkOrgId: string;
   createdAt: Date;
   id: string;
   organisationId: string;
@@ -18,7 +18,7 @@ export interface NotificationData {
 }
 
 export interface NotificationPreferenceData {
-  clerkOrgId: string;
+  accountId: string;
   createdAt: Date;
   emailEnabled: boolean;
   id: string;
@@ -35,23 +35,23 @@ interface NotificationFilters {
 }
 
 export async function listNotificationsForUser(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   filters: NotificationFilters | undefined,
   db: TenantDb
 ): Promise<Result<NotificationData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
       const notifications = await tenantDb2.notification.findMany({
         orderBy: { created_at: "desc" },
         select: {
+          account_id: true,
           action_url: true,
           body: true,
-          clerk_org_id: true,
           created_at: true,
           id: true,
           organisation_id: true,
@@ -62,7 +62,7 @@ export async function listNotificationsForUser(
           updated_at: true,
         },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
           recipient_user_id: userId,
           ...(filters?.isRead === true ? { read_at: { not: null } } : {}),
@@ -74,9 +74,9 @@ export async function listNotificationsForUser(
       return {
         ok: true,
         value: notifications.map((notification) => ({
+          accountId: notification.account_id,
           actionUrl: notification.action_url,
           body: notification.body,
-          clerkOrgId: notification.clerk_org_id,
           createdAt: notification.created_at,
           id: notification.id,
           organisationId: notification.organisation_id,
@@ -100,19 +100,19 @@ export async function listNotificationsForUser(
 }
 
 export async function countUnreadNotifications(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   db: TenantDb
 ): Promise<Result<number>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
       const count = await tenantDb.notification.count({
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
           read_at: null,
           recipient_user_id: userId,
@@ -132,21 +132,21 @@ export async function countUnreadNotifications(
 }
 
 export async function markNotificationRead(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   notificationId: string,
   db: TenantDb
 ): Promise<Result<void>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb3 = db;
 
     try {
       await tenantDb3.notification.updateMany({
         data: { read_at: new Date() },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: notificationId,
           organisation_id: organisationId,
           read_at: null,
@@ -167,20 +167,20 @@ export async function markNotificationRead(
 }
 
 export async function markAllNotificationsRead(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   db: TenantDb
 ): Promise<Result<{ updatedCount: number }>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb4 = db;
 
     try {
       const result = await tenantDb4.notification.updateMany({
         data: { read_at: new Date() },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
           read_at: null,
           recipient_user_id: userId,
@@ -200,20 +200,20 @@ export async function markAllNotificationsRead(
 }
 
 export async function listNotificationPreferencesForUser(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   db: TenantDb
 ): Promise<Result<NotificationPreferenceData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb5 = db;
 
     try {
       const preferences = await tenantDb5.notificationPreference.findMany({
         orderBy: { notification_type: "asc" },
         select: {
-          clerk_org_id: true,
+          account_id: true,
           created_at: true,
           email_enabled: true,
           id: true,
@@ -224,7 +224,7 @@ export async function listNotificationPreferencesForUser(
           user_id: true,
         },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
           user_id: userId,
         },
@@ -233,7 +233,7 @@ export async function listNotificationPreferencesForUser(
       return {
         ok: true,
         value: preferences.map((preference) => ({
-          clerkOrgId: preference.clerk_org_id,
+          accountId: preference.account_id,
           createdAt: preference.created_at,
           emailEnabled: preference.email_enabled,
           id: preference.id,
@@ -257,7 +257,7 @@ export async function listNotificationPreferencesForUser(
 }
 
 export async function upsertNotificationPreference(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   input: {
@@ -268,13 +268,13 @@ export async function upsertNotificationPreference(
   db: TenantDb
 ): Promise<Result<NotificationPreferenceData>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb6 = db;
 
     try {
       const preference = await tenantDb6.notificationPreference.upsert({
         create: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           email_enabled: input.emailEnabled,
           in_app_enabled: input.inAppEnabled,
           notification_type: input.notificationType,
@@ -282,7 +282,7 @@ export async function upsertNotificationPreference(
           user_id: userId,
         },
         select: {
-          clerk_org_id: true,
+          account_id: true,
           created_at: true,
           email_enabled: true,
           id: true,
@@ -308,7 +308,7 @@ export async function upsertNotificationPreference(
       return {
         ok: true,
         value: {
-          clerkOrgId: preference.clerk_org_id,
+          accountId: preference.account_id,
           createdAt: preference.created_at,
           emailEnabled: preference.email_enabled,
           id: preference.id,

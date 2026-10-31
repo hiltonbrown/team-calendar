@@ -18,6 +18,7 @@ export default defineConfig({
       dependencies: ["setup"],
       name: "chromium-core",
       testIgnore: [/global\.setup\.ts/, /shell-matrix\.spec\.ts/],
+      testMatch: /.*\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {

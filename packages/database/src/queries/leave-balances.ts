@@ -1,10 +1,10 @@
-import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 export interface LeaveBalanceData {
+  accountId: string;
   balance: number;
-  clerkOrgId: string;
   createdAt: Date;
   currencyCode: null | string;
   id: string;
@@ -26,21 +26,21 @@ export interface LeaveBalanceSummaryData {
   xeroConnectionId: null | string;
 }
 export async function listLeaveBalancesForPerson(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   personId: PersonId,
   db: TenantDb
 ): Promise<Result<LeaveBalanceData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
       const balances = await tenantDb.leaveBalance.findMany({
         orderBy: { leave_type_xero_id: "asc" },
         select: {
+          account_id: true,
           balance: true,
-          clerk_org_id: true,
           created_at: true,
           currency_code: true,
           id: true,
@@ -51,15 +51,15 @@ export async function listLeaveBalancesForPerson(
           xero_connection_id: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           person_id: personId,
         },
       });
       return {
         ok: true,
         value: balances.map((b) => ({
+          accountId: b.account_id,
           balance: Number(b.balance),
-          clerkOrgId: b.clerk_org_id,
           createdAt: b.created_at,
           currencyCode: b.currency_code,
           id: b.id,
@@ -82,7 +82,7 @@ export async function listLeaveBalancesForPerson(
   }
 }
 export async function listLeaveBalancesForOrganisation(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   filters:
     | {
@@ -92,7 +92,7 @@ export async function listLeaveBalancesForOrganisation(
   db: TenantDb
 ): Promise<Result<LeaveBalanceSummaryData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
@@ -117,7 +117,7 @@ export async function listLeaveBalancesForOrganisation(
           xero_connection_id: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           ...(filters?.personId && { person_id: filters.personId }),
         },
       });

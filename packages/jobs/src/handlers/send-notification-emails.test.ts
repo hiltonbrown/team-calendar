@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  accounts: vi.fn(async () => [{ clerk_org_id: "org_a" }]),
+  accounts: vi.fn(async () => [{ account_id: "org_a" }]),
   createFunction: vi.fn(() => ({ id: "send-notification-emails" })),
   sendQueuedNotificationEmails: vi.fn(),
 }));
@@ -28,8 +28,8 @@ describe("drainNotificationEmailQueue", () => {
 
   it("drains each account through its tenant context", async () => {
     mocks.accounts.mockResolvedValueOnce([
-      { clerk_org_id: "org_a" },
-      { clerk_org_id: "org_b" },
+      { account_id: "org_a" },
+      { account_id: "org_b" },
     ]);
     mocks.sendQueuedNotificationEmails.mockResolvedValue({
       ok: true,
@@ -60,8 +60,8 @@ describe("drainNotificationEmailQueue", () => {
 
   it("drains later accounts before reporting an earlier account failure", async () => {
     mocks.accounts.mockResolvedValueOnce([
-      { clerk_org_id: "org_a" },
-      { clerk_org_id: "org_b" },
+      { account_id: "org_a" },
+      { account_id: "org_b" },
     ]);
     mocks.sendQueuedNotificationEmails
       .mockResolvedValueOnce({

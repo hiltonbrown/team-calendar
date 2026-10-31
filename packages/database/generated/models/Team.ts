@@ -36,7 +36,7 @@ export type TeamSumAggregateOutputType = {
 
 export type TeamMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   name: string | null
   minimum_available_people: number | null
@@ -46,7 +46,7 @@ export type TeamMinAggregateOutputType = {
 
 export type TeamMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   name: string | null
   minimum_available_people: number | null
@@ -56,7 +56,7 @@ export type TeamMaxAggregateOutputType = {
 
 export type TeamCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   name: number
   minimum_available_people: number
@@ -76,7 +76,7 @@ export type TeamSumAggregateInputType = {
 
 export type TeamMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   name?: true
   minimum_available_people?: true
@@ -86,7 +86,7 @@ export type TeamMinAggregateInputType = {
 
 export type TeamMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   name?: true
   minimum_available_people?: true
@@ -96,7 +96,7 @@ export type TeamMaxAggregateInputType = {
 
 export type TeamCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   name?: true
   minimum_available_people?: true
@@ -193,7 +193,7 @@ export type TeamGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
 
 export type TeamGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   minimum_available_people: number | null
@@ -226,7 +226,7 @@ export type TeamWhereInput = {
   OR?: Prisma.TeamWhereInput[]
   NOT?: Prisma.TeamWhereInput | Prisma.TeamWhereInput[]
   id?: Prisma.UuidFilter<"Team"> | string
-  clerk_org_id?: Prisma.StringFilter<"Team"> | string
+  account_id?: Prisma.StringFilter<"Team"> | string
   organisation_id?: Prisma.UuidFilter<"Team"> | string
   name?: Prisma.StringFilter<"Team"> | string
   minimum_available_people?: Prisma.IntNullableFilter<"Team"> | number | null
@@ -238,7 +238,7 @@ export type TeamWhereInput = {
 
 export type TeamOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   minimum_available_people?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -253,7 +253,7 @@ export type TeamWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.TeamWhereInput | Prisma.TeamWhereInput[]
   OR?: Prisma.TeamWhereInput[]
   NOT?: Prisma.TeamWhereInput | Prisma.TeamWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"Team"> | string
+  account_id?: Prisma.StringFilter<"Team"> | string
   organisation_id?: Prisma.UuidFilter<"Team"> | string
   name?: Prisma.StringFilter<"Team"> | string
   minimum_available_people?: Prisma.IntNullableFilter<"Team"> | number | null
@@ -265,7 +265,7 @@ export type TeamWhereUniqueInput = Prisma.AtLeast<{
 
 export type TeamOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   minimum_available_people?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -283,7 +283,7 @@ export type TeamScalarWhereWithAggregatesInput = {
   OR?: Prisma.TeamScalarWhereWithAggregatesInput[]
   NOT?: Prisma.TeamScalarWhereWithAggregatesInput | Prisma.TeamScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"Team"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"Team"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"Team"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"Team"> | string
   name?: Prisma.StringWithAggregatesFilter<"Team"> | string
   minimum_available_people?: Prisma.IntNullableWithAggregatesFilter<"Team"> | number | null
@@ -293,7 +293,7 @@ export type TeamScalarWhereWithAggregatesInput = {
 
 export type TeamCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   minimum_available_people?: number | null
   created_at?: Date | string
@@ -304,7 +304,7 @@ export type TeamCreateInput = {
 
 export type TeamUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   minimum_available_people?: number | null
@@ -315,7 +315,7 @@ export type TeamUncheckedCreateInput = {
 
 export type TeamUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -326,7 +326,7 @@ export type TeamUpdateInput = {
 
 export type TeamUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -337,7 +337,7 @@ export type TeamUncheckedUpdateInput = {
 
 export type TeamCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   minimum_available_people?: number | null
@@ -347,7 +347,7 @@ export type TeamCreateManyInput = {
 
 export type TeamUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -356,7 +356,7 @@ export type TeamUpdateManyMutationInput = {
 
 export type TeamUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -376,7 +376,7 @@ export type TeamOrderByRelationAggregateInput = {
 
 export type TeamCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   minimum_available_people?: Prisma.SortOrder
@@ -390,7 +390,7 @@ export type TeamAvgOrderByAggregateInput = {
 
 export type TeamMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   minimum_available_people?: Prisma.SortOrder
@@ -400,7 +400,7 @@ export type TeamMaxOrderByAggregateInput = {
 
 export type TeamMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   minimum_available_people?: Prisma.SortOrder
@@ -477,7 +477,7 @@ export type TeamUpdateOneWithoutPeopleNestedInput = {
 
 export type TeamCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   minimum_available_people?: number | null
   created_at?: Date | string
@@ -487,7 +487,7 @@ export type TeamCreateWithoutOrganisationInput = {
 
 export type TeamUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   minimum_available_people?: number | null
   created_at?: Date | string
@@ -526,7 +526,7 @@ export type TeamScalarWhereInput = {
   OR?: Prisma.TeamScalarWhereInput[]
   NOT?: Prisma.TeamScalarWhereInput | Prisma.TeamScalarWhereInput[]
   id?: Prisma.UuidFilter<"Team"> | string
-  clerk_org_id?: Prisma.StringFilter<"Team"> | string
+  account_id?: Prisma.StringFilter<"Team"> | string
   organisation_id?: Prisma.UuidFilter<"Team"> | string
   name?: Prisma.StringFilter<"Team"> | string
   minimum_available_people?: Prisma.IntNullableFilter<"Team"> | number | null
@@ -536,7 +536,7 @@ export type TeamScalarWhereInput = {
 
 export type TeamCreateWithoutPeopleInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   minimum_available_people?: number | null
   created_at?: Date | string
@@ -546,7 +546,7 @@ export type TeamCreateWithoutPeopleInput = {
 
 export type TeamUncheckedCreateWithoutPeopleInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   minimum_available_people?: number | null
@@ -572,7 +572,7 @@ export type TeamUpdateToOneWithWhereWithoutPeopleInput = {
 
 export type TeamUpdateWithoutPeopleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -582,7 +582,7 @@ export type TeamUpdateWithoutPeopleInput = {
 
 export type TeamUncheckedUpdateWithoutPeopleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -592,7 +592,7 @@ export type TeamUncheckedUpdateWithoutPeopleInput = {
 
 export type TeamCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   minimum_available_people?: number | null
   created_at?: Date | string
@@ -601,7 +601,7 @@ export type TeamCreateManyOrganisationInput = {
 
 export type TeamUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -611,7 +611,7 @@ export type TeamUpdateWithoutOrganisationInput = {
 
 export type TeamUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -621,7 +621,7 @@ export type TeamUncheckedUpdateWithoutOrganisationInput = {
 
 export type TeamUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   minimum_available_people?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -661,7 +661,7 @@ export type TeamCountOutputTypeCountPeopleArgs<ExtArgs extends runtime.Types.Ext
 
 export type TeamSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   minimum_available_people?: boolean
@@ -674,7 +674,7 @@ export type TeamSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
 
 export type TeamSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   minimum_available_people?: boolean
@@ -685,7 +685,7 @@ export type TeamSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
 
 export type TeamSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   minimum_available_people?: boolean
@@ -696,7 +696,7 @@ export type TeamSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
 
 export type TeamSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   minimum_available_people?: boolean
@@ -704,7 +704,7 @@ export type TeamSelectScalar = {
   updated_at?: boolean
 }
 
-export type TeamOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "name" | "minimum_available_people" | "created_at" | "updated_at", ExtArgs["result"]["team"]>
+export type TeamOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "name" | "minimum_available_people" | "created_at" | "updated_at", ExtArgs["result"]["team"]>
 export type TeamInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   people?: boolean | Prisma.Team$peopleArgs<ExtArgs>
@@ -725,7 +725,7 @@ export type $TeamPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     name: string
     /**
@@ -1160,7 +1160,7 @@ export interface Prisma__TeamClient<T, Null = never, ExtArgs extends runtime.Typ
  */
 export interface TeamFieldRefs {
   readonly id: Prisma.FieldRef<"Team", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"Team", 'String'>
+  readonly account_id: Prisma.FieldRef<"Team", 'String'>
   readonly organisation_id: Prisma.FieldRef<"Team", 'String'>
   readonly name: Prisma.FieldRef<"Team", 'String'>
   readonly minimum_available_people: Prisma.FieldRef<"Team", 'Int'>

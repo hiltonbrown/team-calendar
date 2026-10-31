@@ -23,7 +23,7 @@ vi.mock("@repo/database", async () => ({
 import { TenantMismatchError, withTenantDb } from "@repo/database";
 import { managerScopePersonIds } from "./manager-scope";
 
-const input = { actingPersonId: "manager-A", clerkOrgId: "account-A" };
+const input = { accountId: "account-A", actingPersonId: "manager-A" };
 beforeEach(() => {
   vi.clearAllMocks();
   state.companies.mockResolvedValue([{ id: "company-A" }, { id: "company-B" }]);
@@ -54,8 +54,8 @@ test("direct reports span every owned company", async () => {
   expect(state.people).toHaveBeenCalledWith(
     expect.objectContaining({
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         organisation_id: { in: ["company-A", "company-B"] },
       },
     })
@@ -85,10 +85,10 @@ test("a foreign or archived acting person is never returned", async () => {
   ).toEqual([]);
 });
 test("caller-owned scope is reused and forwarded", async () => {
-  await withTenantDb(input.clerkOrgId, async (db) => {
+  await withTenantDb(input.accountId, async (db) => {
     await managerScopePersonIds(input, db);
-    expect(state.settings).toHaveBeenCalledWith(input.clerkOrgId, db);
-    expect(state.companies).toHaveBeenCalledWith(input.clerkOrgId, db);
+    expect(state.settings).toHaveBeenCalledWith(input.accountId, db);
+    expect(state.companies).toHaveBeenCalledWith(input.accountId, db);
   });
   expect(state.transaction).toHaveBeenCalledOnce();
 });

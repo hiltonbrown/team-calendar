@@ -36,7 +36,7 @@ export type LeaveBalanceSumAggregateOutputType = {
 
 export type LeaveBalanceMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   person_id: string | null
   xero_connection_id: string | null
@@ -54,7 +54,7 @@ export type LeaveBalanceMinAggregateOutputType = {
 
 export type LeaveBalanceMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   person_id: string | null
   xero_connection_id: string | null
@@ -72,7 +72,7 @@ export type LeaveBalanceMaxAggregateOutputType = {
 
 export type LeaveBalanceCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   person_id: number
   xero_connection_id: number
@@ -101,7 +101,7 @@ export type LeaveBalanceSumAggregateInputType = {
 
 export type LeaveBalanceMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   person_id?: true
   xero_connection_id?: true
@@ -119,7 +119,7 @@ export type LeaveBalanceMinAggregateInputType = {
 
 export type LeaveBalanceMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   person_id?: true
   xero_connection_id?: true
@@ -137,7 +137,7 @@ export type LeaveBalanceMaxAggregateInputType = {
 
 export type LeaveBalanceCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   person_id?: true
   xero_connection_id?: true
@@ -243,7 +243,7 @@ export type LeaveBalanceGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 
 export type LeaveBalanceGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   person_id: string
   xero_connection_id: string | null
@@ -285,7 +285,7 @@ export type LeaveBalanceWhereInput = {
   OR?: Prisma.LeaveBalanceWhereInput[]
   NOT?: Prisma.LeaveBalanceWhereInput | Prisma.LeaveBalanceWhereInput[]
   id?: Prisma.UuidFilter<"LeaveBalance"> | string
-  clerk_org_id?: Prisma.StringFilter<"LeaveBalance"> | string
+  account_id?: Prisma.StringFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   xero_connection_id?: Prisma.UuidNullableFilter<"LeaveBalance"> | string | null
@@ -307,7 +307,7 @@ export type LeaveBalanceWhereInput = {
 
 export type LeaveBalanceOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -334,7 +334,7 @@ export type LeaveBalanceWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.LeaveBalanceWhereInput | Prisma.LeaveBalanceWhereInput[]
   OR?: Prisma.LeaveBalanceWhereInput[]
   NOT?: Prisma.LeaveBalanceWhereInput | Prisma.LeaveBalanceWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"LeaveBalance"> | string
+  account_id?: Prisma.StringFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   xero_connection_id?: Prisma.UuidNullableFilter<"LeaveBalance"> | string | null
@@ -356,7 +356,7 @@ export type LeaveBalanceWhereUniqueInput = Prisma.AtLeast<{
 
 export type LeaveBalanceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -383,7 +383,7 @@ export type LeaveBalanceScalarWhereWithAggregatesInput = {
   OR?: Prisma.LeaveBalanceScalarWhereWithAggregatesInput[]
   NOT?: Prisma.LeaveBalanceScalarWhereWithAggregatesInput | Prisma.LeaveBalanceScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"LeaveBalance"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"LeaveBalance"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidWithAggregatesFilter<"LeaveBalance"> | string
   xero_connection_id?: Prisma.UuidNullableWithAggregatesFilter<"LeaveBalance"> | string | null
@@ -420,7 +420,7 @@ export type LeaveBalanceCreateInput = {
 
 export type LeaveBalanceUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   person_id: string
   xero_connection_id?: string | null
@@ -457,7 +457,7 @@ export type LeaveBalanceUpdateInput = {
 
 export type LeaveBalanceUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -476,7 +476,7 @@ export type LeaveBalanceUncheckedUpdateInput = {
 
 export type LeaveBalanceCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   person_id: string
   xero_connection_id?: string | null
@@ -510,7 +510,7 @@ export type LeaveBalanceUpdateManyMutationInput = {
 
 export type LeaveBalanceUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -550,7 +550,7 @@ export type LeaveBalancePerson_idLeave_type_xero_idCompoundUniqueInput = {
 
 export type LeaveBalanceCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
@@ -573,7 +573,7 @@ export type LeaveBalanceAvgOrderByAggregateInput = {
 
 export type LeaveBalanceMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
@@ -591,7 +591,7 @@ export type LeaveBalanceMaxOrderByAggregateInput = {
 
 export type LeaveBalanceMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
@@ -772,7 +772,7 @@ export type LeaveBalanceCreateWithoutOrganisationInput = {
 
 export type LeaveBalanceUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   person_id: string
   xero_connection_id?: string | null
   leave_type_xero_id: string
@@ -819,7 +819,7 @@ export type LeaveBalanceScalarWhereInput = {
   OR?: Prisma.LeaveBalanceScalarWhereInput[]
   NOT?: Prisma.LeaveBalanceScalarWhereInput | Prisma.LeaveBalanceScalarWhereInput[]
   id?: Prisma.UuidFilter<"LeaveBalance"> | string
-  clerk_org_id?: Prisma.StringFilter<"LeaveBalance"> | string
+  account_id?: Prisma.StringFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   xero_connection_id?: Prisma.UuidNullableFilter<"LeaveBalance"> | string | null
@@ -855,7 +855,7 @@ export type LeaveBalanceCreateWithoutPersonInput = {
 
 export type LeaveBalanceUncheckedCreateWithoutPersonInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_connection_id?: string | null
   leave_type_xero_id: string
@@ -958,7 +958,7 @@ export type LeaveBalanceUpdateManyWithWhereWithoutXero_connectionInput = {
 
 export type LeaveBalanceCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   person_id: string
   xero_connection_id?: string | null
   leave_type_xero_id: string
@@ -993,7 +993,7 @@ export type LeaveBalanceUpdateWithoutOrganisationInput = {
 
 export type LeaveBalanceUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1011,7 +1011,7 @@ export type LeaveBalanceUncheckedUpdateWithoutOrganisationInput = {
 
 export type LeaveBalanceUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1029,7 +1029,7 @@ export type LeaveBalanceUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type LeaveBalanceCreateManyPersonInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_connection_id?: string | null
   leave_type_xero_id: string
@@ -1064,7 +1064,7 @@ export type LeaveBalanceUpdateWithoutPersonInput = {
 
 export type LeaveBalanceUncheckedUpdateWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1082,7 +1082,7 @@ export type LeaveBalanceUncheckedUpdateWithoutPersonInput = {
 
 export type LeaveBalanceUncheckedUpdateManyWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1167,7 +1167,7 @@ export type LeaveBalanceUncheckedUpdateManyWithoutXero_connectionInput = {
 
 export type LeaveBalanceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   xero_connection_id?: boolean
@@ -1189,7 +1189,7 @@ export type LeaveBalanceSelect<ExtArgs extends runtime.Types.Extensions.Internal
 
 export type LeaveBalanceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   xero_connection_id?: boolean
@@ -1211,7 +1211,7 @@ export type LeaveBalanceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type LeaveBalanceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   xero_connection_id?: boolean
@@ -1233,7 +1233,7 @@ export type LeaveBalanceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type LeaveBalanceSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   xero_connection_id?: boolean
@@ -1250,7 +1250,7 @@ export type LeaveBalanceSelectScalar = {
   updated_at?: boolean
 }
 
-export type LeaveBalanceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "person_id" | "xero_connection_id" | "leave_type_xero_id" | "leave_type_name" | "record_type" | "balance" | "balance_unit" | "currency_code" | "source_payload_json" | "as_at" | "last_fetched_at" | "created_at" | "updated_at", ExtArgs["result"]["leaveBalance"]>
+export type LeaveBalanceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "person_id" | "xero_connection_id" | "leave_type_xero_id" | "leave_type_name" | "record_type" | "balance" | "balance_unit" | "currency_code" | "source_payload_json" | "as_at" | "last_fetched_at" | "created_at" | "updated_at", ExtArgs["result"]["leaveBalance"]>
 export type LeaveBalanceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
@@ -1276,7 +1276,7 @@ export type $LeaveBalancePayload<ExtArgs extends runtime.Types.Extensions.Intern
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     person_id: string
     xero_connection_id: string | null
@@ -1718,7 +1718,7 @@ export interface Prisma__LeaveBalanceClient<T, Null = never, ExtArgs extends run
  */
 export interface LeaveBalanceFieldRefs {
   readonly id: Prisma.FieldRef<"LeaveBalance", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"LeaveBalance", 'String'>
+  readonly account_id: Prisma.FieldRef<"LeaveBalance", 'String'>
   readonly organisation_id: Prisma.FieldRef<"LeaveBalance", 'String'>
   readonly person_id: Prisma.FieldRef<"LeaveBalance", 'String'>
   readonly xero_connection_id: Prisma.FieldRef<"LeaveBalance", 'String'>

@@ -44,7 +44,7 @@ export type SyncRunSumAggregateOutputType = {
 
 export type SyncRunMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   xero_connection_id: string | null
   status: $Enums.sync_run_status | null
@@ -68,7 +68,7 @@ export type SyncRunMinAggregateOutputType = {
 
 export type SyncRunMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   xero_connection_id: string | null
   status: $Enums.sync_run_status | null
@@ -92,7 +92,7 @@ export type SyncRunMaxAggregateOutputType = {
 
 export type SyncRunCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   xero_connection_id: number
   status: number
@@ -134,7 +134,7 @@ export type SyncRunSumAggregateInputType = {
 
 export type SyncRunMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   xero_connection_id?: true
   status?: true
@@ -158,7 +158,7 @@ export type SyncRunMinAggregateInputType = {
 
 export type SyncRunMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   xero_connection_id?: true
   status?: true
@@ -182,7 +182,7 @@ export type SyncRunMaxAggregateInputType = {
 
 export type SyncRunCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   xero_connection_id?: true
   status?: true
@@ -293,7 +293,7 @@ export type SyncRunGroupByArgs<ExtArgs extends runtime.Types.Extensions.Internal
 
 export type SyncRunGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_connection_id: string | null
   status: $Enums.sync_run_status
@@ -340,7 +340,7 @@ export type SyncRunWhereInput = {
   OR?: Prisma.SyncRunWhereInput[]
   NOT?: Prisma.SyncRunWhereInput | Prisma.SyncRunWhereInput[]
   id?: Prisma.UuidFilter<"SyncRun"> | string
-  clerk_org_id?: Prisma.StringFilter<"SyncRun"> | string
+  account_id?: Prisma.StringFilter<"SyncRun"> | string
   organisation_id?: Prisma.UuidFilter<"SyncRun"> | string
   xero_connection_id?: Prisma.UuidNullableFilter<"SyncRun"> | string | null
   status?: Prisma.Enumsync_run_statusFilter<"SyncRun"> | $Enums.sync_run_status
@@ -367,7 +367,7 @@ export type SyncRunWhereInput = {
 
 export type SyncRunOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -397,7 +397,7 @@ export type SyncRunWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.SyncRunWhereInput | Prisma.SyncRunWhereInput[]
   OR?: Prisma.SyncRunWhereInput[]
   NOT?: Prisma.SyncRunWhereInput | Prisma.SyncRunWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"SyncRun"> | string
+  account_id?: Prisma.StringFilter<"SyncRun"> | string
   organisation_id?: Prisma.UuidFilter<"SyncRun"> | string
   xero_connection_id?: Prisma.UuidNullableFilter<"SyncRun"> | string | null
   status?: Prisma.Enumsync_run_statusFilter<"SyncRun"> | $Enums.sync_run_status
@@ -424,7 +424,7 @@ export type SyncRunWhereUniqueInput = Prisma.AtLeast<{
 
 export type SyncRunOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -456,7 +456,7 @@ export type SyncRunScalarWhereWithAggregatesInput = {
   OR?: Prisma.SyncRunScalarWhereWithAggregatesInput[]
   NOT?: Prisma.SyncRunScalarWhereWithAggregatesInput | Prisma.SyncRunScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"SyncRun"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"SyncRun"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"SyncRun"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"SyncRun"> | string
   xero_connection_id?: Prisma.UuidNullableWithAggregatesFilter<"SyncRun"> | string | null
   status?: Prisma.Enumsync_run_statusWithAggregatesFilter<"SyncRun"> | $Enums.sync_run_status
@@ -504,7 +504,7 @@ export type SyncRunCreateInput = {
 
 export type SyncRunUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_connection_id?: string | null
   status?: $Enums.sync_run_status
@@ -553,7 +553,7 @@ export type SyncRunUpdateInput = {
 
 export type SyncRunUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumsync_run_statusFieldUpdateOperationsInput | $Enums.sync_run_status
@@ -578,7 +578,7 @@ export type SyncRunUncheckedUpdateInput = {
 
 export type SyncRunCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_connection_id?: string | null
   status?: $Enums.sync_run_status
@@ -623,7 +623,7 @@ export type SyncRunUpdateManyMutationInput = {
 
 export type SyncRunUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumsync_run_statusFieldUpdateOperationsInput | $Enums.sync_run_status
@@ -657,7 +657,7 @@ export type SyncRunOrderByRelationAggregateInput = {
 
 export type SyncRunCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -689,7 +689,7 @@ export type SyncRunAvgOrderByAggregateInput = {
 
 export type SyncRunMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -713,7 +713,7 @@ export type SyncRunMaxOrderByAggregateInput = {
 
 export type SyncRunMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -887,7 +887,7 @@ export type SyncRunCreateWithoutOrganisationInput = {
 
 export type SyncRunUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   xero_connection_id?: string | null
   status?: $Enums.sync_run_status
   run_type: $Enums.sync_run_type
@@ -940,7 +940,7 @@ export type SyncRunScalarWhereInput = {
   OR?: Prisma.SyncRunScalarWhereInput[]
   NOT?: Prisma.SyncRunScalarWhereInput | Prisma.SyncRunScalarWhereInput[]
   id?: Prisma.UuidFilter<"SyncRun"> | string
-  clerk_org_id?: Prisma.StringFilter<"SyncRun"> | string
+  account_id?: Prisma.StringFilter<"SyncRun"> | string
   organisation_id?: Prisma.UuidFilter<"SyncRun"> | string
   xero_connection_id?: Prisma.UuidNullableFilter<"SyncRun"> | string | null
   status?: Prisma.Enumsync_run_statusFilter<"SyncRun"> | $Enums.sync_run_status
@@ -1058,7 +1058,7 @@ export type SyncRunCreateWithoutFailed_recordsInput = {
 
 export type SyncRunUncheckedCreateWithoutFailed_recordsInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   xero_connection_id?: string | null
   status?: $Enums.sync_run_status
@@ -1121,7 +1121,7 @@ export type SyncRunUpdateWithoutFailed_recordsInput = {
 
 export type SyncRunUncheckedUpdateWithoutFailed_recordsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumsync_run_statusFieldUpdateOperationsInput | $Enums.sync_run_status
@@ -1145,7 +1145,7 @@ export type SyncRunUncheckedUpdateWithoutFailed_recordsInput = {
 
 export type SyncRunCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   xero_connection_id?: string | null
   status?: $Enums.sync_run_status
   run_type: $Enums.sync_run_type
@@ -1191,7 +1191,7 @@ export type SyncRunUpdateWithoutOrganisationInput = {
 
 export type SyncRunUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumsync_run_statusFieldUpdateOperationsInput | $Enums.sync_run_status
   run_type?: Prisma.Enumsync_run_typeFieldUpdateOperationsInput | $Enums.sync_run_type
@@ -1215,7 +1215,7 @@ export type SyncRunUncheckedUpdateWithoutOrganisationInput = {
 
 export type SyncRunUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumsync_run_statusFieldUpdateOperationsInput | $Enums.sync_run_status
   run_type?: Prisma.Enumsync_run_typeFieldUpdateOperationsInput | $Enums.sync_run_type
@@ -1356,7 +1356,7 @@ export type SyncRunCountOutputTypeCountFailed_recordsArgs<ExtArgs extends runtim
 
 export type SyncRunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_connection_id?: boolean
   status?: boolean
@@ -1384,7 +1384,7 @@ export type SyncRunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
 
 export type SyncRunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_connection_id?: boolean
   status?: boolean
@@ -1410,7 +1410,7 @@ export type SyncRunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
 
 export type SyncRunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_connection_id?: boolean
   status?: boolean
@@ -1436,7 +1436,7 @@ export type SyncRunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
 
 export type SyncRunSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   xero_connection_id?: boolean
   status?: boolean
@@ -1458,7 +1458,7 @@ export type SyncRunSelectScalar = {
   updated_at?: boolean
 }
 
-export type SyncRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_connection_id" | "status" | "run_type" | "trigger_type" | "triggered_by_user_id" | "entity_type" | "records_fetched" | "records_upserted" | "records_skipped" | "records_synced" | "records_failed" | "error_message" | "error_summary" | "cancel_requested_at" | "started_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["syncRun"]>
+export type SyncRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "xero_connection_id" | "status" | "run_type" | "trigger_type" | "triggered_by_user_id" | "entity_type" | "records_fetched" | "records_upserted" | "records_skipped" | "records_synced" | "records_failed" | "error_message" | "error_summary" | "cancel_requested_at" | "started_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["syncRun"]>
 export type SyncRunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.SyncRun$xero_connectionArgs<ExtArgs>
@@ -1483,7 +1483,7 @@ export type $SyncRunPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     xero_connection_id: string | null
     status: $Enums.sync_run_status
@@ -1930,7 +1930,7 @@ export interface Prisma__SyncRunClient<T, Null = never, ExtArgs extends runtime.
  */
 export interface SyncRunFieldRefs {
   readonly id: Prisma.FieldRef<"SyncRun", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"SyncRun", 'String'>
+  readonly account_id: Prisma.FieldRef<"SyncRun", 'String'>
   readonly organisation_id: Prisma.FieldRef<"SyncRun", 'String'>
   readonly xero_connection_id: Prisma.FieldRef<"SyncRun", 'String'>
   readonly status: Prisma.FieldRef<"SyncRun", 'sync_run_status'>

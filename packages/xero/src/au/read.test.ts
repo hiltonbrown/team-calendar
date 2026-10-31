@@ -32,7 +32,7 @@ function restoreEncryptionKey() {
 function buildXeroTenant(tenantId = "xero-tenant-1") {
   return {
     accessToken: "access-token",
-    clerk_org_id: "org_1",
+    account_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: tenantId === "xero-tenant-1" ? "tenant_1" : tenantId,
     organisation_id: "00000000-0000-4000-8000-000000000001",
@@ -707,8 +707,8 @@ describe("AU scoped read rejection and response validation", () => {
     const now = Date.now();
     const prepared = module.prepareAuLeaveMutation(
       {
+        accountId: current.account_id,
         action: "approve",
-        clerkOrgId: current.clerk_org_id,
         employeeId: "employee",
         organisationId: current.organisation_id,
         remoteId: "leave",

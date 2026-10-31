@@ -3,7 +3,7 @@ import { tenantTestAccount } from "../test-fixtures/tenant-scope";
 
 vi.mock("server-only", () => ({}));
 vi.mock("./billing", () => ({
-  getUnresolvedStripeEventsForOrg: async () => [{}, {}],
+  getUnresolvedStripeEventsForAccount: async () => [{}, {}],
 }));
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,13 +48,13 @@ describe("getActivationDashboardSummary", () => {
   it("requires all three succeeded sync types and the durable feed milestone", async () => {
     await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: "11111111-1111-4111-8111-111111111111",
       }),
       (db) =>
         getActivationDashboardSummary(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             organisationId: "11111111-1111-4111-8111-111111111111",
           },
           db

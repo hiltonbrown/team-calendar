@@ -1,9 +1,9 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
 import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const clerkOrgId = "org_clerk_123" as ClerkOrgId;
+const accountId = "org_account_123" as AccountId;
 const organisationId = "00000000-0000-4000-8000-000000000001" as OrganisationId;
 
 const mocks = vi.hoisted(() => ({
@@ -51,8 +51,8 @@ describe("persistSupportSubmissionAudit", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId,
         category: "support",
-        clerkOrgId,
         issueNumber: 42,
         issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/42",
         labelAssignmentSucceeded: true,
@@ -65,8 +65,8 @@ describe("persistSupportSubmissionAudit", () => {
       (db) =>
         persistSupportSubmissionAudit(
           {
+            accountId,
             category: "support",
-            clerkOrgId,
             issueNumber: 42,
             issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/42",
             labelAssignmentSucceeded: true,
@@ -86,9 +86,9 @@ describe("persistSupportSubmissionAudit", () => {
     });
     expect(mocks.create).toHaveBeenCalledWith({
       data: {
+        account_id: "org_account_123",
         action: "support_submissions.github_issue_created",
         actor_user_id: "user_123",
-        clerk_org_id: "org_clerk_123",
         entity_id: "42",
         entity_type: "support_submission",
         organisation_id: "00000000-0000-4000-8000-000000000001",
@@ -112,8 +112,8 @@ describe("persistSupportSubmissionAudit", () => {
 
     const result = withTestTenantResult(
       tenantTestAccount({
+        accountId,
         category: "feedback",
-        clerkOrgId,
         issueNumber: 9,
         issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/9",
         labelAssignmentSucceeded: false,
@@ -126,8 +126,8 @@ describe("persistSupportSubmissionAudit", () => {
       (db) =>
         persistSupportSubmissionAudit(
           {
+            accountId,
             category: "feedback",
-            clerkOrgId,
             issueNumber: 9,
             issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/9",
             labelAssignmentSucceeded: false,

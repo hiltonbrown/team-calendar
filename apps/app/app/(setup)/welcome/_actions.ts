@@ -1,8 +1,8 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { completeMemberWelcome } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -33,21 +33,33 @@ export async function completeWelcomeAction(
       ok: false,
     };
   }
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(orgId && user && orgRole)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user && sessionRole)) {
     return {
       error: { code: "not_authorised", message: "Sign in to continue." },
       ok: false,
     };
   }
-  const clerkOrgId = orgId as ClerkOrgId;
+  const accountId = sessionAccountId as AccountId;
   let completed: Result<void, WelcomeActionError>;
   try {
     completed = await withTenantResult(
-      clerkOrgId,
+      accountId,
       async (db): Promise<Result<void, WelcomeActionError>> => {
         const company = await getOrganisationById(
-          clerkOrgId,
+          accountId,
           parsed.data.organisationId as OrganisationId,
           db
         );
@@ -62,8 +74,8 @@ export async function completeWelcomeAction(
         }
         const saved = await completeMemberWelcome(
           {
-            actingRole: orgRole,
-            clerkOrgId,
+            accountId,
+            actingRole: sessionRole,
             organisationId: company.value.id,
             userId: user.id,
           },

@@ -5,8 +5,8 @@
     "analyze": "ANALYZE=true npm run build",
     "build": "next build",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "bun --bun next dev -p 3001",
-    "start": "bun --bun next start",
+    "dev": "next dev -p 3001",
+    "start": "next start",
     "test": "NODE_ENV=test vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
@@ -52,5 +52,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

@@ -29,9 +29,9 @@ import { setPersonManager } from "./manager-assignment-service";
 const personId = "11111111-1111-4111-8111-111111111111";
 const managerId = "22222222-2222-4222-8222-222222222222";
 const input = {
+  accountId: "account-A",
   actingRole: "owner" as const,
   actingUserId: "user-1",
-  clerkOrgId: "account-A",
   managerPersonId: managerId,
   personId,
 };
@@ -82,7 +82,7 @@ beforeEach(() => {
 test.each(["owner", "admin"] as const)(
   "%s can assign a manager in another owned company",
   async (actingRole) => {
-    const result = await withTenantResult(input.clerkOrgId, (db) =>
+    const result = await withTenantResult(input.accountId, (db) =>
       setPersonManager({ ...input, actingRole }, db)
     );
     expect(result).toMatchObject({
@@ -92,7 +92,7 @@ test.each(["owner", "admin"] as const)(
     expect(state.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           id: personId,
           organisation_id: "company-A",
         }),
@@ -105,7 +105,7 @@ test.each(["manager", "viewer"] as const)(
   "%s cannot assign managers",
   async (actingRole) => {
     expect(
-      await withTenantResult(input.clerkOrgId, (db) =>
+      await withTenantResult(input.accountId, (db) =>
         setPersonManager({ ...input, actingRole }, db)
       )
     ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
@@ -114,14 +114,14 @@ test.each(["manager", "viewer"] as const)(
 );
 test("manager can be cleared", async () => {
   expect(
-    await withTenantResult(input.clerkOrgId, (db) =>
+    await withTenantResult(input.accountId, (db) =>
       setPersonManager({ ...input, managerPersonId: null }, db)
     )
   ).toMatchObject({ ok: true, value: { managerPersonId: null } });
 });
 test("self management is rejected", async () => {
   expect(
-    await withTenantResult(input.clerkOrgId, (db) =>
+    await withTenantResult(input.accountId, (db) =>
       setPersonManager({ ...input, managerPersonId: personId }, db)
     )
   ).toMatchObject({ error: { code: "validation_error" }, ok: false });
@@ -140,18 +140,14 @@ test("a longer cross-company manager cycle is rejected", async () => {
     organisation_id: "company-B",
   });
   expect(
-    await withTenantResult(input.clerkOrgId, (db) =>
-      setPersonManager(input, db)
-    )
+    await withTenantResult(input.accountId, (db) => setPersonManager(input, db))
   ).toMatchObject({ error: { code: "validation_error" }, ok: false });
   expect(state.update).not.toHaveBeenCalled();
 });
 test("a foreign manager is absent from the owned graph", async () => {
   state.people = state.people.slice(0, 1);
   expect(
-    await withTenantResult(input.clerkOrgId, (db) =>
-      setPersonManager(input, db)
-    )
+    await withTenantResult(input.accountId, (db) => setPersonManager(input, db))
   ).toMatchObject({ error: { code: "not_found" }, ok: false });
 });
 test("another account's client fails before assignment", async () => {
@@ -164,7 +160,7 @@ test("another account's client fails before assignment", async () => {
 test("an audit failure rolls back the assigned manager", async () => {
   state.audit.mockRejectedValueOnce(new Error("Audit unavailable"));
   await expect(
-    withTenantResult(input.clerkOrgId, (db) => setPersonManager(input, db))
+    withTenantResult(input.accountId, (db) => setPersonManager(input, db))
   ).rejects.toThrow("Audit unavailable");
   expect(
     state.people.find((person) => person.id === personId)?.manager_person_id

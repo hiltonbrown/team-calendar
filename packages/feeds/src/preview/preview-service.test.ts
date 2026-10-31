@@ -49,8 +49,8 @@ vi.mock("@repo/database", async () => {
     resolveAccountCompanies: async () => [
       { id: baseInput.organisationId, name: "Company A" },
     ],
-    scopedTo: (input: { clerkOrgId: string; organisationId: string }) => ({
-      clerk_org_id: input.clerkOrgId,
+    scopedTo: (input: { accountId: string; organisationId: string }) => ({
+      account_id: input.accountId,
       organisation_id: input.organisationId,
     }),
     ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
@@ -75,15 +75,15 @@ const { previewFeed } = await import("./preview-service");
 
 const validFeedId = "10000000-0000-4000-8000-000000000001";
 const validOrgId = "20000000-0000-4000-8000-000000000002";
-const validClerkOrgId = "org_123";
+const validAccountId = "org_123";
 const validUserId = "user_123";
 const validPersonId = "30000000-0000-4000-8000-000000000003";
 
 const baseInput = {
+  accountId: validAccountId,
   actingPersonId: validPersonId,
-  actingRole: "org:admin",
+  actingRole: "admin",
   actingUserId: validUserId,
-  clerkOrgId: validClerkOrgId,
   feedId: validFeedId,
   organisationId: validOrgId,
 };
@@ -118,7 +118,7 @@ describe("previewFeed", () => {
   });
 
   it.each(
-    ["org:viewer", "org:manager"].flatMap((actingRole) =>
+    ["viewer", "manager"].flatMap((actingRole) =>
       [undefined, "30000000-0000-4000-8000-000000000099"].map(
         (actingPersonId) => ({ actingPersonId, actingRole })
       )
@@ -149,11 +149,11 @@ describe("previewFeed", () => {
       expect(mocks.personFindFirst).toHaveBeenCalledWith({
         select: { id: true },
         where: {
+          account_id: validAccountId,
           archived_at: null,
-          clerk_org_id: validClerkOrgId,
-          clerk_user_id: validUserId,
           is_active: true,
           organisation_id: validOrgId,
+          user_id: validUserId,
         },
       });
       expect(mocks.canViewFeed).toHaveBeenCalledWith(
@@ -167,7 +167,7 @@ describe("previewFeed", () => {
     }
   );
 
-  it.each(["org:viewer", "org:manager"])(
+  it.each(["viewer", "manager"])(
     "denies missing, foreign or inactive identity for %s without projecting",
     async (actingRole) => {
       mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
@@ -193,8 +193,8 @@ describe("previewFeed", () => {
       expect(mocks.personFindFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
+            account_id: validAccountId,
             archived_at: null,
-            clerk_org_id: validClerkOrgId,
             is_active: true,
             organisation_id: validOrgId,
           }),
@@ -231,12 +231,12 @@ describe("previewFeed", () => {
     const visibilityClient = mocks.canViewFeed.mock.calls[0]?.[1];
     expect(visibilityClient).toBeDefined();
     expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
-      expect.objectContaining({ clerkOrgId: validClerkOrgId }),
+      expect.objectContaining({ accountId: validAccountId }),
       visibilityClient
     );
   });
 
-  it("tenant scoping: carries clerk_org_id and organisation_id in database query", async () => {
+  it("tenant scoping: carries account_id and organisation_id in database query", async () => {
     mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
     mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
     mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
@@ -248,7 +248,7 @@ describe("previewFeed", () => {
     expect(mocks.feedFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          clerk_org_id: validClerkOrgId,
+          account_id: validAccountId,
           id: validFeedId,
           OR: [{ organisation_id: validOrgId }, { organisation_id: null }],
         },
@@ -270,14 +270,14 @@ describe("previewFeed", () => {
         const result = await withTestTenantResult(
           tenantTestAccount({
             ...baseInput,
-            actingRole: "org:admin",
+            actingRole: "admin",
             privacyMode,
           }),
           (db) =>
             previewFeed(
               {
                 ...baseInput,
-                actingRole: "org:admin",
+                actingRole: "admin",
                 privacyMode,
               },
               db
@@ -335,14 +335,14 @@ describe("previewFeed", () => {
       const result = await withTestTenantResult(
         tenantTestAccount({
           ...baseInput,
-          actingRole: "org:viewer",
+          actingRole: "viewer",
           privacyMode: "named",
         }),
         (db) =>
           previewFeed(
             {
               ...baseInput,
-              actingRole: "org:viewer",
+              actingRole: "viewer",
               privacyMode: "named",
             },
             db
@@ -372,7 +372,7 @@ describe("previewFeed", () => {
       const result = await withTestTenantResult(
         tenantTestAccount({
           ...baseInput,
-          actingRole: "org:viewer",
+          actingRole: "viewer",
           actingUserId: "user_owner",
           privacyMode: "named",
         }),
@@ -380,7 +380,7 @@ describe("previewFeed", () => {
           previewFeed(
             {
               ...baseInput,
-              actingRole: "org:viewer",
+              actingRole: "viewer",
               actingUserId: "user_owner",
               privacyMode: "named",
             },
@@ -402,14 +402,14 @@ describe("previewFeed", () => {
       const result = await withTestTenantResult(
         tenantTestAccount({
           ...baseInput,
-          actingRole: "org:viewer",
+          actingRole: "viewer",
           privacyMode: "masked",
         }),
         (db) =>
           previewFeed(
             {
               ...baseInput,
-              actingRole: "org:viewer",
+              actingRole: "viewer",
               privacyMode: "masked",
             },
             db
@@ -469,7 +469,7 @@ describe("previewFeed", () => {
       mocks.feedFindFirst
         .mockResolvedValueOnce(null) // initial lookup filtered by org
         .mockResolvedValueOnce({
-          clerk_org_id: "other_clerk_org",
+          account_id: "other_account",
           organisation_id: validOrgId,
         }); // lookup by id only
 

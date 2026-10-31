@@ -1,8 +1,8 @@
 import { SignOutButton } from "@repo/auth/client";
-import { auth, currentUser } from "@repo/auth/server";
 import { ModeToggle } from "@repo/design-system/components/mode-toggle";
 import type { ReactNode } from "react";
 import { BrandPanel, MobileBrand } from "@/components/brand/brand-panel";
+import { requireAccountPage } from "@/lib/auth/require-account-page";
 
 interface SetupLayoutProps {
   readonly children: ReactNode;
@@ -11,13 +11,7 @@ interface SetupLayoutProps {
 // First-run frame for the setup wizard and member welcome: the sign-in split
 // layout without the app sidebar, so sign-up flows straight into setup.
 const SetupLayout = async ({ children }: SetupLayoutProps) => {
-  const [user, { redirectToSignIn }] = await Promise.all([
-    currentUser(),
-    auth(),
-  ]);
-  if (!user) {
-    return redirectToSignIn();
-  }
+  await requireAccountPage();
 
   return (
     <div className="relative grid min-h-dvh w-full grid-cols-1 lg:grid-cols-2">

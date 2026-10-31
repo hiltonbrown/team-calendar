@@ -18,14 +18,23 @@ const validAppVars = {
   XERO_APP_TIER: "starter",
   XERO_REDIRECT_URI: "https://api.teamcalendar.online/oauth/callback",
   ...validCommonVars,
-  CLERK_SECRET_KEY: "clerk_sec_123456",
+  AUTH_CONTEXT_MODE: "local",
+  BETTER_AUTH_SECRET: "separate-better-auth-test-secret-32-characters",
+  BETTER_AUTH_URL: validCommonVars.NEXT_PUBLIC_APP_URL,
   DATABASE_APP_URL:
     "postgresql://team_calendar_app:test@localhost:5432/teamcalendar",
   DATABASE_URL:
     "postgresql://postgres:secretpassword@localhost:5432/teamcalendar",
+  GOOGLE_CLIENT_ID: "google-id",
+  GOOGLE_CLIENT_SECRET: "google-secret",
   KV_REST_API_TOKEN: "kv_token_123",
   KV_REST_API_URL: "https://kv.upstash.io",
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123456",
+  MICROSOFT_CLIENT_ID: "microsoft-id",
+  MICROSOFT_CLIENT_SECRET: "microsoft-secret",
+  RESEND_FROM: "accounts@teamcalendar.online",
+  RESEND_TOKEN: "re_auth-test",
+  XERO_AUTH_CLIENT_ID: "sign-in-xero-id",
+  XERO_AUTH_CLIENT_SECRET: "sign-in-xero-secret",
   XERO_CLIENT_ID: "xero_client_id_123",
   XERO_CLIENT_SECRET: "xero_client_secret_123",
   XERO_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
@@ -33,13 +42,21 @@ const validAppVars = {
 
 const validApiVars = {
   ...validAppVars,
-  CLERK_WEBHOOK_SECRET: "whsec_clerk123",
+  AUTH_CONTEXT_MODE: "remote",
+  BETTER_AUTH_SECRET: undefined,
+  BETTER_AUTH_URL: undefined,
   EARLY_ACCESS_APPLICATION_HMAC_SECRET: "h".repeat(32),
   EARLY_ACCESS_APPLICATION_RECIPIENT: "admissions@teamcalendar.online",
+  GOOGLE_CLIENT_ID: undefined,
+  GOOGLE_CLIENT_SECRET: undefined,
   INNGEST_EVENT_KEY: "ingest_event_key_123",
   INNGEST_SIGNING_KEY: "signkey-prod-123",
+  MICROSOFT_CLIENT_ID: undefined,
+  MICROSOFT_CLIENT_SECRET: undefined,
   RESEND_FROM: "noreply@teamcalendar.online",
   RESEND_TOKEN: "re_123456789",
+  XERO_AUTH_CLIENT_ID: undefined,
+  XERO_AUTH_CLIENT_SECRET: undefined,
 };
 
 const validWebVars = {
@@ -163,6 +180,22 @@ describe("production preflight validation", () => {
     ).toThrow(
       "INNGEST_EVENT_KEY and INNGEST_SIGNING_KEY must be configured together"
     );
+  });
+
+  it("rejects blank JOB_IDENTITY_GENERATION when supplied on app or api", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...validAppVars, JOB_IDENTITY_GENERATION: "   " },
+      })
+    ).toThrow("JOB_IDENTITY_GENERATION must not be empty");
+
+    expect(() =>
+      runProductionPreflight({
+        appName: "api",
+        envVars: { ...validApiVars, JOB_IDENTITY_GENERATION: "" },
+      })
+    ).toThrow("JOB_IDENTITY_GENERATION must not be empty");
   });
 
   it("fails paid mode when Stripe keys are missing", () => {
@@ -566,4 +599,191 @@ it("requires restricted database URL for production app", () => {
       envVars: { ...validAppVars, DATABASE_APP_URL: undefined },
     })
   ).toThrow("DATABASE_APP_URL");
+});
+
+describe("Better Auth production configuration", () => {
+  const betterAuthVars = validAppVars;
+
+  it("requires app auth configuration without a provider flag or Clerk keys", () => {
+    const result = runProductionPreflight({
+      appName: "app",
+      envVars: betterAuthVars,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).toContain("BETTER_AUTH_SECRET");
+    expect(result.checkedVars).not.toContain("AUTH_PROVIDER");
+    expect(result.checkedVars).not.toContain("CLERK_SECRET_KEY");
+  });
+
+  it("keeps auth secrets and social credentials out of API requirements", () => {
+    const result = runProductionPreflight({
+      appName: "api",
+      envVars: {
+        ...validApiVars,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).not.toContain("BETTER_AUTH_SECRET");
+    expect(result.checkedVars).not.toContain("GOOGLE_CLIENT_SECRET");
+    expect(result.checkedVars).not.toContain("CLERK_WEBHOOK_SECRET");
+  });
+
+  it("rejects a local auth context in the API", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "api",
+        envVars: { ...validApiVars, AUTH_CONTEXT_MODE: "local" },
+      })
+    ).toThrow("AUTH_CONTEXT_MODE must be remote");
+  });
+
+  it("rejects a remote auth context in the app", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, AUTH_CONTEXT_MODE: "remote" },
+      })
+    ).toThrow("AUTH_CONTEXT_MODE");
+  });
+
+  it.each([
+    "BETTER_AUTH_SECRET",
+    "XERO_AUTH_CLIENT_ID",
+    "XERO_AUTH_CLIENT_SECRET",
+    "RESEND_FROM",
+    "RESEND_TOKEN",
+  ])("requires %s on the auth app", (name) => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, [name]: undefined },
+      })
+    ).toThrow(name);
+  });
+
+  it("does not require Google or Microsoft credentials", () => {
+    const result = runProductionPreflight({
+      appName: "app",
+      envVars: {
+        ...betterAuthVars,
+        GOOGLE_CLIENT_ID: undefined,
+        GOOGLE_CLIENT_SECRET: undefined,
+        MICROSOFT_CLIENT_ID: undefined,
+        MICROSOFT_CLIENT_SECRET: undefined,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.checkedVars).not.toContain("GOOGLE_CLIENT_ID");
+    expect(result.checkedVars).not.toContain("MICROSOFT_CLIENT_ID");
+  });
+
+  it.each([
+    ["XERO_AUTH_CLIENT_ID", "XERO_CLIENT_ID"],
+    ["XERO_AUTH_CLIENT_SECRET", "XERO_CLIENT_SECRET"],
+  ] as const)("rejects payroll reuse for %s", (name, payrollName) => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, [name]: betterAuthVars[payrollName] },
+      })
+    ).toThrow(`${name} must be separate`);
+  });
+
+  it("requires HTTPS even for an otherwise valid local origin", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...betterAuthVars,
+          BETTER_AUTH_URL: "http://localhost:3000",
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000",
+        },
+      })
+    ).toThrow("BETTER_AUTH_URL must use HTTPS in production");
+  });
+
+  it("does not let a stale provider flag bypass Better Auth requirements", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...validAppVars,
+          AUTH_PROVIDER: "clerk",
+          BETTER_AUTH_SECRET: undefined,
+          CLERK_SECRET_KEY: "legacy-clerk-key",
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_legacy",
+        },
+      })
+    ).toThrow("BETTER_AUTH_SECRET");
+  });
+
+  it("rejects Infrastructure enablement pending approval even with an opt-in", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, BETTER_AUTH_INFRA_ENABLED: "true" },
+      })
+    ).toThrow(
+      "BETTER_AUTH_INFRA_ENABLED is disabled pending data residency and security approval"
+    );
+  });
+
+  it("never echoes an invalid auth secret", () => {
+    const secret = "auth-secret-canary";
+    try {
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...betterAuthVars, BETTER_AUTH_SECRET: secret },
+      });
+      expect.fail("Expected auth secret rejection");
+    } catch (error) {
+      expect(String(error)).toContain("BETTER_AUTH_SECRET");
+      expect(String(error)).not.toContain(secret);
+    }
+  });
+
+  for (const appName of ["app", "api"] as const) {
+    const preview = {
+      ...(appName === "app" ? betterAuthVars : validApiVars),
+      AUTH_CONTEXT_MODE: appName === "app" ? "local" : "remote",
+      BETTER_AUTH_URL:
+        appName === "app" ? "https://app-preview.vercel.app" : undefined,
+      NEXT_PUBLIC_API_URL: "https://api-preview.vercel.app",
+      NEXT_PUBLIC_APP_URL: "https://app-preview.vercel.app",
+      TC_API_CANDIDATE_URL: "https://api-preview.vercel.app",
+      TC_APP_CANDIDATE_URL: "https://app-preview.vercel.app",
+      VERCEL_ENV: "preview",
+    };
+
+    it(`accepts the exact Preview app/API pair for ${appName}`, () => {
+      expect(runProductionPreflight({ appName, envVars: preview }).ok).toBe(
+        true
+      );
+    });
+
+    it.each(["TC_APP_CANDIDATE_URL", "TC_API_CANDIDATE_URL"])(
+      `rejects missing %s for Preview ${appName}`,
+      (name) => {
+        expect(() =>
+          runProductionPreflight({
+            appName,
+            envVars: { ...preview, [name]: undefined },
+          })
+        ).toThrow("Preview auth requires an exact app/API candidate pair");
+      }
+    );
+
+    it.each([
+      "TC_APP_CANDIDATE_URL",
+      "TC_API_CANDIDATE_URL",
+      "NEXT_PUBLIC_API_URL",
+    ])(`rejects mismatched %s for Preview ${appName}`, (name) => {
+      expect(() =>
+        runProductionPreflight({
+          appName,
+          envVars: { ...preview, [name]: "https://different.vercel.app" },
+        })
+      ).toThrow("Preview auth requires an exact app/API candidate pair");
+    });
+  }
 });

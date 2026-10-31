@@ -1,12 +1,12 @@
-import { requireOrg } from "@repo/auth/helpers";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import type { AccountId } from "@repo/core";
 import {
   resolveAccountCompanies,
   TENANT_READ_TRANSACTION_OPTIONS,
   withTenantDb,
 } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 import { NewPersonClient } from "./new-person-client";
@@ -22,21 +22,21 @@ interface NewPersonPageProps {
 export default async function NewPersonPage({
   searchParams,
 }: NewPersonPageProps) {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ people: ["manage"] });
 
   const params = await searchParams;
   const orgParam = typeof params.org === "string" ? params.org : undefined;
-  // Clerk authentication completes before owned company preparation.
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  // Authentication completes before owned company preparation.
+  const accountId = (await requireAccount()) as AccountId;
   const { organisationId, orgQueryValue, companies } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const context = await resolveActiveOrgPageContext(
-        clerkOrgId,
+        accountId,
         orgParam,
         db
       );
-      const preparedCompanies = await resolveAccountCompanies(clerkOrgId, db);
+      const preparedCompanies = await resolveAccountCompanies(accountId, db);
       return { ...context, companies: preparedCompanies };
     },
     TENANT_READ_TRANSACTION_OPTIONS

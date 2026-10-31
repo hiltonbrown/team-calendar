@@ -32,14 +32,14 @@ describe("canonical scoped connections", () => {
     findFirst.mockResolvedValue(null);
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "account",
+        accountId: "account",
         connectionId: "connection",
         organisationId: "payroll",
       }),
       (db) =>
         module.getScopedXeroConnection(
           {
-            clerkOrgId: "account",
+            accountId: "account",
             connectionId: "connection",
             organisationId: "payroll",
           },
@@ -48,7 +48,7 @@ describe("canonical scoped connections", () => {
     );
     expect(findFirst).toHaveBeenCalledWith({
       where: {
-        clerk_org_id: "account",
+        account_id: "account",
         id: "connection",
         organisation_id: "payroll",
         released_at: null,
@@ -69,9 +69,9 @@ describe("provider disconnect compare-and-set", () => {
     findFirst.mockResolvedValue({ id: "connection" });
     updateMany.mockResolvedValue({ count: 1 });
     const captured = {
+      accountId: "account",
       authorisationId: "grant",
       authorisationUpdatedAt: new Date("2026-10-07T00:00:00Z"),
-      clerkOrgId: "account",
       connectionId: "connection",
       lastConnectedAt: new Date("2026-10-06T00:00:00Z"),
       organisationId: "payroll",
@@ -88,11 +88,11 @@ describe("provider disconnect compare-and-set", () => {
         status: "reconnect_required",
       },
       where: {
+        account_id: "account",
         authorisation: {
           status: "active",
           updated_at: captured.authorisationUpdatedAt,
         },
-        clerk_org_id: "account",
         disconnected_at: null,
         id: "connection",
         last_connected_at: captured.lastConnectedAt,

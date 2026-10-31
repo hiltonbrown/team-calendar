@@ -36,7 +36,7 @@ export type NotificationEmailQueueSumAggregateOutputType = {
 
 export type NotificationEmailQueueMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   notification_id: string | null
   recipient_user_id: string | null
@@ -58,7 +58,7 @@ export type NotificationEmailQueueMinAggregateOutputType = {
 
 export type NotificationEmailQueueMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   notification_id: string | null
   recipient_user_id: string | null
@@ -80,7 +80,7 @@ export type NotificationEmailQueueMaxAggregateOutputType = {
 
 export type NotificationEmailQueueCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   notification_id: number
   recipient_user_id: number
@@ -113,7 +113,7 @@ export type NotificationEmailQueueSumAggregateInputType = {
 
 export type NotificationEmailQueueMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   notification_id?: true
   recipient_user_id?: true
@@ -135,7 +135,7 @@ export type NotificationEmailQueueMinAggregateInputType = {
 
 export type NotificationEmailQueueMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   notification_id?: true
   recipient_user_id?: true
@@ -157,7 +157,7 @@ export type NotificationEmailQueueMaxAggregateInputType = {
 
 export type NotificationEmailQueueCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   notification_id?: true
   recipient_user_id?: true
@@ -267,7 +267,7 @@ export type NotificationEmailQueueGroupByArgs<ExtArgs extends runtime.Types.Exte
 
 export type NotificationEmailQueueGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   notification_id: string | null
   recipient_user_id: string
@@ -313,7 +313,7 @@ export type NotificationEmailQueueWhereInput = {
   OR?: Prisma.NotificationEmailQueueWhereInput[]
   NOT?: Prisma.NotificationEmailQueueWhereInput | Prisma.NotificationEmailQueueWhereInput[]
   id?: Prisma.UuidFilter<"NotificationEmailQueue"> | string
-  clerk_org_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
+  account_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
   organisation_id?: Prisma.UuidFilter<"NotificationEmailQueue"> | string
   notification_id?: Prisma.UuidNullableFilter<"NotificationEmailQueue"> | string | null
   recipient_user_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
@@ -338,7 +338,7 @@ export type NotificationEmailQueueWhereInput = {
 
 export type NotificationEmailQueueOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_id?: Prisma.SortOrderInput | Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
@@ -366,7 +366,7 @@ export type NotificationEmailQueueWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.NotificationEmailQueueWhereInput | Prisma.NotificationEmailQueueWhereInput[]
   OR?: Prisma.NotificationEmailQueueWhereInput[]
   NOT?: Prisma.NotificationEmailQueueWhereInput | Prisma.NotificationEmailQueueWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
+  account_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
   organisation_id?: Prisma.UuidFilter<"NotificationEmailQueue"> | string
   notification_id?: Prisma.UuidNullableFilter<"NotificationEmailQueue"> | string | null
   recipient_user_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
@@ -391,7 +391,7 @@ export type NotificationEmailQueueWhereUniqueInput = Prisma.AtLeast<{
 
 export type NotificationEmailQueueOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_id?: Prisma.SortOrderInput | Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
@@ -422,7 +422,7 @@ export type NotificationEmailQueueScalarWhereWithAggregatesInput = {
   OR?: Prisma.NotificationEmailQueueScalarWhereWithAggregatesInput[]
   NOT?: Prisma.NotificationEmailQueueScalarWhereWithAggregatesInput | Prisma.NotificationEmailQueueScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"NotificationEmailQueue"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"NotificationEmailQueue"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"NotificationEmailQueue"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"NotificationEmailQueue"> | string
   notification_id?: Prisma.UuidNullableWithAggregatesFilter<"NotificationEmailQueue"> | string | null
   recipient_user_id?: Prisma.StringWithAggregatesFilter<"NotificationEmailQueue"> | string
@@ -445,7 +445,7 @@ export type NotificationEmailQueueScalarWhereWithAggregatesInput = {
 
 export type NotificationEmailQueueCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   notification_type: $Enums.notification_type
   email_template: string
@@ -468,7 +468,7 @@ export type NotificationEmailQueueCreateInput = {
 
 export type NotificationEmailQueueUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   notification_id?: string | null
   recipient_user_id: string
@@ -491,7 +491,7 @@ export type NotificationEmailQueueUncheckedCreateInput = {
 
 export type NotificationEmailQueueUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   email_template?: Prisma.StringFieldUpdateOperationsInput | string
@@ -514,7 +514,7 @@ export type NotificationEmailQueueUpdateInput = {
 
 export type NotificationEmailQueueUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -537,7 +537,7 @@ export type NotificationEmailQueueUncheckedUpdateInput = {
 
 export type NotificationEmailQueueCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   notification_id?: string | null
   recipient_user_id: string
@@ -560,7 +560,7 @@ export type NotificationEmailQueueCreateManyInput = {
 
 export type NotificationEmailQueueUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   email_template?: Prisma.StringFieldUpdateOperationsInput | string
@@ -581,7 +581,7 @@ export type NotificationEmailQueueUpdateManyMutationInput = {
 
 export type NotificationEmailQueueUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -614,7 +614,7 @@ export type NotificationEmailQueueOrderByRelationAggregateInput = {
 
 export type NotificationEmailQueueCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
@@ -641,7 +641,7 @@ export type NotificationEmailQueueAvgOrderByAggregateInput = {
 
 export type NotificationEmailQueueMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
@@ -663,7 +663,7 @@ export type NotificationEmailQueueMaxOrderByAggregateInput = {
 
 export type NotificationEmailQueueMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
@@ -777,7 +777,7 @@ export type Enumnotification_email_statusFieldUpdateOperationsInput = {
 
 export type NotificationEmailQueueCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   notification_type: $Enums.notification_type
   email_template: string
@@ -799,7 +799,7 @@ export type NotificationEmailQueueCreateWithoutOrganisationInput = {
 
 export type NotificationEmailQueueUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   notification_id?: string | null
   recipient_user_id: string
   notification_type: $Enums.notification_type
@@ -850,7 +850,7 @@ export type NotificationEmailQueueScalarWhereInput = {
   OR?: Prisma.NotificationEmailQueueScalarWhereInput[]
   NOT?: Prisma.NotificationEmailQueueScalarWhereInput | Prisma.NotificationEmailQueueScalarWhereInput[]
   id?: Prisma.UuidFilter<"NotificationEmailQueue"> | string
-  clerk_org_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
+  account_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
   organisation_id?: Prisma.UuidFilter<"NotificationEmailQueue"> | string
   notification_id?: Prisma.UuidNullableFilter<"NotificationEmailQueue"> | string | null
   recipient_user_id?: Prisma.StringFilter<"NotificationEmailQueue"> | string
@@ -873,7 +873,7 @@ export type NotificationEmailQueueScalarWhereInput = {
 
 export type NotificationEmailQueueCreateWithoutNotificationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   notification_type: $Enums.notification_type
   email_template: string
@@ -895,7 +895,7 @@ export type NotificationEmailQueueCreateWithoutNotificationInput = {
 
 export type NotificationEmailQueueUncheckedCreateWithoutNotificationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   notification_type: $Enums.notification_type
@@ -943,7 +943,7 @@ export type NotificationEmailQueueUpdateManyWithWhereWithoutNotificationInput = 
 
 export type NotificationEmailQueueCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   notification_id?: string | null
   recipient_user_id: string
   notification_type: $Enums.notification_type
@@ -965,7 +965,7 @@ export type NotificationEmailQueueCreateManyOrganisationInput = {
 
 export type NotificationEmailQueueUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   email_template?: Prisma.StringFieldUpdateOperationsInput | string
@@ -987,7 +987,7 @@ export type NotificationEmailQueueUpdateWithoutOrganisationInput = {
 
 export type NotificationEmailQueueUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -1009,7 +1009,7 @@ export type NotificationEmailQueueUncheckedUpdateWithoutOrganisationInput = {
 
 export type NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -1031,7 +1031,7 @@ export type NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationInput = 
 
 export type NotificationEmailQueueCreateManyNotificationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   notification_type: $Enums.notification_type
@@ -1053,7 +1053,7 @@ export type NotificationEmailQueueCreateManyNotificationInput = {
 
 export type NotificationEmailQueueUpdateWithoutNotificationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   email_template?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1075,7 +1075,7 @@ export type NotificationEmailQueueUpdateWithoutNotificationInput = {
 
 export type NotificationEmailQueueUncheckedUpdateWithoutNotificationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -1097,7 +1097,7 @@ export type NotificationEmailQueueUncheckedUpdateWithoutNotificationInput = {
 
 export type NotificationEmailQueueUncheckedUpdateManyWithoutNotificationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -1121,7 +1121,7 @@ export type NotificationEmailQueueUncheckedUpdateManyWithoutNotificationInput = 
 
 export type NotificationEmailQueueSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_id?: boolean
   recipient_user_id?: boolean
@@ -1146,7 +1146,7 @@ export type NotificationEmailQueueSelect<ExtArgs extends runtime.Types.Extension
 
 export type NotificationEmailQueueSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_id?: boolean
   recipient_user_id?: boolean
@@ -1171,7 +1171,7 @@ export type NotificationEmailQueueSelectCreateManyAndReturn<ExtArgs extends runt
 
 export type NotificationEmailQueueSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_id?: boolean
   recipient_user_id?: boolean
@@ -1196,7 +1196,7 @@ export type NotificationEmailQueueSelectUpdateManyAndReturn<ExtArgs extends runt
 
 export type NotificationEmailQueueSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_id?: boolean
   recipient_user_id?: boolean
@@ -1217,7 +1217,7 @@ export type NotificationEmailQueueSelectScalar = {
   updated_at?: boolean
 }
 
-export type NotificationEmailQueueOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "notification_id" | "recipient_user_id" | "notification_type" | "email_template" | "recipient_email" | "title" | "body" | "action_url" | "unsubscribe_url" | "merge_data" | "status" | "attempts" | "last_error" | "queued_at" | "sent_at" | "created_at" | "updated_at", ExtArgs["result"]["notificationEmailQueue"]>
+export type NotificationEmailQueueOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "notification_id" | "recipient_user_id" | "notification_type" | "email_template" | "recipient_email" | "title" | "body" | "action_url" | "unsubscribe_url" | "merge_data" | "status" | "attempts" | "last_error" | "queued_at" | "sent_at" | "created_at" | "updated_at", ExtArgs["result"]["notificationEmailQueue"]>
 export type NotificationEmailQueueInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   notification?: boolean | Prisma.NotificationEmailQueue$notificationArgs<ExtArgs>
@@ -1239,7 +1239,7 @@ export type $NotificationEmailQueuePayload<ExtArgs extends runtime.Types.Extensi
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     notification_id: string | null
     recipient_user_id: string
@@ -1684,7 +1684,7 @@ export interface Prisma__NotificationEmailQueueClient<T, Null = never, ExtArgs e
  */
 export interface NotificationEmailQueueFieldRefs {
   readonly id: Prisma.FieldRef<"NotificationEmailQueue", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"NotificationEmailQueue", 'String'>
+  readonly account_id: Prisma.FieldRef<"NotificationEmailQueue", 'String'>
   readonly organisation_id: Prisma.FieldRef<"NotificationEmailQueue", 'String'>
   readonly notification_id: Prisma.FieldRef<"NotificationEmailQueue", 'String'>
   readonly recipient_user_id: Prisma.FieldRef<"NotificationEmailQueue", 'String'>

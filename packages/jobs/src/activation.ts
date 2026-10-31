@@ -5,7 +5,7 @@ import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { log } from "@repo/observability/log";
 export interface CaptureInitialSyncCompletedInput {
-  clerkOrgId: string;
+  accountId: string;
   connectionId?: string;
   organisationId: string;
 }
@@ -17,7 +17,7 @@ export interface XeroImportReadiness {
 }
 function connectionWhere(input: CaptureInitialSyncCompletedInput) {
   return {
-    clerk_org_id: input.clerkOrgId,
+    account_id: input.accountId,
     organisation_id: input.organisationId,
     ...(input.connectionId ? { id: input.connectionId } : {}),
   };
@@ -27,7 +27,7 @@ export async function captureInitialSyncCompleted(
 ): Promise<void> {
   assertNoTenantTransaction("captureInitialSyncCompleted");
   try {
-    const connection = await withTenantDb(input.clerkOrgId, (db) =>
+    const connection = await withTenantDb(input.accountId, (db) =>
       db.xeroConnection.findFirst({
         select: { initial_sync_completed_at: true },
         where: connectionWhere(input),
@@ -37,16 +37,16 @@ export async function captureInitialSyncCompleted(
       return;
     }
     const event = createActivationEvent({
-      deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,
+      deduplicationKey: `${input.accountId}:${input.organisationId}`,
       name: "Initial Sync Completed",
       occurredAt: connection.initial_sync_completed_at,
-      subjectId: input.clerkOrgId,
+      subjectId: input.accountId,
     });
     analytics?.capture({ ...event });
     await analytics?.flush();
   } catch (error) {
     log.warn("Initial sync activation capture failed", {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       error,
       organisationId: input.organisationId,
     });
@@ -56,9 +56,9 @@ export async function checkXeroImportReadiness(
   input: CaptureInitialSyncCompletedInput,
   db: TenantDb
 ): Promise<XeroImportReadiness> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const [connection, unresolvedPeopleCount] = [
@@ -68,7 +68,7 @@ export async function checkXeroImportReadiness(
       }),
       await client.xeroPersonMatch.count({
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
           status: "pending",
         },

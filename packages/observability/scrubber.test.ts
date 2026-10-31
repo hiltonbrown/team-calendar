@@ -10,9 +10,9 @@ import {
 describe("observability scrubber", () => {
   it("allows the exact operational keys", () => {
     for (const key of [
-      "actingClerkOrgId",
+      "actingAccountId",
       "blockedOrigin",
-      "clerkOrgId",
+      "accountId",
       "columnNumber",
       "disposition",
       "documentOrigin",
@@ -51,7 +51,7 @@ describe("observability scrubber", () => {
   });
 
   it("lets a sensitive parent dominate an allowlisted child", () => {
-    expect(sanitizeObject({ rawPayload: { clerkOrgId: "org_1" } })).toEqual({
+    expect(sanitizeObject({ rawPayload: { accountId: "org_1" } })).toEqual({
       rawPayload: "[SCRUBBED]",
     });
   });

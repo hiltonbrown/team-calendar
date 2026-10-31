@@ -17,8 +17,8 @@ import { executeWithXeroAuthRecovery } from "./auth-recovery";
 function tenant(): XeroAccessContext {
   return {
     accessToken: "old-token",
+    account_id: "account-test",
     capability: "payroll.employees",
-    clerk_org_id: "clerk",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "binding",
     organisation_id: "organisation",
@@ -65,7 +65,7 @@ describe("bounded Xero auth recovery", () => {
     expect(mocks.resolve).toHaveBeenCalledOnce();
     expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "clerk",
+        accountId: "account-test",
         connectionId: "binding",
         deadline: current.deadline,
         organisationId: "organisation",

@@ -1,4 +1,9 @@
 import { withTenantDb } from "@repo/database";
+import { currentJobIdentityGeneration } from "../../keys";
+import {
+  assertJobIdentityGeneration,
+  readJobEventData,
+} from "../event-context";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
@@ -17,8 +22,12 @@ import { syncXeroPeople } from "./sync-xero-people";
 import { isCurrentXeroSyncBinding } from "./xero-sync-access";
 
 const InputSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
+  identityGeneration: z
+    .string()
+    .min(1)
+    .default(() => currentJobIdentityGeneration()),
   organisationId: z.string().uuid(),
   requestedAt: z.string().datetime().optional(),
   runId: z.string().uuid().optional(),
@@ -50,8 +59,9 @@ export async function executeInitialSync(
   runStep: RunStep
 ): Promise<InitialXeroSyncResult | { status: "ignored" }> {
   assertNoTenantTransaction("executeInitialSync");
+  assertJobIdentityGeneration(input.identityGeneration);
   if (
-    !(await withTenantDb(input.clerkOrgId, (db) =>
+    !(await withTenantDb(input.accountId, (db) =>
       isCurrentXeroSyncBinding(input, db)
     ))
   ) {
@@ -59,7 +69,7 @@ export async function executeInitialSync(
   }
   const requestedAt =
     input.requestedAt ??
-    (await withTenantDb(input.clerkOrgId, (db) =>
+    (await withTenantDb(input.accountId, (db) =>
       ensureXeroInitialSyncRequested(input, db)
     ));
   if (!requestedAt) {
@@ -67,37 +77,41 @@ export async function executeInitialSync(
   }
   const phaseInput = { ...input, mode: "full" as const, requestedAt };
   // Each phase/page is its own sync run; a successful people run cannot short-circuit leave or balances.
-  const people = await runStep("sync-people", async () =>
-    successfulPhase(
+  const people = await runStep("sync-people", async () => {
+    assertJobIdentityGeneration(input.identityGeneration);
+    return successfulPhase(
       await syncXeroPeople({ ...phaseInput, runId: randomUUID() })
-    )
-  );
-  const leaveRecords = await runStep("sync-leave-records", async () =>
-    successfulPhase(
+    );
+  });
+  const leaveRecords = await runStep("sync-leave-records", async () => {
+    assertJobIdentityGeneration(input.identityGeneration);
+    return successfulPhase(
       await syncXeroLeaveRecords({ ...phaseInput, runId: randomUUID() })
-    )
-  );
+    );
+  });
   const leaveBalances: unknown[] = [];
   let hasMore = true;
   for (let page = 0; hasMore; page += 1) {
-    const result = await runStep(`sync-leave-balances-${page}`, async () =>
-      successfulPhase(
+    const result = await runStep(`sync-leave-balances-${page}`, async () => {
+      assertJobIdentityGeneration(input.identityGeneration);
+      return successfulPhase(
         await syncXeroLeaveBalances({ ...phaseInput, runId: randomUUID() })
-      )
-    );
+      );
+    });
     leaveBalances.push(result);
     hasMore = result.hasMore === true;
   }
-  const completedAt = await runStep("complete-initial-import", () =>
-    completeInitialSyncPhase({ ...input, requestedAt })
-  );
+  const completedAt = await runStep("complete-initial-import", () => {
+    assertJobIdentityGeneration(input.identityGeneration);
+    return completeInitialSyncPhase({ ...input, requestedAt });
+  });
   return { completedAt, leaveBalances, leaveRecords, people };
 }
 export async function completeInitialSyncPhase(
   input: Parameters<typeof completeXeroInitialSync>[0]
 ): Promise<Date> {
   assertNoTenantTransaction("completeInitialSyncPhase");
-  const completed = await withTenantDb(input.clerkOrgId, (db) =>
+  const completed = await withTenantDb(input.accountId, (db) =>
     completeXeroInitialSync(input, db)
   );
   if (!completed) {
@@ -119,10 +133,12 @@ export const initialXeroSyncFunction: InngestFunction.Any =
       id: "initial-xero-sync",
       triggers: { event: "initial-xero-sync" },
     },
-    async ({ event, step }) =>
-      executeInitialSync(InputSchema.parse(event.data), (name, operation) =>
+    async ({ event, step }) => {
+      const data = InputSchema.parse(readJobEventData(event.data));
+      return await executeInitialSync(data, (name, operation) =>
         step.run(name, operation)
-      )
+      );
+    }
   );
 export async function initialXeroSync(
   input: unknown

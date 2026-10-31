@@ -4,10 +4,8 @@ const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
   analyticsFlush: vi.fn(),
   archiveFeed: vi.fn(),
-  auth: vi.fn(),
   createFeed: vi.fn(),
   createOwnFeed: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     feed: {
       findFirst: vi.fn(),
@@ -17,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   dispatchNotification: vi.fn(),
   effects: [] as Array<() => Promise<void>>,
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   issueToken: vi.fn(),
   log: {
     error: vi.fn(),
@@ -35,8 +35,8 @@ vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/feeds", () => ({
   archiveFeed: mocks.archiveFeed,
@@ -45,8 +45,7 @@ vi.mock("@repo/feeds", () => ({
   createFeed: mocks.createFeed,
   createOwnFeed: mocks.createOwnFeed,
   issueToken: mocks.issueToken,
-  normaliseRole: (role: string | null | undefined) =>
-    role?.replace("org:", "") ?? "viewer",
+  normaliseRole: (role: string | null | undefined) => role ?? null,
   pauseFeed: mocks.pauseFeed,
   restoreFeed: mocks.restoreFeed,
   resumeFeed: mocks.resumeFeed,
@@ -116,11 +115,11 @@ describe("feed actions", () => {
     mocks.database.organisation.findFirst.mockResolvedValue({
       id: organisationId,
     });
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: "org_1", organisationId },
+      value: { accountId: "org_1", organisationId },
     });
     mocks.createFeed.mockResolvedValue({
       ok: true,
@@ -144,10 +143,10 @@ describe("feed actions", () => {
     });
   });
 
-  it.each(["org:admin", "org:owner"])(
+  it.each(["admin", "owner"])(
     "issues a usable URL with authorised %s identity and both tenant scopes",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       mocks.issueToken.mockResolvedValue({
         ok: true,
         value: { plaintext: "issued_plaintext", tokenId: "token-issued" },
@@ -162,9 +161,9 @@ describe("feed actions", () => {
       });
       expect(mocks.issueToken).toHaveBeenCalledWith(
         {
-          actingRole: orgRole.replace("org:", ""),
+          accountId: "org_1",
+          actingRole: role,
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           feedId,
           organisationId,
         },
@@ -175,10 +174,10 @@ describe("feed actions", () => {
     }
   );
 
-  it.each(["org:viewer", "org:manager", null])(
+  it.each(["viewer", "manager", null])(
     "denies token issuance to %s without calling the service",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       expect(await issueTokenAction({ feedId, organisationId })).toMatchObject({
         error: { code: "not_authorised" },
         ok: false,
@@ -268,17 +267,17 @@ describe("feed actions", () => {
       expect(mocks.database.feed.findFirst).toHaveBeenCalledWith({
         select: { name: true },
         where: {
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           id: feedId,
           organisation_id: organisationId,
         },
       });
       expect(mocks.dispatchNotification).toHaveBeenCalledWith(
         {
+          accountId: "org_1",
           actionUrl: `/feeds/${feedId}?org=${organisationId}`,
           actorUserId: "user_1",
           body: 'The token for calendar feed "Internal Calendar" has been rotated.',
-          clerkOrgId: "org_1",
           objectId: feedId,
           objectType: "feed",
           organisationId,
@@ -340,7 +339,10 @@ describe("feed actions", () => {
 
   describe("owner self-service", () => {
     beforeEach(() => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_1",
+        role: "viewer",
+      });
     });
 
     it.each([
@@ -404,7 +406,7 @@ describe("feed actions", () => {
     });
 
     it("rejects callers without an organisation role", async () => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: null });
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role: null });
       expect(
         await createOwnFeedAction({ kind: "personal", organisationId })
       ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
@@ -421,9 +423,9 @@ describe("feed actions", () => {
       ).toEqual({ ok: true, value: { created: true, feedId } });
       expect(mocks.createOwnFeed).toHaveBeenCalledWith(
         {
+          accountId: "org_1",
           actingRole: "viewer",
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           kind: "team",
           organisationId,
         },

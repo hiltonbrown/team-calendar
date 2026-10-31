@@ -62,8 +62,8 @@ describe("Slice 14 cohesion flows", () => {
     const fixture = createSlice14Fixture();
     const [person] = fixture.people;
     const record: Slice14AvailabilityRecordFixture = {
+      accountId: person?.accountId ?? "org_a",
       approvalStatus: "approved",
-      clerkOrgId: person?.clerkOrgId ?? "org_a",
       failedAction: null,
       id: "00000000-0000-4000-8000-999000000001",
       organisationId:

@@ -3,6 +3,28 @@
   "globalDependencies": ["**/.env.*local", "bun.lock", "package.json"],
   "ui": "tui",
   "envMode": "loose",
+  "globalEnv": [
+    "AUTH_CONTEXT_MODE",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "BETTER_AUTH_INFRA_ENABLED",
+    "BETTER_AUTH_API_KEY",
+    "BETTER_AUTH_TELEMETRY",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "JOB_IDENTITY_GENERATION",
+    "MICROSOFT_CLIENT_ID",
+    "MICROSOFT_CLIENT_SECRET",
+    "MICROSOFT_TENANT_ID",
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_APP_URL",
+    "NEXT_PUBLIC_WEB_URL",
+    "TC_API_CANDIDATE_URL",
+    "TC_APP_CANDIDATE_URL",
+    "VERCEL_ENV",
+    "XERO_AUTH_CLIENT_ID",
+    "XERO_AUTH_CLIENT_SECRET"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

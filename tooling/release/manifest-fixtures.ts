@@ -50,13 +50,13 @@ export const createLiveManifestOwnership = (input: {
   runId: string;
   uuid?: () => string;
 }): {
-  clerkOrgIds: string[];
+  accountIds: string[];
   globalKeys: string[];
   organisationIds: string[];
 } => {
   const uuid = input.uuid ?? randomUUID;
   const runMarker = input.runId.replaceAll("-", "");
-  const clerkOrgIds = Array.from(
+  const accountIds = Array.from(
     { length: REQUIRED_LIVE_FIXTURE_TENANT_SLOTS },
     (_, index) =>
       `org_release_${runMarker}_${String(index + 1).padStart(3, "0")}`
@@ -71,5 +71,5 @@ export const createLiveManifestOwnership = (input: {
       return `${kind}:${value}`;
     })
   );
-  return { clerkOrgIds, globalKeys, organisationIds };
+  return { accountIds, globalKeys, organisationIds };
 };

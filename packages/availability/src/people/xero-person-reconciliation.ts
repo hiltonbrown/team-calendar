@@ -17,7 +17,7 @@ import { noemailFallbackDomain } from "@repo/seo/branding";
 type ReconciliationClient = TenantDb;
 
 export interface ReconcileXeroPersonContext {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }
 
@@ -39,13 +39,13 @@ export type ReconcileOutcome =
   | { outcome: "created"; personId: string };
 
 export interface MergePersonMatchInput {
+  accountId: string;
   actorDisplay?: string;
   actorUserId: string;
   candidatePersonId?: string | null;
-  clerkOrgId: string;
-  clerkUserId?: string | null;
   matchId?: string;
   organisationId: string;
+  userId?: string | null;
   xeroPersonId: string;
 }
 
@@ -76,7 +76,7 @@ async function findExistingExactMatch(
 ): Promise<string | null> {
   const exactMatch = await client.person.findFirst({
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: context.organisationId,
       xero_employee_id: input.employeeId,
     },
@@ -105,7 +105,7 @@ async function findExistingExactMatch(
 
   const sourceMatch = await client.person.findFirst({
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: context.organisationId,
       source_person_key: input.employeeId,
       source_system: "XERO",
@@ -163,8 +163,8 @@ async function tryUpgradeManualCandidate(
   const allOrgPeopleWithEmail = await client.person.findMany({
     select: { id: true, xero_employee_id: true },
     where: {
+      account_id: context.accountId,
       archived_at: null,
-      clerk_org_id: context.clerkOrgId,
       email: { equals: emailLower, mode: "insensitive" },
       organisation_id: context.organisationId,
     },
@@ -234,7 +234,7 @@ async function handleCandidatesOrNewPerson(
 
   const xeroPerson = await client.person.upsert({
     create: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       default_contactability: "contactable",
       default_privacy_mode: "named",
       display_name: `${input.firstName} ${input.lastName}`,
@@ -267,7 +267,7 @@ async function handleCandidatesOrNewPerson(
       xero_employee_id: input.employeeId,
     },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id_source_system_source_person_key: {
         organisation_id: context.organisationId,
         source_person_key: input.employeeId,
@@ -290,8 +290,8 @@ async function handleCandidatesOrNewPerson(
 
     const match = await client.xeroPersonMatch.upsert({
       create: {
+        account_id: context.accountId,
         candidate_person_id: candidate.id,
-        clerk_org_id: context.clerkOrgId,
         detected_reason: detectedReason,
         organisation_id: context.organisationId,
         status: "pending",
@@ -333,7 +333,7 @@ export async function reconcileXeroPerson(
   db: TenantDb
 ): Promise<ReconcileOutcome> {
   {
-    assertTenantDb(db, context.clerkOrgId);
+    assertTenantDb(db, context.accountId);
     const client = db;
 
     const rawEmail =
@@ -360,8 +360,8 @@ export async function reconcileXeroPerson(
     // 2. Discover manual candidate people in this organisation
     const manualCandidates = await client.person.findMany({
       where: {
+        account_id: context.accountId,
         archived_at: null,
-        clerk_org_id: context.clerkOrgId,
         organisation_id: context.organisationId,
         xero_employee_id: null,
       },
@@ -396,7 +396,7 @@ export async function reconcileXeroPerson(
 
 interface ValidatedMergeTarget {
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>> | null;
-  resolvedClerkUserId: string | null;
+  resolvedUserId: string | null;
   xeroPerson: Prisma.PersonGetPayload<Record<string, never>>;
 }
 
@@ -407,7 +407,7 @@ async function validateMergeInput(
 ): Promise<Result<ValidatedMergeTarget, ReconciliationError>> {
   const xeroPerson = await client.person.findFirst({
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       id: input.xeroPersonId,
       organisation_id: context.organisationId,
     },
@@ -423,7 +423,7 @@ async function validateMergeInput(
   const candidatePerson = input.candidatePersonId
     ? await client.person.findFirst({
         where: {
-          clerk_org_id: context.clerkOrgId,
+          account_id: context.accountId,
           id: input.candidatePersonId,
           organisation_id: context.organisationId,
         },
@@ -447,19 +447,18 @@ async function validateMergeInput(
     };
   }
 
-  const resolvedClerkUserId =
-    input.clerkUserId ?? candidatePerson?.clerk_user_id ?? null;
+  const resolvedUserId = input.userId ?? candidatePerson?.user_id ?? null;
 
-  if (resolvedClerkUserId) {
+  if (resolvedUserId) {
     const excludedIds = [xeroPerson.id, candidatePerson?.id].filter(
       Boolean
     ) as string[];
     const alreadyLinked = await client.person.findFirst({
       select: { id: true },
       where: {
-        clerk_org_id: context.clerkOrgId,
-        clerk_user_id: resolvedClerkUserId,
+        account_id: context.accountId,
         id: { notIn: excludedIds },
+        user_id: resolvedUserId,
       },
     });
 
@@ -477,7 +476,7 @@ async function validateMergeInput(
 
   return {
     ok: true,
-    value: { candidatePerson, resolvedClerkUserId, xeroPerson },
+    value: { candidatePerson, resolvedUserId, xeroPerson },
   };
 }
 
@@ -487,11 +486,11 @@ async function prepareManagerMerge(
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>>,
   xeroPerson: Prisma.PersonGetPayload<Record<string, never>>
 ): Promise<Result<{ managerPersonId: string | null }, ReconciliationError>> {
-  const companies = await resolveAccountCompanies(context.clerkOrgId, client);
+  const companies = await resolveAccountCompanies(context.accountId, client);
   const people = await client.person.findMany({
     select: { id: true, manager_person_id: true },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: { in: companies.map((company) => company.id) },
     },
   });
@@ -549,11 +548,11 @@ async function transferCandidateRelations(
   xeroPerson: Prisma.PersonGetPayload<Record<string, never>>,
   managerPersonId: string | null
 ): Promise<void> {
-  const companies = await resolveAccountCompanies(context.clerkOrgId, client);
+  const companies = await resolveAccountCompanies(context.accountId, client);
   await client.person.updateMany({
     data: { manager_person_id: xeroPerson.id },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       id: { notIn: [candidatePerson.id, xeroPerson.id] },
       manager_person_id: candidatePerson.id,
       organisation_id: { in: companies.map((company) => company.id) },
@@ -562,7 +561,7 @@ async function transferCandidateRelations(
   await client.person.updateMany({
     data: { manager_person_id: managerPersonId },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       id: xeroPerson.id,
       organisation_id: context.organisationId,
     },
@@ -587,7 +586,7 @@ async function transferCandidateRelations(
   await client.availabilityRecord.updateMany({
     data: { person_id: xeroPerson.id },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: context.organisationId,
       person_id: candidatePerson.id,
     },
@@ -596,8 +595,8 @@ async function transferCandidateRelations(
   await client.availabilityRecord.updateMany({
     data: { approved_by_person_id: xeroPerson.id },
     where: {
+      account_id: context.accountId,
       approved_by_person_id: candidatePerson.id,
-      clerk_org_id: context.clerkOrgId,
       organisation_id: context.organisationId,
     },
   });
@@ -605,7 +604,7 @@ async function transferCandidateRelations(
   await client.alternativeContact.updateMany({
     data: { person_id: xeroPerson.id },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: context.organisationId,
       person_id: candidatePerson.id,
     },
@@ -614,7 +613,7 @@ async function transferCandidateRelations(
   await client.notification.updateMany({
     data: { recipient_person_id: xeroPerson.id },
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: { in: companies.map((company) => company.id) },
       recipient_person_id: candidatePerson.id,
     },
@@ -629,7 +628,7 @@ async function transferCandidateBalancesAndScopes(
 ): Promise<void> {
   const xeroBalances = await client.leaveBalance.findMany({
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: context.organisationId,
       person_id: xeroPerson.id,
     },
@@ -637,7 +636,7 @@ async function transferCandidateBalancesAndScopes(
 
   const candidateBalances = await client.leaveBalance.findMany({
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: context.organisationId,
       person_id: candidatePerson.id,
     },
@@ -659,10 +658,10 @@ async function transferCandidateBalancesAndScopes(
     }
   }
 
-  const companies = await resolveAccountCompanies(context.clerkOrgId, client);
+  const companies = await resolveAccountCompanies(context.accountId, client);
   const candidateScopes = await client.feedScope.findMany({
     where: {
-      clerk_org_id: context.clerkOrgId,
+      account_id: context.accountId,
       organisation_id: { in: companies.map((company) => company.id) },
       scope_type: "person",
       scope_value: candidatePerson.id,
@@ -672,7 +671,7 @@ async function transferCandidateBalancesAndScopes(
   for (const scopeItem of candidateScopes) {
     const targetScopeExists = await client.feedScope.findFirst({
       where: {
-        clerk_org_id: context.clerkOrgId,
+        account_id: context.accountId,
         feed_id: scopeItem.feed_id,
         organisation_id: scopeItem.organisation_id,
         scope_type: "person",
@@ -692,9 +691,9 @@ async function transferCandidateBalancesAndScopes(
   await client.person.update({
     data: {
       archived_at: new Date(),
-      clerk_user_id: null,
       manager_person_id: null,
       updated_at: new Date(),
+      user_id: null,
     },
     where: { id: candidatePerson.id },
   });
@@ -706,13 +705,13 @@ async function finaliseMergeAndAudit(
   input: MergePersonMatchInput,
   candidatePerson: Prisma.PersonGetPayload<Record<string, never>> | null,
   xeroPerson: Prisma.PersonGetPayload<Record<string, never>>,
-  resolvedClerkUserId: string | null
+  resolvedUserId: string | null
 ): Promise<void> {
-  if (resolvedClerkUserId) {
+  if (resolvedUserId) {
     await client.person.update({
       data: {
-        clerk_user_id: resolvedClerkUserId,
         updated_at: new Date(),
+        user_id: resolvedUserId,
       },
       where: { id: xeroPerson.id },
     });
@@ -724,8 +723,8 @@ async function finaliseMergeAndAudit(
         resolution_note: "Linked Xero person to candidate profile.",
         resolved_at: new Date(),
         resolved_by_user_id: input.actorUserId,
-        resolved_clerk_user_id: resolvedClerkUserId,
         resolved_person_id: xeroPerson.id,
+        resolved_user_id: resolvedUserId,
         status: "matched",
       },
       where: { id: input.matchId },
@@ -734,15 +733,15 @@ async function finaliseMergeAndAudit(
 
   await client.auditEvent.create({
     data: {
+      account_id: context.accountId,
       action: "xero.person_match_resolved",
       actor_display: input.actorDisplay ?? input.actorUserId,
       actor_user_id: input.actorUserId,
-      clerk_org_id: context.clerkOrgId,
       entity_id: input.matchId ?? xeroPerson.id,
       entity_type: "xero_person_match",
       metadata: {
         candidatePersonId: candidatePerson?.id ?? null,
-        resolvedClerkUserId,
+        resolvedUserId,
         xeroPersonId: xeroPerson.id,
       },
       organisation_id: context.organisationId,
@@ -751,18 +750,18 @@ async function finaliseMergeAndAudit(
     },
   });
 
-  const { clerkOrgId, organisationId } = context;
+  const { accountId, organisationId } = context;
   const personIds = [candidatePerson?.id, xeroPerson.id].filter(
     (id): id is string => Boolean(id)
   );
-  const result = await invalidateAccountFeedCaches({ clerkOrgId }, client);
+  const result = await invalidateAccountFeedCaches({ accountId }, client);
   if (!result.ok) {
     throw new Error(result.error.message);
   }
   for (const personId of personIds) {
     const invalidated = await invalidateFeedCachesForPerson(
       {
-        clerkOrgId,
+        accountId,
         organisationId,
         personId,
       },
@@ -777,7 +776,7 @@ async function finaliseMergeAndAudit(
 /**
  * Transactional merge of a candidate person into an imported Xero person.
  * Transfers availability records, balances, manager links, feed scopes, and notifications,
- * checks for unique constraint conflicts, archives candidate, and links Clerk user ID.
+ * checks for unique constraint conflicts, archives candidate, and links user ID.
  */
 export async function mergeCandidateIntoXeroPerson(
   context: ReconcileXeroPersonContext,
@@ -786,9 +785,9 @@ export async function mergeCandidateIntoXeroPerson(
 ): Promise<
   Result<{ merged: true; xeroPersonId: string }, ReconciliationError>
 > {
-  assertTenantDb(db, context.clerkOrgId);
+  assertTenantDb(db, context.accountId);
   if (
-    input.clerkOrgId !== context.clerkOrgId ||
+    input.accountId !== context.accountId ||
     input.organisationId !== context.organisationId
   ) {
     return await {
@@ -801,14 +800,13 @@ export async function mergeCandidateIntoXeroPerson(
   }
   const runMerge = async (client: ReconciliationClient) => {
     // Read merge targets after both account locks so concurrent linking or graph edits cannot invalidate validation.
-    await lockPlanLimitMutations(context.clerkOrgId, client);
-    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-calendar:manager-assignment:${context.clerkOrgId}`}, 0))::text AS acquired`;
+    await lockPlanLimitMutations(context.accountId, client);
+    await client.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-calendar:manager-assignment:${context.accountId}`}, 0))::text AS acquired`;
     const validation = await validateMergeInput(client, context, input);
     if (!validation.ok) {
       return validation;
     }
-    const { candidatePerson, resolvedClerkUserId, xeroPerson } =
-      validation.value;
+    const { candidatePerson, resolvedUserId, xeroPerson } = validation.value;
 
     if (candidatePerson && candidatePerson.id !== xeroPerson.id) {
       const managerMerge = await prepareManagerMerge(
@@ -841,7 +839,7 @@ export async function mergeCandidateIntoXeroPerson(
       input,
       candidatePerson,
       xeroPerson,
-      resolvedClerkUserId
+      resolvedUserId
     );
 
     return {
@@ -851,7 +849,7 @@ export async function mergeCandidateIntoXeroPerson(
   };
 
   return await (async () => {
-    assertTenantDb(db, context.clerkOrgId);
+    assertTenantDb(db, context.accountId);
     return await runMerge(db);
   })();
 }
@@ -868,11 +866,11 @@ export async function ignorePersonMatch(
   },
   db: TenantDb
 ): Promise<Result<{ ignored: true }, ReconciliationError>> {
-  assertTenantDb(db, context.clerkOrgId);
+  assertTenantDb(db, context.accountId);
   const runIgnore = async (client: ReconciliationClient) => {
     const match = await client.xeroPersonMatch.findFirst({
       where: {
-        clerk_org_id: context.clerkOrgId,
+        account_id: context.accountId,
         id: input.matchId,
         organisation_id: context.organisationId,
       },
@@ -897,10 +895,10 @@ export async function ignorePersonMatch(
 
     await client.auditEvent.create({
       data: {
+        account_id: context.accountId,
         action: "xero.person_match_ignored",
         actor_display: input.actorDisplay ?? input.actorUserId,
         actor_user_id: input.actorUserId,
-        clerk_org_id: context.clerkOrgId,
         entity_id: match.id,
         entity_type: "xero_person_match",
         metadata: {
@@ -917,7 +915,7 @@ export async function ignorePersonMatch(
   };
 
   return await (async () => {
-    assertTenantDb(db, context.clerkOrgId);
+    assertTenantDb(db, context.accountId);
     return await runIgnore(db);
   })();
 }

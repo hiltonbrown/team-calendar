@@ -1,8 +1,8 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { updateSettings } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -39,24 +39,36 @@ export async function updateFeedDefaultsAction(input: {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
   let role: "admin" | "owner" | null = null;
-  if (orgRole === "org:owner") {
+  if (sessionRole === "owner") {
     role = "owner";
-  } else if (orgRole === "org:admin") {
+  } else if (sessionRole === "admin") {
     role = "admin";
   }
-  if (!(orgId && role && user)) {
+  if (!(sessionAccountId && role && user)) {
     return notAuthorised();
   }
 
-  const clerkOrgId = orgId as ClerkOrgId;
+  const accountId = sessionAccountId as AccountId;
   try {
     return await withTenantResult(
-      clerkOrgId,
+      accountId,
       async (db): ReturnType<typeof updateFeedDefaultsAction> => {
         const company = await getOrganisationById(
-          clerkOrgId,
+          accountId,
           parsed.data.organisationId as OrganisationId,
           db
         );
@@ -65,9 +77,9 @@ export async function updateFeedDefaultsAction(input: {
         }
         const result = await updateSettings(
           {
+            accountId,
             actingRole: role,
             actingUserId: user.id,
-            clerkOrgId,
             organisationId: company.value.id,
             patch: parsed.data.patch,
           },

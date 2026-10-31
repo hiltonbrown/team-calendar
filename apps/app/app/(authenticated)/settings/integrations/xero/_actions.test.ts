@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   coreKeys: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     $transaction: vi.fn(),
     auditEvent: { create: vi.fn() },
@@ -12,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   },
   disconnectXeroOAuthConnection: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   headers: vi.fn(),
   removeXeroCompany: vi.fn(),
   revalidatePath: vi.fn(),
@@ -21,8 +21,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -61,7 +61,13 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+  hasPermission: async (
+    request: import("@repo/auth/permissions").PermissionRequest
+  ) =>
+    (await import("@repo/auth/permissions")).hasPermission(
+      (await mocks.getSession())?.role,
+      request
+    ),
 }));
 const actions = await import("./_actions");
 const {
@@ -73,7 +79,7 @@ const {
 } = actions;
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const connectionId = "00000000-0000-4000-8000-000000000002";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 const orgName = "Acme Corp";
 describe("xero settings integration server actions", () => {
@@ -82,16 +88,15 @@ describe("xero settings integration server actions", () => {
   });
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "admin@example.com" }],
-      firstName: "Admin",
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "admin@example.com",
       id: userId,
-      lastName: "User",
+      name: "Admin",
     });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.headers.mockResolvedValue(new Headers());
     mocks.coreKeys.mockReturnValue({
@@ -113,10 +118,10 @@ describe("xero settings integration server actions", () => {
     });
   });
 
-  it.each(["org:admin", "org:owner"])(
+  it.each(["admin", "owner"])(
     "permits %s to connect, reconnect, disconnect, pause and resume scoped companies",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId, role });
       expect((await connectXeroAction({ organisationId })).ok).toBe(true);
       expect(
         (
@@ -137,9 +142,9 @@ describe("xero settings integration server actions", () => {
     }
   );
   it("refuses company removal if the owner is downgraded during the request", async () => {
-    mocks.auth
-      .mockResolvedValueOnce({ orgId: "org_123", orgRole: "org:owner" })
-      .mockResolvedValueOnce({ orgId: "org_123", orgRole: "org:admin" });
+    mocks.getSession
+      .mockResolvedValueOnce({ accountId: "org_123", role: "owner" })
+      .mockResolvedValueOnce({ accountId: "org_123", role: "admin" });
     const result = await removeCompanyAction({
       confirmationText: orgName,
       connectionId,
@@ -152,7 +157,7 @@ describe("xero settings integration server actions", () => {
     expect(mocks.removeXeroCompany).not.toHaveBeenCalled();
   });
   it("starts Add company with the authenticated account and no preset company", async () => {
-    mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId, role: "admin" });
     const result = await connectXeroAction({});
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -163,7 +168,7 @@ describe("xero settings integration server actions", () => {
     expect(mocks.getActiveOrgContext).not.toHaveBeenCalled();
   });
   it("delegates confirmed company removal only for an owner", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:owner" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "owner" });
     mocks.removeXeroCompany.mockResolvedValue({
       ok: true,
       value: { connectionId, organisationId, state: "removed" },
@@ -175,7 +180,7 @@ describe("xero settings integration server actions", () => {
     });
     expect(result).toEqual({ ok: true, value: { removed: true } });
     expect(mocks.removeXeroCompany).toHaveBeenCalledWith({
-      clerkOrgId,
+      accountId,
       connectionId,
       organisationId,
       performedByUserId: userId,
@@ -185,7 +190,7 @@ describe("xero settings integration server actions", () => {
   });
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers for all actions", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
       const resConnect = await connectXeroAction({ organisationId });
       expect(resConnect).toEqual({
         error: {
@@ -203,10 +208,10 @@ describe("xero settings integration server actions", () => {
       expect(resDisconnect.ok).toBe(false);
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
     });
-    it.each(["org:manager", "org:viewer", "org:member", null])(
+    it.each(["manager", "viewer", "member", null])(
       "rejects role %s without calling the disconnect service",
-      async (orgRole) => {
-        mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
+      async (role) => {
+        mocks.getSession.mockResolvedValue({ accountId, role });
         const resDisconnect = await disconnectXeroAction({
           confirmationText: orgName,
           connectionId,
@@ -223,7 +228,7 @@ describe("xero settings integration server actions", () => {
         expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
       }
     );
-    it("rejects an organisation outside the active Clerk account without calling the service", async () => {
+    it("rejects an organisation outside the active Account without calling the service", async () => {
       mocks.database.organisation.findFirst.mockResolvedValue(null);
       const result = await disconnectXeroAction({
         confirmationText: orgName,
@@ -234,7 +239,7 @@ describe("xero settings integration server actions", () => {
       expect(result.ok).toBe(false);
       expect(mocks.database.organisation.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { clerk_org_id: clerkOrgId, id: organisationId },
+          where: { account_id: accountId, id: organisationId },
         })
       );
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
@@ -256,7 +261,7 @@ describe("xero settings integration server actions", () => {
       expect(resDisconnect.ok).toBe(false);
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
     });
-    it("scopes disconnect lookup to clerk_org_id and organisation_id", async () => {
+    it("scopes disconnect lookup to account_id and organisation_id", async () => {
       await disconnectXeroAction({
         confirmationText: orgName,
         connectionId,
@@ -266,12 +271,12 @@ describe("xero settings integration server actions", () => {
       expect(mocks.database.organisation.findFirst).toHaveBeenCalledWith({
         select: { name: true },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: organisationId,
         },
       });
       expect(mocks.disconnectXeroOAuthConnection).toHaveBeenCalledWith({
-        clerkOrgId,
+        accountId,
         connectionId,
         destructive: false,
         organisationId,
@@ -280,7 +285,7 @@ describe("xero settings integration server actions", () => {
       expect(mocks.database.xeroConnection.findFirst).toHaveBeenCalledWith({
         select: { id: true },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: connectionId,
           organisation_id: organisationId,
         },
@@ -345,10 +350,10 @@ describe("xero settings integration server actions", () => {
         "/settings/integrations/xero"
       );
     });
-    it.each(["org:owner", "org:admin"])(
+    it.each(["owner", "admin"])(
       "allows %s to confirm disconnect using the existing trimmed organisation name",
-      async (orgRole) => {
-        mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
+      async (role) => {
+        mocks.getSession.mockResolvedValue({ accountId, role });
         const result = await disconnectXeroAction({
           confirmationText: ` ${orgName} `,
           connectionId,
@@ -357,7 +362,7 @@ describe("xero settings integration server actions", () => {
         });
         expect(result.ok).toBe(true);
         expect(mocks.disconnectXeroOAuthConnection).toHaveBeenCalledWith({
-          clerkOrgId,
+          accountId,
           connectionId,
           destructive: false,
           organisationId,
@@ -426,7 +431,7 @@ describe("xero settings integration server actions", () => {
       if (result.ok) {
         const url = new URL(result.value.redirectUrl);
         expect(url.pathname).toBe("/api/xero/oauth/start");
-        expect(url.searchParams.get("clerkOrgId")).toBe(clerkOrgId);
+        expect(url.searchParams.get("accountId")).toBe(accountId);
         expect(url.searchParams.get("organisationId")).toBe(organisationId);
         expect(url.searchParams.get("userId")).toBe(userId);
         expect(url.searchParams.get("returnTo")).toBe(
@@ -463,7 +468,7 @@ describe("xero settings integration server actions", () => {
       expect(mocks.database.xeroConnection.updateMany).toHaveBeenCalledWith({
         data: { sync_paused_at: expect.any(Date) },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: connectionId,
           organisation_id: organisationId,
         },
@@ -476,7 +481,7 @@ describe("xero settings integration server actions", () => {
       expect(mocks.database.xeroConnection.updateMany).toHaveBeenCalledWith({
         data: { sync_paused_at: null },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: connectionId,
           organisation_id: organisationId,
         },
@@ -507,7 +512,7 @@ describe("xero settings integration server actions", () => {
         expect(mocks.database.xeroConnection.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: {
-              clerk_org_id: clerkOrgId,
+              account_id: accountId,
               id: connectionId,
               organisation_id: organisationId,
             },
@@ -523,10 +528,10 @@ describe("xero settings integration server actions", () => {
 vi.mock("server-only", () => ({}));
 
 describe("Xero mutation role ordering", () => {
-  it.each(["org:manager", "org:viewer"])(
+  it.each(["manager", "viewer"])(
     "rejects %s before validating input or resolving companies",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId, role });
       mocks.getActiveOrgContext.mockClear();
       for (const action of [
         connectXeroAction,
@@ -546,7 +551,7 @@ describe("Xero mutation role ordering", () => {
     }
   );
   it("refuses company removal to admins before reading input", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
     const result = await removeCompanyAction({
       confirmationText: "",
       connectionId: "invalid",

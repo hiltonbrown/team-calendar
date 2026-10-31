@@ -59,10 +59,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   ensureDefaultOrganisation: vi.fn(),
+  getCurrentUser: vi.fn(),
   getOrganisationById: vi.fn(),
+  getSession: vi.fn(),
   loadOnboardingPeople: vi.fn(),
   loadWizardSnapshot: vi.fn(),
   redirect: vi.fn((path: string) => {
@@ -74,12 +74,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   isOnboardingAdmin: (role: string | null) =>
-    role === "org:admin" || role === "org:owner",
+    role === "admin" || role === "owner",
   loadWizardSnapshot: mocks.loadWizardSnapshot,
 }));
 vi.mock("@repo/database/queries/organisations", () => ({
@@ -155,17 +155,17 @@ async function renderPage(
 
 describe("OnboardingPage", () => {
   beforeEach(() => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:owner" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "owner" });
     mocks.resolveAccountCompanies.mockResolvedValue([
       { id: organisationId, name: "Acme" },
     ]);
     mocks.ensureDefaultOrganisation.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
     });
-    mocks.currentUser.mockResolvedValue({ id: "user_owner" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_owner" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
       orgQueryValue: null,
     });
@@ -204,7 +204,7 @@ describe("OnboardingPage", () => {
     expect(mocks.resolveAccountCompanies).not.toHaveBeenCalled();
   });
   it("sends members back to the app", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "viewer" });
     await expect(renderPage()).rejects.toThrow("redirect:/");
     expect(mocks.loadWizardSnapshot).not.toHaveBeenCalled();
   });

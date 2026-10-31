@@ -38,7 +38,7 @@ export type OutboundOperationSumAggregateOutputType = {
 
 export type OutboundOperationMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   availability_record_id: string | null
   action: $Enums.outbound_operation_action | null
@@ -74,7 +74,7 @@ export type OutboundOperationMinAggregateOutputType = {
 
 export type OutboundOperationMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   availability_record_id: string | null
   action: $Enums.outbound_operation_action | null
@@ -110,7 +110,7 @@ export type OutboundOperationMaxAggregateOutputType = {
 
 export type OutboundOperationCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   availability_record_id: number
   action: number
@@ -158,7 +158,7 @@ export type OutboundOperationSumAggregateInputType = {
 
 export type OutboundOperationMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   availability_record_id?: true
   action?: true
@@ -194,7 +194,7 @@ export type OutboundOperationMinAggregateInputType = {
 
 export type OutboundOperationMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   availability_record_id?: true
   action?: true
@@ -230,7 +230,7 @@ export type OutboundOperationMaxAggregateInputType = {
 
 export type OutboundOperationCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   availability_record_id?: true
   action?: true
@@ -353,7 +353,7 @@ export type OutboundOperationGroupByArgs<ExtArgs extends runtime.Types.Extension
 
 export type OutboundOperationGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   availability_record_id: string
   action: $Enums.outbound_operation_action
@@ -412,7 +412,7 @@ export type OutboundOperationWhereInput = {
   OR?: Prisma.OutboundOperationWhereInput[]
   NOT?: Prisma.OutboundOperationWhereInput | Prisma.OutboundOperationWhereInput[]
   id?: Prisma.UuidFilter<"OutboundOperation"> | string
-  clerk_org_id?: Prisma.StringFilter<"OutboundOperation"> | string
+  account_id?: Prisma.StringFilter<"OutboundOperation"> | string
   organisation_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   availability_record_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
@@ -450,7 +450,7 @@ export type OutboundOperationWhereInput = {
 
 export type OutboundOperationOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
@@ -493,7 +493,7 @@ export type OutboundOperationWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.OutboundOperationWhereInput | Prisma.OutboundOperationWhereInput[]
   OR?: Prisma.OutboundOperationWhereInput[]
   NOT?: Prisma.OutboundOperationWhereInput | Prisma.OutboundOperationWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"OutboundOperation"> | string
+  account_id?: Prisma.StringFilter<"OutboundOperation"> | string
   organisation_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   availability_record_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
@@ -530,7 +530,7 @@ export type OutboundOperationWhereUniqueInput = Prisma.AtLeast<{
 
 export type OutboundOperationOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
@@ -574,7 +574,7 @@ export type OutboundOperationScalarWhereWithAggregatesInput = {
   OR?: Prisma.OutboundOperationScalarWhereWithAggregatesInput[]
   NOT?: Prisma.OutboundOperationScalarWhereWithAggregatesInput | Prisma.OutboundOperationScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"OutboundOperation"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"OutboundOperation"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"OutboundOperation"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"OutboundOperation"> | string
   availability_record_id?: Prisma.UuidWithAggregatesFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionWithAggregatesFilter<"OutboundOperation"> | $Enums.outbound_operation_action
@@ -610,7 +610,7 @@ export type OutboundOperationScalarWhereWithAggregatesInput = {
 
 export type OutboundOperationCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   idempotency_key?: string | null
@@ -646,7 +646,7 @@ export type OutboundOperationCreateInput = {
 
 export type OutboundOperationUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   availability_record_id: string
   action: $Enums.outbound_operation_action
@@ -682,7 +682,7 @@ export type OutboundOperationUncheckedCreateInput = {
 
 export type OutboundOperationUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -718,7 +718,7 @@ export type OutboundOperationUpdateInput = {
 
 export type OutboundOperationUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
@@ -754,7 +754,7 @@ export type OutboundOperationUncheckedUpdateInput = {
 
 export type OutboundOperationCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   availability_record_id: string
   action: $Enums.outbound_operation_action
@@ -790,7 +790,7 @@ export type OutboundOperationCreateManyInput = {
 
 export type OutboundOperationUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -824,7 +824,7 @@ export type OutboundOperationUpdateManyMutationInput = {
 
 export type OutboundOperationUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
@@ -875,7 +875,7 @@ export type OutboundOperationAvailability_record_idActionCompoundUniqueInput = {
 
 export type OutboundOperationCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
@@ -916,7 +916,7 @@ export type OutboundOperationAvgOrderByAggregateInput = {
 
 export type OutboundOperationMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
@@ -952,7 +952,7 @@ export type OutboundOperationMaxOrderByAggregateInput = {
 
 export type OutboundOperationMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   action?: Prisma.SortOrder
@@ -1085,7 +1085,7 @@ export type Enumoutbound_operation_statusFieldUpdateOperationsInput = {
 
 export type OutboundOperationCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   idempotency_key?: string | null
@@ -1120,7 +1120,7 @@ export type OutboundOperationCreateWithoutOrganisationInput = {
 
 export type OutboundOperationUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
@@ -1184,7 +1184,7 @@ export type OutboundOperationScalarWhereInput = {
   OR?: Prisma.OutboundOperationScalarWhereInput[]
   NOT?: Prisma.OutboundOperationScalarWhereInput | Prisma.OutboundOperationScalarWhereInput[]
   id?: Prisma.UuidFilter<"OutboundOperation"> | string
-  clerk_org_id?: Prisma.StringFilter<"OutboundOperation"> | string
+  account_id?: Prisma.StringFilter<"OutboundOperation"> | string
   organisation_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   availability_record_id?: Prisma.UuidFilter<"OutboundOperation"> | string
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
@@ -1220,7 +1220,7 @@ export type OutboundOperationScalarWhereInput = {
 
 export type OutboundOperationCreateWithoutAvailability_recordInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   idempotency_key?: string | null
@@ -1255,7 +1255,7 @@ export type OutboundOperationCreateWithoutAvailability_recordInput = {
 
 export type OutboundOperationUncheckedCreateWithoutAvailability_recordInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
@@ -1316,7 +1316,7 @@ export type OutboundOperationUpdateManyWithWhereWithoutAvailability_recordInput 
 
 export type OutboundOperationCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   availability_record_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
@@ -1351,7 +1351,7 @@ export type OutboundOperationCreateManyOrganisationInput = {
 
 export type OutboundOperationUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1386,7 +1386,7 @@ export type OutboundOperationUpdateWithoutOrganisationInput = {
 
 export type OutboundOperationUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
@@ -1421,7 +1421,7 @@ export type OutboundOperationUncheckedUpdateWithoutOrganisationInput = {
 
 export type OutboundOperationUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
@@ -1456,7 +1456,7 @@ export type OutboundOperationUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type OutboundOperationCreateManyAvailability_recordInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
@@ -1491,7 +1491,7 @@ export type OutboundOperationCreateManyAvailability_recordInput = {
 
 export type OutboundOperationUpdateWithoutAvailability_recordInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   idempotency_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1526,7 +1526,7 @@ export type OutboundOperationUpdateWithoutAvailability_recordInput = {
 
 export type OutboundOperationUncheckedUpdateWithoutAvailability_recordInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
@@ -1561,7 +1561,7 @@ export type OutboundOperationUncheckedUpdateWithoutAvailability_recordInput = {
 
 export type OutboundOperationUncheckedUpdateManyWithoutAvailability_recordInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
@@ -1598,7 +1598,7 @@ export type OutboundOperationUncheckedUpdateManyWithoutAvailability_recordInput 
 
 export type OutboundOperationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   action?: boolean
@@ -1636,7 +1636,7 @@ export type OutboundOperationSelect<ExtArgs extends runtime.Types.Extensions.Int
 
 export type OutboundOperationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   action?: boolean
@@ -1674,7 +1674,7 @@ export type OutboundOperationSelectCreateManyAndReturn<ExtArgs extends runtime.T
 
 export type OutboundOperationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   action?: boolean
@@ -1712,7 +1712,7 @@ export type OutboundOperationSelectUpdateManyAndReturn<ExtArgs extends runtime.T
 
 export type OutboundOperationSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   action?: boolean
@@ -1746,7 +1746,7 @@ export type OutboundOperationSelectScalar = {
   updated_at?: boolean
 }
 
-export type OutboundOperationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "action" | "status" | "idempotency_key" | "request_xero_tenant_id" | "request_method" | "request_url" | "request_body_json" | "request_reason" | "idempotency_first_dispatched_at" | "idempotency_replay_before" | "request_fingerprint" | "request_employee_id" | "request_leave_type_id" | "request_starts_at" | "request_ends_at" | "request_title" | "request_units" | "actor_user_id" | "attempt_generation" | "safe_error_code" | "known_remote_id" | "merged_record_id" | "side_effect_claimed_at" | "prepared_at" | "dispatch_started_at" | "provider_accepted_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["outboundOperation"]>
+export type OutboundOperationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "availability_record_id" | "action" | "status" | "idempotency_key" | "request_xero_tenant_id" | "request_method" | "request_url" | "request_body_json" | "request_reason" | "idempotency_first_dispatched_at" | "idempotency_replay_before" | "request_fingerprint" | "request_employee_id" | "request_leave_type_id" | "request_starts_at" | "request_ends_at" | "request_title" | "request_units" | "actor_user_id" | "attempt_generation" | "safe_error_code" | "known_remote_id" | "merged_record_id" | "side_effect_claimed_at" | "prepared_at" | "dispatch_started_at" | "provider_accepted_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["outboundOperation"]>
 export type OutboundOperationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   availability_record?: boolean | Prisma.AvailabilityRecordDefaultArgs<ExtArgs>
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -1768,7 +1768,7 @@ export type $OutboundOperationPayload<ExtArgs extends runtime.Types.Extensions.I
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     availability_record_id: string
     action: $Enums.outbound_operation_action
@@ -2226,7 +2226,7 @@ export interface Prisma__OutboundOperationClient<T, Null = never, ExtArgs extend
  */
 export interface OutboundOperationFieldRefs {
   readonly id: Prisma.FieldRef<"OutboundOperation", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly account_id: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly organisation_id: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly availability_record_id: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly action: Prisma.FieldRef<"OutboundOperation", 'outbound_operation_action'>

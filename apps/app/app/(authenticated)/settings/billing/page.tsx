@@ -1,18 +1,18 @@
-import { requireOrg, requireRole } from "@repo/auth/helpers";
-import { currentUser } from "@repo/auth/server";
+import { hasPermission, requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser } from "@repo/auth/server";
 import { getBillingSummary } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import {
   getActivationDashboardSummary,
-  getSubscriptionForOrg,
-  getUnresolvedStripeEventsForOrg,
-  hasUnresolvedStripeEventForOrg,
+  getSubscriptionForAccount,
+  getUnresolvedStripeEventsForAccount,
+  hasUnresolvedStripeEventForAccount,
   withTenantDb,
 } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { BillingClient } from "./billing-client";
 
@@ -26,34 +26,33 @@ interface BillingPageProps {
 }
 
 // S-22 Settings > Billing. Billing, plan limits, and usage are enforced at the
-// Clerk Organisation level. requirePageRole below admits admins and owners and
+// Account level. requirePagePermission below admits admins and owners and
 // denies managers and below, so they can view billing status, usage, and any
-// available Stripe self-serve actions. Clerk assigns the org creator org:admin
-// by default; org:owner is a distinct higher role, so we resolve the acting role
-// explicitly and pass it through to getBillingSummary.
+// available Stripe self-serve actions. Resolve the acting role explicitly
+// and pass it through to getBillingSummary.
 const BillingPage = async ({ searchParams }: BillingPageProps) => {
-  await requirePageRole("org:admin");
-  const [user, { org }] = await Promise.all([currentUser(), searchParams]);
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  await requirePagePermission({ billing: ["read"] });
+  const [user, { org }] = await Promise.all([getCurrentUser(), searchParams]);
+  const accountId = (await requireAccount()) as AccountId;
 
   if (!user) {
     return <PermissionDeniedState />;
   }
 
-  const isOwner = await requireRole("org:owner");
+  const isOwner = await hasPermission({ ownership: ["manage"] });
   const actingRole = isOwner ? "owner" : "admin";
 
-  const prepared = await withTenantDb(clerkOrgId, async (db) => {
+  const prepared = await withTenantDb(accountId, async (db) => {
     const { organisationId } = await resolveActiveOrgPageContext(
-      clerkOrgId,
+      accountId,
       org,
       db
     );
     const summary = await getBillingSummary(
       {
+        accountId,
         actingRole,
         actingUserId: user.id,
-        clerkOrgId,
         organisationId,
       },
       db
@@ -63,25 +62,22 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
       return { kind: "error" as const };
     }
 
-    const subscription = await getSubscriptionForOrg(clerkOrgId, db);
+    const subscription = await getSubscriptionForAccount(accountId, db);
     const [billingSyncUnhealthy, failedStripeEvents, activation] = [
-      await hasUnresolvedStripeEventForOrg(
-        clerkOrgId,
+      await hasUnresolvedStripeEventForAccount(
+        accountId,
         subscription?.stripe_event_created_at ?? null
       ),
-      await getUnresolvedStripeEventsForOrg(clerkOrgId),
-      await getActivationDashboardSummary({ clerkOrgId, organisationId }, db),
+      await getUnresolvedStripeEventsForAccount(accountId),
+      await getActivationDashboardSummary({ accountId, organisationId }, db),
     ];
 
     await db.auditEvent.create({
       data: {
+        account_id: accountId,
         action: "billing.viewed",
-        actor_display:
-          [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-          user.emailAddresses[0]?.emailAddress ||
-          "Unknown user",
+        actor_display: user.name || user.email || "Unknown user",
         actor_user_id: user.id,
-        clerk_org_id: clerkOrgId,
         entity_id: organisationId,
         entity_type: "billing",
         metadata: {},

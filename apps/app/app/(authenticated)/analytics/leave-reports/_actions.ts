@@ -1,6 +1,6 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type AnalyticsRecordListItem,
   type AnalyticsRole,
@@ -8,7 +8,7 @@ import {
   listLeaveReportRecordsForDrilldown,
   resolveDateRange,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -49,27 +49,39 @@ export async function exportLeaveReportsCsvAction(input: {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
   let role: AnalyticsRole | null = null;
-  if (orgRole === "org:owner") {
+  if (sessionRole === "owner") {
     role = "owner";
-  } else if (orgRole === "org:admin") {
+  } else if (sessionRole === "admin") {
     role = "admin";
-  } else if (orgRole === "org:manager") {
+  } else if (sessionRole === "manager") {
     role = "manager";
   }
 
-  if (!(orgId && role && user)) {
+  if (!(sessionAccountId && role && user)) {
     return notAuthorised();
   }
 
-  const clerkOrgId = orgId as ClerkOrgId;
+  const accountId = sessionAccountId as AccountId;
   try {
     return await withTenantResult(
-      clerkOrgId,
+      accountId,
       async (db): ReturnType<typeof exportLeaveReportsCsvAction> => {
         const company = await getOrganisationById(
-          clerkOrgId,
+          accountId,
           parsed.data.organisationId as OrganisationId,
           db
         );
@@ -80,8 +92,8 @@ export async function exportLeaveReportsCsvAction(input: {
         const organisation = await db.organisation.findFirst({
           select: { timezone: true },
           where: {
+            account_id: accountId,
             archived_at: null,
-            clerk_org_id: clerkOrgId,
             id: parsed.data.organisationId,
           },
         });
@@ -114,8 +126,8 @@ export async function exportLeaveReportsCsvAction(input: {
         for (;;) {
           const result = await listLeaveReportRecordsForDrilldown(
             {
+              accountId,
               actingUserId: user.id,
-              clerkOrgId,
               cursor,
               dateRange: rangeResult.value,
               filters: {

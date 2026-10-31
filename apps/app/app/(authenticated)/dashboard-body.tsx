@@ -1,3 +1,4 @@
+import { hasPermission as can } from "@repo/auth/permissions";
 import {
   buildTimelineWeek,
   createDashboardCache,
@@ -9,7 +10,7 @@ import {
   resolveDashboardRole,
   selectCalendarCompanies,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import {
   resolveAccountCompanies,
   TENANT_READ_TRANSACTION_OPTIONS,
@@ -29,27 +30,34 @@ import { ViewerView } from "@/components/dashboard/viewer-view";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 
 interface DashboardBodyProps {
-  clerkOrgId: ClerkOrgId;
+  accountId: AccountId;
   companyIds?: string[];
   orgParam?: string;
-  orgRole: string | null | undefined;
+  role: string | null | undefined;
   userId: string;
   weekAnchor?: string;
 }
 
 export async function DashboardBody({
-  clerkOrgId,
+  accountId,
   orgParam,
   companyIds,
-  orgRole,
+  role: sessionRole,
   userId,
   weekAnchor,
 }: DashboardBodyProps) {
   const prepared = await withTenantDb(
-    clerkOrgId,
+    accountId,
     (db) =>
       prepareDashboardData(
-        { clerkOrgId, companyIds, orgParam, orgRole, userId, weekAnchor },
+        {
+          accountId,
+          companyIds,
+          orgParam,
+          role: sessionRole,
+          userId,
+          weekAnchor,
+        },
         db
       ),
     TENANT_READ_TRANSACTION_OPTIONS
@@ -102,16 +110,16 @@ interface DashboardBase {
 }
 async function prepareDashboardData(
   {
-    clerkOrgId,
+    accountId,
     orgParam,
     companyIds,
-    orgRole,
+    role: sessionRole,
     userId,
     weekAnchor,
   }: DashboardBodyProps,
   db: TenantDb
 ) {
-  const companies = await resolveAccountCompanies(clerkOrgId, db);
+  const companies = await resolveAccountCompanies(accountId, db);
   if (companies.length === 0) {
     redirect("/onboarding");
   }
@@ -127,10 +135,10 @@ async function prepareDashboardData(
     orderBy: [{ created_at: "asc" }, { id: "asc" }],
     select: { id: true, organisation_id: true },
     where: {
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
-      clerk_user_id: userId,
       organisation_id: { in: companies.map((company) => company.id) },
+      user_id: userId,
     },
   });
   const organisationId = actingPerson?.organisation_id ?? companies[0]?.id;
@@ -138,7 +146,7 @@ async function prepareDashboardData(
     redirect("/onboarding");
   }
   const roleResult = await resolveDashboardRole(
-    { clerkOrgId, organisationId, orgRole, userId },
+    { accountId, organisationId, role: sessionRole, userId },
     db
   );
   const base = {
@@ -155,15 +163,15 @@ async function prepareDashboardData(
   if (!actingPerson || role === "viewer") {
     return prepareUnlinkedDashboard(
       base,
-      { clerkOrgId, userId, weekAnchor },
+      { accountId, userId, weekAnchor },
       role,
       db
     );
   }
 
   const input = {
+    accountId,
     actingRole: role,
-    clerkOrgId,
     companyIds: selectedIds,
     organisationId,
     personId: actingPerson.id,
@@ -175,26 +183,26 @@ async function prepareDashboardData(
 async function prepareUnlinkedDashboard(
   base: DashboardBase,
   {
-    clerkOrgId,
+    accountId,
     userId,
     weekAnchor,
-  }: Pick<DashboardBodyProps, "clerkOrgId" | "userId" | "weekAnchor">,
+  }: Pick<DashboardBodyProps, "accountId" | "userId" | "weekAnchor">,
   role: DashboardRole,
   db: TenantDb
 ) {
   const calendar = await getCalendarRange(
     {
+      accountId,
       actingPersonId: base.actingPersonId,
       actingUserId: userId,
       anchorDate: weekAnchor ? new Date(`${weekAnchor}T12:00:00Z`) : new Date(),
-      clerkOrgId,
       companyIds: base.companyIds,
       filters: {
         approvalStatus: ["approved"],
         includeDrafts: false,
         recordTypeCategory: "all",
       },
-      role: role === "owner" || role === "admin" ? role : "viewer",
+      role: can(role, { settings: ["update"] }) ? role : "viewer",
       scope: { type: "all_teams" },
       view: "week",
     },
@@ -212,26 +220,24 @@ async function prepareUnlinkedDashboard(
         status: "ready" as const,
       }
     : { message: calendar.error.message, status: "error" as const };
-  const approvalQueue =
-    role === "owner" || role === "admin"
-      ? await getDashboardApprovalQueue(
-          {
-            actingRole: role,
-            clerkOrgId,
-            companyIds: base.companyIds,
-            personId: null,
-            userId,
-          },
-          db
-        )
-      : null;
+  const approvalQueue = can(role, { settings: ["update"] })
+    ? await getDashboardApprovalQueue(
+        {
+          accountId,
+          actingRole: role === "owner" ? "owner" : "admin",
+          companyIds: base.companyIds,
+          personId: null,
+          userId,
+        },
+        db
+      )
+    : null;
   return {
     ...base,
     approvalQueue,
-    kind:
-      role === "owner" || role === "admin"
-        ? ("admin-empty" as const)
-        : ("viewer" as const),
+    kind: can(role, { settings: ["update"] })
+      ? ("admin-empty" as const)
+      : ("viewer" as const),
     timeline,
   };
 }
@@ -242,7 +248,7 @@ async function prepareLinkedDashboard(
   db: TenantDb
 ) {
   const cache = createDashboardCache();
-  if (role === "admin" || role === "owner") {
+  if (can(role, { settings: ["update"] })) {
     const result = await getAdminView(input, cache, db);
     return result.ok
       ? { ...base, kind: "admin" as const, view: result.value }

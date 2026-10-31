@@ -20,7 +20,11 @@ const organisationIds = Array.from(
   { length: REQUIRED_LIVE_FIXTURE_TENANT_SLOTS },
   (_, index) => `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}`
 );
-const clerkOrgIds = organisationIds.map((_, index) => `org_release_${index}`);
+const accountIds = organisationIds.map((_, index) => `org_release_${index}`);
+const authorisationIds = Array.from(
+  { length: 17 },
+  (_, index) => `owner_release_${index}`
+);
 const environment = { ...process.env };
 const configureEnvironment = () => {
   delete process.env.TC_SOURCE_GATES;
@@ -46,25 +50,22 @@ describe("live fixture registry", () => {
         durableManifestConfirmed: true,
         namespace: `release:run:${runId}`,
         owned: {
-          clerkOrgIds,
+          accountIds,
           globalKeys: [
             ...Array.from(
-              { length: 8 },
+              { length: 12 },
               (_, index) =>
                 `plan_id:22222222-2222-4222-8222-${index.toString().padStart(12, "0")}`
             ),
             ...Array.from(
-              { length: 8 },
+              { length: 12 },
               (_, index) => `plan_key:release_plan_${index}`
             ),
             ...Array.from(
               { length: 5 },
               (_, index) => `stripe_event:evt_release_${index}`
             ),
-            ...Array.from(
-              { length: 6 },
-              (_, index) => `authorisation:owner_release_${index}`
-            ),
+            ...authorisationIds.map((id) => `authorisation:${id}`),
             ...Array.from(
               { length: 10 },
               (_, index) => `provider_app:app_release_${index}`
@@ -90,15 +91,64 @@ describe("live fixture registry", () => {
     const allocations = Object.keys(LIVE_FIXTURE_SUITES).map((suite) =>
       allocateLiveTestFixture(suite as keyof typeof LIVE_FIXTURE_SUITES)
     );
-    const allocatedClerkIds = allocations.flatMap((item) =>
-      item.tenants.map((tenant) => tenant.clerkOrgId)
+    const allocatedAccountIds = allocations.flatMap((item) =>
+      item.tenants.map((tenant) => tenant.accountId)
     );
     const allocatedOrganisationIds = allocations.flatMap((item) =>
       item.tenants.map((tenant) => tenant.organisationId)
     );
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(28);
-    expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
-    expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
+    const rlsAllocation = allocations.find(
+      (item) =>
+        item.suite ===
+        "packages/database/row-level-security.integration.test.ts"
+    );
+    expect(rlsAllocation?.tenants).toHaveLength(2);
+    const oauthAllocation = allocations.find(
+      (item) =>
+        item.suite === "packages/xero/src/oauth/service.integration.test.ts"
+    );
+    expect(oauthAllocation?.tenants).toHaveLength(5);
+    expect(
+      oauthAllocation?.tenants
+        .slice(2)
+        .every((tenant) => organisationIds.includes(tenant.organisationId))
+    ).toBe(true);
+    const backgroundGrantIds: string[] = [];
+    for (const [suite, count] of [
+      ["reconcile-xero-approval-state", 2],
+      ["schedule-xero-syncs", 2],
+      ["sync-xero-leave-balances", 4],
+      ["sync-xero-leave-records", 2],
+      ["sync-xero-people", 2],
+    ] as const) {
+      const jobFixture = allocations.find(
+        (item) =>
+          item.suite ===
+          `packages/jobs/src/handlers/${suite}.integration.test.ts`
+      );
+      if (!jobFixture) {
+        throw new Error(`Missing background job fixture: ${suite}`);
+      }
+      const grantIds = Array.from({ length: count }, (_, index) =>
+        jobFixture.globalKey("authorisation", index)
+      );
+      expect(grantIds.every((id) => authorisationIds.includes(id))).toBe(true);
+      expect(() => jobFixture.globalKey("authorisation", count)).toThrow(
+        "does not own"
+      );
+      // Jobs use the configured Xero app; owning that app would also select
+      // unrelated canonical grants during protected cleanup.
+      expect(() => jobFixture.globalKey("provider_app")).toThrow(
+        "does not own"
+      );
+      backgroundGrantIds.push(...grantIds);
+    }
+    expect(new Set(backgroundGrantIds).size).toBe(12);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(37);
+    expect(allocatedAccountIds).toHaveLength(
+      REQUIRED_LIVE_FIXTURE_TENANT_SLOTS
+    );
+    expect(new Set(allocatedAccountIds).size).toBe(allocatedAccountIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
       allocatedOrganisationIds.length
     );
@@ -122,7 +172,7 @@ describe("live fixture registry", () => {
       allocations
         .find((item) => item.suite.includes("plan_limits.integration"))
         ?.globalKey("plan_key")
-    ).toBe("release_plan_3");
+    ).toBe("release_plan_6");
     const planLimitAllocation = allocations.find((item) =>
       item.suite.includes("plan_limits.integration")
     );
@@ -141,7 +191,7 @@ describe("live fixture registry", () => {
         durableManifestConfirmed: true,
         namespace: `release:run:${runId}`,
         owned: {
-          clerkOrgIds: ["org_only"],
+          accountIds: ["org_only"],
           globalKeys: [],
           organisationIds: ["00000000-0000-4000-8000-000000000000"],
         },
@@ -170,7 +220,7 @@ describe("live fixture registry", () => {
         durableManifestConfirmed: true,
         namespace: `release:run:${runId}`,
         owned: {
-          clerkOrgIds,
+          accountIds,
           globalKeys: Array.from({ length: 17 }, () => "plan_id:duplicate"),
           organisationIds,
         },
@@ -237,10 +287,16 @@ describe("live fixture registry", () => {
         durableManifestConfirmed: true,
         namespace: `release:run:${runId}`,
         owned: {
-          clerkOrgIds,
+          accountIds,
           globalKeys: [
-            ...Array.from({ length: 8 }, (_, index) => `plan_id:plan-${index}`),
-            ...Array.from({ length: 8 }, (_, index) => `plan_key:key-${index}`),
+            ...Array.from(
+              { length: 12 },
+              (_, index) => `plan_id:plan-${index}`
+            ),
+            ...Array.from(
+              { length: 12 },
+              (_, index) => `plan_key:key-${index}`
+            ),
             ...Array.from(
               { length: 5 },
               (_, index) => `stripe_event:event-${index}`
@@ -285,15 +341,17 @@ describe("live fixture registry", () => {
     const allocations = Object.keys(LIVE_FIXTURE_SUITES).map((suite) =>
       allocateLiveTestFixture(suite as keyof typeof LIVE_FIXTURE_SUITES)
     );
-    const allocatedClerkIds = allocations.flatMap((item) =>
-      item.tenants.map((tenant) => tenant.clerkOrgId)
+    const allocatedAccountIds = allocations.flatMap((item) =>
+      item.tenants.map((tenant) => tenant.accountId)
     );
     const allocatedOrganisationIds = allocations.flatMap((item) =>
       item.tenants.map((tenant) => tenant.organisationId)
     );
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(28);
-    expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
-    expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(37);
+    expect(allocatedAccountIds).toHaveLength(
+      REQUIRED_LIVE_FIXTURE_TENANT_SLOTS
+    );
+    expect(new Set(allocatedAccountIds).size).toBe(allocatedAccountIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
       allocatedOrganisationIds.length
     );

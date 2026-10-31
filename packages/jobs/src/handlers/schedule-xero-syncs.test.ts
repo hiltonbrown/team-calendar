@@ -35,7 +35,7 @@ const { functions } = await import("../functions");
 describe("scheduleXeroSyncs Coordinator", () => {
   const providerTenantId = "00000000-0000-4000-8000-000000000099";
   const baseTenant: SchedulableXeroConnection = {
-    clerkOrgId: "org_clerk_1",
+    accountId: "org_account_1",
     connectionId: "00000000-0000-4000-8000-000000000010",
     connectionStatus: "active",
     disconnectedAt: null,
@@ -171,7 +171,7 @@ describe("scheduleXeroSyncs Coordinator", () => {
       expect(mocks.dispatchSyncEvent.mock.calls).toEqual(
         expectedRunTypes.map((runType) => [
           {
-            clerkOrgId: baseTenant.clerkOrgId,
+            accountId: baseTenant.accountId,
             connectionId: baseTenant.connectionId,
             organisationId: baseTenant.organisationId,
             runType,
@@ -317,7 +317,7 @@ describe("scheduleXeroSyncs Coordinator", () => {
 
 it("dispatches distinct nightly full traversal and normal incremental modes", async () => {
   const tenant = {
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     connectionId: "connection",
     connectionStatus: "active",
     disconnectedAt: null,

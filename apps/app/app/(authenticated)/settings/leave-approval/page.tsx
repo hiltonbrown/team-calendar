@@ -1,7 +1,7 @@
 import { getAccountApprovalSettings, getSettings } from "@repo/availability";
 import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { LeaveApprovalSettingsClient } from "./leave-approval-settings-client";
 
@@ -15,18 +15,18 @@ interface LeaveApprovalPageProps {
 }
 
 const LeaveApprovalPage = async ({ searchParams }: LeaveApprovalPageProps) => {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ settings: ["update"] });
 
   const { org } = await searchParams;
-  const { clerkOrgId, organisationId } = await requireActiveOrgPageContext(org);
+  const { accountId, organisationId } = await requireActiveOrgPageContext(org);
   const { settings, accountSettings } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
-      const company = await getSettings({ clerkOrgId, organisationId }, db);
+      const company = await getSettings({ accountId, organisationId }, db);
       if (!company.ok) {
         throw new Error(company.error.message);
       }
-      const account = await getAccountApprovalSettings({ clerkOrgId }, db);
+      const account = await getAccountApprovalSettings({ accountId }, db);
       if (!account.ok) {
         throw new Error(account.error.message);
       }

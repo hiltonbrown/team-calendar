@@ -8,7 +8,7 @@ const personId = "00000000-0000-4000-8000-000000000001";
 const organisationId = "00000000-0000-4000-8000-000000000002";
 const now = "2026-09-27T00:00:00.000Z";
 const scope = {
-  clerkOrgId: "org_owned",
+  accountId: "org_owned",
   organisationId,
   xeroTenantId: "tenant-owned",
 };
@@ -125,7 +125,7 @@ describe("actual independent import and scheduler assertions", () => {
       value.runs.pop();
     }
     if (fault === "scope") {
-      value.clerkOrgId = "org_foreign";
+      value.accountId = "org_foreign";
     }
     expect(() =>
       assertIndependentInitialImport(raw(), value, importScope)

@@ -6,7 +6,7 @@ import { assertTenantDb, type TenantDb } from "@repo/database";
 import type { StageInput, WizardInputs } from "./wizard-rules";
 
 export interface WizardContext {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   userId: string;
 }
@@ -26,9 +26,9 @@ export async function loadWizardInputs(
   ctx: WizardContext,
   db: TenantDb
 ): Promise<Result<WizardInputs>> {
-  assertTenantDb(db, ctx.clerkOrgId);
+  assertTenantDb(db, ctx.accountId);
   const scope = {
-    clerk_org_id: ctx.clerkOrgId,
+    account_id: ctx.accountId,
     organisation_id: ctx.organisationId,
   };
   const run = async (client: TenantDb): ReturnType<typeof loadWizardInputs> => {
@@ -41,8 +41,8 @@ export async function loadWizardInputs(
           xero_setup_skipped_at: true,
         },
         where: {
+          account_id: ctx.accountId,
           archived_at: null,
-          clerk_org_id: ctx.clerkOrgId,
           id: ctx.organisationId,
         },
       }),
@@ -61,7 +61,7 @@ export async function loadWizardInputs(
       }),
       await client.person.findFirst({
         select: { id: true },
-        where: { ...scope, archived_at: null, clerk_user_id: ctx.userId },
+        where: { ...scope, archived_at: null, user_id: ctx.userId },
       }),
     ];
     if (!organisation) {
@@ -128,7 +128,7 @@ export async function loadWizardInputs(
     };
   };
   return await (async () => {
-    assertTenantDb(db, ctx.clerkOrgId);
+    assertTenantDb(db, ctx.accountId);
     return await run(db);
   })();
 }

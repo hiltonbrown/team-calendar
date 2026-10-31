@@ -47,8 +47,8 @@ export async function lockActiveScopedXeroConnection(
   scope: XeroScope,
   tx: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(tx, scope.clerkOrgId);
-  await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
+  assertTenantDb(tx, scope.accountId);
+  await tx.$queryRaw`SELECT id FROM xero_connections WHERE account_id = ${scope.accountId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
   const connection = await tx.xeroConnection.findFirst({
     select: { xero_authorisation_id: true },
     where: {
@@ -74,7 +74,7 @@ export async function lockScopedXeroConnection(
 ): Promise<void> {
   const rows = await tx.$queryRaw<
     Array<{ id: string }>
-  >`SELECT id FROM xero_connections WHERE id = ${scope.connectionId}::uuid AND clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
+  >`SELECT id FROM xero_connections WHERE id = ${scope.connectionId}::uuid AND account_id = ${scope.accountId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
   if (rows.length !== 1) {
     throw new Error("Xero connection not found");
   }

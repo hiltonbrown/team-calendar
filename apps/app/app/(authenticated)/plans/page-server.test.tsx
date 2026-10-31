@@ -60,20 +60,20 @@ import { createElement, Fragment, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   computeWorkingDays: vi.fn(),
-  currentUser: vi.fn(),
   ensureCurrentUserPerson: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
   listMyRecords: vi.fn(),
   listTeamRecords: vi.fn(),
   redirect: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   computeWorkingDaysFromReferenceData: mocks.computeWorkingDays,
@@ -112,8 +112,8 @@ vi.mock("@repo/availability", () => ({
 vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }));
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -156,16 +156,15 @@ const { default: PlansPage } = await import("./page");
 describe("Plans page server data", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "person@example.com" }],
-      firstName: "Test",
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "viewer" });
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "person@example.com",
       id: "user_1",
-      imageUrl: "https://img.clerk.com/user.png",
-      lastName: "Person",
+      image: "https://images.example.test/user.png",
+      name: "Test Person",
     });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       orgQueryValue: null,
     });
@@ -182,7 +181,7 @@ describe("Plans page server data", () => {
   });
   afterEach(() => cleanup());
   it("offers Connect Xero only for a verified disconnected admin", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
     expect(
       screen.getByRole("link", { name: "Connect Xero to submit leave" })
@@ -192,7 +191,7 @@ describe("Plans page server data", () => {
     ).toBeDefined();
   });
   it("shows cannot-check recovery without a reconnect prompt for an unavailable admin", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       error: { code: "state_unavailable" },
       ok: false,
@@ -211,22 +210,20 @@ describe("Plans page server data", () => {
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
       },
       {
-        avatarUrl: "https://img.clerk.com/user.png",
-        clerkUserId: "user_1",
+        avatarUrl: "https://images.example.test/user.png",
         displayName: "Test Person",
         email: "person@example.com",
-        firstName: "Test",
-        lastName: "Person",
+        userId: "user_1",
       },
       expect.any(Object)
     );
     expect(mocks.listMyRecords).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
         userId: "user_1",
       }),
@@ -237,7 +234,7 @@ describe("Plans page server data", () => {
     mocks.ensureCurrentUserPerson.mockResolvedValue({
       error: {
         code: "conflict",
-        message: "Multiple people match this Clerk user's email.",
+        message: "Multiple people match this user's email.",
       },
       ok: false,
     });
@@ -253,7 +250,7 @@ describe("Plans page server data", () => {
     expect(screen.getByText("Plans client: 0")).toBeDefined();
   });
   it("passes the imported recovery filter through the scoped administrator Plans route", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
     render(
       await PlansPage({
         searchParams: Promise.resolve({
@@ -265,9 +262,9 @@ describe("Plans page server data", () => {
     );
     expect(mocks.listTeamRecords).toHaveBeenCalledWith(
       expect.objectContaining({
-        actingOrgRole: "org:admin",
+        accountId: "org_1",
+        actingRole: "admin",
         allHistory: true,
-        clerkOrgId: "org_1",
         filters: expect.objectContaining({ sourceType: ["xero_leave"] }),
         organisationId: "00000000-0000-4000-8000-000000000001",
       }),
@@ -277,13 +274,13 @@ describe("Plans page server data", () => {
   });
   it("computes working days once per returned record without amplification", async () => {
     const records = Array.from({ length: 25 }, (_, index) => ({
+      accountId: "org_1",
       allDay: true,
       approvalNote: null,
       approvalStatus: "draft",
       approvedAt: null,
       archivedAt: null,
       balanceChip: null,
-      clerkOrgId: "org_1",
       contactabilityStatus: "unavailable",
       createdAt: new Date("2026-01-01T00:00:00.000Z"),
       createdByUserId: "user_1",

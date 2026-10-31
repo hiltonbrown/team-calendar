@@ -1,8 +1,8 @@
-import { auth } from "@repo/auth/server";
+import { getSession } from "@repo/auth/server";
 import { getXeroConnectionStateForScope } from "@repo/availability";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { organisationWithConnectionSelect } from "./_connection-view";
 import { IntegrationsClient } from "./integrations-client";
 export const metadata: Metadata = {
@@ -10,20 +10,25 @@ export const metadata: Metadata = {
   title: "Integrations - Settings - Team Calendar",
 };
 export default async function IntegrationsPage() {
-  await requirePageRole("org:admin");
-  const { orgId } = await auth();
-  if (!orgId) {
+  await requirePagePermission({ xero: ["manage"] });
+  const { accountId: sessionAccountId } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  if (!sessionAccountId) {
     throw new Error("Organisation context is required.");
   }
   const { withState } = await withTenantDb(
-    orgId,
+    sessionAccountId,
     async (db) => {
       const organisations = await db.organisation.findMany({
         orderBy: [{ created_at: "asc" }, { name: "asc" }],
         select: organisationWithConnectionSelect,
         where: {
+          account_id: sessionAccountId,
           archived_at: null,
-          clerk_org_id: orgId,
         },
       });
       const preparedWithState: Array<
@@ -33,7 +38,7 @@ export default async function IntegrationsPage() {
       > = [];
       for (const organisation of organisations) {
         const result = await getXeroConnectionStateForScope(
-          { clerkOrgId: orgId, organisationId: organisation.id },
+          { accountId: sessionAccountId, organisationId: organisation.id },
           db
         );
         const xeroConnectionState: import("@repo/core").XeroConnectionDisplayState =

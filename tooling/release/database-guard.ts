@@ -7,52 +7,63 @@ const TRAILING_SLASH = /\/$/;
 export const LIVE_DATABASE_ACKNOWLEDGEMENT =
   "I_ACKNOWLEDGE_LIVE_MUTATION" as const;
 
-const manifestSchema = z.object({
-  active: z.literal(true),
-  candidateSha: z.string().regex(/^[0-9a-f]{7,40}$/),
-  consumerIsolation: z
-    .object({
-      activeApps: z.literal(0),
-      archivedApps: z.literal(0),
-      environmentId: z.string().min(1),
-      kind: z.literal("unregistered-inngest-environment"),
+const manifestSchema = z
+  .object({
+    active: z.literal(true),
+    candidateSha: z.string().regex(/^[0-9a-f]{7,40}$/),
+    consumerIsolation: z
+      .object({
+        activeApps: z.literal(0),
+        archivedApps: z.literal(0),
+        environmentId: z.string().min(1),
+        environmentType: z.enum(["BRANCH", "PRODUCTION"]).optional(),
+        kind: z.literal("unregistered-inngest-environment"),
+        observedAt: z.string().datetime(),
+        pausedRuns: z.literal(0),
+        pendingRuns: z.literal(0),
+        runningRuns: z.literal(0),
+      })
+      .optional(),
+    durableManifestConfirmed: z.literal(true),
+    mode: z.literal("database-fixture").optional(),
+    namespace: z.string().regex(/^release:run:[0-9a-f-]{36}$/),
+    owned: z.object({
+      accountIds: z.array(z.string()).default([]),
+      globalKeys: z.array(z.string()).default([]),
+      organisationIds: z.array(z.string().uuid()).default([]),
+    }),
+    pausedConsumers: z.record(z.string(), z.boolean()).default({}),
+    pauseWindow: z
+      .object({
+        currentlyPaused: z.array(z.string()),
+        drainedAt: z.string().datetime(),
+        establishedAt: z.string().datetime(),
+      })
+      .optional(),
+    restoreEvidence: z.object({
       observedAt: z.string().datetime(),
-      pausedRuns: z.literal(0),
-      pendingRuns: z.literal(0),
-      runningRuns: z.literal(0),
-    })
-    .optional(),
-  durableManifestConfirmed: z.literal(true),
-  mode: z.literal("database-fixture").optional(),
-  namespace: z.string().regex(/^release:run:[0-9a-f-]{36}$/),
-  owned: z.object({
-    clerkOrgIds: z.array(z.string()).default([]),
-    globalKeys: z.array(z.string()).default([]),
-    organisationIds: z.array(z.string().uuid()).default([]),
-  }),
-  pausedConsumers: z.record(z.string(), z.boolean()).default({}),
-  pauseWindow: z
-    .object({
-      currentlyPaused: z.array(z.string()),
-      drainedAt: z.string().datetime(),
-      establishedAt: z.string().datetime(),
-    })
-    .optional(),
-  restoreEvidence: z.object({
-    observedAt: z.string().datetime(),
-    reference: z.string().min(1),
-  }),
-  runId: z.string().uuid(),
-  target: z.object({
-    branchId: z.string().min(1),
-    database: z.string().min(1),
-    endpointId: z.string().min(1),
-    hostname: z.string().min(1),
-    projectId: z.string().min(1),
-    role: z.string().min(1),
-  }),
-  version: z.literal(1),
-});
+      reference: z.string().min(1),
+    }),
+    runId: z.string().uuid(),
+    target: z.object({
+      branchId: z.string().min(1),
+      database: z.string().min(1),
+      endpointId: z.string().min(1),
+      hostname: z.string().min(1),
+      projectId: z.string().min(1),
+      role: z.string().min(1),
+    }),
+    version: z.literal(1),
+  })
+  .refine(
+    (manifest) =>
+      manifest.consumerIsolation?.environmentType !== "BRANCH" ||
+      manifest.mode === "database-fixture",
+    {
+      message: "Branch consumer isolation requires database-fixture mode",
+      path: ["consumerIsolation", "environmentType"],
+    }
+  );
 
 export type ReleaseManifest = z.infer<typeof manifestSchema>;
 

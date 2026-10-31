@@ -1,3 +1,4 @@
+import { type AuthRole, hasPermission } from "@repo/auth/permissions";
 import { withTenantResult } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import "server-only";
@@ -35,7 +36,7 @@ const failure = (
 });
 
 export async function disconnectXeroOAuthConnection(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   connectionId: string;
   destructive: boolean;
@@ -44,12 +45,15 @@ export async function disconnectXeroOAuthConnection(input: {
   performedByUserId?: string | null;
 }): Promise<Result<XeroDisconnectResult, DisconnectError>> {
   assertNoTenantTransaction("disconnectXeroOAuthConnection");
-  if (input.removeCompany && input.role !== "owner") {
+  if (
+    input.removeCompany &&
+    !hasPermission(input.role, { xero: ["removeCompany"] })
+  ) {
     return failure("forbidden", "Only an account owner can remove a company.");
   }
   try {
     if (input.removeCompany) {
-      const previous = await withTenantDb(input.clerkOrgId, (db) =>
+      const previous = await withTenantDb(input.accountId, (db) =>
         db.xeroConnection.findFirst({
           select: {
             disconnected_at: true,
@@ -60,7 +64,7 @@ export async function disconnectXeroOAuthConnection(input: {
             xero_authorisation_id: true,
           },
           where: {
-            clerk_org_id: input.clerkOrgId,
+            account_id: input.accountId,
             id: input.connectionId,
             organisation_id: input.organisationId,
           },
@@ -81,7 +85,7 @@ export async function disconnectXeroOAuthConnection(input: {
           value: { connectionId: previous.id, state: "disconnected" },
         };
       }
-      const current = await withTenantResult(input.clerkOrgId, (db) =>
+      const current = await withTenantResult(input.accountId, (db) =>
         getScopedXeroConnection(input, db)
       );
       if (
@@ -92,7 +96,7 @@ export async function disconnectXeroOAuthConnection(input: {
         return removeUnreachableCompany(input);
       }
     }
-    const initial = await withTenantResult(input.clerkOrgId, (db) =>
+    const initial = await withTenantResult(input.accountId, (db) =>
       getScopedXeroConnection(input, db)
     );
     if (
@@ -126,7 +130,7 @@ export async function disconnectXeroOAuthConnection(input: {
       // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Remote certainty, grant lifetime and atomic archival must share the existing grant-locked transaction.
       async (tx) => {
         await lockScopedXeroConnection(tx, input);
-        const scoped = await withTenantResult(input.clerkOrgId, (db) =>
+        const scoped = await withTenantResult(input.accountId, (db) =>
           getScopedXeroConnection(input, db)
         );
         if (
@@ -148,7 +152,7 @@ export async function disconnectXeroOAuthConnection(input: {
         }
         const connection = scoped.value;
         const scope = {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
         };
         const busy = await tx.availabilityRecord.findFirst({
@@ -236,7 +240,7 @@ export async function disconnectXeroOAuthConnection(input: {
             ? await tx.feed.findMany({
                 select: { id: true },
                 where: {
-                  clerk_org_id: input.clerkOrgId,
+                  account_id: input.accountId,
                   OR: [
                     { organisation_id: input.organisationId },
                     { organisation_id: null },
@@ -284,7 +288,7 @@ export async function disconnectXeroOAuthConnection(input: {
           await tx.person.updateMany({
             data: {
               archived_at: now,
-              clerk_user_id: null,
+              user_id: null,
               xero_employee_id: null,
             },
             where: { ...scope, source_system: "XERO" },
@@ -364,9 +368,9 @@ export async function disconnectXeroOAuthConnection(input: {
       );
       if (input.removeCompany) {
         const phaseInput1 = {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
         } satisfies Parameters<typeof invalidateAccountFeedCaches>[0];
-        await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+        await withTenantResult(phaseInput1.accountId, (db) =>
           invalidateAccountFeedCaches(phaseInput1, db)
         );
       }
@@ -379,11 +383,11 @@ export async function disconnectXeroOAuthConnection(input: {
 }
 
 export async function removeXeroCompany(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   connectionId: string;
   performedByUserId?: string | null;
-  role: "owner" | "admin" | "manager" | "viewer";
+  role: AuthRole;
 }): Promise<
   Result<
     { connectionId: string; organisationId: string; state: "removed" },
@@ -408,16 +412,16 @@ export async function removeXeroCompany(input: {
     : result;
 }
 export async function disconnectAllXeroConnections(input: {
-  clerkOrgId: string;
+  accountId: string;
   performedByUserId?: string | null;
   destructive?: boolean;
 }) {
   assertNoTenantTransaction("disconnectAllXeroConnections");
-  const connections = await withTenantDb(input.clerkOrgId, (db) =>
+  const connections = await withTenantDb(input.accountId, (db) =>
     db.xeroConnection.findMany({
       select: { id: true, organisation_id: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         released_at: null,
         status: "active",
       },
@@ -446,18 +450,18 @@ export async function disconnectAllXeroConnections(input: {
 // Grant-locked owner transactions and tenant roots both archive with explicit account/company predicates.
 async function archiveCompanyState(
   tx: Prisma.TransactionClient,
-  input: { clerkOrgId: string; organisationId: string },
+  input: { accountId: string; organisationId: string },
   now: Date
 ): Promise<void> {
   const scope = {
-    clerk_org_id: input.clerkOrgId,
+    account_id: input.accountId,
     organisation_id: input.organisationId,
   };
   await tx.organisation.updateMany({
     data: { archived_at: now, is_active: false },
     where: {
+      account_id: input.accountId,
       archived_at: null,
-      clerk_org_id: input.clerkOrgId,
       id: input.organisationId,
     },
   });
@@ -486,9 +490,9 @@ async function archiveCompanyState(
   await tx.feedToken.updateMany({
     data: { revoked_at: now, status: "revoked" },
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       feed: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
       },
       revoked_at: null,
@@ -499,14 +503,14 @@ async function archiveCompanyState(
   await tx.$executeRaw`
     UPDATE feed_event_publications
     SET present = false, updated_at = ${now}
-    WHERE clerk_org_id = ${input.clerkOrgId}
+    WHERE account_id = ${input.accountId}
       AND (
         organisation_id = ${input.organisationId}::uuid
         OR starts_with(source_key, ${`holiday:${input.organisationId}:`})
         OR source_key IN (
           SELECT 'availability:' || record.id::text
           FROM availability_records record
-          WHERE record.clerk_org_id = ${input.clerkOrgId}
+          WHERE record.account_id = ${input.accountId}
             AND record.organisation_id = ${input.organisationId}::uuid
         )
       )`;
@@ -517,7 +521,7 @@ async function archiveCompanyState(
       representation_generation: { increment: 1 },
     },
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       OR: [
         { organisation_id: input.organisationId },
         { organisation_id: null },
@@ -539,15 +543,15 @@ function canReachXero(connection: {
 // possible. The owner's confirmation releases the company locally and the audit
 // event records that remote deletion was not confirmed.
 async function removeUnreachableCompany(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   connectionId: string;
   performedByUserId?: string | null;
 }): Promise<Result<XeroDisconnectResult, DisconnectError>> {
-  const result = await withTenantDb(input.clerkOrgId, async (tx) => {
+  const result = await withTenantDb(input.accountId, async (tx) => {
     await lockScopedXeroConnection(tx, input);
     const scope = {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       organisation_id: input.organisationId,
     };
     const released = await tx.xeroConnection.findFirst({
@@ -628,10 +632,10 @@ async function removeUnreachableCompany(input: {
     };
   });
   if (result.ok) {
-    const phaseInput2 = { clerkOrgId: input.clerkOrgId } satisfies Parameters<
+    const phaseInput2 = { accountId: input.accountId } satisfies Parameters<
       typeof invalidateAccountFeedCaches
     >[0];
-    await withTenantResult(phaseInput2.clerkOrgId, (db) =>
+    await withTenantResult(phaseInput2.accountId, (db) =>
       invalidateAccountFeedCaches(phaseInput2, db)
     );
   }
@@ -639,15 +643,15 @@ async function removeUnreachableCompany(input: {
 }
 
 async function removePreviouslyDisconnectedCompany(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   connectionId: string;
   performedByUserId?: string | null;
 }): Promise<Result<XeroDisconnectResult, DisconnectError>> {
-  const result = await withTenantDb(input.clerkOrgId, async (tx) => {
+  const result = await withTenantDb(input.accountId, async (tx) => {
     await lockScopedXeroConnection(tx, input);
     const scope = {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       organisation_id: input.organisationId,
     };
     const connection = await tx.xeroConnection.findFirst({
@@ -719,10 +723,10 @@ async function removePreviouslyDisconnectedCompany(input: {
     };
   });
   if (result.ok) {
-    const phaseInput3 = { clerkOrgId: input.clerkOrgId } satisfies Parameters<
+    const phaseInput3 = { accountId: input.accountId } satisfies Parameters<
       typeof invalidateAccountFeedCaches
     >[0];
-    await withTenantResult(phaseInput3.clerkOrgId, (db) =>
+    await withTenantResult(phaseInput3.accountId, (db) =>
       invalidateAccountFeedCaches(phaseInput3, db)
     );
   }

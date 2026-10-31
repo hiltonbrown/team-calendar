@@ -1,7 +1,8 @@
 "use server";
 
-import { requireRole } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { hasPermission } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
+import { getSessionAuthorizationHeaders } from "@repo/auth/transport";
 import {
   exportFailedRecordsCsv,
   getRedactedFailedRecordPayload,
@@ -34,9 +35,9 @@ type SyncActionError =
   | { code: "sync_failed"; message: string };
 
 interface SyncActionContext {
+  accountId: string;
   actingRole: SyncMonitorRole;
   actingUserId: string;
-  clerkOrgId: string;
   organisationId: string;
 }
 
@@ -96,8 +97,8 @@ export async function dispatchManualSyncAction(input: {
 }): Promise<Result<DispatchResultValue, SyncActionError>> {
   assertNoTenantTransaction("dispatchManualSyncAction");
   const [admin, owner] = await Promise.all([
-    requireRole("org:admin"),
-    requireRole("org:owner"),
+    hasPermission({ xero: ["sync"] }),
+    hasPermission({ ownership: ["manage"] }),
   ]);
   if (!(admin || owner)) {
     return notAuthorised();
@@ -127,14 +128,13 @@ async function dispatchManualSyncViaApi(input: {
     return dispatchFailed("The API URL is not configured for sync dispatch.");
   }
 
-  let sessionToken: string | null;
+  let authorizationHeaders: Record<string, string> | null;
   try {
-    const authObject = await auth();
-    sessionToken = await authObject.getToken();
+    authorizationHeaders = await getSessionAuthorizationHeaders();
   } catch {
     return dispatchFailed("Could not authorise the sync dispatch request.");
   }
-  if (!sessionToken) {
+  if (!authorizationHeaders) {
     return notAuthorised();
   }
 
@@ -143,7 +143,7 @@ async function dispatchManualSyncViaApi(input: {
       body: JSON.stringify(input),
       cache: "no-store",
       headers: {
-        authorization: `Bearer ${sessionToken}`,
+        ...authorizationHeaders,
         "content-type": "application/json",
       },
       method: "POST",
@@ -176,8 +176,8 @@ export async function cancelRunAction(input: {
 > {
   assertNoTenantTransaction("cancelRunAction");
   const [admin, owner] = await Promise.all([
-    requireRole("org:admin"),
-    requireRole("org:owner"),
+    hasPermission({ xero: ["sync"] }),
+    hasPermission({ ownership: ["manage"] }),
   ]);
   if (!(admin || owner)) {
     return notAuthorised();
@@ -201,7 +201,7 @@ export async function cancelRunAction(input: {
     if (sent.ok) {
       const { value: cancellation } = prepared;
       const { eventQueued } = sent.value;
-      const audited = await withTenantResult(cancellation.clerkOrgId, (db) =>
+      const audited = await withTenantResult(cancellation.accountId, (db) =>
         recordSyncCancellation(cancellation, eventQueued, db)
       );
       if (!audited.ok) {
@@ -319,17 +319,29 @@ export async function loadRedactedFailurePayloadAction(input: {
 async function syncActionIdentity(
   organisationId: string
 ): Promise<Result<SyncActionContext, SyncActionError>> {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  const role = effectiveRole(orgRole);
-  if (!(orgId && user && role)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const role = effectiveRole(sessionRole);
+  if (!(sessionAccountId && user && role)) {
     return notAuthorised();
   }
   return {
     ok: true,
     value: {
+      accountId: sessionAccountId,
       actingRole: role,
       actingUserId: user.id,
-      clerkOrgId: orgId,
       organisationId,
     },
   };
@@ -347,10 +359,10 @@ async function runSyncOperation<T>(
     return identity;
   }
   const { value: context } = identity;
-  return withTenantResult(context.clerkOrgId, async (db) => {
+  return withTenantResult(context.accountId, async (db) => {
     const company = await db.organisation.findFirst({
       select: { id: true },
-      where: { clerk_org_id: context.clerkOrgId, id: organisationId },
+      where: { account_id: context.accountId, id: organisationId },
     });
     if (!company) {
       return notAuthorised(
@@ -373,10 +385,10 @@ async function syncActionContext(
 function effectiveRole(
   role: string | null | undefined
 ): SyncMonitorRole | null {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
   return null;

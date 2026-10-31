@@ -14,34 +14,34 @@ if (!(accountA && accountB)) {
 }
 const companies = [
   {
-    clerkOrgId: accountA.clerkOrgId,
+    accountId: accountA.accountId,
     id: accountA.organisationId,
     name: "Restaurants",
   },
   {
-    clerkOrgId: accountA.clerkOrgId,
+    accountId: accountA.accountId,
     id: fixture.id("second-company", 0),
     name: "Hotels",
   },
   {
-    clerkOrgId: accountB.clerkOrgId,
+    accountId: accountB.accountId,
     id: accountB.organisationId,
     name: "Other account",
   },
 ];
 const { systemDatabase, withTenantDb } = await import("@repo/database");
 const { getCalendarRange } = await import("./calendar-service");
-const clerkOrgIds = [accountA.clerkOrgId, accountB.clerkOrgId];
+const accountIds = [accountA.accountId, accountB.accountId];
 const input = {
+  accountId: accountA.accountId,
   actingUserId: fixture.key("viewer", 0),
   anchorDate: new Date("2026-04-15T12:00:00Z"),
-  clerkOrgId: accountA.clerkOrgId,
   role: "viewer",
   scope: { type: "all_teams" },
   view: "week",
 };
 async function clean() {
-  const where = { clerk_org_id: { in: clerkOrgIds } };
+  const where = { account_id: { in: accountIds } };
   await systemDatabase.availabilityRecord.deleteMany({ where });
   await systemDatabase.person.deleteMany({ where });
   await systemDatabase.organisationSettings.deleteMany({ where });
@@ -52,7 +52,7 @@ beforeAll(async () => {
   for (const [index, company] of companies.entries()) {
     await systemDatabase.organisation.create({
       data: {
-        clerk_org_id: company.clerkOrgId,
+        account_id: company.accountId,
         country_code: "AU",
         id: company.id,
         name: company.name,
@@ -61,7 +61,7 @@ beforeAll(async () => {
     });
     await systemDatabase.person.create({
       data: {
-        clerk_org_id: company.clerkOrgId,
+        account_id: company.accountId,
         email: `${index}@calendar.example.test`,
         employment_type: "employee",
         first_name: "Sensitive",
@@ -75,9 +75,9 @@ beforeAll(async () => {
     });
     await systemDatabase.availabilityRecord.create({
       data: {
+        account_id: company.accountId,
         all_day: true,
         approval_status: "approved",
-        clerk_org_id: company.clerkOrgId,
         contactability: "limited",
         derived_uid_key: fixture.key("leave-uid", index),
         ends_at: new Date("2026-04-15T23:59:59Z"),
@@ -166,7 +166,7 @@ describe("account-wide calendar isolation", () => {
     ).toMatchObject({ error: { code: "validation_error" }, ok: false });
   });
   it("enforces RLS when all application filters are removed", async () => {
-    const records = await withTenantDb(accountA.clerkOrgId, (tx) =>
+    const records = await withTenantDb(accountA.accountId, (tx) =>
       tx.availabilityRecord.findMany({
         select: { id: true, organisation_id: true },
       })

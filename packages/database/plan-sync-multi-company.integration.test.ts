@@ -1,21 +1,22 @@
-import { randomUUID } from "node:crypto";
 import { expect, test } from "vitest";
-import { isLocalDatabase } from "./src/is-local-database";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { syncPlansFromCatalogue } from "./src/seed/plan-sync";
 import { getPlanDefinition } from "./src/seed/plans";
 import { systemDatabase } from "./src/system-client";
 
-const ownerUrl = process.env.DATABASE_URL;
-if (!(ownerUrl && isLocalDatabase(ownerUrl))) {
-  throw new Error(
-    "Multi-company database fixtures require disposable local PostgreSQL"
-  );
-}
+const fixture = allocateLiveTestFixture(
+  "packages/database/plan-sync-multi-company.integration.test.ts"
+);
 
 test("Premium projection updates an existing one-company limit to five idempotently", async () => {
-  const key = `premium-projection-${randomUUID()}`;
+  const key = fixture.globalKey("plan_key");
   const plan = await systemDatabase.plan.create({
-    data: { key, name: "Owned Premium projection", plan_key: key },
+    data: {
+      id: fixture.globalKey("plan_id"),
+      key,
+      name: "Owned Premium projection",
+      plan_key: key,
+    },
   });
   try {
     await systemDatabase.planLimit.create({

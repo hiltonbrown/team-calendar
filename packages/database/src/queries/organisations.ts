@@ -1,15 +1,15 @@
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
-export async function listOrganisationsByClerkOrg(
-  clerkOrgId: ClerkOrgId,
+export async function listOrganisationsByAccount(
+  accountId: AccountId,
   db: TenantDb
 ): Promise<
   Result<
     Array<{
       id: OrganisationId;
-      clerkOrgId: string;
+      accountId: string;
       name: string;
       countryCode: string;
       fiscalYearStart: number | null;
@@ -23,14 +23,14 @@ export async function listOrganisationsByClerkOrg(
   >
 > {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb3 = db;
 
     try {
       const organisations = await tenantDb3.organisation.findMany({
         orderBy: [{ created_at: "asc" }, { name: "asc" }],
         select: {
-          clerk_org_id: true,
+          account_id: true,
           country_code: true,
           created_at: true,
           fiscal_year_start: true,
@@ -42,12 +42,12 @@ export async function listOrganisationsByClerkOrg(
           updated_at: true,
           working_hours_per_day: true,
         },
-        where: { archived_at: null, clerk_org_id: clerkOrgId },
+        where: { account_id: accountId, archived_at: null },
       });
       return {
         ok: true,
         value: organisations.map((o) => ({
-          clerkOrgId: o.clerk_org_id,
+          accountId: o.account_id,
           countryCode: o.country_code,
           createdAt: o.created_at,
           fiscalYearStart: o.fiscal_year_start,
@@ -75,13 +75,13 @@ export async function listOrganisationsByClerkOrg(
   }
 }
 export async function getOrganisationById(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   db: TenantDb
 ): Promise<
   Result<{
     id: OrganisationId;
-    clerkOrgId: string;
+    accountId: string;
     name: string;
     countryCode: string;
     fiscalYearStart: number | null;
@@ -94,13 +94,13 @@ export async function getOrganisationById(
   }>
 > {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
       const organisation = await tenantDb2.organisation.findFirst({
         select: {
-          clerk_org_id: true,
+          account_id: true,
           country_code: true,
           created_at: true,
           fiscal_year_start: true,
@@ -113,8 +113,8 @@ export async function getOrganisationById(
           working_hours_per_day: true,
         },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       });
@@ -127,7 +127,7 @@ export async function getOrganisationById(
       return {
         ok: true,
         value: {
-          clerkOrgId: organisation.clerk_org_id,
+          accountId: organisation.account_id,
           countryCode: organisation.country_code,
           createdAt: organisation.created_at,
           fiscalYearStart: organisation.fiscal_year_start,
@@ -155,18 +155,18 @@ export async function getOrganisationById(
   }
 }
 export async function hasXeroConnection(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   db: TenantDb
 ): Promise<Result<boolean>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
       const connection = await tenantDb.xeroConnection.findFirst({
         select: { id: true },
-        where: scopedQuery(clerkOrgId, organisationId),
+        where: scopedQuery(accountId, organisationId),
       });
       return {
         ok: true,

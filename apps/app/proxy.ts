@@ -1,36 +1,20 @@
-import { authMiddleware, createRouteMatcher } from "@repo/auth/proxy";
+import { authProxy, createRouteMatcher } from "@repo/auth/proxy";
 import { type NextRequest, NextResponse } from "next/server";
 import { getPublicApiOrigin } from "./lib/public-api-url";
 
 export const REPORTING_ENDPOINTS_HEADER = 'csp-endpoint="/api/csp-report"';
-const CLERK_KEY_PREFIX = /^pk_(?:test|live)_/;
-const CLERK_KEY_TERMINATOR = /\$$/;
-const SAFE_HOSTNAME =
-  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
-
-export function clerkFrontendOrigin(
-  publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-): string | null {
-  if (!(publishableKey && CLERK_KEY_PREFIX.test(publishableKey))) {
-    return null;
-  }
-  try {
-    const encoded = publishableKey.replace(CLERK_KEY_PREFIX, "");
-    const hostname = Buffer.from(encoded, "base64url")
-      .toString("utf8")
-      .replace(CLERK_KEY_TERMINATOR, "")
-      .toLowerCase();
-    return SAFE_HOSTNAME.test(hostname) ? `https://${hostname}` : null;
-  } catch {
-    return null;
-  }
-}
-
 export const isPublicAppRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/verify-email(.*)",
+  "/forgot-password(.*)",
+  "/reset-password(.*)",
+  "/magic-link(.*)",
+  "/accept-invitation(.*)",
   "/api/csp-report",
-  "/__clerk(.*)",
+  "/api/auth/(.*)",
+  "/api/auth-context",
+  "/api/xero/oauth/callback",
 ]);
 
 export function generateNonce(): string {
@@ -39,8 +23,7 @@ export function generateNonce(): string {
 
 export function buildContentSecurityPolicy(
   nonce: string,
-  isDev = process.env.NODE_ENV === "development",
-  clerkOrigin = clerkFrontendOrigin()
+  isDev = process.env.NODE_ENV === "development"
 ): string {
   const apiOrigin = getPublicApiOrigin();
 
@@ -48,9 +31,6 @@ export function buildContentSecurityPolicy(
     "'self'",
     `'nonce-${nonce}'`,
     isDev ? "'unsafe-eval'" : null,
-    "https://*.clerk.accounts.dev",
-    "https://*.clerk.com",
-    clerkOrigin,
     "https://challenges.cloudflare.com",
     "https://va.vercel-scripts.com",
     "https://www.googletagmanager.com",
@@ -59,9 +39,6 @@ export function buildContentSecurityPolicy(
 
   const connectSrcTokens = [
     "'self'",
-    "https://*.clerk.accounts.dev",
-    "https://*.clerk.com",
-    clerkOrigin,
     "https://*.sentry.io",
     "https://us.i.posthog.com",
     "https://*.posthog.com",
@@ -77,17 +54,11 @@ export function buildContentSecurityPolicy(
     "'self'",
     "data:",
     "blob:",
-    "https://img.clerk.com",
     "https://*.google-analytics.com",
     "https://*.googletagmanager.com",
   ];
 
-  const frameSrcTokens = [
-    "https://challenges.cloudflare.com",
-    "https://*.clerk.accounts.dev",
-    "https://*.clerk.com",
-    clerkOrigin,
-  ];
+  const frameSrcTokens = ["https://challenges.cloudflare.com"];
 
   return [
     "default-src 'self'",
@@ -126,9 +97,9 @@ export function handleProxyWithNonce(request: NextRequest): NextResponse {
   return response;
 }
 
-export default authMiddleware(async (auth, request) => {
+export const proxy = authProxy((context, request) => {
   if (!isPublicAppRoute(request)) {
-    await auth.protect();
+    context.requireSessionCookie();
   }
   return handleProxyWithNonce(request);
 });
@@ -139,6 +110,5 @@ export const config = {
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",
-    "/__clerk/:path*",
   ],
 };

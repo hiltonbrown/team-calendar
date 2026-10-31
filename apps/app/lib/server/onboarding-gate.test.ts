@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { resolveOnboardingRedirect } from "./onboarding-gate";
 
 const base = {
-  orgRole: "org:admin",
   pathname: "/",
+  role: "admin",
   welcomeEligible: false,
   wizardCompleted: false,
 };
@@ -18,14 +18,9 @@ describe("resolveOnboardingRedirect", () => {
     }
   );
 
-  it.each(["org:owner", "owner", "admin"])(
-    "treats %s as an admin",
-    (orgRole) => {
-      expect(resolveOnboardingRedirect({ ...base, orgRole })).toBe(
-        "/onboarding"
-      );
-    }
-  );
+  it.each(["owner", "admin"])("treats %s as an admin", (role) => {
+    expect(resolveOnboardingRedirect({ ...base, role })).toBe("/onboarding");
+  });
 
   it.each([
     "/settings/integrations/xero/connect",
@@ -60,11 +55,11 @@ describe("resolveOnboardingRedirect", () => {
     ).toBeNull();
   });
 
-  it.each(["org:manager", "org:viewer"])(
+  it.each(["manager", "viewer"])(
     "never blocks %s on the organisation wizard",
-    (orgRole) => {
+    (role) => {
       expect(
-        resolveOnboardingRedirect({ ...base, orgRole, wizardCompleted: false })
+        resolveOnboardingRedirect({ ...base, role, wizardCompleted: false })
       ).toBeNull();
     }
   );
@@ -73,7 +68,7 @@ describe("resolveOnboardingRedirect", () => {
     expect(
       resolveOnboardingRedirect({
         ...base,
-        orgRole: "org:viewer",
+        role: "viewer",
         welcomeEligible: true,
       })
     ).toBe("/welcome");
@@ -83,7 +78,7 @@ describe("resolveOnboardingRedirect", () => {
     expect(
       resolveOnboardingRedirect({
         ...base,
-        orgRole: null,
+        role: null,
         welcomeEligible: true,
       })
     ).toBeNull();

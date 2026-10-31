@@ -37,8 +37,8 @@ vi.mock("@repo/database", async () => ({
     "@repo/database/tenant-db"
   )),
 
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
 }));
@@ -73,9 +73,9 @@ import {
 } from "./holiday-preferences";
 
 const base = {
+  accountId: "org_a",
   actingRole: "admin" as const,
   actingUserId: "user_1",
-  clerkOrgId: "org_a",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
 const LOCATION = "22222222-2222-4222-8222-222222222222";
@@ -141,7 +141,7 @@ describe("holiday preferences", () => {
     expect(referenceDatabase.$transaction).toHaveBeenCalledTimes(1);
     expect(db.publicHolidayPreference.createMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        clerk_org_id: "org_a",
+        account_id: "org_a",
         holiday_key: CHRISTMAS,
         location_id: null,
         organisation_id: base.organisationId,
@@ -183,7 +183,7 @@ describe("holiday preferences", () => {
     expect(db.publicHolidayPreference.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({ setting: "working" }),
       where: expect.objectContaining({
-        clerk_org_id: base.clerkOrgId,
+        account_id: base.accountId,
         id: "pref-1",
         organisation_id: base.organisationId,
       }),
@@ -224,7 +224,7 @@ describe("holiday preferences", () => {
     expect(db.publicHolidayPreference.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({ setting: "hidden" }),
       where: expect.objectContaining({
-        clerk_org_id: base.clerkOrgId,
+        account_id: base.accountId,
         id: "pref-race",
         organisation_id: base.organisationId,
       }),
@@ -314,7 +314,7 @@ describe("holiday preferences", () => {
       ok: false,
     });
     expect(db.publicHoliday.findFirst.mock.calls[0]?.[0]?.where).toMatchObject({
-      clerk_org_id: "org_a",
+      account_id: "org_a",
       organisation_id: base.organisationId,
       source: "manual",
     });
@@ -345,7 +345,7 @@ describe("holiday preferences", () => {
       ok: false,
     });
     expect(db.location.findFirst.mock.calls[0]?.[0]?.where).toMatchObject({
-      clerk_org_id: "org_a",
+      account_id: "org_a",
       id: LOCATION,
       organisation_id: base.organisationId,
     });
@@ -456,7 +456,7 @@ describe("holiday preferences", () => {
     );
     expect(db.publicHolidayPreference.deleteMany).toHaveBeenCalledWith({
       where: {
-        clerk_org_id: "org_a",
+        account_id: "org_a",
         holiday_key: CHRISTMAS,
         location_id: null,
         organisation_id: base.organisationId,

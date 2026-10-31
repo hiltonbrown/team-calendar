@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   analyticsFlush: vi.fn(),
   analyticsShutdown: vi.fn(),
   auditEventCreate: vi.fn(),
-  auth: vi.fn(),
   completeXeroTenantSelection: vi.fn(),
   createActivationEvent: vi.fn((input: { name: string }) => ({
     distinctId: "subject",
@@ -16,8 +15,9 @@ const mocks = vi.hoisted(() => ({
     timestamp: "2026-09-19T00:00:00.000Z",
     uuid: `uuid-${input.name}`,
   })),
-  currentUser: vi.fn(),
   dispatchInitialXeroSync: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   getXeroConnectionState: vi.fn(),
   revalidatePath: vi.fn(),
   sessionFind: vi.fn().mockResolvedValue(null),
@@ -34,8 +34,8 @@ vi.mock("@repo/analytics/server", () => ({
   },
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/jobs", () => ({
   dispatchInitialXeroSync: mocks.dispatchInitialXeroSync,
@@ -74,7 +74,13 @@ vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+  hasPermission: async (
+    request: import("@repo/auth/permissions").PermissionRequest
+  ) =>
+    (await import("@repo/auth/permissions")).hasPermission(
+      (await mocks.getSession())?.role,
+      request
+    ),
 }));
 const { completeTenantSelectionAction } = await import("./_actions");
 const validInput = {
@@ -94,12 +100,11 @@ describe("completeTenantSelectionAction", () => {
     });
     mocks.analyticsShutdown.mockResolvedValue(undefined);
     mocks.analyticsFlush.mockResolvedValue(undefined);
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "admin@example.com" }],
-      firstName: "Admin",
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "admin@example.com",
       id: "user_1",
-      lastName: "User",
+      name: "Admin",
     });
     mocks.completeXeroTenantSelection.mockResolvedValue({
       ok: true,
@@ -130,14 +135,14 @@ describe("completeTenantSelectionAction", () => {
       },
     });
   });
-  it.each(["org:admin", "org:owner"])(
+  it.each(["admin", "owner"])(
     "allows %s to complete scoped tenant selection",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       expect((await completeTenantSelectionAction(validInput)).ok).toBe(true);
       expect(mocks.completeXeroTenantSelection).toHaveBeenCalledWith(
         expect.objectContaining({
-          clerkOrgId: "org_1",
+          accountId: "org_1",
           tenantIds: validInput.tenantIds,
           timezone: "Australia/Perth",
           userId: "user_1",
@@ -156,10 +161,10 @@ describe("completeTenantSelectionAction", () => {
     });
     expect(mocks.completeXeroTenantSelection).not.toHaveBeenCalled();
   });
-  it.each(["org:viewer", "org:manager"])(
+  it.each(["viewer", "manager"])(
     "refuses %s before input validation and account lookup",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       const result = await completeTenantSelectionAction({
         sessionId: "invalid",
         tenantIds: [],
@@ -222,7 +227,7 @@ describe("completeTenantSelectionAction", () => {
     expect(result.ok).toBe(true);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         connectionId: "44444444-4444-4444-8444-444444444444",
         organisationId: "33333333-3333-4333-8333-333333333333",
         triggeredByUserId: "user_1",
@@ -250,7 +255,7 @@ describe("completeTenantSelectionAction", () => {
     );
   });
   it("does not dispatch a sync for unauthorised roles", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:member" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "member" });
     const result = await completeTenantSelectionAction(validInput);
     expect(result.ok).toBe(false);
     expect(mocks.completeXeroTenantSelection).not.toHaveBeenCalled();

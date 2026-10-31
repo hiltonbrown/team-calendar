@@ -23,23 +23,23 @@ const {
   source_system,
 } = await import("./index.js");
 const tenantA = {
-  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  accountId: fixture.tenants[0]?.accountId as string,
   locationId: fixture.id("location", 0),
   organisationId: fixture.tenants[0]?.organisationId as string,
   personId: fixture.id("person", 0),
   teamId: fixture.id("team", 0),
 } as const;
 const tenantB = {
-  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  accountId: fixture.tenants[1]?.accountId as string,
   locationId: fixture.id("location", 1),
   organisationId: fixture.tenants[1]?.organisationId as string,
   personId: fixture.id("person", 1),
   teamId: fixture.id("team", 1),
 } as const;
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
+const testAccountIds = [tenantA.accountId, tenantB.accountId] as const;
 const approvalAuthorisationId = fixture.id("approval-authorisation");
 interface Tenant {
-  clerkOrgId: string;
+  accountId: string;
   locationId: string;
   organisationId: string;
   personId: string;
@@ -56,15 +56,15 @@ const availabilityRecordIds = {
 const createTenant = async (tenant: Tenant) => {
   await database.organisation.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       country_code: "AU",
       id: tenant.organisationId,
-      name: `Test ${tenant.clerkOrgId}`,
+      name: `Test ${tenant.accountId}`,
     },
   });
   await database.team.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.teamId,
       name: "Operations",
       organisation_id: tenant.organisationId,
@@ -72,7 +72,7 @@ const createTenant = async (tenant: Tenant) => {
   });
   await database.location.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.locationId,
       name: "Brisbane",
       organisation_id: tenant.organisationId,
@@ -81,8 +81,8 @@ const createTenant = async (tenant: Tenant) => {
   });
   await database.person.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
-      email: `${tenant.clerkOrgId}@example.com`,
+      account_id: tenant.accountId,
+      email: `${tenant.accountId}@example.com`,
       employment_type: employment_type.employee,
       first_name: "Test",
       id: tenant.personId,
@@ -111,8 +111,8 @@ const createAvailabilityRecord = async ({
 }) =>
   database.availabilityRecord.create({
     data: {
+      account_id: tenant.accountId,
       approval_status: availability_approval_status.approved,
-      clerk_org_id: tenant.clerkOrgId,
       contactability: availability_contactability.contactable,
       derived_uid_key: `test:${id}`,
       ends_at: new Date("2026-05-02T00:00:00.000Z"),
@@ -129,7 +129,7 @@ const createAvailabilityRecord = async ({
     },
   });
 const cleanTestData = async () => {
-  const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
+  const scope = { account_id: { in: [...testAccountIds] } };
   await database.failedRecord.deleteMany({ where: scope });
   await database.availabilityPublication.deleteMany({ where: scope });
   await database.auditEvent.deleteMany({ where: scope });
@@ -189,7 +189,7 @@ describe("availability_records", () => {
     const indexNames = indexes.map(({ indexname }) => indexname);
     expect(indexNames).toEqual(
       expect.arrayContaining([
-        "availability_records_clerk_org_id_idx",
+        "availability_records_account_id_idx",
         "availability_records_organisation_id_idx",
         "availability_records_person_id_starts_at_ends_at_idx",
         "availability_records_source_type_source_remote_id_idx",
@@ -226,7 +226,7 @@ describe("availability_records", () => {
       tenant: tenantA,
     });
     expect(record).toMatchObject({
-      clerk_org_id: tenantA.clerkOrgId,
+      account_id: tenantA.accountId,
       id: availabilityRecordIds.scoped,
       organisation_id: tenantA.organisationId,
       person_id: tenantA.personId,
@@ -257,7 +257,7 @@ describe("availability_records", () => {
     });
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         organisation_id: tenantA.organisationId,
         payroll_region: "AU",
         remote_connection_id: fixture.id("approval-remote-connection"),
@@ -275,15 +275,15 @@ describe("availability_records", () => {
         source_type: "team_calendar_leave",
       },
       where: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         id: record.id,
         organisation_id: tenantA.organisationId,
       },
     });
     const scope = {
+      accountId: tenantA.accountId,
       action: "approve" as const,
       availabilityRecordId: record.id,
-      clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
     };
     const request = {
@@ -333,14 +333,14 @@ describe("availability_records", () => {
       await withTestTenantDb(
         tenantTestAccount({
           ...scope,
-          clerkOrgId: tenantB.clerkOrgId,
+          accountId: tenantB.accountId,
           organisationId: tenantB.organisationId,
         }),
         (db) =>
           getSubmitOperation(
             {
               ...scope,
-              clerkOrgId: tenantB.clerkOrgId,
+              accountId: tenantB.accountId,
               organisationId: tenantB.organisationId,
             },
             db
@@ -361,7 +361,7 @@ describe("availability_records", () => {
     await database.availabilityRecord.updateMany({
       data: { xero_write_claimed_at: new Date(0) },
       where: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         id: record.id,
         organisation_id: tenantA.organisationId,
       },
@@ -405,7 +405,7 @@ describe("availability_records", () => {
     await database.availabilityRecord.updateMany({
       data: { xero_write_claimed_at: null },
       where: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         id: record.id,
         organisation_id: tenantA.organisationId,
       },
@@ -420,7 +420,7 @@ describe("availability_records", () => {
       data: { idempotency_replay_before: new Date(Date.now() - 1) },
       where: {
         ...{
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
         action: "approve",
@@ -448,21 +448,21 @@ describe("availability_records", () => {
     });
     const crossOrgRecord = await database.availabilityRecord.findFirst({
       where: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         id: availabilityRecordIds.otherTenant,
         organisation_id: tenantA.organisationId,
       },
     });
     const correctlyScopedRecord = await database.availabilityRecord.findFirst({
       where: {
-        clerk_org_id: tenantB.clerkOrgId,
+        account_id: tenantB.accountId,
         id: availabilityRecordIds.otherTenant,
         organisation_id: tenantB.organisationId,
       },
     });
     expect(crossOrgRecord).toBeNull();
     expect(correctlyScopedRecord).toMatchObject({
-      clerk_org_id: tenantB.clerkOrgId,
+      account_id: tenantB.accountId,
       id: availabilityRecordIds.otherTenant,
       organisation_id: tenantB.organisationId,
     });
@@ -501,8 +501,8 @@ describe("availability_records", () => {
     await expectPrismaErrorCode(
       database.availabilityRecord.create({
         data: {
+          account_id: tenantA.accountId,
           approval_status: availability_approval_status.approved,
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: availability_contactability.contactable,
           derived_uid_key: "test:missing-person",
           ends_at: new Date("2026-05-02T00:00:00.000Z"),

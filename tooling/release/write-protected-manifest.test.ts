@@ -10,7 +10,7 @@ const manifest = {
   candidateSha,
   durableManifestConfirmed: true,
   namespace: "release:run:018f47d8-3c0a-7f95-8c77-44f4be5c3210",
-  owned: { clerkOrgIds: [], globalKeys: [], organisationIds: [] },
+  owned: { accountIds: [], globalKeys: [], organisationIds: [] },
   pausedConsumers: {
     "rebuild-feed-cache": false,
     "reconcile-feed-publications": false,

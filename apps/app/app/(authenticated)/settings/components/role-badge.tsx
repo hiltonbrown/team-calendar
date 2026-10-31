@@ -1,24 +1,24 @@
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { cn } from "@repo/design-system/lib/utils";
 
-type OrgRole = "org:owner" | "org:admin" | "org:manager" | "org:viewer";
+type OrgRole = "owner" | "admin" | "manager" | "viewer";
 
 const ROLE_CONFIG: Record<OrgRole, { label: string; className: string }> = {
-  "org:admin": {
+  admin: {
     className:
       "bg-secondary/10 text-secondary border-secondary/20 hover:bg-secondary/10",
     label: "Admin",
   },
-  "org:manager": {
+  manager: {
     className: "bg-muted text-foreground border-border hover:bg-muted",
     label: "Manager",
   },
-  "org:owner": {
+  owner: {
     className:
       "bg-primary/10 text-primary border-primary/20 hover:bg-primary/10",
     label: "Owner",
   },
-  "org:viewer": {
+  viewer: {
     className: "bg-muted text-muted-foreground border-border hover:bg-muted",
     label: "Viewer",
   },

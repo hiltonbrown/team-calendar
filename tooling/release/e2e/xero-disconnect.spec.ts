@@ -46,7 +46,7 @@ test("admin confirms remote-first disconnect while preserving history and siblin
     JSON.parse(process.env.TC_E2E_XERO_DISCONNECT_FIXTURE_JSON ?? "null"),
     {
       foreignOrganisationId: environment.fixtures.organisations.foreign,
-      ownedClerkOrgIds: environment.manifest.owned.clerkOrgIds,
+      ownedAccountIds: environment.manifest.owned.accountIds,
       ownedOrganisationIds: environment.manifest.owned.organisationIds,
       primaryOrganisationId: environment.fixtures.organisations.primary,
       providerAppId: process.env.XERO_CLIENT_ID ?? "",

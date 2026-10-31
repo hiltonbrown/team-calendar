@@ -1,8 +1,11 @@
 "use server";
 
-import { auth, clerkClient, currentUser } from "@repo/auth/server";
+import { getAccount, updateAccount } from "@repo/auth/accounts";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
-  type ClerkOrgId,
+  type AccountId,
   normaliseRegionCode,
   type OrganisationId,
   type Result,
@@ -57,24 +60,21 @@ export async function updateAccountNameAction(input: {
   }
 
   try {
-    const clerk = await clerkClient();
-    const organisation = await clerk.organizations.getOrganization({
-      organizationId: context.value.clerkOrgId,
-    });
+    const organisation = await getAccount(context.value.accountId);
 
-    await clerk.organizations.updateOrganization(context.value.clerkOrgId, {
+    await updateAccount(context.value.accountId, {
       name: parsed.data.name,
     });
 
-    await withTenantDb(context.value.clerkOrgId, (db) =>
+    await withTenantDb(context.value.accountId, (db) =>
       db.auditEvent.create({
         data: {
+          account_id: context.value.accountId,
           action: "account.name_changed",
           actor_display: context.value.actorDisplay,
           actor_user_id: context.value.actingUserId,
           after_value: { name: parsed.data.name },
           before_value: { name: organisation.name },
-          clerk_org_id: context.value.clerkOrgId,
           entity_id: context.value.organisationId,
           entity_type: "organisation",
           ip_address: context.value.ipAddress,
@@ -124,10 +124,10 @@ export async function updateOrganisationAction(input: {
 
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof updateOrganisationAction> => {
         const owned = await getOrganisationById(
-          context.value.clerkOrgId as ClerkOrgId,
+          context.value.accountId as AccountId,
           context.value.organisationId as OrganisationId,
           db
         );
@@ -143,7 +143,7 @@ export async function updateOrganisationAction(input: {
             timezone: true,
           },
           where: {
-            clerk_org_id: context.value.clerkOrgId,
+            account_id: context.value.accountId,
             id: context.value.organisationId,
           },
         });
@@ -176,6 +176,7 @@ export async function updateOrganisationAction(input: {
 
         await db.auditEvent.create({
           data: {
+            account_id: context.value.accountId,
             action: "organisation.updated",
             actor_display: context.value.actorDisplay,
             actor_user_id: context.value.actingUserId,
@@ -191,7 +192,6 @@ export async function updateOrganisationAction(input: {
               regionCode: organisation.region_code,
               timezone: organisation.timezone,
             },
-            clerk_org_id: context.value.clerkOrgId,
             entity_id: context.value.organisationId,
             entity_type: "organisation",
             ip_address: context.value.ipAddress,
@@ -249,20 +249,32 @@ async function resolveAdminIdentity(organisationId: string): Promise<
   ActionResult<{
     actingUserId: string;
     actorDisplay: string;
-    clerkOrgId: string;
+    accountId: string;
     ipAddress: null | string;
     organisationId: string;
     userAgent: null | string;
   }>
 > {
-  const [{ orgId, orgRole }, user, requestHeaders] = await Promise.all([
-    auth(),
-    currentUser(),
+  const [
+    { accountId: sessionAccountId, role: sessionRole },
+    user,
+    requestHeaders,
+  ] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
     headers(),
   ]);
 
   if (
-    !(user && (orgRole === "org:admin" || orgRole === "org:owner") && orgId)
+    !(user && can(sessionRole, { settings: ["update"] }) && sessionAccountId)
   ) {
     return notAuthorised();
   }
@@ -270,12 +282,9 @@ async function resolveAdminIdentity(organisationId: string): Promise<
   return {
     ok: true,
     value: {
+      accountId: sessionAccountId,
       actingUserId: user.id,
-      actorDisplay:
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.emailAddresses[0]?.emailAddress ||
-        "Unknown user",
-      clerkOrgId: orgId,
+      actorDisplay: user.name || user.email || "Unknown user",
       ipAddress: requestHeaders.get("x-forwarded-for"),
       organisationId,
       userAgent: requestHeaders.get("user-agent"),
@@ -320,9 +329,9 @@ async function resolveAdminContext(
   if (!actor.ok) {
     return actor;
   }
-  const company = await withTenantDb(actor.value.clerkOrgId, (db) =>
+  const company = await withTenantDb(actor.value.accountId, (db) =>
     getOrganisationById(
-      actor.value.clerkOrgId as ClerkOrgId,
+      actor.value.accountId as AccountId,
       organisationId as OrganisationId,
       db
     )

@@ -47,7 +47,7 @@ const {
 } = await import("./notification-service");
 
 const input = {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   userId: "user_1",
 };
@@ -79,9 +79,9 @@ describe("notification-service", () => {
     mocks.findMany.mockResolvedValue([row]);
     mocks.personFindMany.mockResolvedValue([
       {
-        clerk_user_id: "manager_1",
         first_name: "Mina",
         last_name: "Patel",
+        user_id: "manager_1",
       },
     ]);
     mocks.updateMany.mockResolvedValue({ count: 1 });
@@ -107,8 +107,8 @@ describe("notification-service", () => {
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
-          organisation: { clerk_org_id: input.clerkOrgId },
+          account_id: input.accountId,
+          organisation: { account_id: input.accountId },
           recipient_user_id: input.userId,
         }),
       })
@@ -135,8 +135,8 @@ describe("notification-service", () => {
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
-          organisation: { clerk_org_id: input.clerkOrgId },
+          account_id: input.accountId,
+          organisation: { account_id: input.accountId },
           recipient_user_id: input.userId,
         }),
       })
@@ -169,7 +169,7 @@ describe("notification-service", () => {
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          organisation: { clerk_org_id: input.clerkOrgId },
+          organisation: { account_id: input.accountId },
           read_at: null,
         }),
       })

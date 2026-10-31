@@ -2,8 +2,8 @@ import "server-only";
 
 import { withinLimit } from "@repo/auth/server";
 import {
+  type AccountId,
   appError,
-  type ClerkOrgId,
   type OrganisationId,
   type Result,
 } from "@repo/core";
@@ -24,12 +24,12 @@ import {
 const WHITESPACE_PATTERN = /\s+/;
 
 export interface TenantContext {
-  clerkOrgId: ClerkOrgId;
+  accountId: AccountId;
   organisationId: OrganisationId;
 }
 
 export interface OrganisationSettingsInput {
-  clerkOrgId: string;
+  accountId: string;
   countryCode: string;
   fiscalYearStart?: number;
   locale?: string;
@@ -41,12 +41,10 @@ export interface OrganisationSettingsInput {
 
 export interface CurrentUserPersonInput {
   avatarUrl?: string | null;
-  clerkUserId: string;
   displayName?: string | null;
   email?: string | null;
-  firstName?: string | null;
   jobTitle?: string;
-  lastName?: string | null;
+  userId: string;
 }
 
 export interface PersonView {
@@ -96,28 +94,28 @@ const mapPerson = (person: {
   };
 };
 
-export async function ensureOrganisationForClerk(
+export async function ensureOrganisationForAccount(
   input: OrganisationSettingsInput,
   db: TenantDb
 ): Promise<TenantContext> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    await lockPlanLimitMutations(input.clerkOrgId, client);
+    await lockPlanLimitMutations(input.accountId, client);
 
     const existingOrganisation = await client.organisation.findFirst({
       orderBy: { created_at: "asc" },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
       },
     });
 
     if (!existingOrganisation) {
       const entitlement = await withinLimit(
-        input.clerkOrgId,
+        input.accountId,
         "00000000-0000-4000-8000-000000000000",
         "payroll_entities",
         client
@@ -151,7 +149,7 @@ export async function ensureOrganisationForClerk(
 
     const defaultFeed = await ensureDefaultCalendarFeed(
       {
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         organisationId: organisation.id,
       },
       client
@@ -161,7 +159,7 @@ export async function ensureOrganisationForClerk(
     }
 
     return {
-      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      accountId: input.accountId as AccountId,
       organisationId: organisation.id as OrganisationId,
     };
   }
@@ -170,8 +168,8 @@ export async function ensureOrganisationForClerk(
 type PersonWithRelations = Parameters<typeof mapPerson>[0];
 
 async function findResolvedMatchPerson(
-  scoped: { clerk_org_id: string; organisation_id: string },
-  clerkUserId: string,
+  scoped: { account_id: string; organisation_id: string },
+  userId: string,
   safeProfilePatch: Record<string, unknown>,
   db: TenantDb
 ): Promise<PersonWithRelations | null> {
@@ -182,7 +180,7 @@ async function findResolvedMatchPerson(
     },
     where: {
       ...scoped,
-      resolved_clerk_user_id: clerkUserId,
+      resolved_user_id: userId,
       status: "matched",
     },
   });
@@ -192,16 +190,16 @@ async function findResolvedMatchPerson(
   if (
     !targetPerson ||
     targetPerson.archived_at !== null ||
-    targetPerson.clerk_org_id !== scoped.clerk_org_id ||
+    targetPerson.account_id !== scoped.account_id ||
     targetPerson.organisation_id !== scoped.organisation_id
   ) {
     return null;
   }
-  if (targetPerson.clerk_user_id !== clerkUserId) {
+  if (targetPerson.user_id !== userId) {
     await db.person.update({
       data: {
         ...safeProfilePatch,
-        clerk_user_id: clerkUserId,
+        user_id: userId,
       },
       where: { id: targetPerson.id },
     });
@@ -214,24 +212,24 @@ export async function ensureCurrentUserPerson(
   input: CurrentUserPersonInput,
   db: TenantDb
 ): Promise<Result<PersonView>> {
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof ensureCurrentUserPerson> => {
-    await lockPlanLimitMutations(tenant.clerkOrgId, client);
+    await lockPlanLimitMutations(tenant.accountId, client);
 
-    const scoped = scopedQuery(tenant.clerkOrgId, tenant.organisationId);
+    const scoped = scopedQuery(tenant.accountId, tenant.organisationId);
     const profile = normaliseCurrentUserProfile(input);
     const safeProfilePatch = safeCurrentUserProfilePatch(profile);
-    const companies = await resolveAccountCompanies(tenant.clerkOrgId, client);
+    const companies = await resolveAccountCompanies(tenant.accountId, client);
     const existingLinkedPerson = await client.person.findFirst({
       include: { location: true, team: true },
       orderBy: [{ created_at: "asc" }, { id: "asc" }],
       where: {
+        account_id: tenant.accountId,
         archived_at: null,
-        clerk_org_id: tenant.clerkOrgId,
-        clerk_user_id: input.clerkUserId,
         organisation_id: { in: companies.map((company) => company.id) },
+        user_id: input.userId,
       },
     });
     if (existingLinkedPerson) {
@@ -240,7 +238,7 @@ export async function ensureCurrentUserPerson(
 
     const matchPerson = await findResolvedMatchPerson(
       scoped,
-      input.clerkUserId,
+      input.userId,
       safeProfilePatch,
       client
     );
@@ -253,11 +251,11 @@ export async function ensureCurrentUserPerson(
         include: { location: true, team: true },
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         where: {
+          account_id: tenant.accountId,
           archived_at: null,
-          clerk_org_id: tenant.clerkOrgId,
-          clerk_user_id: null,
           email: { equals: profile.email, mode: "insensitive" },
           organisation_id: { in: companies.map((company) => company.id) },
+          user_id: null,
         },
       });
 
@@ -265,7 +263,7 @@ export async function ensureCurrentUserPerson(
         return {
           error: appError(
             "conflict",
-            "Multiple people match this Clerk user's email. Review the people directory before opening plans."
+            "Multiple people match this user's email. Review the people directory before opening plans."
           ),
           ok: false,
         };
@@ -276,7 +274,7 @@ export async function ensureCurrentUserPerson(
         const person = await client.person.update({
           data: {
             ...safeProfilePatch,
-            clerk_user_id: input.clerkUserId,
+            user_id: input.userId,
           },
           include: { location: true, team: true },
           where: { id: sameEmailPerson.id },
@@ -287,7 +285,7 @@ export async function ensureCurrentUserPerson(
     }
 
     const entitlement = await withinLimit(
-      tenant.clerkOrgId,
+      tenant.accountId,
       tenant.organisationId,
       "seats",
       client
@@ -307,17 +305,17 @@ export async function ensureCurrentUserPerson(
 
     await client.person.createMany({
       data: {
+        account_id: tenant.accountId,
         avatar_url: profile.avatarUrl,
-        clerk_org_id: tenant.clerkOrgId,
-        clerk_user_id: input.clerkUserId,
         display_name: profile.displayName,
-        email: profile.email ?? `${input.clerkUserId}@internal`,
+        email: profile.email ?? `${input.userId}@internal`,
         employment_type: "employee",
         first_name: profile.firstName,
         job_title: input.jobTitle ?? null,
         last_name: profile.lastName,
         organisation_id: tenant.organisationId,
         source_system: "MANUAL",
+        user_id: input.userId,
       },
       skipDuplicates: true,
     });
@@ -327,7 +325,7 @@ export async function ensureCurrentUserPerson(
       where: {
         ...scoped,
         archived_at: null,
-        clerk_user_id: input.clerkUserId,
+        user_id: input.userId,
       },
     });
     if (!person) {
@@ -342,7 +340,7 @@ export async function ensureCurrentUserPerson(
     return { ok: true, value: mapPerson(person) };
   };
   return await (async () => {
-    assertTenantDb(db, tenant.clerkOrgId);
+    assertTenantDb(db, tenant.accountId);
     return await run(db);
   })();
 }
@@ -351,16 +349,16 @@ export async function listPersonViews(
   tenant: TenantContext,
   db: TenantDb
 ): Promise<PersonView[]> {
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   {
-    assertTenantDb(db, tenant.clerkOrgId);
+    assertTenantDb(db, tenant.accountId);
     const client = db;
 
     const people = await client.person.findMany({
       include: { location: true, team: true },
       orderBy: [{ display_name: "asc" }, { first_name: "asc" }],
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
       },
     });

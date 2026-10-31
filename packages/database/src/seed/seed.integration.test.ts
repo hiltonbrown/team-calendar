@@ -10,7 +10,7 @@ const fixture = allocateLiveTestFixture(
 );
 const { systemDatabase: database } = await import("../../index.js");
 const { seedDevelopmentData } = await import("./seed.js");
-const clerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
+const accountId = fixture.tenants[0]?.accountId as string;
 const organisationIds = fixture.tenants.map((tenant) => tenant.organisationId);
 const planIds = [0, 1, 2].map((index) => fixture.globalKey("plan_id", index));
 const planKeys = [0, 1, 2].map((index) => fixture.globalKey("plan_key", index));
@@ -65,7 +65,7 @@ const plans: PlanSeedDefinition[] = planIds.map((id, index) => ({
 }));
 
 const cleanSeedData = async () => {
-  const scope = { clerk_org_id: clerkOrgId };
+  const scope = { account_id: accountId };
   await database.person.deleteMany({ where: scope });
   await database.location.deleteMany({ where: scope });
   await database.team.deleteMany({ where: scope });
@@ -82,13 +82,13 @@ afterAll(async () => {
 
 describe("production seed path with owned inputs", () => {
   test("seeds organisations, locations, people and plan limits idempotently", async () => {
-    const options = { clerkOrgId, organisations, plans };
+    const options = { accountId, organisations, plans };
     const first = await seedDevelopmentData(database, options);
     const second = await seedDevelopmentData(database, options);
 
     expect(second).toEqual(first);
     expect(first).toEqual({
-      clerkOrgId,
+      accountId,
       locations: 2,
       organisations: 2,
       people: 2,
@@ -96,7 +96,7 @@ describe("production seed path with owned inputs", () => {
       plans: 3,
       teams: 2,
     });
-    const scope = { clerk_org_id: clerkOrgId };
+    const scope = { account_id: accountId };
     const [
       organisationCount,
       locationCount,

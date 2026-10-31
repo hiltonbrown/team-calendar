@@ -18,8 +18,8 @@ vi.mock("@repo/database", async () => ({
     "@repo/database/tenant-db"
   )),
   resolveAccountCompanies: async () => companies,
-  scopedTo: (requestInput: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: requestInput.clerkOrgId,
+  scopedTo: (requestInput: { accountId: string; organisationId: string }) => ({
+    account_id: requestInput.accountId,
     organisation_id: requestInput.organisationId,
   }),
 }));
@@ -81,12 +81,12 @@ function record(
   index: number
 ) {
   return {
+    account_id: "account-A",
     all_day: true,
     approval_note: null,
     approval_status: status,
     approved_at: null,
     archived_at: null,
-    clerk_org_id: "account-A",
     created_at: new Date("2026-10-12"),
     created_by_user_id: "user-1",
     ends_at: new Date("2050-10-15"),
@@ -97,7 +97,6 @@ function record(
     organisation_id: company.id,
     outbound_operations: [],
     person: {
-      clerk_user_id: "user-1",
       email: "alex@example.com",
       first_name: "Alex",
       id: company.id === companyB ? reportId : actorId,
@@ -106,6 +105,7 @@ function record(
       manager: null,
       manager_person_id: null,
       team: null,
+      user_id: "user-1",
     },
     person_id: company.id === companyB ? reportId : actorId,
     record_type: "annual_leave",
@@ -125,8 +125,8 @@ const rows = [
 ];
 interface Where {
   AND?: Where[];
+  account_id?: string;
   approval_status?: string | { in: string[] };
-  clerk_org_id?: string;
   OR?: Where[];
   organisation_id?: string | { in: string[] };
   person_id?: { in: string[] };
@@ -135,7 +135,7 @@ function matches(row: (typeof rows)[number], where: Where): boolean {
   const company = where.organisation_id;
   const status = where.approval_status;
   return (
-    (!where.clerk_org_id || where.clerk_org_id === row.clerk_org_id) &&
+    (!where.account_id || where.account_id === row.account_id) &&
     (!company ||
       (typeof company === "string"
         ? company === row.organisation_id
@@ -177,9 +177,9 @@ beforeEach(() => {
   );
 });
 const input = {
+  accountId: "account-A",
   actingPersonId: actorId,
   actingUserId: "user-1",
-  clerkOrgId: "account-A",
   role: "admin" as const,
 };
 test.each(["owner", "admin"] as const)(

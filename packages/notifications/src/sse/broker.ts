@@ -48,21 +48,21 @@ export type NotificationSseEvent =
     };
 
 export function streamKey(input: {
-  clerkOrgId: string;
+  accountId: string;
   userId: string;
 }): string {
-  return `account:${input.clerkOrgId}:${input.userId}`;
+  return `account:${input.accountId}:${input.userId}`;
 }
 
 export function notificationSseChannel(input: {
-  clerkOrgId: string;
+  accountId: string;
   userId: string;
 }): string {
   return `sse:${streamKey(input)}`;
 }
 
 export function pollNotificationStream(
-  input: { clerkOrgId: string; userId: string },
+  input: { accountId: string; userId: string },
   sinceId: string
 ): Promise<NotificationSseStreamEntry[]> {
   assertNoTenantTransaction("pollNotificationStream");
@@ -74,7 +74,7 @@ export function pollNotificationStream(
 }
 
 export async function publishNotificationEvent(
-  input: { clerkOrgId: string; userId: string },
+  input: { accountId: string; userId: string },
   event: NotificationSseEvent
 ): Promise<void> {
   assertNoTenantTransaction("publishNotificationEvent");
@@ -86,7 +86,7 @@ export async function publishNotificationEvent(
 }
 
 export async function publishOrganisationNotificationEvent(
-  input: { clerkOrgId: string; organisationId: string },
+  input: { accountId: string; organisationId: string },
   event: NotificationSseEvent
 ): Promise<void> {
   assertNoTenantTransaction("publishOrganisationNotificationEvent");
@@ -96,27 +96,27 @@ export async function publishOrganisationNotificationEvent(
   }
 
   const { withTenantDb } = await import("@repo/database");
-  const recipients = await withTenantDb(input.clerkOrgId, (db) =>
+  const recipients = await withTenantDb(input.accountId, (db) =>
     db.person.findMany({
-      select: { clerk_user_id: true },
+      select: { user_id: true },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
-        clerk_user_id: { not: null },
         is_active: true,
-        organisation: { clerk_org_id: input.clerkOrgId },
+        organisation: { account_id: input.accountId },
+        user_id: { not: null },
       },
     })
   );
   const userIds = new Set(
     recipients.flatMap((recipient) =>
-      recipient.clerk_user_id ? [recipient.clerk_user_id] : []
+      recipient.user_id ? [recipient.user_id] : []
     )
   );
   await Promise.all(
     [...userIds].map((userId) =>
       streamClient.append(
-        notificationSseChannel({ clerkOrgId: input.clerkOrgId, userId }),
+        notificationSseChannel({ accountId: input.accountId, userId }),
         event
       )
     )

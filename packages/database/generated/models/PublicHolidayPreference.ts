@@ -28,7 +28,7 @@ export type AggregatePublicHolidayPreference = {
 
 export type PublicHolidayPreferenceMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   holiday_key: string | null
   location_id: string | null
@@ -41,7 +41,7 @@ export type PublicHolidayPreferenceMinAggregateOutputType = {
 
 export type PublicHolidayPreferenceMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   holiday_key: string | null
   location_id: string | null
@@ -54,7 +54,7 @@ export type PublicHolidayPreferenceMaxAggregateOutputType = {
 
 export type PublicHolidayPreferenceCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   holiday_key: number
   location_id: number
@@ -69,7 +69,7 @@ export type PublicHolidayPreferenceCountAggregateOutputType = {
 
 export type PublicHolidayPreferenceMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   holiday_key?: true
   location_id?: true
@@ -82,7 +82,7 @@ export type PublicHolidayPreferenceMinAggregateInputType = {
 
 export type PublicHolidayPreferenceMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   holiday_key?: true
   location_id?: true
@@ -95,7 +95,7 @@ export type PublicHolidayPreferenceMaxAggregateInputType = {
 
 export type PublicHolidayPreferenceCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   holiday_key?: true
   location_id?: true
@@ -181,7 +181,7 @@ export type PublicHolidayPreferenceGroupByArgs<ExtArgs extends runtime.Types.Ext
 
 export type PublicHolidayPreferenceGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   holiday_key: string
   location_id: string | null
@@ -215,7 +215,7 @@ export type PublicHolidayPreferenceWhereInput = {
   OR?: Prisma.PublicHolidayPreferenceWhereInput[]
   NOT?: Prisma.PublicHolidayPreferenceWhereInput | Prisma.PublicHolidayPreferenceWhereInput[]
   id?: Prisma.UuidFilter<"PublicHolidayPreference"> | string
-  clerk_org_id?: Prisma.StringFilter<"PublicHolidayPreference"> | string
+  account_id?: Prisma.StringFilter<"PublicHolidayPreference"> | string
   organisation_id?: Prisma.UuidFilter<"PublicHolidayPreference"> | string
   holiday_key?: Prisma.StringFilter<"PublicHolidayPreference"> | string
   location_id?: Prisma.UuidNullableFilter<"PublicHolidayPreference"> | string | null
@@ -230,7 +230,7 @@ export type PublicHolidayPreferenceWhereInput = {
 
 export type PublicHolidayPreferenceOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   holiday_key?: Prisma.SortOrder
   location_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -250,7 +250,7 @@ export type PublicHolidayPreferenceWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.PublicHolidayPreferenceWhereInput | Prisma.PublicHolidayPreferenceWhereInput[]
   OR?: Prisma.PublicHolidayPreferenceWhereInput[]
   NOT?: Prisma.PublicHolidayPreferenceWhereInput | Prisma.PublicHolidayPreferenceWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"PublicHolidayPreference"> | string
+  account_id?: Prisma.StringFilter<"PublicHolidayPreference"> | string
   organisation_id?: Prisma.UuidFilter<"PublicHolidayPreference"> | string
   holiday_key?: Prisma.StringFilter<"PublicHolidayPreference"> | string
   location_id?: Prisma.UuidNullableFilter<"PublicHolidayPreference"> | string | null
@@ -265,7 +265,7 @@ export type PublicHolidayPreferenceWhereUniqueInput = Prisma.AtLeast<{
 
 export type PublicHolidayPreferenceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   holiday_key?: Prisma.SortOrder
   location_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -284,7 +284,7 @@ export type PublicHolidayPreferenceScalarWhereWithAggregatesInput = {
   OR?: Prisma.PublicHolidayPreferenceScalarWhereWithAggregatesInput[]
   NOT?: Prisma.PublicHolidayPreferenceScalarWhereWithAggregatesInput | Prisma.PublicHolidayPreferenceScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"PublicHolidayPreference"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"PublicHolidayPreference"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"PublicHolidayPreference"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"PublicHolidayPreference"> | string
   holiday_key?: Prisma.StringWithAggregatesFilter<"PublicHolidayPreference"> | string
   location_id?: Prisma.UuidNullableWithAggregatesFilter<"PublicHolidayPreference"> | string | null
@@ -297,7 +297,7 @@ export type PublicHolidayPreferenceScalarWhereWithAggregatesInput = {
 
 export type PublicHolidayPreferenceCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   holiday_key: string
   setting: $Enums.public_holiday_setting
   created_by_user_id?: string | null
@@ -310,7 +310,7 @@ export type PublicHolidayPreferenceCreateInput = {
 
 export type PublicHolidayPreferenceUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   holiday_key: string
   location_id?: string | null
@@ -323,7 +323,7 @@ export type PublicHolidayPreferenceUncheckedCreateInput = {
 
 export type PublicHolidayPreferenceUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -336,7 +336,7 @@ export type PublicHolidayPreferenceUpdateInput = {
 
 export type PublicHolidayPreferenceUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   location_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -349,7 +349,7 @@ export type PublicHolidayPreferenceUncheckedUpdateInput = {
 
 export type PublicHolidayPreferenceCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   holiday_key: string
   location_id?: string | null
@@ -362,7 +362,7 @@ export type PublicHolidayPreferenceCreateManyInput = {
 
 export type PublicHolidayPreferenceUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -373,7 +373,7 @@ export type PublicHolidayPreferenceUpdateManyMutationInput = {
 
 export type PublicHolidayPreferenceUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   location_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -407,7 +407,7 @@ export type PublicHolidayPreferenceOrganisation_idHoliday_keyCompoundUniqueInput
 
 export type PublicHolidayPreferenceCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   holiday_key?: Prisma.SortOrder
   location_id?: Prisma.SortOrder
@@ -420,7 +420,7 @@ export type PublicHolidayPreferenceCountOrderByAggregateInput = {
 
 export type PublicHolidayPreferenceMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   holiday_key?: Prisma.SortOrder
   location_id?: Prisma.SortOrder
@@ -433,7 +433,7 @@ export type PublicHolidayPreferenceMaxOrderByAggregateInput = {
 
 export type PublicHolidayPreferenceMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   holiday_key?: Prisma.SortOrder
   location_id?: Prisma.SortOrder
@@ -534,7 +534,7 @@ export type Enumpublic_holiday_settingFieldUpdateOperationsInput = {
 
 export type PublicHolidayPreferenceCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   holiday_key: string
   setting: $Enums.public_holiday_setting
   created_by_user_id?: string | null
@@ -546,7 +546,7 @@ export type PublicHolidayPreferenceCreateWithoutOrganisationInput = {
 
 export type PublicHolidayPreferenceUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   holiday_key: string
   location_id?: string | null
   setting: $Enums.public_holiday_setting
@@ -587,7 +587,7 @@ export type PublicHolidayPreferenceScalarWhereInput = {
   OR?: Prisma.PublicHolidayPreferenceScalarWhereInput[]
   NOT?: Prisma.PublicHolidayPreferenceScalarWhereInput | Prisma.PublicHolidayPreferenceScalarWhereInput[]
   id?: Prisma.UuidFilter<"PublicHolidayPreference"> | string
-  clerk_org_id?: Prisma.StringFilter<"PublicHolidayPreference"> | string
+  account_id?: Prisma.StringFilter<"PublicHolidayPreference"> | string
   organisation_id?: Prisma.UuidFilter<"PublicHolidayPreference"> | string
   holiday_key?: Prisma.StringFilter<"PublicHolidayPreference"> | string
   location_id?: Prisma.UuidNullableFilter<"PublicHolidayPreference"> | string | null
@@ -600,7 +600,7 @@ export type PublicHolidayPreferenceScalarWhereInput = {
 
 export type PublicHolidayPreferenceCreateWithoutLocationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   holiday_key: string
   setting: $Enums.public_holiday_setting
   created_by_user_id?: string | null
@@ -612,7 +612,7 @@ export type PublicHolidayPreferenceCreateWithoutLocationInput = {
 
 export type PublicHolidayPreferenceUncheckedCreateWithoutLocationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   holiday_key: string
   setting: $Enums.public_holiday_setting
@@ -650,7 +650,7 @@ export type PublicHolidayPreferenceUpdateManyWithWhereWithoutLocationInput = {
 
 export type PublicHolidayPreferenceCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   holiday_key: string
   location_id?: string | null
   setting: $Enums.public_holiday_setting
@@ -662,7 +662,7 @@ export type PublicHolidayPreferenceCreateManyOrganisationInput = {
 
 export type PublicHolidayPreferenceUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -674,7 +674,7 @@ export type PublicHolidayPreferenceUpdateWithoutOrganisationInput = {
 
 export type PublicHolidayPreferenceUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   location_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
@@ -686,7 +686,7 @@ export type PublicHolidayPreferenceUncheckedUpdateWithoutOrganisationInput = {
 
 export type PublicHolidayPreferenceUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   location_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
@@ -698,7 +698,7 @@ export type PublicHolidayPreferenceUncheckedUpdateManyWithoutOrganisationInput =
 
 export type PublicHolidayPreferenceCreateManyLocationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   holiday_key: string
   setting: $Enums.public_holiday_setting
@@ -710,7 +710,7 @@ export type PublicHolidayPreferenceCreateManyLocationInput = {
 
 export type PublicHolidayPreferenceUpdateWithoutLocationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -722,7 +722,7 @@ export type PublicHolidayPreferenceUpdateWithoutLocationInput = {
 
 export type PublicHolidayPreferenceUncheckedUpdateWithoutLocationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
@@ -734,7 +734,7 @@ export type PublicHolidayPreferenceUncheckedUpdateWithoutLocationInput = {
 
 export type PublicHolidayPreferenceUncheckedUpdateManyWithoutLocationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   holiday_key?: Prisma.StringFieldUpdateOperationsInput | string
   setting?: Prisma.Enumpublic_holiday_settingFieldUpdateOperationsInput | $Enums.public_holiday_setting
@@ -748,7 +748,7 @@ export type PublicHolidayPreferenceUncheckedUpdateManyWithoutLocationInput = {
 
 export type PublicHolidayPreferenceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   holiday_key?: boolean
   location_id?: boolean
@@ -763,7 +763,7 @@ export type PublicHolidayPreferenceSelect<ExtArgs extends runtime.Types.Extensio
 
 export type PublicHolidayPreferenceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   holiday_key?: boolean
   location_id?: boolean
@@ -778,7 +778,7 @@ export type PublicHolidayPreferenceSelectCreateManyAndReturn<ExtArgs extends run
 
 export type PublicHolidayPreferenceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   holiday_key?: boolean
   location_id?: boolean
@@ -793,7 +793,7 @@ export type PublicHolidayPreferenceSelectUpdateManyAndReturn<ExtArgs extends run
 
 export type PublicHolidayPreferenceSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   holiday_key?: boolean
   location_id?: boolean
@@ -804,7 +804,7 @@ export type PublicHolidayPreferenceSelectScalar = {
   updated_at?: boolean
 }
 
-export type PublicHolidayPreferenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "holiday_key" | "location_id" | "setting" | "created_by_user_id" | "updated_by_user_id" | "created_at" | "updated_at", ExtArgs["result"]["publicHolidayPreference"]>
+export type PublicHolidayPreferenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "holiday_key" | "location_id" | "setting" | "created_by_user_id" | "updated_by_user_id" | "created_at" | "updated_at", ExtArgs["result"]["publicHolidayPreference"]>
 export type PublicHolidayPreferenceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   location?: boolean | Prisma.PublicHolidayPreference$locationArgs<ExtArgs>
@@ -826,7 +826,7 @@ export type $PublicHolidayPreferencePayload<ExtArgs extends runtime.Types.Extens
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     holiday_key: string
     location_id: string | null
@@ -1261,7 +1261,7 @@ export interface Prisma__PublicHolidayPreferenceClient<T, Null = never, ExtArgs 
  */
 export interface PublicHolidayPreferenceFieldRefs {
   readonly id: Prisma.FieldRef<"PublicHolidayPreference", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"PublicHolidayPreference", 'String'>
+  readonly account_id: Prisma.FieldRef<"PublicHolidayPreference", 'String'>
   readonly organisation_id: Prisma.FieldRef<"PublicHolidayPreference", 'String'>
   readonly holiday_key: Prisma.FieldRef<"PublicHolidayPreference", 'String'>
   readonly location_id: Prisma.FieldRef<"PublicHolidayPreference", 'String'>

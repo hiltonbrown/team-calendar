@@ -26,9 +26,9 @@ import {
 } from "./account-approval-settings-service";
 
 const input = {
+  accountId: "account-A",
   actingRole: "owner" as const,
   actingUserId: "user-1",
-  clerkOrgId: "account-A",
   managerVisibilityScope: "all_team_leave" as const,
 };
 beforeEach(() => {
@@ -45,7 +45,7 @@ beforeEach(() => {
     async (fn: (db: Prisma.TransactionClient) => Promise<unknown>) => {
       const previous = state.scope;
       const row = () => ({
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         created_at: new Date(),
         id: "settings-A",
         manager_visibility_scope: state.scope,
@@ -106,7 +106,7 @@ test.each(["owner", "admin"] as const)(
     expect(state.audit).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           entity_type: "account_settings",
           organisation_id: "company-A",
         }),
@@ -124,7 +124,7 @@ test("audit failure rolls back the visibility change", async () => {
   expect(state.scope).toBe("direct_reports_only");
 });
 test("reads and updates share a supplied scope", async () => {
-  await withTenantDb(input.clerkOrgId, async (db) => {
+  await withTenantDb(input.accountId, async (db) => {
     await getAccountApprovalSettings(input, db);
     await updateAccountApprovalSettings(input, db);
   });

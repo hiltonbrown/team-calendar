@@ -45,10 +45,10 @@ class TenantRollback extends Error {}
 type Effect = () => Promise<void>;
 const owners = new WeakMap<object, string>();
 const effects = new WeakMap<object, Effect[]>();
-export const assertTenantDb = (db: TenantDb, clerkOrgId: string): void => {
-  if (owners.get(db) !== clerkOrgId) {
+export const assertTenantDb = (db: TenantDb, accountId: string): void => {
+  if (owners.get(db) !== accountId) {
     throw new TenantMismatchError(
-      "Tenant client does not belong to this Clerk organisation"
+      "Tenant client does not belong to this Account"
     );
   }
 };
@@ -87,14 +87,12 @@ const runEffect = async (effect: Effect): Promise<void> => {
 };
 
 export const withTenantDb = async <T>(
-  clerkOrgId: string,
+  accountId: string,
   fn: (db: TenantDb) => Promise<T>,
   options: TenantTransactionOptions = TENANT_REQUEST_OPTIONS
 ): Promise<T> => {
-  if (!clerkOrgId.trim()) {
-    throw new Error(
-      "Clerk organisation is required for tenant database access"
-    );
+  if (!accountId.trim()) {
+    throw new Error("Account is required for tenant database access");
   }
   if (isTenantScopeActive()) {
     throw new TenantNestingError(
@@ -102,15 +100,15 @@ export const withTenantDb = async <T>(
     );
   }
   const pending: Effect[] = [];
-  const scope = { active: true, clerkOrgId };
+  const scope = { accountId, active: true };
   let registered: Prisma.TransactionClient | undefined;
   let result: T;
   try {
     result = await runInTenantScope(scope, () =>
       referenceDatabase.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT set_config('app.clerk_org_id', ${clerkOrgId}, true)`;
+        await tx.$queryRaw`SELECT set_config('app.account_id', ${accountId}, true)`;
         registered = tx;
-        owners.set(tx, clerkOrgId);
+        owners.set(tx, accountId);
         effects.set(tx, pending);
         // The brand is a phantom type; runtime ownership is held in owners.
         return fn(tx as TenantDb);
@@ -130,7 +128,7 @@ export const withTenantDb = async <T>(
 };
 
 export const withTenantResult = async <T, E>(
-  clerkOrgId: string,
+  accountId: string,
   fn: (db: TenantDb) => Promise<Result<T, E>>,
   options?: TenantTransactionOptions
 ): Promise<Result<T, E>> => {
@@ -138,7 +136,7 @@ export const withTenantResult = async <T, E>(
   let failure: Result<T, E> | undefined;
   try {
     return await withTenantDb(
-      clerkOrgId,
+      accountId,
       async (db) => {
         const result = await fn(db);
         if (!result.ok) {
@@ -158,7 +156,7 @@ export const withTenantResult = async <T, E>(
 };
 
 export const withTenantReads = async <K extends string, V>(
-  clerkOrgId: string,
+  accountId: string,
   branches: Record<K, (db: TenantDb) => Promise<V>>,
   options?: TenantTransactionOptions
 ): Promise<Record<K, V>> => {
@@ -172,7 +170,7 @@ export const withTenantReads = async <K extends string, V>(
   const results = await Promise.all(
     branchKeys.map(
       async (key) =>
-        [key, await withTenantDb(clerkOrgId, branches[key], options)] as const
+        [key, await withTenantDb(accountId, branches[key], options)] as const
     )
   );
   // Every input key has exactly one resolved result in this mapping.

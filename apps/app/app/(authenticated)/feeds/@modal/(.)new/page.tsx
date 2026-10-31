@@ -1,6 +1,7 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getSession } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { normaliseRole } from "@repo/feeds";
 import { FeedCreateForm } from "@/components/feed/feed-create-form";
@@ -15,18 +16,19 @@ interface NewFeedModalPageProps {
 
 const NewFeedModalPage = async ({ searchParams }: NewFeedModalPageProps) => {
   const { org } = await searchParams;
-  const { orgRole } = await auth();
-  const role = normaliseRole(orgRole);
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
-  const canManage =
-    role === "admin" ||
-    role === "owner" ||
-    role === "org:admin" ||
-    role === "org:owner";
+  const { role: sessionRole } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  const role = normaliseRole(sessionRole);
+  const accountId = (await requireAccount()) as AccountId;
+  const canManage = can(role, { feeds: ["manageAll"] });
   const { organisationId, orgQueryValue, teams, people } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
-      const context = await resolveActiveOrgPageContext(clerkOrgId, org, db);
+      const context = await resolveActiveOrgPageContext(accountId, org, db);
       const scopedOrganisationId = context.organisationId;
       const [preparedTeams, preparedPeople] = canManage
         ? ([
@@ -34,7 +36,7 @@ const NewFeedModalPage = async ({ searchParams }: NewFeedModalPageProps) => {
               orderBy: { name: "asc" },
               select: { id: true, name: true },
               where: {
-                clerk_org_id: clerkOrgId,
+                account_id: accountId,
                 organisation_id: scopedOrganisationId,
               },
             }),
@@ -42,8 +44,8 @@ const NewFeedModalPage = async ({ searchParams }: NewFeedModalPageProps) => {
               orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
               select: { first_name: true, id: true, last_name: true },
               where: {
+                account_id: accountId,
                 archived_at: null,
-                clerk_org_id: clerkOrgId,
                 is_active: true,
                 organisation_id: scopedOrganisationId,
               },

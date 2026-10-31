@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { Prisma } from "@repo/database/generated/client";
 import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
 import { tenantTestAccount } from "@repo/database/test-fixtures/tenant-scope";
@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   interface ScopedWhere {
+    account_id?: string;
     archived_at?: Date | null;
-    clerk_org_id?: string;
     ends_at?: Date;
     id?: string | { not: string };
     organisation_id?: string;
@@ -19,19 +19,19 @@ const mocks = vi.hoisted(() => {
   }
 
   interface PersonFixture {
-    clerk_user_id: string | null;
     display_name: string | null;
     email: string | null;
     first_name: string;
     id: string;
     last_name: string;
     manager_person_id: string | null;
+    user_id: string | null;
   }
 
   interface AvailabilityRecordFixture {
+    account_id: string;
     all_day: boolean;
     archived_at: Date | null;
-    clerk_org_id: string;
     contactability: string | null;
     ends_at: Date;
     id: string;
@@ -72,8 +72,8 @@ const mocks = vi.hoisted(() => {
     idMatches(record, where) &&
     (where.archived_at === undefined ||
       record.archived_at === where.archived_at) &&
-    (where.clerk_org_id === undefined ||
-      record.clerk_org_id === where.clerk_org_id) &&
+    (where.account_id === undefined ||
+      record.account_id === where.account_id) &&
     (where.organisation_id === undefined ||
       record.organisation_id === where.organisation_id) &&
     (where.person_id === undefined || record.person_id === where.person_id) &&
@@ -95,9 +95,9 @@ const mocks = vi.hoisted(() => {
       }
 
       const record: AvailabilityRecordFixture = {
+        account_id: String(data.account_id),
         all_day: data.all_day === true,
         archived_at: null,
-        clerk_org_id: String(data.clerk_org_id),
         contactability:
           typeof data.contactability === "string" ? data.contactability : null,
         ends_at: data.ends_at instanceof Date ? data.ends_at : new Date(),
@@ -209,8 +209,8 @@ const mocks = vi.hoisted(() => {
       people.splice(0, people.length);
       records.splice(0, records.length);
     },
-    scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-      clerk_org_id: clerkOrgId,
+    scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+      account_id: accountId,
       organisation_id: organisationId,
     })),
   };
@@ -258,14 +258,14 @@ const { createManualAvailability, updateManualAvailability } = await import(
 
 const baseTenant = {
   // Test fixture IDs are fixed strings that match the branded runtime shape.
-  clerkOrgId: "org_duplicate_manual_a" as ClerkOrgId,
+  accountId: "org_duplicate_manual_a" as AccountId,
   // Test fixture IDs are fixed strings that match the branded runtime shape.
   organisationId: "51000000-0000-4000-8000-000000000001" as OrganisationId,
 };
 
 const otherTenant = {
   // Test fixture IDs are fixed strings that match the branded runtime shape.
-  clerkOrgId: "org_duplicate_manual_b" as ClerkOrgId,
+  accountId: "org_duplicate_manual_b" as AccountId,
   // Test fixture IDs are fixed strings that match the branded runtime shape.
   organisationId: "52000000-0000-4000-8000-000000000001" as OrganisationId,
 };
@@ -301,19 +301,19 @@ const basePatchInput = {
 };
 
 const adminActor = {
-  orgRole: "org:admin",
+  role: "admin",
   userId: "user_test",
 } as const;
 
-function addPerson(id: string, clerkUserId: string | null = null) {
+function addPerson(id: string, userId: string | null = null) {
   mocks.people.push({
-    clerk_user_id: clerkUserId,
     display_name: null,
     email: `${id}@example.com`,
     first_name: "Manual",
     id,
     last_name: "Person",
     manager_person_id: null,
+    user_id: userId,
   });
 }
 
@@ -429,7 +429,7 @@ describe("createManualAvailability duplicate guard", () => {
     expect(mocks.availabilityFindFirst).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: otherTenant.clerkOrgId,
+          account_id: otherTenant.accountId,
           organisation_id: otherTenant.organisationId,
           person_id: basePersonId,
           source_remote_id: null,
@@ -598,8 +598,8 @@ describe("createManualAvailability duplicate guard", () => {
           title: "Changed",
         }),
         where: {
+          account_id: baseTenant.accountId,
           archived_at: null,
-          clerk_org_id: baseTenant.clerkOrgId,
           id: created.value.id,
           organisation_id: baseTenant.organisationId,
           source_type: "manual",
@@ -688,7 +688,7 @@ describe("createManualAvailability duplicate guard", () => {
           baseTenant,
           created.value.id,
           { title: "Changed" },
-          { orgRole: "org:viewer", userId: "user_outsider" },
+          { role: "viewer", userId: "user_outsider" },
           db
         )
     );

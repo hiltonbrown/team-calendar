@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  clerkClient: vi.fn(),
-  deleteOrganizationMembership: vi.fn(),
-  getOrganizationMembershipList: vi.fn(),
+  getSession: vi.fn(),
+  listAccountMembers: vi.fn(),
+
+  removeAccountMember: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  clerkClient: mocks.clerkClient,
+  getSession: mocks.getSession,
 }));
 
 const { removeMember } = await import("./remove-member");
@@ -21,56 +20,51 @@ const validInput = {
 describe("removeMember", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:viewer",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "viewer",
     });
-    mocks.clerkClient.mockResolvedValue({
-      organizations: {
-        deleteOrganizationMembership: mocks.deleteOrganizationMembership,
-        getOrganizationMembershipList: mocks.getOrganizationMembershipList,
-      },
-    });
-    mocks.deleteOrganizationMembership.mockResolvedValue({});
-    mocks.getOrganizationMembershipList.mockResolvedValue({
-      data: [{ id: "membership_2", role: "org:viewer" }],
+
+    mocks.removeAccountMember.mockResolvedValue({});
+    mocks.listAccountMembers.mockResolvedValue({
+      data: [{ id: "membership_2", role: "viewer" }],
     });
   });
 
-  it("rejects viewers before deleting Clerk memberships", async () => {
+  it("rejects viewers before deleting Account memberships", async () => {
     const result = await removeMember(validInput);
 
     expect(result.ok).toBe(false);
-    expect(mocks.clerkClient).not.toHaveBeenCalled();
-    expect(mocks.deleteOrganizationMembership).not.toHaveBeenCalled();
+
+    expect(mocks.removeAccountMember).not.toHaveBeenCalled();
   });
 
   it("allows admins to remove members", async () => {
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "admin",
     });
 
     const result = await removeMember(validInput);
 
     expect(result.ok).toBe(true);
-    expect(mocks.getOrganizationMembershipList).toHaveBeenCalledWith({
-      organizationId: "org_1",
-      userId: ["user_2"],
+    expect(mocks.listAccountMembers).toHaveBeenCalledWith({
+      accountId: "org_1",
+      userIds: ["user_2"],
     });
-    expect(mocks.deleteOrganizationMembership).toHaveBeenCalledWith({
-      organizationId: "org_1",
+    expect(mocks.removeAccountMember).toHaveBeenCalledWith({
+      accountId: "org_1",
       userId: "user_2",
     });
   });
 
   it("forbids admins from removing owners", async () => {
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "admin",
     });
-    mocks.getOrganizationMembershipList.mockResolvedValue({
-      data: [{ id: "membership_2", role: "org:owner" }],
+    mocks.listAccountMembers.mockResolvedValue({
+      data: [{ id: "membership_2", role: "owner" }],
     });
 
     const result = await removeMember(validInput);
@@ -79,49 +73,74 @@ describe("removeMember", () => {
       error: "Only owners can remove another owner",
       ok: false,
     });
-    expect(mocks.deleteOrganizationMembership).not.toHaveBeenCalled();
+    expect(mocks.removeAccountMember).not.toHaveBeenCalled();
   });
 
   it("allows owners to remove another owner", async () => {
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:owner",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "owner",
     });
-    mocks.getOrganizationMembershipList.mockResolvedValue({
-      data: [{ id: "membership_2", role: "org:owner" }],
+    mocks.listAccountMembers.mockResolvedValue({
+      data: [{ id: "membership_2", role: "owner" }],
     });
 
     const result = await removeMember(validInput);
 
     expect(result.ok).toBe(true);
-    expect(mocks.deleteOrganizationMembership).toHaveBeenCalledWith({
-      organizationId: "org_1",
+    expect(mocks.removeAccountMember).toHaveBeenCalledWith({
+      accountId: "org_1",
       userId: "user_2",
     });
   });
+
+  it.each(["admin", "owner"])(
+    "rejects an unknown target role for %s",
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
+      mocks.listAccountMembers.mockResolvedValue({
+        data: [{ id: "membership_1", role: null }],
+      });
+      expect(await removeMember(validInput)).toEqual({
+        error: "Member role could not be verified",
+        ok: false,
+      });
+      expect(mocks.removeAccountMember).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     ["missing", []],
     [
       "ambiguous",
       [
-        { id: "membership_2", role: "org:viewer" },
-        { id: "membership_3", role: "org:viewer" },
+        { id: "membership_2", role: "viewer" },
+        { id: "membership_3", role: "viewer" },
       ],
     ],
   ])(
     "rejects a %s target before removing a membership",
     async (_case, data) => {
-      mocks.auth.mockResolvedValue({
-        orgId: "org_1",
-        orgRole: "org:owner",
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_1",
+        role: "owner",
       });
-      mocks.getOrganizationMembershipList.mockResolvedValue({ data });
+      mocks.listAccountMembers.mockResolvedValue({ data });
 
       const result = await removeMember(validInput);
 
       expect(result).toEqual({ error: "Member not found", ok: false });
-      expect(mocks.deleteOrganizationMembership).not.toHaveBeenCalled();
+      expect(mocks.removeAccountMember).not.toHaveBeenCalled();
     }
   );
 });
+
+vi.mock("@repo/auth/accounts", () => ({
+  accountDirectory: {
+    inviteMembers: vi.fn(),
+    listInvitations: vi.fn(),
+    listMembers: vi.fn(),
+  },
+  listAccountMembers: mocks.listAccountMembers,
+  removeAccountMember: mocks.removeAccountMember,
+}));

@@ -1,18 +1,18 @@
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_1"),
+  requireAccount: () => Promise.resolve("org_1"),
 }));
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  getSession: vi.fn(),
   personFindMany: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   teamFindMany: vi.fn(),
 }));
 
-vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
+vi.mock("@repo/auth/server", () => ({ getSession: mocks.getSession }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
     $transaction: async (
@@ -56,7 +56,7 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 describe("NewFeedPage", () => {
   beforeEach(() => {
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
       orgQueryValue: organisationId,
     });
@@ -68,7 +68,7 @@ describe("NewFeedPage", () => {
   });
 
   it("gives viewers a safe return without loading creation data", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.getSession.mockResolvedValue({ role: "viewer" });
 
     render(
       await Page({
@@ -86,7 +86,7 @@ describe("NewFeedPage", () => {
   });
 
   it("loads creation data for administrators", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     mocks.teamFindMany.mockResolvedValue([]);
     mocks.personFindMany.mockResolvedValue([]);
 

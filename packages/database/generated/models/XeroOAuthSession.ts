@@ -26,7 +26,7 @@ export type AggregateXeroOAuthSession = {
 
 export type XeroOAuthSessionMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   created_by_user_id: string | null
   status: $Enums.xero_oauth_session_status | null
@@ -45,7 +45,7 @@ export type XeroOAuthSessionMinAggregateOutputType = {
 
 export type XeroOAuthSessionMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   created_by_user_id: string | null
   status: $Enums.xero_oauth_session_status | null
@@ -64,7 +64,7 @@ export type XeroOAuthSessionMaxAggregateOutputType = {
 
 export type XeroOAuthSessionCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   created_by_user_id: number
   status: number
@@ -87,7 +87,7 @@ export type XeroOAuthSessionCountAggregateOutputType = {
 
 export type XeroOAuthSessionMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   created_by_user_id?: true
   status?: true
@@ -106,7 +106,7 @@ export type XeroOAuthSessionMinAggregateInputType = {
 
 export type XeroOAuthSessionMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   created_by_user_id?: true
   status?: true
@@ -125,7 +125,7 @@ export type XeroOAuthSessionMaxAggregateInputType = {
 
 export type XeroOAuthSessionCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   created_by_user_id?: true
   status?: true
@@ -219,7 +219,7 @@ export type XeroOAuthSessionGroupByArgs<ExtArgs extends runtime.Types.Extensions
 
 export type XeroOAuthSessionGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string | null
   created_by_user_id: string | null
   status: $Enums.xero_oauth_session_status
@@ -261,7 +261,7 @@ export type XeroOAuthSessionWhereInput = {
   OR?: Prisma.XeroOAuthSessionWhereInput[]
   NOT?: Prisma.XeroOAuthSessionWhereInput | Prisma.XeroOAuthSessionWhereInput[]
   id?: Prisma.UuidFilter<"XeroOAuthSession"> | string
-  clerk_org_id?: Prisma.StringFilter<"XeroOAuthSession"> | string
+  account_id?: Prisma.StringFilter<"XeroOAuthSession"> | string
   organisation_id?: Prisma.UuidNullableFilter<"XeroOAuthSession"> | string | null
   created_by_user_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   status?: Prisma.Enumxero_oauth_session_statusFilter<"XeroOAuthSession"> | $Enums.xero_oauth_session_status
@@ -284,7 +284,7 @@ export type XeroOAuthSessionWhereInput = {
 
 export type XeroOAuthSessionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -311,7 +311,7 @@ export type XeroOAuthSessionWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.XeroOAuthSessionWhereInput | Prisma.XeroOAuthSessionWhereInput[]
   OR?: Prisma.XeroOAuthSessionWhereInput[]
   NOT?: Prisma.XeroOAuthSessionWhereInput | Prisma.XeroOAuthSessionWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"XeroOAuthSession"> | string
+  account_id?: Prisma.StringFilter<"XeroOAuthSession"> | string
   organisation_id?: Prisma.UuidNullableFilter<"XeroOAuthSession"> | string | null
   created_by_user_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   status?: Prisma.Enumxero_oauth_session_statusFilter<"XeroOAuthSession"> | $Enums.xero_oauth_session_status
@@ -333,7 +333,7 @@ export type XeroOAuthSessionWhereUniqueInput = Prisma.AtLeast<{
 
 export type XeroOAuthSessionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -360,7 +360,7 @@ export type XeroOAuthSessionScalarWhereWithAggregatesInput = {
   OR?: Prisma.XeroOAuthSessionScalarWhereWithAggregatesInput[]
   NOT?: Prisma.XeroOAuthSessionScalarWhereWithAggregatesInput | Prisma.XeroOAuthSessionScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"XeroOAuthSession"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"XeroOAuthSession"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"XeroOAuthSession"> | string
   organisation_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   created_by_user_id?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   status?: Prisma.Enumxero_oauth_session_statusWithAggregatesFilter<"XeroOAuthSession"> | $Enums.xero_oauth_session_status
@@ -401,7 +401,7 @@ export type XeroOAuthSessionCreateInput = {
 
 export type XeroOAuthSessionUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   created_by_user_id?: string | null
   status?: $Enums.xero_oauth_session_status
@@ -442,7 +442,7 @@ export type XeroOAuthSessionUpdateInput = {
 
 export type XeroOAuthSessionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumxero_oauth_session_statusFieldUpdateOperationsInput | $Enums.xero_oauth_session_status
@@ -463,7 +463,7 @@ export type XeroOAuthSessionUncheckedUpdateInput = {
 
 export type XeroOAuthSessionCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   created_by_user_id?: string | null
   status?: $Enums.xero_oauth_session_status
@@ -502,7 +502,7 @@ export type XeroOAuthSessionUpdateManyMutationInput = {
 
 export type XeroOAuthSessionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumxero_oauth_session_statusFieldUpdateOperationsInput | $Enums.xero_oauth_session_status
@@ -533,7 +533,7 @@ export type XeroOAuthSessionOrderByRelationAggregateInput = {
 
 export type XeroOAuthSessionCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -554,7 +554,7 @@ export type XeroOAuthSessionCountOrderByAggregateInput = {
 
 export type XeroOAuthSessionMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -573,7 +573,7 @@ export type XeroOAuthSessionMaxOrderByAggregateInput = {
 
 export type XeroOAuthSessionMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   created_by_user_id?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -760,7 +760,7 @@ export type XeroOAuthSessionScalarWhereInput = {
   OR?: Prisma.XeroOAuthSessionScalarWhereInput[]
   NOT?: Prisma.XeroOAuthSessionScalarWhereInput | Prisma.XeroOAuthSessionScalarWhereInput[]
   id?: Prisma.UuidFilter<"XeroOAuthSession"> | string
-  clerk_org_id?: Prisma.StringFilter<"XeroOAuthSession"> | string
+  account_id?: Prisma.StringFilter<"XeroOAuthSession"> | string
   organisation_id?: Prisma.UuidNullableFilter<"XeroOAuthSession"> | string | null
   created_by_user_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   status?: Prisma.Enumxero_oauth_session_statusFilter<"XeroOAuthSession"> | $Enums.xero_oauth_session_status
@@ -800,7 +800,7 @@ export type XeroOAuthSessionCreateWithoutAuthorisationInput = {
 
 export type XeroOAuthSessionUncheckedCreateWithoutAuthorisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   created_by_user_id?: string | null
   status?: $Enums.xero_oauth_session_status
@@ -922,7 +922,7 @@ export type XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type XeroOAuthSessionCreateManyAuthorisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   created_by_user_id?: string | null
   status?: $Enums.xero_oauth_session_status
@@ -961,7 +961,7 @@ export type XeroOAuthSessionUpdateWithoutAuthorisationInput = {
 
 export type XeroOAuthSessionUncheckedUpdateWithoutAuthorisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumxero_oauth_session_statusFieldUpdateOperationsInput | $Enums.xero_oauth_session_status
@@ -981,7 +981,7 @@ export type XeroOAuthSessionUncheckedUpdateWithoutAuthorisationInput = {
 
 export type XeroOAuthSessionUncheckedUpdateManyWithoutAuthorisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.Enumxero_oauth_session_statusFieldUpdateOperationsInput | $Enums.xero_oauth_session_status
@@ -1003,7 +1003,7 @@ export type XeroOAuthSessionUncheckedUpdateManyWithoutAuthorisationInput = {
 
 export type XeroOAuthSessionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   created_by_user_id?: boolean
   status?: boolean
@@ -1026,7 +1026,7 @@ export type XeroOAuthSessionSelect<ExtArgs extends runtime.Types.Extensions.Inte
 
 export type XeroOAuthSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   created_by_user_id?: boolean
   status?: boolean
@@ -1049,7 +1049,7 @@ export type XeroOAuthSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
 
 export type XeroOAuthSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   created_by_user_id?: boolean
   status?: boolean
@@ -1072,7 +1072,7 @@ export type XeroOAuthSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
 
 export type XeroOAuthSessionSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   created_by_user_id?: boolean
   status?: boolean
@@ -1091,7 +1091,7 @@ export type XeroOAuthSessionSelectScalar = {
   updated_at?: boolean
 }
 
-export type XeroOAuthSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "created_by_user_id" | "status" | "return_to" | "state_hash" | "nonce_hash" | "callback_claimed_at" | "requested_scopes" | "xero_authorisation_id" | "available_tenants_json" | "selected_tenant_id" | "selected_tenant_name" | "selected_payroll_region" | "expires_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroOAuthSession"]>
+export type XeroOAuthSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "created_by_user_id" | "status" | "return_to" | "state_hash" | "nonce_hash" | "callback_claimed_at" | "requested_scopes" | "xero_authorisation_id" | "available_tenants_json" | "selected_tenant_id" | "selected_tenant_name" | "selected_payroll_region" | "expires_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroOAuthSession"]>
 export type XeroOAuthSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.XeroOAuthSession$organisationArgs<ExtArgs>
   authorisation?: boolean | Prisma.XeroOAuthSession$authorisationArgs<ExtArgs>
@@ -1113,7 +1113,7 @@ export type $XeroOAuthSessionPayload<ExtArgs extends runtime.Types.Extensions.In
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string | null
     created_by_user_id: string | null
     status: $Enums.xero_oauth_session_status
@@ -1556,7 +1556,7 @@ export interface Prisma__XeroOAuthSessionClient<T, Null = never, ExtArgs extends
  */
 export interface XeroOAuthSessionFieldRefs {
   readonly id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
+  readonly account_id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
   readonly organisation_id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
   readonly created_by_user_id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
   readonly status: Prisma.FieldRef<"XeroOAuthSession", 'xero_oauth_session_status'>

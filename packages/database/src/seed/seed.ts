@@ -1,13 +1,13 @@
 import type { PrismaClient } from "../../generated/client";
 import {
-  DEFAULT_SEED_CLERK_ORG_ID,
+  DEFAULT_SEED_ACCOUNT_ID,
   type OrganisationSeed,
   seedOrganisations,
 } from "./data";
 import { type PlanSeedDefinition, syncPlansFromCatalogue } from "./plan-sync";
 
 export interface SeedSummary {
-  clerkOrgId: string;
+  accountId: string;
   locations: number;
   organisations: number;
   people: number;
@@ -18,23 +18,23 @@ export interface SeedSummary {
 
 export interface SeedOptions {
   /**
-   * Clerk Organisation id every seeded row is scoped to. For the app to render a
-   * seeded tenant, this must match a real Clerk Organisation id (see README dev
-   * setup). Falls back to DEFAULT_SEED_CLERK_ORG_ID when absent.
+   * Account id every seeded row is scoped to. For the app to render a
+   * seeded tenant, this must match a real Account id (see README dev
+   * setup). Falls back to DEFAULT_SEED_ACCOUNT_ID when absent.
    */
-  clerkOrgId?: string | undefined;
+  accountId?: string | undefined;
   organisations?: readonly OrganisationSeed[] | undefined;
   plans?: readonly PlanSeedDefinition[] | undefined;
 }
 
 const seedOrganisation = async (
   db: PrismaClient,
-  clerkOrgId: string,
+  accountId: string,
   org: OrganisationSeed
 ): Promise<void> => {
   await db.organisation.upsert({
     create: {
-      clerk_org_id: clerkOrgId,
+      account_id: accountId,
       country_code: org.country_code,
       id: org.id,
       is_active: true,
@@ -43,7 +43,7 @@ const seedOrganisation = async (
       timezone: org.timezone,
     },
     update: {
-      clerk_org_id: clerkOrgId,
+      account_id: accountId,
       country_code: org.country_code,
       name: org.name,
       region_code: org.region_code,
@@ -55,13 +55,13 @@ const seedOrganisation = async (
   for (const team of org.teams) {
     await db.team.upsert({
       create: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         id: team.id,
         name: team.name,
         organisation_id: org.id,
       },
       update: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         name: team.name,
         organisation_id: org.id,
       },
@@ -72,7 +72,7 @@ const seedOrganisation = async (
   for (const location of org.locations) {
     await db.location.upsert({
       create: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         country_code: location.country_code,
         id: location.id,
         name: location.name,
@@ -81,7 +81,7 @@ const seedOrganisation = async (
         timezone: location.timezone,
       },
       update: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         country_code: location.country_code,
         name: location.name,
         organisation_id: org.id,
@@ -95,7 +95,7 @@ const seedOrganisation = async (
   for (const person of org.people) {
     await db.person.upsert({
       create: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         email: person.email,
         employment_type: person.employment_type,
         first_name: person.first_name,
@@ -113,7 +113,7 @@ const seedOrganisation = async (
         xero_employee_id: person.xero_employee_id,
       },
       update: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         email: person.email,
         employment_type: person.employment_type,
         first_name: person.first_name,
@@ -137,7 +137,7 @@ const seedOrganisation = async (
 };
 
 /**
- * Idempotently upserts the development seed dataset: one Clerk Organisation worth
+ * Idempotently upserts the development seed dataset: one Account worth
  * of organisations, teams, locations and people. Re-running creates no duplicates.
  * Seeds canonical data only; never writes Xero tokens or any other secret.
  */
@@ -145,7 +145,7 @@ export const seedDevelopmentData = async (
   db: PrismaClient,
   options: SeedOptions = {}
 ): Promise<SeedSummary> => {
-  const clerkOrgId = options.clerkOrgId ?? DEFAULT_SEED_CLERK_ORG_ID;
+  const accountId = options.accountId ?? DEFAULT_SEED_ACCOUNT_ID;
   const organisations = options.organisations ?? seedOrganisations;
 
   let teams = 0;
@@ -155,14 +155,14 @@ export const seedDevelopmentData = async (
   const planSummary = await syncPlansFromCatalogue(db, options.plans);
 
   for (const org of organisations) {
-    await seedOrganisation(db, clerkOrgId, org);
+    await seedOrganisation(db, accountId, org);
     teams += org.teams.length;
     locations += org.locations.length;
     people += org.people.length;
   }
 
   return {
-    clerkOrgId,
+    accountId,
     locations,
     organisations: organisations.length,
     people,

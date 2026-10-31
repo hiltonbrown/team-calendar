@@ -36,7 +36,7 @@ export type UsageCounterSumAggregateOutputType = {
 
 export type UsageCounterMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   metric_key: string | null
   counter_type: $Enums.plan_limit_type | null
   current_value: number | null
@@ -48,7 +48,7 @@ export type UsageCounterMinAggregateOutputType = {
 
 export type UsageCounterMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   metric_key: string | null
   counter_type: $Enums.plan_limit_type | null
   current_value: number | null
@@ -60,7 +60,7 @@ export type UsageCounterMaxAggregateOutputType = {
 
 export type UsageCounterCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   metric_key: number
   counter_type: number
   current_value: number
@@ -82,7 +82,7 @@ export type UsageCounterSumAggregateInputType = {
 
 export type UsageCounterMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   metric_key?: true
   counter_type?: true
   current_value?: true
@@ -94,7 +94,7 @@ export type UsageCounterMinAggregateInputType = {
 
 export type UsageCounterMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   metric_key?: true
   counter_type?: true
   current_value?: true
@@ -106,7 +106,7 @@ export type UsageCounterMaxAggregateInputType = {
 
 export type UsageCounterCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   metric_key?: true
   counter_type?: true
   current_value?: true
@@ -205,7 +205,7 @@ export type UsageCounterGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 
 export type UsageCounterGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   metric_key: string
   counter_type: $Enums.plan_limit_type | null
   current_value: number
@@ -240,7 +240,7 @@ export type UsageCounterWhereInput = {
   OR?: Prisma.UsageCounterWhereInput[]
   NOT?: Prisma.UsageCounterWhereInput | Prisma.UsageCounterWhereInput[]
   id?: Prisma.UuidFilter<"UsageCounter"> | string
-  clerk_org_id?: Prisma.StringFilter<"UsageCounter"> | string
+  account_id?: Prisma.StringFilter<"UsageCounter"> | string
   metric_key?: Prisma.StringFilter<"UsageCounter"> | string
   counter_type?: Prisma.Enumplan_limit_typeNullableFilter<"UsageCounter"> | $Enums.plan_limit_type | null
   current_value?: Prisma.IntFilter<"UsageCounter"> | number
@@ -252,7 +252,7 @@ export type UsageCounterWhereInput = {
 
 export type UsageCounterOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
   counter_type?: Prisma.SortOrderInput | Prisma.SortOrder
   current_value?: Prisma.SortOrder
@@ -264,12 +264,12 @@ export type UsageCounterOrderByWithRelationInput = {
 
 export type UsageCounterWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  clerk_org_id_metric_key_period_start_period_end?: Prisma.UsageCounterClerk_org_idMetric_keyPeriod_startPeriod_endCompoundUniqueInput
-  clerk_org_id_counter_type?: Prisma.UsageCounterClerk_org_idCounter_typeCompoundUniqueInput
+  account_id_metric_key_period_start_period_end?: Prisma.UsageCounterAccount_idMetric_keyPeriod_startPeriod_endCompoundUniqueInput
+  account_id_counter_type?: Prisma.UsageCounterAccount_idCounter_typeCompoundUniqueInput
   AND?: Prisma.UsageCounterWhereInput | Prisma.UsageCounterWhereInput[]
   OR?: Prisma.UsageCounterWhereInput[]
   NOT?: Prisma.UsageCounterWhereInput | Prisma.UsageCounterWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"UsageCounter"> | string
+  account_id?: Prisma.StringFilter<"UsageCounter"> | string
   metric_key?: Prisma.StringFilter<"UsageCounter"> | string
   counter_type?: Prisma.Enumplan_limit_typeNullableFilter<"UsageCounter"> | $Enums.plan_limit_type | null
   current_value?: Prisma.IntFilter<"UsageCounter"> | number
@@ -277,11 +277,11 @@ export type UsageCounterWhereUniqueInput = Prisma.AtLeast<{
   period_end?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
   created_at?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
-}, "id" | "clerk_org_id_metric_key_period_start_period_end" | "clerk_org_id_counter_type">
+}, "id" | "account_id_metric_key_period_start_period_end" | "account_id_counter_type">
 
 export type UsageCounterOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
   counter_type?: Prisma.SortOrderInput | Prisma.SortOrder
   current_value?: Prisma.SortOrder
@@ -301,7 +301,7 @@ export type UsageCounterScalarWhereWithAggregatesInput = {
   OR?: Prisma.UsageCounterScalarWhereWithAggregatesInput[]
   NOT?: Prisma.UsageCounterScalarWhereWithAggregatesInput | Prisma.UsageCounterScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"UsageCounter"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"UsageCounter"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"UsageCounter"> | string
   metric_key?: Prisma.StringWithAggregatesFilter<"UsageCounter"> | string
   counter_type?: Prisma.Enumplan_limit_typeNullableWithAggregatesFilter<"UsageCounter"> | $Enums.plan_limit_type | null
   current_value?: Prisma.IntWithAggregatesFilter<"UsageCounter"> | number
@@ -313,7 +313,7 @@ export type UsageCounterScalarWhereWithAggregatesInput = {
 
 export type UsageCounterCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   metric_key: string
   counter_type?: $Enums.plan_limit_type | null
   current_value?: number
@@ -325,7 +325,7 @@ export type UsageCounterCreateInput = {
 
 export type UsageCounterUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   metric_key: string
   counter_type?: $Enums.plan_limit_type | null
   current_value?: number
@@ -337,7 +337,7 @@ export type UsageCounterUncheckedCreateInput = {
 
 export type UsageCounterUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
   counter_type?: Prisma.NullableEnumplan_limit_typeFieldUpdateOperationsInput | $Enums.plan_limit_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
@@ -349,7 +349,7 @@ export type UsageCounterUpdateInput = {
 
 export type UsageCounterUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
   counter_type?: Prisma.NullableEnumplan_limit_typeFieldUpdateOperationsInput | $Enums.plan_limit_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
@@ -361,7 +361,7 @@ export type UsageCounterUncheckedUpdateInput = {
 
 export type UsageCounterCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   metric_key: string
   counter_type?: $Enums.plan_limit_type | null
   current_value?: number
@@ -373,7 +373,7 @@ export type UsageCounterCreateManyInput = {
 
 export type UsageCounterUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
   counter_type?: Prisma.NullableEnumplan_limit_typeFieldUpdateOperationsInput | $Enums.plan_limit_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
@@ -385,7 +385,7 @@ export type UsageCounterUpdateManyMutationInput = {
 
 export type UsageCounterUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
   counter_type?: Prisma.NullableEnumplan_limit_typeFieldUpdateOperationsInput | $Enums.plan_limit_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
@@ -395,21 +395,21 @@ export type UsageCounterUncheckedUpdateManyInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
-export type UsageCounterClerk_org_idMetric_keyPeriod_startPeriod_endCompoundUniqueInput = {
-  clerk_org_id: string
+export type UsageCounterAccount_idMetric_keyPeriod_startPeriod_endCompoundUniqueInput = {
+  account_id: string
   metric_key: string
   period_start: Date | string
   period_end: Date | string
 }
 
-export type UsageCounterClerk_org_idCounter_typeCompoundUniqueInput = {
-  clerk_org_id: string
+export type UsageCounterAccount_idCounter_typeCompoundUniqueInput = {
+  account_id: string
   counter_type: $Enums.plan_limit_type
 }
 
 export type UsageCounterCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
   counter_type?: Prisma.SortOrder
   current_value?: Prisma.SortOrder
@@ -425,7 +425,7 @@ export type UsageCounterAvgOrderByAggregateInput = {
 
 export type UsageCounterMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
   counter_type?: Prisma.SortOrder
   current_value?: Prisma.SortOrder
@@ -437,7 +437,7 @@ export type UsageCounterMaxOrderByAggregateInput = {
 
 export type UsageCounterMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
   counter_type?: Prisma.SortOrder
   current_value?: Prisma.SortOrder
@@ -459,7 +459,7 @@ export type NullableEnumplan_limit_typeFieldUpdateOperationsInput = {
 
 export type UsageCounterSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   metric_key?: boolean
   counter_type?: boolean
   current_value?: boolean
@@ -471,7 +471,7 @@ export type UsageCounterSelect<ExtArgs extends runtime.Types.Extensions.Internal
 
 export type UsageCounterSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   metric_key?: boolean
   counter_type?: boolean
   current_value?: boolean
@@ -483,7 +483,7 @@ export type UsageCounterSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type UsageCounterSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   metric_key?: boolean
   counter_type?: boolean
   current_value?: boolean
@@ -495,7 +495,7 @@ export type UsageCounterSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type UsageCounterSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   metric_key?: boolean
   counter_type?: boolean
   current_value?: boolean
@@ -505,14 +505,14 @@ export type UsageCounterSelectScalar = {
   updated_at?: boolean
 }
 
-export type UsageCounterOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "metric_key" | "counter_type" | "current_value" | "period_start" | "period_end" | "created_at" | "updated_at", ExtArgs["result"]["usageCounter"]>
+export type UsageCounterOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "metric_key" | "counter_type" | "current_value" | "period_start" | "period_end" | "created_at" | "updated_at", ExtArgs["result"]["usageCounter"]>
 
 export type $UsageCounterPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "UsageCounter"
   objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     metric_key: string
     counter_type: $Enums.plan_limit_type | null
     current_value: number
@@ -944,7 +944,7 @@ export interface Prisma__UsageCounterClient<T, Null = never, ExtArgs extends run
  */
 export interface UsageCounterFieldRefs {
   readonly id: Prisma.FieldRef<"UsageCounter", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"UsageCounter", 'String'>
+  readonly account_id: Prisma.FieldRef<"UsageCounter", 'String'>
   readonly metric_key: Prisma.FieldRef<"UsageCounter", 'String'>
   readonly counter_type: Prisma.FieldRef<"UsageCounter", 'plan_limit_type'>
   readonly current_value: Prisma.FieldRef<"UsageCounter", 'Int'>

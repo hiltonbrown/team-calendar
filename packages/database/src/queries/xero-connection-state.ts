@@ -7,7 +7,7 @@ export interface XeroConnectionStateResult {
   state: XeroConnectionState;
 }
 export interface XeroConnectionStateInput {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }
 export interface XeroConnectionStateError {
@@ -18,12 +18,12 @@ export async function getXeroConnectionState(
   db: TenantDb
 ): Promise<Result<XeroConnectionStateResult, XeroConnectionStateError>> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
     const connection = await client.xeroConnection.findFirst({
       select: { status: true, xero_authorisation_id: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
         released_at: null,
       },

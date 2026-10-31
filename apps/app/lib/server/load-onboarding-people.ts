@@ -28,27 +28,27 @@ export interface OnboardingPeopleData {
 // Everything the People and Invite steps show, scoped to one organisation.
 export async function loadOnboardingPeople(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     userId: string;
   },
   db: TenantDb
 ): Promise<OnboardingPeopleData> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const scope = {
+      account_id: input.accountId,
       archived_at: null,
-      clerk_org_id: input.clerkOrgId,
       organisation_id: input.organisationId,
     };
     const [peopleCount, actingPerson, matches, unlinked, managers] = [
       await client.person.count({ where: scope }),
       await client.person.findFirst({
         select: { first_name: true, id: true, last_name: true },
-        where: { ...scope, clerk_user_id: input.userId },
+        where: { ...scope, user_id: input.userId },
       }),
       await client.xeroPersonMatch.findMany({
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
@@ -56,7 +56,7 @@ export async function loadOnboardingPeople(
         // One extra row tells the step to link to the full matches page.
         take: INLINE_MATCH_LIMIT + 1,
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
           status: "pending",
         },
@@ -65,7 +65,7 @@ export async function loadOnboardingPeople(
         orderBy: [{ first_name: "asc" }, { last_name: "asc" }],
         select: { email: true, first_name: true, id: true, last_name: true },
         take: ROSTER_LIMIT,
-        where: { ...scope, clerk_user_id: null, is_active: true },
+        where: { ...scope, is_active: true, user_id: null },
       }),
       await client.person.findMany({
         distinct: ["manager_person_id"],

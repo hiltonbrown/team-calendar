@@ -1,44 +1,79 @@
 "use server";
 
+import { hasPermission, requireAccountResult } from "@repo/auth/server";
 import { createCheckoutSession, createPortalSession } from "@repo/billing";
+import { type AppError, appError, type Result } from "@repo/core";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { isEarlyAccess } from "@repo/next-config/launch-mode";
 import { redirect } from "next/navigation";
-import { requirePageRole } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 
-export async function startCheckout(planKey: "basic" | "premium") {
+export async function startCheckout(
+  planKey: "basic" | "premium"
+): Promise<Result<never, AppError>> {
   assertNoTenantTransaction("startCheckout");
-  // Server actions are directly invocable endpoints, so the page-level gate in
-  // page.tsx does not protect them. Admits admins and owners, matching S-22.
-  await requirePageRole("org:admin");
-  if (isEarlyAccess()) {
-    throw new Error(
-      "Paid billing operations are disabled during early access."
-    );
+
+  const accountResult = await requireAccountResult();
+  if (!accountResult.ok) {
+    return accountResult;
   }
-  const { clerkOrgId } = await requireActiveOrgPageContext();
-  const result = await createCheckoutSession(clerkOrgId, planKey);
+
+  const permitted = await hasPermission({ billing: ["checkout"] });
+  if (!permitted) {
+    return {
+      error: appError("forbidden", "Permission denied"),
+      ok: false,
+    };
+  }
+
+  if (isEarlyAccess()) {
+    return {
+      error: appError(
+        "bad_request",
+        "Paid billing operations are disabled during early access."
+      ),
+      ok: false,
+    };
+  }
+
+  const { accountId } = await requireActiveOrgPageContext();
+  const result = await createCheckoutSession(accountId, planKey);
   if (result.ok) {
     redirect(result.value);
   }
-  throw new Error(result.error.message);
+  return result;
 }
 
-export async function startPortal() {
+export async function startPortal(): Promise<Result<never, AppError>> {
   assertNoTenantTransaction("startPortal");
-  // Server actions are directly invocable endpoints, so the page-level gate in
-  // page.tsx does not protect them. Admits admins and owners, matching S-22.
-  await requirePageRole("org:admin");
-  if (isEarlyAccess()) {
-    throw new Error(
-      "Paid billing operations are disabled during early access."
-    );
+
+  const accountResult = await requireAccountResult();
+  if (!accountResult.ok) {
+    return accountResult;
   }
-  const { clerkOrgId } = await requireActiveOrgPageContext();
-  const result = await createPortalSession(clerkOrgId);
+
+  const permitted = await hasPermission({ billing: ["portal"] });
+  if (!permitted) {
+    return {
+      error: appError("forbidden", "Permission denied"),
+      ok: false,
+    };
+  }
+
+  if (isEarlyAccess()) {
+    return {
+      error: appError(
+        "bad_request",
+        "Paid billing operations are disabled during early access."
+      ),
+      ok: false,
+    };
+  }
+
+  const { accountId } = await requireActiveOrgPageContext();
+  const result = await createPortalSession(accountId);
   if (result.ok) {
     redirect(result.value);
   }
-  throw new Error(result.error.message);
+  return result;
 }

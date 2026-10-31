@@ -25,15 +25,15 @@ vi.mock("@repo/feeds", async () => {
     feedIdsForPeople: async () => [],
     // Publication is a separate persistence phase. The worker must call it after its candidate read closes.
     materialiseAvailabilityPublication: async (
-      input: { clerkOrgId: string; availabilityRecordId: string },
+      input: { accountId: string; availabilityRecordId: string },
       db: import("@repo/database").TenantDb
     ) => {
-      assertTenantDb(db, input.clerkOrgId);
+      assertTenantDb(db, input.accountId);
       expect(isTenantScopeActive()).toBe(true);
       await db.availabilityRecord.updateMany({
         data: { derived_sequence: { increment: 1 } },
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           id: input.availabilityRecordId,
         },
       });
@@ -81,7 +81,7 @@ beforeEach(() => {
 
 test("a publication failure leaves earlier and later records committed in independent phases", async () => {
   const result = await reconcileFeedPublications({
-    clerkOrgId: "account-A",
+    accountId: "account-A",
     organisationId: "11111111-1111-4111-8111-111111111111",
   });
   expect(result).toMatchObject({

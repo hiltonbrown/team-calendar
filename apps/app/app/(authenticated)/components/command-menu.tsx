@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@repo/auth/client";
+import { useSession } from "@repo/auth/client";
 import {
   CommandDialog,
   CommandEmpty,
@@ -30,8 +30,9 @@ export function CommandMenu() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const orgId = getOrgFromSearchParams(searchParams);
-  const { orgRole } = useAuth();
+  const sessionAccountId = getOrgFromSearchParams(searchParams);
+  const { session } = useSession();
+  const role = session?.role ?? null;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -53,13 +54,13 @@ export function CommandMenu() {
   const go = useCallback(
     (href: string) => {
       setOpen(false);
-      router.push(withOrg(href, orgId));
+      router.push(withOrg(href, sessionAccountId));
     },
-    [orgId, router]
+    [sessionAccountId, router]
   );
 
   const visibleQuickActions = quickActions.filter((action) =>
-    isNavItemVisible(action.roles, orgRole)
+    isNavItemVisible(action.permission, role)
   );
 
   return (
@@ -94,7 +95,7 @@ export function CommandMenu() {
 
         {navGroups.map((group) => {
           const items = group.items.filter((item) =>
-            isNavItemVisible(item.roles, orgRole)
+            isNavItemVisible(item.permission, role)
           );
           if (items.length === 0) {
             return null;

@@ -82,7 +82,7 @@ const { resolveWriteEmployeeId, resolveWriteLeaveTypeId, XeroWriteAdapter } =
   await import("./xero-write-adapter");
 const { toPlainLanguageMessage } = await import("../write/types");
 const submitInput = withPortMutation("create", {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   employeeId: "employee-1",
   endsAt: new Date("2026-05-05T00:00:00.000Z"),
   leaveTypeId: "leave-type-1",
@@ -92,7 +92,7 @@ const submitInput = withPortMutation("create", {
   units: 7.6,
 });
 const approveInput = withPortMutation("approve", {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   employeeId: "employee-1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   remoteId: "leave-application-1",
@@ -102,7 +102,7 @@ function buildTenant(id: string): XeroAccessContext & {
 } {
   return {
     accessToken: "access-token",
-    clerk_org_id: "org_1",
+    account_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id,
     organisation_id: "00000000-0000-4000-8000-000000000001",
@@ -175,8 +175,8 @@ describe("XeroWriteAdapter", () => {
     ).toBe(true);
     expect(mocks.resolveXeroAccess).toHaveBeenCalledWith(
       expect.objectContaining({
+        accountId: submitInput.accountId,
         capability: "payroll.employees",
-        clerkOrgId: submitInput.clerkOrgId,
         deadline: expect.objectContaining({ expiresAtMs: expect.any(Number) }),
         organisationId: submitInput.organisationId,
       })
@@ -291,7 +291,7 @@ describe("safe neutral resolution failures", () => {
         ok: false,
       });
       const input = {
-        clerkOrgId: submitInput.clerkOrgId,
+        accountId: submitInput.accountId,
         organisationId: submitInput.organisationId,
         personId: "person-1",
         recordType: "annual_leave",
@@ -615,7 +615,7 @@ it("rejects recovery candidate reads when the current tenant differs from the jo
   });
   expect(
     await XeroWriteAdapter.findLeaveApplicationCandidates?.({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       employeeId: "employee-1",
       expectedXeroTenantId: "original-tenant",
       organisationId: "00000000-0000-4000-8000-000000000001",

@@ -215,7 +215,7 @@ export type PlanWhereInput = {
   created_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   limits?: Prisma.PlanLimitListRelationFilter
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionListRelationFilter
+  account_subscriptions?: Prisma.AccountSubscriptionListRelationFilter
 }
 
 export type PlanOrderByWithRelationInput = {
@@ -229,7 +229,7 @@ export type PlanOrderByWithRelationInput = {
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   limits?: Prisma.PlanLimitOrderByRelationAggregateInput
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionOrderByRelationAggregateInput
+  account_subscriptions?: Prisma.AccountSubscriptionOrderByRelationAggregateInput
 }
 
 export type PlanWhereUniqueInput = Prisma.AtLeast<{
@@ -246,7 +246,7 @@ export type PlanWhereUniqueInput = Prisma.AtLeast<{
   created_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   limits?: Prisma.PlanLimitListRelationFilter
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionListRelationFilter
+  account_subscriptions?: Prisma.AccountSubscriptionListRelationFilter
 }, "id" | "key" | "plan_key">
 
 export type PlanOrderByWithAggregationInput = {
@@ -290,7 +290,7 @@ export type PlanCreateInput = {
   created_at?: Date | string
   updated_at?: Date | string
   limits?: Prisma.PlanLimitCreateNestedManyWithoutPlanInput
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionCreateNestedManyWithoutPlanInput
+  account_subscriptions?: Prisma.AccountSubscriptionCreateNestedManyWithoutPlanInput
 }
 
 export type PlanUncheckedCreateInput = {
@@ -304,7 +304,7 @@ export type PlanUncheckedCreateInput = {
   created_at?: Date | string
   updated_at?: Date | string
   limits?: Prisma.PlanLimitUncheckedCreateNestedManyWithoutPlanInput
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUncheckedCreateNestedManyWithoutPlanInput
+  account_subscriptions?: Prisma.AccountSubscriptionUncheckedCreateNestedManyWithoutPlanInput
 }
 
 export type PlanUpdateInput = {
@@ -318,7 +318,7 @@ export type PlanUpdateInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limits?: Prisma.PlanLimitUpdateManyWithoutPlanNestedInput
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUpdateManyWithoutPlanNestedInput
+  account_subscriptions?: Prisma.AccountSubscriptionUpdateManyWithoutPlanNestedInput
 }
 
 export type PlanUncheckedUpdateInput = {
@@ -332,7 +332,7 @@ export type PlanUncheckedUpdateInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limits?: Prisma.PlanLimitUncheckedUpdateManyWithoutPlanNestedInput
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanNestedInput
+  account_subscriptions?: Prisma.AccountSubscriptionUncheckedUpdateManyWithoutPlanNestedInput
 }
 
 export type PlanCreateManyInput = {
@@ -426,18 +426,18 @@ export type PlanUpdateOneRequiredWithoutLimitsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PlanUpdateToOneWithWhereWithoutLimitsInput, Prisma.PlanUpdateWithoutLimitsInput>, Prisma.PlanUncheckedUpdateWithoutLimitsInput>
 }
 
-export type PlanCreateNestedOneWithoutClerk_org_subscriptionsInput = {
-  create?: Prisma.XOR<Prisma.PlanCreateWithoutClerk_org_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutClerk_org_subscriptionsInput>
-  connectOrCreate?: Prisma.PlanCreateOrConnectWithoutClerk_org_subscriptionsInput
+export type PlanCreateNestedOneWithoutAccount_subscriptionsInput = {
+  create?: Prisma.XOR<Prisma.PlanCreateWithoutAccount_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutAccount_subscriptionsInput>
+  connectOrCreate?: Prisma.PlanCreateOrConnectWithoutAccount_subscriptionsInput
   connect?: Prisma.PlanWhereUniqueInput
 }
 
-export type PlanUpdateOneRequiredWithoutClerk_org_subscriptionsNestedInput = {
-  create?: Prisma.XOR<Prisma.PlanCreateWithoutClerk_org_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutClerk_org_subscriptionsInput>
-  connectOrCreate?: Prisma.PlanCreateOrConnectWithoutClerk_org_subscriptionsInput
-  upsert?: Prisma.PlanUpsertWithoutClerk_org_subscriptionsInput
+export type PlanUpdateOneRequiredWithoutAccount_subscriptionsNestedInput = {
+  create?: Prisma.XOR<Prisma.PlanCreateWithoutAccount_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutAccount_subscriptionsInput>
+  connectOrCreate?: Prisma.PlanCreateOrConnectWithoutAccount_subscriptionsInput
+  upsert?: Prisma.PlanUpsertWithoutAccount_subscriptionsInput
   connect?: Prisma.PlanWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.PlanUpdateToOneWithWhereWithoutClerk_org_subscriptionsInput, Prisma.PlanUpdateWithoutClerk_org_subscriptionsInput>, Prisma.PlanUncheckedUpdateWithoutClerk_org_subscriptionsInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PlanUpdateToOneWithWhereWithoutAccount_subscriptionsInput, Prisma.PlanUpdateWithoutAccount_subscriptionsInput>, Prisma.PlanUncheckedUpdateWithoutAccount_subscriptionsInput>
 }
 
 export type PlanCreateWithoutLimitsInput = {
@@ -450,7 +450,7 @@ export type PlanCreateWithoutLimitsInput = {
   stripe_price_id?: string | null
   created_at?: Date | string
   updated_at?: Date | string
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionCreateNestedManyWithoutPlanInput
+  account_subscriptions?: Prisma.AccountSubscriptionCreateNestedManyWithoutPlanInput
 }
 
 export type PlanUncheckedCreateWithoutLimitsInput = {
@@ -463,7 +463,7 @@ export type PlanUncheckedCreateWithoutLimitsInput = {
   stripe_price_id?: string | null
   created_at?: Date | string
   updated_at?: Date | string
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUncheckedCreateNestedManyWithoutPlanInput
+  account_subscriptions?: Prisma.AccountSubscriptionUncheckedCreateNestedManyWithoutPlanInput
 }
 
 export type PlanCreateOrConnectWithoutLimitsInput = {
@@ -492,7 +492,7 @@ export type PlanUpdateWithoutLimitsInput = {
   stripe_price_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUpdateManyWithoutPlanNestedInput
+  account_subscriptions?: Prisma.AccountSubscriptionUpdateManyWithoutPlanNestedInput
 }
 
 export type PlanUncheckedUpdateWithoutLimitsInput = {
@@ -505,10 +505,10 @@ export type PlanUncheckedUpdateWithoutLimitsInput = {
   stripe_price_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanNestedInput
+  account_subscriptions?: Prisma.AccountSubscriptionUncheckedUpdateManyWithoutPlanNestedInput
 }
 
-export type PlanCreateWithoutClerk_org_subscriptionsInput = {
+export type PlanCreateWithoutAccount_subscriptionsInput = {
   id?: string
   key: string
   plan_key: string
@@ -521,7 +521,7 @@ export type PlanCreateWithoutClerk_org_subscriptionsInput = {
   limits?: Prisma.PlanLimitCreateNestedManyWithoutPlanInput
 }
 
-export type PlanUncheckedCreateWithoutClerk_org_subscriptionsInput = {
+export type PlanUncheckedCreateWithoutAccount_subscriptionsInput = {
   id?: string
   key: string
   plan_key: string
@@ -534,23 +534,23 @@ export type PlanUncheckedCreateWithoutClerk_org_subscriptionsInput = {
   limits?: Prisma.PlanLimitUncheckedCreateNestedManyWithoutPlanInput
 }
 
-export type PlanCreateOrConnectWithoutClerk_org_subscriptionsInput = {
+export type PlanCreateOrConnectWithoutAccount_subscriptionsInput = {
   where: Prisma.PlanWhereUniqueInput
-  create: Prisma.XOR<Prisma.PlanCreateWithoutClerk_org_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutClerk_org_subscriptionsInput>
+  create: Prisma.XOR<Prisma.PlanCreateWithoutAccount_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutAccount_subscriptionsInput>
 }
 
-export type PlanUpsertWithoutClerk_org_subscriptionsInput = {
-  update: Prisma.XOR<Prisma.PlanUpdateWithoutClerk_org_subscriptionsInput, Prisma.PlanUncheckedUpdateWithoutClerk_org_subscriptionsInput>
-  create: Prisma.XOR<Prisma.PlanCreateWithoutClerk_org_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutClerk_org_subscriptionsInput>
+export type PlanUpsertWithoutAccount_subscriptionsInput = {
+  update: Prisma.XOR<Prisma.PlanUpdateWithoutAccount_subscriptionsInput, Prisma.PlanUncheckedUpdateWithoutAccount_subscriptionsInput>
+  create: Prisma.XOR<Prisma.PlanCreateWithoutAccount_subscriptionsInput, Prisma.PlanUncheckedCreateWithoutAccount_subscriptionsInput>
   where?: Prisma.PlanWhereInput
 }
 
-export type PlanUpdateToOneWithWhereWithoutClerk_org_subscriptionsInput = {
+export type PlanUpdateToOneWithWhereWithoutAccount_subscriptionsInput = {
   where?: Prisma.PlanWhereInput
-  data: Prisma.XOR<Prisma.PlanUpdateWithoutClerk_org_subscriptionsInput, Prisma.PlanUncheckedUpdateWithoutClerk_org_subscriptionsInput>
+  data: Prisma.XOR<Prisma.PlanUpdateWithoutAccount_subscriptionsInput, Prisma.PlanUncheckedUpdateWithoutAccount_subscriptionsInput>
 }
 
-export type PlanUpdateWithoutClerk_org_subscriptionsInput = {
+export type PlanUpdateWithoutAccount_subscriptionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   key?: Prisma.StringFieldUpdateOperationsInput | string
   plan_key?: Prisma.StringFieldUpdateOperationsInput | string
@@ -563,7 +563,7 @@ export type PlanUpdateWithoutClerk_org_subscriptionsInput = {
   limits?: Prisma.PlanLimitUpdateManyWithoutPlanNestedInput
 }
 
-export type PlanUncheckedUpdateWithoutClerk_org_subscriptionsInput = {
+export type PlanUncheckedUpdateWithoutAccount_subscriptionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   key?: Prisma.StringFieldUpdateOperationsInput | string
   plan_key?: Prisma.StringFieldUpdateOperationsInput | string
@@ -583,12 +583,12 @@ export type PlanUncheckedUpdateWithoutClerk_org_subscriptionsInput = {
 
 export type PlanCountOutputType = {
   limits: number
-  clerk_org_subscriptions: number
+  account_subscriptions: number
 }
 
 export type PlanCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   limits?: boolean | PlanCountOutputTypeCountLimitsArgs
-  clerk_org_subscriptions?: boolean | PlanCountOutputTypeCountClerk_org_subscriptionsArgs
+  account_subscriptions?: boolean | PlanCountOutputTypeCountAccount_subscriptionsArgs
 }
 
 /**
@@ -611,8 +611,8 @@ export type PlanCountOutputTypeCountLimitsArgs<ExtArgs extends runtime.Types.Ext
 /**
  * PlanCountOutputType without action
  */
-export type PlanCountOutputTypeCountClerk_org_subscriptionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.ClerkOrgSubscriptionWhereInput
+export type PlanCountOutputTypeCountAccount_subscriptionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AccountSubscriptionWhereInput
 }
 
 
@@ -627,7 +627,7 @@ export type PlanSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   created_at?: boolean
   updated_at?: boolean
   limits?: boolean | Prisma.Plan$limitsArgs<ExtArgs>
-  clerk_org_subscriptions?: boolean | Prisma.Plan$clerk_org_subscriptionsArgs<ExtArgs>
+  account_subscriptions?: boolean | Prisma.Plan$account_subscriptionsArgs<ExtArgs>
   _count?: boolean | Prisma.PlanCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["plan"]>
 
@@ -670,7 +670,7 @@ export type PlanSelectScalar = {
 export type PlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "key" | "plan_key" | "name" | "is_active" | "is_custom" | "stripe_price_id" | "created_at" | "updated_at", ExtArgs["result"]["plan"]>
 export type PlanInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   limits?: boolean | Prisma.Plan$limitsArgs<ExtArgs>
-  clerk_org_subscriptions?: boolean | Prisma.Plan$clerk_org_subscriptionsArgs<ExtArgs>
+  account_subscriptions?: boolean | Prisma.Plan$account_subscriptionsArgs<ExtArgs>
   _count?: boolean | Prisma.PlanCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PlanIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -680,7 +680,7 @@ export type $PlanPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   name: "Plan"
   objects: {
     limits: Prisma.$PlanLimitPayload<ExtArgs>[]
-    clerk_org_subscriptions: Prisma.$ClerkOrgSubscriptionPayload<ExtArgs>[]
+    account_subscriptions: Prisma.$AccountSubscriptionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1087,7 +1087,7 @@ readonly fields: PlanFieldRefs;
 export interface Prisma__PlanClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   limits<T extends Prisma.Plan$limitsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Plan$limitsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PlanLimitPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  clerk_org_subscriptions<T extends Prisma.Plan$clerk_org_subscriptionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Plan$clerk_org_subscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ClerkOrgSubscriptionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  account_subscriptions<T extends Prisma.Plan$account_subscriptionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Plan$account_subscriptionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AccountSubscriptionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1543,27 +1543,27 @@ export type Plan$limitsArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
 }
 
 /**
- * Plan.clerk_org_subscriptions
+ * Plan.account_subscriptions
  */
-export type Plan$clerk_org_subscriptionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type Plan$account_subscriptionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
-   * Select specific fields to fetch from the ClerkOrgSubscription
+   * Select specific fields to fetch from the AccountSubscription
    */
-  select?: Prisma.ClerkOrgSubscriptionSelect<ExtArgs> | null
+  select?: Prisma.AccountSubscriptionSelect<ExtArgs> | null
   /**
-   * Omit specific fields from the ClerkOrgSubscription
+   * Omit specific fields from the AccountSubscription
    */
-  omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  omit?: Prisma.AccountSubscriptionOmit<ExtArgs> | null
   /**
    * Choose, which related nodes to fetch as well
    */
-  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
-  where?: Prisma.ClerkOrgSubscriptionWhereInput
-  orderBy?: Prisma.ClerkOrgSubscriptionOrderByWithRelationInput | Prisma.ClerkOrgSubscriptionOrderByWithRelationInput[]
-  cursor?: Prisma.ClerkOrgSubscriptionWhereUniqueInput
+  include?: Prisma.AccountSubscriptionInclude<ExtArgs> | null
+  where?: Prisma.AccountSubscriptionWhereInput
+  orderBy?: Prisma.AccountSubscriptionOrderByWithRelationInput | Prisma.AccountSubscriptionOrderByWithRelationInput[]
+  cursor?: Prisma.AccountSubscriptionWhereUniqueInput
   take?: number
   skip?: number
-  distinct?: Prisma.ClerkOrgSubscriptionScalarFieldEnum | Prisma.ClerkOrgSubscriptionScalarFieldEnum[]
+  distinct?: Prisma.AccountSubscriptionScalarFieldEnum | Prisma.AccountSubscriptionScalarFieldEnum[]
 }
 
 /**

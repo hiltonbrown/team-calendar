@@ -1,6 +1,6 @@
 import {
+  type AccountId,
   appError,
-  type ClerkOrgId,
   isCountryCode,
   isRegionCode,
   type OrganisationId,
@@ -15,9 +15,9 @@ import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
  * bundled reference files and are never stored per organisation.
  */
 export interface AddCustomHolidayInput {
+  accountId: AccountId;
   /** true applies the holiday in every country and region. */
   appliesToAllJurisdictions: boolean;
-  clerkOrgId: ClerkOrgId;
   /** Required when appliesToAllJurisdictions is false. */
   countryCode: string | null;
   date: Date;
@@ -32,7 +32,7 @@ export async function addCustomHoliday(
   input: AddCustomHolidayInput,
   db: TenantDb
 ): Promise<Result<{ id: string }>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (client: TenantDb): ReturnType<typeof addCustomHoliday> => {
     const name = input.name.trim();
     if (name === "") {
@@ -67,7 +67,7 @@ export async function addCustomHoliday(
     const existing = await client.publicHoliday.findFirst({
       select: { id: true },
       where: {
-        ...scopedQuery(input.clerkOrgId, input.organisationId),
+        ...scopedQuery(input.accountId, input.organisationId),
         source: "manual",
         source_remote_id: sourceRemoteId,
       },
@@ -84,7 +84,7 @@ export async function addCustomHoliday(
 
     const holiday = await client.publicHoliday.create({
       data: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         country_code: countryCode,
         created_by_user_id: input.userId,
         default_classification: "non_working",
@@ -103,25 +103,25 @@ export async function addCustomHoliday(
     return { ok: true, value: { id: holiday.id } };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
 
 export async function deleteCustomHoliday(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   holidayId: string,
   db: TenantDb
 ): Promise<Result<{ id: string }>> {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof deleteCustomHoliday> => {
     const holiday = await client.publicHoliday.findFirst({
       select: { id: true },
       where: {
-        ...scopedQuery(clerkOrgId, organisationId),
+        ...scopedQuery(accountId, organisationId),
         id: holidayId,
         source: "manual",
       },
@@ -132,18 +132,18 @@ export async function deleteCustomHoliday(
     await (async (tx: TenantDb) => {
       await tx.publicHolidayPreference.deleteMany({
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           holiday_key: `custom:${holidayId}`,
         },
       });
       await tx.publicHoliday.delete({
-        where: { ...scopedQuery(clerkOrgId, organisationId), id: holidayId },
+        where: { ...scopedQuery(accountId, organisationId), id: holidayId },
       });
     })(client);
     return { ok: true, value: { id: holidayId } };
   };
   return await (async () => {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     return await run(db);
   })();
 }

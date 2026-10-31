@@ -352,8 +352,8 @@ async function resolveDispatchAccess(
   try {
     const resolve = resolveAccess ?? resolveXeroAccess;
     access = await resolve({
+      accountId: context.account_id,
       capability: context.capability,
-      clerkOrgId: context.clerk_org_id,
       connectionId: context.id,
       deadline,
       organisationId: context.organisation_id,

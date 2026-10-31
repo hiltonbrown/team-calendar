@@ -23,7 +23,7 @@ import {
 export const NO_TEAM_NAME = "No team";
 
 export interface LoadManagerCoverageInput {
-  clerkOrgId: string;
+  accountId: string;
   companyIds?: string[];
   organisationId: string;
   /**
@@ -43,9 +43,9 @@ export async function loadManagerCoverage(
   input: LoadManagerCoverageInput,
   db: TenantDb
 ): Promise<Result<CoverageMap>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const timezone = input.ranges[0]?.range.timezone;
@@ -59,7 +59,7 @@ export async function loadManagerCoverage(
     const { calendarDays, scopeTeamIds, noTeamPeople } = coverageRangeIndex(
       input.ranges
     );
-    const companies = await resolveAccountCompanies(input.clerkOrgId, client);
+    const companies = await resolveAccountCompanies(input.accountId, client);
     const companyIds = input.companyIds ?? [
       ...new Set(
         input.ranges.flatMap((range) =>
@@ -76,7 +76,7 @@ export async function loadManagerCoverage(
       };
     }
     const teamsResult = await coverageTeams(
-      input.clerkOrgId,
+      input.accountId,
       companyIds,
       companies,
       scopeTeamIds,
@@ -98,8 +98,8 @@ export async function loadManagerCoverage(
     for (const companyId of companyIds) {
       const result = await countAwayPeopleByTeamAndDay(
         {
+          accountId: input.accountId,
           awayRecordTypes: AWAY_RECORD_TYPES,
-          clerkOrgId: input.clerkOrgId,
           from,
           organisationId: companyId,
           teamIds: teams.flatMap((team) => (team.id ? [team.id] : [])),
@@ -182,7 +182,7 @@ function coverageRangeIndex(ranges: LoadManagerCoverageInput["ranges"]) {
 }
 
 async function coverageTeams(
-  clerkOrgId: string,
+  accountId: string,
   companyIds: string[],
   companies: Awaited<ReturnType<typeof resolveAccountCompanies>>,
   scopeTeamIds: Set<string>,
@@ -193,7 +193,7 @@ async function coverageTeams(
     companyIds.includes(preparedCompany.id)
   )) {
     const result = await listTeamsWithCoverageMinimum(
-      { clerkOrgId, organisationId: company.id },
+      { accountId, organisationId: company.id },
       client
     );
     if (!result.ok) {

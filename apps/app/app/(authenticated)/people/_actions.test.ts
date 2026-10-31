@@ -3,9 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   addAlternativeContact: vi.fn(),
-  auth: vi.fn(),
-  clerkClient: vi.fn(),
-  currentUser: vi.fn(),
+
   database: {
     alternativeContact: { findFirst: vi.fn() },
     auditEvent: { create: vi.fn() },
@@ -16,9 +14,11 @@ const mocks = vi.hoisted(() => ({
   deleteAlternativeContact: vi.fn(),
   dispatchBalanceRefresh: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
-  inviteClerkAccessCandidates: vi.fn(),
-  loadClerkAccessReview: vi.fn(),
+  inviteAccountAccessCandidates: vi.fn(),
+  loadAccountAccessReview: vi.fn(),
   reorderAlternativeContacts: vi.fn(),
   revalidatePath: vi.fn(),
   setManualLeaveBalance: vi.fn(),
@@ -26,9 +26,8 @@ const mocks = vi.hoisted(() => ({
   updateAlternativeContact: vi.fn(),
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  clerkClient: mocks.clerkClient,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/jobs", () => ({
   syncXeroLeaveBalances: mocks.syncXeroLeaveBalances,
@@ -37,8 +36,8 @@ vi.mock("@repo/availability", () => ({
   addAlternativeContact: mocks.addAlternativeContact,
   deleteAlternativeContact: mocks.deleteAlternativeContact,
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
-  inviteClerkAccessCandidates: mocks.inviteClerkAccessCandidates,
-  loadClerkAccessReview: mocks.loadClerkAccessReview,
+  inviteAccountAccessCandidates: mocks.inviteAccountAccessCandidates,
+  loadAccountAccessReview: mocks.loadAccountAccessReview,
   prepareBalanceRefresh: vi.fn(async (input: unknown) => ({
     ok: true,
     value: input,
@@ -68,9 +67,9 @@ vi.mock("@repo/database", async () => ({
   ...(await vi.importActual<
     typeof import("../../../../../packages/database/src/queries/account-companies")
   >("../../../../../packages/database/src/queries/account-companies")),
-  scopedQuery: (cOrgId: string, orgId: string) => ({
-    clerk_org_id: cOrgId,
-    organisation_id: orgId,
+  scopedQuery: (cOrgId: string, scopedOrganisationId: string) => ({
+    account_id: cOrgId,
+    organisation_id: scopedOrganisationId,
   }),
   ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
     "@repo/database/tenant-db"
@@ -88,8 +87,8 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 const {
   addAlternativeContactAction,
   deleteAlternativeContactAction,
-  inviteClerkAccessCandidates,
-  loadClerkAccessCandidates,
+  inviteAccountAccessCandidates,
+  loadAccountAccessCandidates,
   refreshBalancesAction,
   reorderAlternativeContactsAction,
   setManualBalanceAction,
@@ -98,7 +97,7 @@ const {
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const personId = "00000000-0000-4000-8000-000000000002";
 const contactId = "00000000-0000-4000-8000-000000000003";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 describe("people server actions", () => {
   beforeEach(() => {
@@ -113,11 +112,11 @@ describe("people server actions", () => {
       ok: true,
       value: { state: "connected" },
     });
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.database.person.findFirst.mockResolvedValue({ id: personId });
     mocks.database.alternativeContact.findFirst.mockResolvedValue({
@@ -153,7 +152,7 @@ describe("people server actions", () => {
   });
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
       const resAdd = await addAlternativeContactAction({
         email: "contact@example.com",
         name: "Emergency Contact",
@@ -170,7 +169,7 @@ describe("people server actions", () => {
       expect(mocks.addAlternativeContact).not.toHaveBeenCalled();
     });
     it("rejects unauthenticated or non-member roles without permission", async () => {
-      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: null });
+      mocks.getSession.mockResolvedValue({ accountId: "org_123", role: null });
       const resDelete = await deleteAlternativeContactAction({
         contactId,
         organisationId,
@@ -191,7 +190,7 @@ describe("people server actions", () => {
       }
       expect(mocks.addAlternativeContact).not.toHaveBeenCalled();
     });
-    it("scopes person lookup to clerk_org_id and organisation_id", async () => {
+    it("scopes person lookup to account_id and organisation_id", async () => {
       await addAlternativeContactAction({
         email: "contact@example.com",
         name: "Emergency Contact",
@@ -206,10 +205,10 @@ describe("people server actions", () => {
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: { id: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: userId,
           organisation_id: { in: [organisationId] },
+          user_id: userId,
         },
       });
     });
@@ -225,10 +224,10 @@ describe("people server actions", () => {
       expect(result).toEqual({ ok: true, value: { id: contactId } });
       expect(mocks.addAlternativeContact).toHaveBeenCalledWith(
         expect.objectContaining({
+          accountId,
           actingPersonId: personId,
           actingRole: "admin",
           actingUserId: userId,
-          clerkOrgId,
           email: "contact@example.com",
           name: "Emergency Contact",
           organisationId,
@@ -249,7 +248,7 @@ describe("people server actions", () => {
       expect(mocks.database.alternativeContact.findFirst).toHaveBeenCalledWith({
         select: { person_id: true },
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: contactId,
           organisation_id: organisationId,
         },
@@ -271,7 +270,7 @@ describe("people server actions", () => {
       expect(resRefresh).toEqual({ ok: true, value: { queued: true } });
       expect(mocks.dispatchBalanceRefresh).toHaveBeenCalled();
       expect(mocks.syncXeroLeaveBalances).toHaveBeenCalledWith({
-        clerkOrgId,
+        accountId,
         connectionId: "tenant_1",
         organisationId,
         personId,
@@ -289,10 +288,10 @@ describe("people server actions", () => {
       expect(result).toEqual({ ok: true, value: { id: "balance_1" } });
       expect(mocks.setManualLeaveBalance).toHaveBeenCalledWith(
         expect.objectContaining({
+          accountId,
           actingRole: "admin",
           actingUserId: userId,
           balance: 40,
-          clerkOrgId,
           leaveTypeXeroId: "xero-leave-1",
           organisationId,
           personId,
@@ -300,13 +299,14 @@ describe("people server actions", () => {
         expect.any(Object)
       );
     });
-    it("loadClerkAccessCandidates requires owner or admin role", async () => {
-      mocks.auth.mockResolvedValue({
-        has: vi.fn().mockReturnValue(false),
-        orgId: "org_123",
-        orgRole: "org:viewer",
+    it("loadAccountAccessCandidates requires owner or admin role", async () => {
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "viewer",
       });
-      const resWrongRole = await loadClerkAccessCandidates({ organisationId });
+      const resWrongRole = await loadAccountAccessCandidates({
+        organisationId,
+      });
       expect(resWrongRole).toEqual({
         error: {
           code: "not_authorised",
@@ -315,19 +315,13 @@ describe("people server actions", () => {
         ok: false,
       });
     });
-    it("loadClerkAccessCandidates calls service and records audit event", async () => {
-      const mockOrganizations = {
-        createOrganizationInvitationBulk: vi.fn(),
-        getOrganizationInvitationList: vi.fn(),
-        getOrganizationMembershipList: vi.fn(),
-      };
-      mocks.auth.mockResolvedValue({
-        has: vi.fn().mockReturnValue(true),
-        orgId: "org_123",
-        orgRole: "org:admin",
+    it("loadAccountAccessCandidates calls service and records audit event", async () => {
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "admin",
       });
-      mocks.clerkClient.mockResolvedValue({ organizations: mockOrganizations });
-      mocks.loadClerkAccessReview.mockResolvedValue({
+
+      mocks.loadAccountAccessReview.mockResolvedValue({
         ok: true,
         value: {
           alreadyInvitedCount: 1,
@@ -339,18 +333,18 @@ describe("people server actions", () => {
           memberCount: 0,
         },
       });
-      const result = await loadClerkAccessCandidates({ organisationId });
+      const result = await loadAccountAccessCandidates({ organisationId });
       expect(result.ok).toBe(true);
-      expect(mocks.loadClerkAccessReview).toHaveBeenCalledWith({
-        clerkOrganizations: mockOrganizations,
-        clerkOrgId,
+      expect(mocks.loadAccountAccessReview).toHaveBeenCalledWith({
+        accountDirectory: expect.any(Object),
+        accountId,
         organisationId,
       });
       expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          action: "people.clerk_access_reviewed",
+          account_id: accountId,
+          action: "people.account_access_reviewed",
           actor_user_id: userId,
-          clerk_org_id: clerkOrgId,
           entity_id: organisationId,
           metadata: {
             alreadyInvitedCount: 1,
@@ -365,19 +359,13 @@ describe("people server actions", () => {
         }),
       });
     });
-    it("inviteClerkAccessCandidates validates auth, calls service, records audit event, and revalidates", async () => {
-      const mockOrganizations = {
-        createOrganizationInvitationBulk: vi.fn(),
-        getOrganizationInvitationList: vi.fn(),
-        getOrganizationMembershipList: vi.fn(),
-      };
-      mocks.auth.mockResolvedValue({
-        has: vi.fn().mockReturnValue(true),
-        orgId: "org_123",
-        orgRole: "org:owner",
+    it("inviteAccountAccessCandidates validates getSession, calls service, records audit event, and revalidates", async () => {
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "owner",
       });
-      mocks.clerkClient.mockResolvedValue({ organizations: mockOrganizations });
-      mocks.inviteClerkAccessCandidates.mockResolvedValue({
+
+      mocks.inviteAccountAccessCandidates.mockResolvedValue({
         ok: true,
         value: {
           alreadyInvitedCount: 0,
@@ -388,20 +376,20 @@ describe("people server actions", () => {
           succeededCount: 1,
         },
       });
-      const result = await inviteClerkAccessCandidates({ organisationId });
+      const result = await inviteAccountAccessCandidates({ organisationId });
       expect(result.ok).toBe(true);
-      expect(mocks.inviteClerkAccessCandidates).toHaveBeenCalledWith({
+      expect(mocks.inviteAccountAccessCandidates).toHaveBeenCalledWith({
+        accountDirectory: expect.any(Object),
+        accountId,
         candidatePersonIds: undefined,
-        clerkOrganizations: mockOrganizations,
-        clerkOrgId,
         inviterUserId: userId,
         organisationId,
       });
       expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          action: "people.clerk_invitations_sent",
+          account_id: accountId,
+          action: "people.account_invitations_sent",
           actor_user_id: userId,
-          clerk_org_id: clerkOrgId,
           metadata: {
             candidateCount: 2,
             failedCount: 0,
@@ -415,3 +403,11 @@ describe("people server actions", () => {
     });
   });
 });
+
+vi.mock("@repo/auth/accounts", () => ({
+  accountDirectory: {
+    inviteMembers: vi.fn(),
+    listInvitations: vi.fn(),
+    listMembers: vi.fn(),
+  },
+}));

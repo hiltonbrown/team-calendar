@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   checkoutCreate: vi.fn(),
   eventRetrieve: vi.fn(),
-  getSubscriptionForOrg: vi.fn(),
+  getSubscriptionForAccount: vi.fn(),
   subscriptionRetrieve: vi.fn(),
 }));
 const CHECKOUT_IDEMPOTENCY_KEY = /^team-calendar:checkout:[a-f0-9]{64}$/;
@@ -19,7 +19,7 @@ vi.mock("@repo/database", async () => ({
   ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
     "@repo/database/tenant-db"
   )),
-  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  getSubscriptionForAccount: mocks.getSubscriptionForAccount,
   PLAN_CATALOGUE: [
     { plan_key: "basic", priceId: "price_basic" },
     { plan_key: "premium", priceId: "price_premium" },
@@ -114,7 +114,7 @@ describe("createCheckoutSession", () => {
   it.each(["active", "trialing", "incomplete", "past_due"])(
     "rejects a new checkout for an existing %s subscription",
     async (status) => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         status,
         stripe_customer_id: "cus_existing",
         stripe_subscription_id: "sub_existing",
@@ -135,7 +135,7 @@ describe("createCheckoutSession", () => {
   );
 
   it("fails closed when a non-terminal mirror is awaiting its Stripe subscription id", async () => {
-    mocks.getSubscriptionForOrg.mockResolvedValue({
+    mocks.getSubscriptionForAccount.mockResolvedValue({
       status: "active",
       stripe_customer_id: "cus_existing",
       stripe_subscription_id: null,
@@ -150,7 +150,7 @@ describe("createCheckoutSession", () => {
   it.each(["canceled", "incomplete_expired"])(
     "creates Checkout for a terminal %s subscription and reuses its customer",
     async (status) => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         status,
         stripe_customer_id: "cus_returning",
         stripe_subscription_id: "sub_terminal",
@@ -173,7 +173,7 @@ describe("createCheckoutSession", () => {
   );
 
   it("creates Checkout when no subscription exists", async () => {
-    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getSubscriptionForAccount.mockResolvedValue(null);
 
     await expect(createCheckoutSession("org_new", "basic")).resolves.toEqual({
       ok: true,
@@ -181,13 +181,17 @@ describe("createCheckoutSession", () => {
     });
 
     expect(mocks.checkoutCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: undefined }),
+      expect.objectContaining({
+        customer: undefined,
+        metadata: { account_id: "org_new" },
+        subscription_data: { metadata: { account_id: "org_new" } },
+      }),
       { idempotencyKey: expect.any(String) }
     );
   });
 
   it("uses one stable idempotency key for concurrent requests for the same transition", async () => {
-    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getSubscriptionForAccount.mockResolvedValue(null);
 
     await Promise.all([
       createCheckoutSession("org_concurrent", "basic"),
@@ -200,7 +204,7 @@ describe("createCheckoutSession", () => {
   });
 
   it("uses distinct idempotency keys for distinct requested plans", async () => {
-    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getSubscriptionForAccount.mockResolvedValue(null);
 
     await createCheckoutSession("org_concurrent", "basic");
     await createCheckoutSession("org_concurrent", "premium");

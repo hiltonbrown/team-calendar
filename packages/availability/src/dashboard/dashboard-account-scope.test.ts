@@ -100,8 +100,8 @@ const companies = [
   { country_code: "AU", id: companyB, name: "Company B", timezone: "UTC" },
 ];
 const input = {
+  accountId: "account-A",
   actingRole: "admin" as const,
-  clerkOrgId: "account-A",
   organisationId: companyA,
   personId,
   userId: "user-1",
@@ -131,7 +131,7 @@ beforeEach(() => {
     return Promise.resolve(query.where.organisation_id ? 1 : 2);
   });
   state.calendar.mockImplementation(async (query, db) => {
-    assertTenantDb(db, query.clerkOrgId);
+    assertTenantDb(db, query.accountId);
     const selected = query.companyIds ?? [companyA, companyB];
     return await {
       ok: true,
@@ -153,7 +153,7 @@ beforeEach(() => {
     };
   });
   state.approvals.mockImplementation(async (query, db) => {
-    assertTenantDb(db, query.clerkOrgId);
+    assertTenantDb(db, query.accountId);
     return await {
       ok: true,
       value: {
@@ -229,9 +229,9 @@ test("employee timeline defaults to all companies and reuses the caller scope", 
         )
       ).ok
     ).toBe(true);
-    expect(
-      (await resolveDashboardRole({ ...input, orgRole: null }, db)).ok
-    ).toBe(true);
+    expect((await resolveDashboardRole({ ...input, role: null }, db)).ok).toBe(
+      true
+    );
   });
   expect(state.transaction).toHaveBeenCalledTimes(1);
   expect(state.calendar.mock.calls[0]?.[0].scope).toEqual({

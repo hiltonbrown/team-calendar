@@ -1,12 +1,18 @@
 "use server";
 
-import { auth, clerkClient } from "@repo/auth/server";
+import {
+  listAccountMembers,
+  updateAccountMemberRole,
+} from "@repo/auth/accounts";
+import { hasPermission as can, isAuthRole } from "@repo/auth/permissions";
+
+import { getSession } from "@repo/auth/server";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
 
 const UpdateRoleSchema = z.object({
   membershipId: z.string().min(1),
-  role: z.enum(["org:owner", "org:admin", "org:manager", "org:viewer"]),
+  role: z.enum(["owner", "admin", "manager", "viewer"]),
 });
 
 type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
@@ -15,12 +21,18 @@ export const updateMemberRole = async (
   input: unknown
 ): Promise<Result<void>> => {
   assertNoTenantTransaction("updateMemberRole");
-  const { orgId, orgRole } = await auth();
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
 
-  if (!orgId) {
+  if (!sessionAccountId) {
     return { error: "Not authenticated", ok: false };
   }
-  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+  if (!can(sessionRole, { member: ["update"] })) {
     return { error: "You do not have permission to manage members", ok: false };
   }
 
@@ -34,7 +46,10 @@ export const updateMemberRole = async (
 
   // Owner assignment is ownership-sensitive: only owners may grant the owner
   // role, otherwise an admin could escalate themselves (or others) to owner.
-  if (parsed.data.role === "org:owner" && orgRole !== "org:owner") {
+  if (
+    parsed.data.role === "owner" &&
+    !can(sessionRole, { ownership: ["manage"] })
+  ) {
     return {
       error: "Only owners can assign the owner role",
       ok: false,
@@ -42,27 +57,31 @@ export const updateMemberRole = async (
   }
 
   try {
-    const clerk = await clerkClient();
-    const memberships = await clerk.organizations.getOrganizationMembershipList(
-      {
-        organizationId: orgId,
-        userId: [parsed.data.membershipId],
-      }
-    );
+    const memberships = await listAccountMembers({
+      accountId: sessionAccountId,
+      userIds: [parsed.data.membershipId],
+    });
 
     if (memberships.data.length !== 1) {
       return { error: "Member not found", ok: false };
     }
 
-    if (memberships.data[0]?.role === "org:owner" && orgRole !== "org:owner") {
+    if (!isAuthRole(memberships.data[0]?.role)) {
+      return { error: "Member role could not be verified", ok: false };
+    }
+
+    if (
+      memberships.data[0]?.role === "owner" &&
+      !can(sessionRole, { ownership: ["manage"] })
+    ) {
       return {
         error: "Only owners can change another owner's role",
         ok: false,
       };
     }
 
-    await clerk.organizations.updateOrganizationMembership({
-      organizationId: orgId,
+    await updateAccountMemberRole({
+      accountId: sessionAccountId,
       role: parsed.data.role,
       userId: parsed.data.membershipId,
     });

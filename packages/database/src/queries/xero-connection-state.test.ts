@@ -26,7 +26,7 @@ vi.mock("../system-client", () => ({
     },
   },
 }));
-const scope = { clerkOrgId: "account", organisationId: "payroll" };
+const scope = { accountId: "account", organisationId: "payroll" };
 beforeEach(() => {
   findFirst.mockReset();
 });
@@ -59,7 +59,7 @@ test.each([
       value: { state: expected },
     });
     expect(findFirst.mock.calls[0]?.[0].where).toEqual({
-      clerk_org_id: "account",
+      account_id: "account",
       organisation_id: "payroll",
       released_at: null,
     });

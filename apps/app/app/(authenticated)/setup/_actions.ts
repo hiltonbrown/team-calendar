@@ -1,9 +1,11 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   ensureCurrentUserPerson,
-  ensureOrganisationForClerk,
+  ensureOrganisationForAccount,
   type OrganisationSettingsInput,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
@@ -41,38 +43,44 @@ export async function createOrganisationAction(input: {
     return validationError(parsed.error.issues[0]?.message);
   }
 
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
 
   if (
-    !(orgId && user) ||
-    (orgRole !== "org:admin" && orgRole !== "org:owner")
+    !(sessionAccountId && user && can(sessionRole, { settings: ["update"] }))
   ) {
     return notAuthorised();
   }
 
-  // ensureOrganisationForClerk throws on DB failure, so redirect must be outside try/catch
+  // ensureOrganisationForAccount throws on DB failure, so redirect must be outside try/catch
   try {
     const prepared = await withTenantResult(
-      orgId,
+      sessionAccountId,
       async (db): Promise<ActionResult<void>> => {
         const payload: OrganisationSettingsInput = {
-          clerkOrgId: orgId,
+          accountId: sessionAccountId,
           countryCode: parsed.data.countryCode,
           name: parsed.data.name,
         };
-        const tenant = await ensureOrganisationForClerk(payload, db);
+        const tenant = await ensureOrganisationForAccount(payload, db);
         const personResult = await ensureCurrentUserPerson(
           tenant,
           {
-            avatarUrl: user.imageUrl,
-            clerkUserId: user.id,
-            displayName:
-              [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-              user.emailAddresses[0]?.emailAddress ||
-              user.id,
-            email: user.emailAddresses[0]?.emailAddress,
-            firstName: user.firstName,
-            lastName: user.lastName,
+            avatarUrl: user.image,
+            displayName: user.name || user.email || user.id,
+            email: user.email,
+            userId: user.id,
           },
           db
         );

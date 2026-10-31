@@ -105,7 +105,7 @@ describe("Database package exports boundary", () => {
 
     const orgQueries = await import("@repo/database/queries/organisations");
     expect(typeof orgQueries.getOrganisationById).toBe("function");
-    expect(typeof orgQueries.listOrganisationsByClerkOrg).toBe("function");
+    expect(typeof orgQueries.listOrganisationsByAccount).toBe("function");
 
     const peopleQueries = await import("@repo/database/queries/people");
     expect(typeof peopleQueries.listPeopleForOrganisation).toBe("function");
@@ -230,6 +230,11 @@ it("tenant transaction roots stay at entry points and registered phases", async 
 });
 
 const SYSTEM_IMPORT_ALLOWLIST = new Set([
+  "packages/auth/account-audit.ts",
+  "packages/auth/user-lifecycle.ts",
+  "packages/auth/membership-reconciliation.ts",
+  "packages/auth/adapters/better-auth-server.ts",
+  "packages/auth/adapters/better-auth-accounts.ts",
   "packages/database/index.ts",
   "packages/database/src/system-client.ts",
   "packages/database/src/xero-locks.ts",
@@ -248,8 +253,7 @@ const SYSTEM_IMPORT_ALLOWLIST = new Set([
   "packages/jobs/src/handlers/recount-usage.ts",
   "packages/jobs/src/handlers/send-notification-emails.ts",
   "apps/api/app/ical/[token]/route.ts",
-  "apps/api/app/webhooks/clerk/route.ts",
-  "apps/api/app/webhooks/stripe/route.ts",
+  "apps/api/app/webhooks/payments/route.ts",
 ]);
 
 it("only explicitly allowlisted production modules access the owner client", () => {

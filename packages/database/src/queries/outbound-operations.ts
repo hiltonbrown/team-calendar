@@ -7,9 +7,9 @@ import { scopedTo } from "../tenant-query";
 import { lockActiveScopedXeroConnection } from "../xero-locks";
 
 export interface OutboundOperationScope {
+  accountId: string;
   action?: "approve" | "decline" | "withdraw";
   availabilityRecordId: string;
-  clerkOrgId: string;
   organisationId: string;
 }
 
@@ -52,7 +52,7 @@ export const getSubmitOperation = async (
   scope: OutboundOperationScope,
   db: TenantDb
 ) => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const client = db;
   return await client.outboundOperation.findFirst({
     where: {
@@ -68,7 +68,7 @@ export const prepareAndClaimSubmitOperation = async (
 ): Promise<PreparedSubmitOperation | null> => {
   assertNoTenantTransaction("prepareAndClaimSubmitOperation");
   try {
-    return await withTenantDb(input.clerkOrgId, (db) =>
+    return await withTenantDb(input.accountId, (db) =>
       claimSubmitOperation(input, db)
     );
   } catch (error) {
@@ -92,7 +92,7 @@ export async function claimSubmitOperation(
   input: PrepareSubmitOperationInput,
   db: TenantDb
 ): Promise<PreparedSubmitOperation> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   if (!(await lockActiveScopedXeroConnection(input, db))) {
     throw new SubmitClaimConflictError();
   }
@@ -204,11 +204,11 @@ export async function claimSubmitOperation(
   } else {
     await db.outboundOperation.create({
       data: {
+        account_id: input.accountId,
         action: input.action ?? "approve",
         actor_user_id: actorUserId,
         attempt_generation: attemptGeneration,
         availability_record_id: input.availabilityRecordId,
-        clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
         request_employee_id: input.requestEmployeeId,
         request_ends_at: input.requestEndsAt,
@@ -277,7 +277,7 @@ export const markSubmitDispatchStarted = async (
   mutation: XeroMutationIdentity | undefined,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const tenantDb = db;
 
   const operation = await getSubmitOperation(scope, tenantDb);
@@ -326,7 +326,7 @@ export const markSubmitDefinitiveFailure = async (
   safeErrorCode: string,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const client = db;
 
   const updated = await client.outboundOperation.updateMany({
@@ -347,7 +347,7 @@ export const markSubmitOutcomeUnknown = async (
   safeErrorCode: string,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const tenantDb2 = db;
 
   const updated = await tenantDb2.outboundOperation.updateMany({
@@ -369,7 +369,7 @@ export const markSubmitProviderAccepted = async (
   remoteId: string,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const tenantDb3 = db;
 
   const updated = await tenantDb3.outboundOperation.updateMany({
@@ -394,7 +394,7 @@ export const markSubmitCompleted = async (
   scope: OutboundOperationAttemptScope,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const client = db;
 
   const updated = await client.outboundOperation.updateMany({
@@ -415,7 +415,7 @@ export const persistSubmitRecoveryMerge = async (
   mergedRecordId: string | null,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const client = db;
 
   const updated = await client.outboundOperation.updateMany({
@@ -436,7 +436,7 @@ export const acquireSubmitRecoverySideEffects = async (
   claimableBefore: Date,
   db: TenantDb
 ): Promise<Date | null> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const tenantDb4 = db;
 
   const claimedAt = new Date();
@@ -462,7 +462,7 @@ export const releaseSubmitRecoverySideEffects = async (
   claimedAt: Date,
   db: TenantDb
 ): Promise<void> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const tenantDb5 = db;
 
   await tenantDb5.outboundOperation.updateMany({
@@ -483,7 +483,7 @@ export const fenceSubmitRecoverySideEffectClaim = async (
   claimedAt: Date,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const client = db;
 
   const updated = await client.outboundOperation.updateMany({
@@ -504,7 +504,7 @@ export const hasUnresolvedSubmitOperation = async (
   scope: OutboundOperationScope,
   db: TenantDb
 ): Promise<boolean> => {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   const client = db;
 
   const count = await client.outboundOperation.count({

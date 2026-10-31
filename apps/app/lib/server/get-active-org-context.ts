@@ -2,30 +2,30 @@ import { withTenantDb } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 
-import { requireOrg } from "@repo/auth/helpers";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 
 /**
- * Resolves the active organisation context from Clerk auth and validated params.
+ * Resolves the active organisation context from getSession and validated params.
  * Must be called in server context only.
  *
- * Returns the clerk_org_id and organisation_id with full scope validation.
- * If organisation is missing or not accessible within the clerk_org_id boundary,
+ * Returns the account_id and organisation_id with full scope validation.
+ * If organisation is missing or not accessible within the account_id boundary,
  * returns an error result.
  */
 export async function getActiveOrgContext(organisationId: string): Promise<
   Result<{
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: OrganisationId;
   }>
 > {
   assertNoTenantTransaction("getActiveOrgContext");
-  // Get authenticated Clerk Org ID
-  let clerkOrgId: ClerkOrgId;
+  // Get authenticated Account ID
+  let accountId: AccountId;
   try {
-    clerkOrgId = (await requireOrg()) as ClerkOrgId;
+    accountId = (await requireAccount()) as AccountId;
   } catch {
     return {
       error: appError(
@@ -37,8 +37,8 @@ export async function getActiveOrgContext(organisationId: string): Promise<
   }
 
   // Validate organisation exists and is within scope
-  const orgResult = await withTenantDb(clerkOrgId, (db) =>
-    getOrganisationById(clerkOrgId, organisationId as OrganisationId, db)
+  const orgResult = await withTenantDb(accountId, (db) =>
+    getOrganisationById(accountId, organisationId as OrganisationId, db)
   );
 
   if (!orgResult.ok) {
@@ -60,7 +60,7 @@ export async function getActiveOrgContext(organisationId: string): Promise<
   return {
     ok: true,
     value: {
-      clerkOrgId,
+      accountId,
       organisationId: organisationId as OrganisationId,
     },
   };

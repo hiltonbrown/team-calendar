@@ -26,7 +26,7 @@ export type AggregateFeedScope = {
 
 export type FeedScopeMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   feed_id: string | null
   scope_type: $Enums.feed_scope_rule_type | null
@@ -36,7 +36,7 @@ export type FeedScopeMinAggregateOutputType = {
 
 export type FeedScopeMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   feed_id: string | null
   scope_type: $Enums.feed_scope_rule_type | null
@@ -46,7 +46,7 @@ export type FeedScopeMaxAggregateOutputType = {
 
 export type FeedScopeCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   feed_id: number
   scope_type: number
@@ -58,7 +58,7 @@ export type FeedScopeCountAggregateOutputType = {
 
 export type FeedScopeMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   feed_id?: true
   scope_type?: true
@@ -68,7 +68,7 @@ export type FeedScopeMinAggregateInputType = {
 
 export type FeedScopeMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   feed_id?: true
   scope_type?: true
@@ -78,7 +78,7 @@ export type FeedScopeMaxAggregateInputType = {
 
 export type FeedScopeCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   feed_id?: true
   scope_type?: true
@@ -161,7 +161,7 @@ export type FeedScopeGroupByArgs<ExtArgs extends runtime.Types.Extensions.Intern
 
 export type FeedScopeGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string | null
   feed_id: string
   scope_type: $Enums.feed_scope_rule_type
@@ -192,7 +192,7 @@ export type FeedScopeWhereInput = {
   OR?: Prisma.FeedScopeWhereInput[]
   NOT?: Prisma.FeedScopeWhereInput | Prisma.FeedScopeWhereInput[]
   id?: Prisma.UuidFilter<"FeedScope"> | string
-  clerk_org_id?: Prisma.StringFilter<"FeedScope"> | string
+  account_id?: Prisma.StringFilter<"FeedScope"> | string
   organisation_id?: Prisma.UuidNullableFilter<"FeedScope"> | string | null
   feed_id?: Prisma.UuidFilter<"FeedScope"> | string
   scope_type?: Prisma.Enumfeed_scope_rule_typeFilter<"FeedScope"> | $Enums.feed_scope_rule_type
@@ -203,7 +203,7 @@ export type FeedScopeWhereInput = {
 
 export type FeedScopeOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   scope_type?: Prisma.SortOrder
@@ -217,7 +217,7 @@ export type FeedScopeWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.FeedScopeWhereInput | Prisma.FeedScopeWhereInput[]
   OR?: Prisma.FeedScopeWhereInput[]
   NOT?: Prisma.FeedScopeWhereInput | Prisma.FeedScopeWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"FeedScope"> | string
+  account_id?: Prisma.StringFilter<"FeedScope"> | string
   organisation_id?: Prisma.UuidNullableFilter<"FeedScope"> | string | null
   feed_id?: Prisma.UuidFilter<"FeedScope"> | string
   scope_type?: Prisma.Enumfeed_scope_rule_typeFilter<"FeedScope"> | $Enums.feed_scope_rule_type
@@ -228,7 +228,7 @@ export type FeedScopeWhereUniqueInput = Prisma.AtLeast<{
 
 export type FeedScopeOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrderInput | Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   scope_type?: Prisma.SortOrder
@@ -244,7 +244,7 @@ export type FeedScopeScalarWhereWithAggregatesInput = {
   OR?: Prisma.FeedScopeScalarWhereWithAggregatesInput[]
   NOT?: Prisma.FeedScopeScalarWhereWithAggregatesInput | Prisma.FeedScopeScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"FeedScope"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"FeedScope"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"FeedScope"> | string
   organisation_id?: Prisma.UuidNullableWithAggregatesFilter<"FeedScope"> | string | null
   feed_id?: Prisma.UuidWithAggregatesFilter<"FeedScope"> | string
   scope_type?: Prisma.Enumfeed_scope_rule_typeWithAggregatesFilter<"FeedScope"> | $Enums.feed_scope_rule_type
@@ -254,7 +254,7 @@ export type FeedScopeScalarWhereWithAggregatesInput = {
 
 export type FeedScopeCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   scope_type: $Enums.feed_scope_rule_type
   scope_value?: string | null
@@ -264,7 +264,7 @@ export type FeedScopeCreateInput = {
 
 export type FeedScopeUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   feed_id: string
   scope_type: $Enums.feed_scope_rule_type
@@ -274,7 +274,7 @@ export type FeedScopeUncheckedCreateInput = {
 
 export type FeedScopeUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
   scope_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -284,7 +284,7 @@ export type FeedScopeUpdateInput = {
 
 export type FeedScopeUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
@@ -294,7 +294,7 @@ export type FeedScopeUncheckedUpdateInput = {
 
 export type FeedScopeCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   feed_id: string
   scope_type: $Enums.feed_scope_rule_type
@@ -304,7 +304,7 @@ export type FeedScopeCreateManyInput = {
 
 export type FeedScopeUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
   scope_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -313,7 +313,7 @@ export type FeedScopeUpdateManyMutationInput = {
 
 export type FeedScopeUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   feed_id?: Prisma.StringFieldUpdateOperationsInput | string
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
@@ -333,7 +333,7 @@ export type FeedScopeOrderByRelationAggregateInput = {
 
 export type FeedScopeCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   scope_type?: Prisma.SortOrder
@@ -343,7 +343,7 @@ export type FeedScopeCountOrderByAggregateInput = {
 
 export type FeedScopeMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   scope_type?: Prisma.SortOrder
@@ -353,7 +353,7 @@ export type FeedScopeMaxOrderByAggregateInput = {
 
 export type FeedScopeMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   feed_id?: Prisma.SortOrder
   scope_type?: Prisma.SortOrder
@@ -409,7 +409,7 @@ export type Enumfeed_scope_rule_typeFieldUpdateOperationsInput = {
 
 export type FeedScopeCreateWithoutFeedInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   scope_type: $Enums.feed_scope_rule_type
   scope_value?: string | null
@@ -418,7 +418,7 @@ export type FeedScopeCreateWithoutFeedInput = {
 
 export type FeedScopeUncheckedCreateWithoutFeedInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   scope_type: $Enums.feed_scope_rule_type
   scope_value?: string | null
@@ -456,7 +456,7 @@ export type FeedScopeScalarWhereInput = {
   OR?: Prisma.FeedScopeScalarWhereInput[]
   NOT?: Prisma.FeedScopeScalarWhereInput | Prisma.FeedScopeScalarWhereInput[]
   id?: Prisma.UuidFilter<"FeedScope"> | string
-  clerk_org_id?: Prisma.StringFilter<"FeedScope"> | string
+  account_id?: Prisma.StringFilter<"FeedScope"> | string
   organisation_id?: Prisma.UuidNullableFilter<"FeedScope"> | string | null
   feed_id?: Prisma.UuidFilter<"FeedScope"> | string
   scope_type?: Prisma.Enumfeed_scope_rule_typeFilter<"FeedScope"> | $Enums.feed_scope_rule_type
@@ -466,7 +466,7 @@ export type FeedScopeScalarWhereInput = {
 
 export type FeedScopeCreateManyFeedInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id?: string | null
   scope_type: $Enums.feed_scope_rule_type
   scope_value?: string | null
@@ -475,7 +475,7 @@ export type FeedScopeCreateManyFeedInput = {
 
 export type FeedScopeUpdateWithoutFeedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
   scope_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -484,7 +484,7 @@ export type FeedScopeUpdateWithoutFeedInput = {
 
 export type FeedScopeUncheckedUpdateWithoutFeedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
   scope_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -493,7 +493,7 @@ export type FeedScopeUncheckedUpdateWithoutFeedInput = {
 
 export type FeedScopeUncheckedUpdateManyWithoutFeedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   scope_type?: Prisma.Enumfeed_scope_rule_typeFieldUpdateOperationsInput | $Enums.feed_scope_rule_type
   scope_value?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -504,7 +504,7 @@ export type FeedScopeUncheckedUpdateManyWithoutFeedInput = {
 
 export type FeedScopeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   feed_id?: boolean
   scope_type?: boolean
@@ -515,7 +515,7 @@ export type FeedScopeSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
 
 export type FeedScopeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   feed_id?: boolean
   scope_type?: boolean
@@ -526,7 +526,7 @@ export type FeedScopeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
 
 export type FeedScopeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   feed_id?: boolean
   scope_type?: boolean
@@ -537,7 +537,7 @@ export type FeedScopeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
 
 export type FeedScopeSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   feed_id?: boolean
   scope_type?: boolean
@@ -545,7 +545,7 @@ export type FeedScopeSelectScalar = {
   created_at?: boolean
 }
 
-export type FeedScopeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "feed_id" | "scope_type" | "scope_value" | "created_at", ExtArgs["result"]["feedScope"]>
+export type FeedScopeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "feed_id" | "scope_type" | "scope_value" | "created_at", ExtArgs["result"]["feedScope"]>
 export type FeedScopeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   feed?: boolean | Prisma.FeedDefaultArgs<ExtArgs>
 }
@@ -563,7 +563,7 @@ export type $FeedScopePayload<ExtArgs extends runtime.Types.Extensions.InternalA
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string | null
     feed_id: string
     scope_type: $Enums.feed_scope_rule_type
@@ -994,7 +994,7 @@ export interface Prisma__FeedScopeClient<T, Null = never, ExtArgs extends runtim
  */
 export interface FeedScopeFieldRefs {
   readonly id: Prisma.FieldRef<"FeedScope", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"FeedScope", 'String'>
+  readonly account_id: Prisma.FieldRef<"FeedScope", 'String'>
   readonly organisation_id: Prisma.FieldRef<"FeedScope", 'String'>
   readonly feed_id: Prisma.FieldRef<"FeedScope", 'String'>
   readonly scope_type: Prisma.FieldRef<"FeedScope", 'feed_scope_rule_type'>

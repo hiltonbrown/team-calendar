@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { getScopedXeroAuthorisationMetadata } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { log } from "@repo/observability/log";
@@ -189,9 +190,9 @@ const RunStatusSchema = z.enum([
 ]);
 const TriggerTypeSchema = z.enum(["scheduled", "manual", "webhook"]);
 const BaseSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1).optional(),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 const ListTenantSummariesSchema = BaseSchema;
@@ -258,7 +259,7 @@ export async function listTenantSummaries(
   input: z.input<typeof ListTenantSummariesSchema>,
   db: TenantDb
 ): Promise<Result<TenantSummary[], SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = ListTenantSummariesSchema.safeParse(input);
   if (!parsed.success) {
@@ -294,7 +295,7 @@ export async function listTenantSummaries(
         tenant.id,
         await getScopedXeroAuthorisationMetadata(
           {
-            clerkOrgId: parsed.data.clerkOrgId,
+            accountId: parsed.data.accountId,
             connectionId: tenant.id,
             organisationId: parsed.data.organisationId,
           },
@@ -478,7 +479,7 @@ export async function listTenantSummaries(
       }),
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function listRuns(
@@ -493,7 +494,7 @@ export async function listRuns(
     SyncMonitorError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = ListRunsSchema.safeParse(input);
   if (!parsed.success) {
@@ -532,14 +533,14 @@ export async function listRuns(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function getRunDetail(
   input: z.input<typeof GetRunDetailSchema>,
   db: TenantDb
 ): Promise<Result<RunDetail, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = GetRunDetailSchema.safeParse(input);
   if (!parsed.success) {
@@ -626,14 +627,14 @@ export async function getRunDetail(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function listRunFailedRecords(
   input: z.input<typeof DetailPageSchema>,
   db: TenantDb
 ): Promise<Result<RunDetailPage, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = DetailPageSchema.safeParse(input);
   if (!parsed.success) {
@@ -688,14 +689,14 @@ export async function listRunFailedRecords(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function listRunTimeline(
   input: z.input<typeof DetailPageSchema>,
   db: TenantDb
 ): Promise<Result<TimelinePage, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = DetailPageSchema.safeParse(input);
   if (!parsed.success) {
@@ -742,7 +743,7 @@ export async function listRunTimeline(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function getRedactedFailedRecordPayload(
@@ -756,15 +757,13 @@ export async function getRedactedFailedRecordPayload(
     SyncMonitorError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = GetRawFailureSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (
-    !(parsed.data.actingRole === "admin" || parsed.data.actingRole === "owner")
-  ) {
+  if (!hasPermission(parsed.data.actingRole, { xero: ["sync"] })) {
     return notAuthorised();
   }
   const run = async (
@@ -784,9 +783,9 @@ export async function getRedactedFailedRecordPayload(
     }
     await client.auditEvent.create({
       data: {
+        account_id: parsed.data.accountId,
         action: "sync.failed_record_payload_viewed",
         actor_user_id: parsed.data.actingUserId,
-        clerk_org_id: parsed.data.clerkOrgId,
         organisation_id: parsed.data.organisationId,
         resource_id: failure.id,
         resource_type: "failed_record",
@@ -800,7 +799,7 @@ export async function getRedactedFailedRecordPayload(
     return { ok: true, value: { payload } };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -818,7 +817,7 @@ export async function dispatchManualSync(
 ): Promise<Result<ManualSyncOutcome, SyncMonitorError>> {
   assertNoTenantTransaction("dispatchManualSync");
   try {
-    const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+    const prepared = await withTenantDb(input.accountId, (db) =>
       prepareManualSync(input, db)
     );
     if (!prepared.ok) {
@@ -829,7 +828,7 @@ export async function dispatchManualSync(
       return sent;
     }
     const { input: dispatchInput } = prepared.value;
-    const audited = await withTenantDb(input.clerkOrgId, (db) =>
+    const audited = await withTenantDb(input.accountId, (db) =>
       recordManualSyncDispatch(dispatchInput, db)
     );
     return audited.ok ? sent : audited;
@@ -842,7 +841,7 @@ export async function prepareManualSync(
   input: z.input<typeof DispatchManualSyncSchema>,
   db: TenantDb
 ): Promise<Result<PreparedManualSync, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = DispatchManualSyncSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -932,7 +931,7 @@ export async function sendPreparedManualSync(
   try {
     const { input } = prepared;
     const dispatched = await dispatchSyncEvent({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       connectionId: input.connectionId,
       organisationId: input.organisationId,
       runType: input.runType,
@@ -961,7 +960,7 @@ export async function recordManualSyncDispatch(
   input: z.input<typeof DispatchManualSyncSchema>,
   db: TenantDb
 ): Promise<Result<void, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = DispatchManualSyncSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -994,7 +993,7 @@ export async function exportFailedRecordsCsv(
     SyncMonitorError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
 
   const parsed = ExportFailedRecordsCsvSchema.safeParse(input);
   if (!parsed.success) {
@@ -1082,7 +1081,7 @@ export async function exportFailedRecordsCsv(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -1098,7 +1097,7 @@ export async function cancelRun(
 > {
   assertNoTenantTransaction("cancelRun");
   try {
-    const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+    const prepared = await withTenantDb(input.accountId, (db) =>
       prepareSyncCancellation(input, db)
     );
     if (!prepared.ok) {
@@ -1110,7 +1109,7 @@ export async function cancelRun(
     }
     const { value: cancellationInput } = prepared;
     const { eventQueued } = sent.value;
-    const audited = await withTenantDb(input.clerkOrgId, (db) =>
+    const audited = await withTenantDb(input.accountId, (db) =>
       recordSyncCancellation(cancellationInput, eventQueued, db)
     );
     return audited.ok ? sent : audited;
@@ -1123,7 +1122,7 @@ export async function prepareSyncCancellation(
   input: z.input<typeof CancelRunSchema>,
   db: TenantDb
 ): Promise<Result<PreparedSyncCancellation, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = CancelRunSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -1160,7 +1159,7 @@ export async function sendPreparedSyncCancellation(
   assertNoTenantTransaction("sendPreparedSyncCancellation");
   try {
     const queued = await dispatchCancelSyncRun({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       organisationId: input.organisationId,
       runId: input.runId,
     });
@@ -1178,7 +1177,7 @@ export async function recordSyncCancellation(
   eventQueued: boolean,
   db: TenantDb
 ): Promise<Result<void, SyncMonitorError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   await db.auditEvent.create({
     data: {
       ...auditBase(input, input.actingUserId),
@@ -1195,12 +1194,12 @@ export async function recordSyncCancellation(
   return { ok: true, value: undefined };
 }
 function canUseSyncMonitor(role: SyncMonitorRole): boolean {
-  return role === "admin" || role === "owner";
+  return hasPermission(role, { xero: ["sync"] });
 }
 function auditBase(input: BaseInput, actingUserId: string) {
   return {
+    account_id: input.accountId,
     actor_user_id: actingUserId,
-    clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
   };
 }
@@ -1389,7 +1388,7 @@ function runWhere(
 }
 async function loadTriggeredByPeople(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   },
   runs: Array<{
@@ -1412,21 +1411,21 @@ async function loadTriggeredByPeople(
   }
   const people = await db.person.findMany({
     select: {
-      clerk_user_id: true,
       first_name: true,
       last_name: true,
+      user_id: true,
     },
     where: {
       ...scoped(input),
-      clerk_user_id: { in: userIds },
+      user_id: { in: userIds },
     },
   });
   return new Map(
     people.flatMap((person) =>
-      person.clerk_user_id
+      person.user_id
         ? [
             [
-              person.clerk_user_id,
+              person.user_id,
               `${person.first_name} ${person.last_name.charAt(0)}.`,
             ],
           ]
@@ -1497,18 +1496,18 @@ async function runNotFound(
 ): Promise<Result<never, SyncMonitorError>> {
   const existing = await db.syncRun.findUnique({
     select: {
-      clerk_org_id: true,
+      account_id: true,
       organisation_id: true,
     },
     where: { id: input.runId },
   });
   if (
     existing &&
-    (existing.clerk_org_id !== input.clerkOrgId ||
+    (existing.account_id !== input.accountId ||
       existing.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.runId,
       resourceType: "sync_run",
@@ -1525,18 +1524,18 @@ async function tenantNotFound(
 ): Promise<Result<never, SyncMonitorError>> {
   const existing = await db.xeroConnection.findUnique({
     select: {
-      clerk_org_id: true,
+      account_id: true,
       organisation_id: true,
     },
     where: { id: input.connectionId },
   });
   if (
     existing &&
-    (existing.clerk_org_id !== input.clerkOrgId ||
+    (existing.account_id !== input.accountId ||
       existing.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.connectionId,
       resourceType: "xero_tenant",

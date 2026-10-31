@@ -22,8 +22,8 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 const personId = "00000000-0000-4000-8000-000000000011";
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: async () => ({ orgId: "org_1", orgRole: "org:viewer" }),
-  currentUser: async () => ({ id: "user_1" }),
+  getCurrentUser: async () => ({ id: "user_1" }),
+  getSession: async () => ({ accountId: "org_1", role: "viewer" }),
 }));
 vi.mock("@repo/availability", () => ({
   getRecord: mocks.getRecord,
@@ -49,8 +49,8 @@ vi.mock("@repo/database", async () => ({
   resolveAccountCompanies: async () => [
     { id: organisationId, name: "Company A" },
   ],
-  scopedQuery: (clerkOrgId: string, payrollOrganisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: (accountId: string, payrollOrganisationId: string) => ({
+    account_id: accountId,
     organisation_id: payrollOrganisationId,
   }),
   ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
@@ -77,7 +77,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: async () => ({
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     organisationId: "00000000-0000-4000-8000-000000000001",
     orgQueryValue: "org_1",
   }),
@@ -157,7 +157,7 @@ describe("calendar slot plan form loading", () => {
     );
     expect(mocks.organisation).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { archived_at: null, clerk_org_id: "org_1", id: organisationId },
+        where: { account_id: "org_1", archived_at: null, id: organisationId },
       })
     );
   });

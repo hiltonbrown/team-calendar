@@ -1,6 +1,7 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { log } from "@repo/observability/log";
 import "server-only";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
@@ -32,11 +33,11 @@ export type ManualBalanceServiceError =
       message: string;
     };
 const ManualBalanceSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.enum(["admin", "manager", "owner", "viewer"]),
   actingUserId: z.string().min(1),
   balance: z.number().finite(),
   balanceUnit: z.enum(["days", "hours"]).nullable().optional(),
-  clerkOrgId: z.string().min(1),
   leaveTypeName: z.string().trim().max(200).nullable().optional(),
   leaveTypeXeroId: z.string().trim().min(1).max(200),
   organisationId: z.string().uuid(),
@@ -73,7 +74,7 @@ export async function setManualLeaveBalance(
     actingUserId: string;
     balance: number;
     balanceUnit?: leave_balance_unit | null;
-    clerkOrgId: string;
+    accountId: string;
     leaveTypeName?: null | string;
     leaveTypeXeroId: string;
     organisationId: string;
@@ -89,7 +90,7 @@ export async function setManualLeaveBalance(
     ManualBalanceServiceError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof setManualLeaveBalance> => {
@@ -97,20 +98,16 @@ export async function setManualLeaveBalance(
     if (!parsed.success) {
       return validationError(parsed.error);
     }
-    if (
-      !(
-        parsed.data.actingRole === "admin" || parsed.data.actingRole === "owner"
-      )
-    ) {
+    if (!hasPermission(parsed.data.actingRole, { balances: ["manage"] })) {
       return notAuthorised();
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const xeroStateResult = await getXeroConnectionStateForScope(
       {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         organisationId: parsed.data.organisationId,
       },
       client
@@ -147,14 +144,14 @@ export async function setManualLeaveBalance(
     return await createOrUpdateManualBalance(parsed.data, scoped, client);
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
 async function createOrUpdateManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   scoped: {
-    clerk_org_id: ClerkOrgId;
+    account_id: AccountId;
     organisation_id: OrganisationId;
   },
   db: TenantDb
@@ -193,7 +190,7 @@ async function createOrUpdateManualBalance(
 async function updateManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   scoped: {
-    clerk_org_id: ClerkOrgId;
+    account_id: AccountId;
     organisation_id: OrganisationId;
   },
   balanceId: string,
@@ -231,7 +228,7 @@ function manualBalanceData(input: z.infer<typeof ManualBalanceSchema>) {
 async function findManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   scoped: {
-    clerk_org_id: ClerkOrgId;
+    account_id: AccountId;
     organisation_id: OrganisationId;
   },
   db: TenantDb
@@ -253,9 +250,9 @@ async function auditManualBalance(
 ) {
   await db.auditEvent.create({
     data: {
+      account_id: input.accountId,
       action: "leave_balances.manual_balance_saved",
       actor_user_id: input.actingUserId,
-      clerk_org_id: input.clerkOrgId,
       organisation_id: input.organisationId,
       payload: {
         balance: input.balance,
@@ -270,23 +267,23 @@ async function auditManualBalance(
 }
 async function personNotFound(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<Result<never, ManualBalanceServiceError>> {
   const exists = await db.person.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { clerk_org_id: input.clerkOrgId, id: input.personId },
+    select: { account_id: true, organisation_id: true },
+    where: { account_id: input.accountId, id: input.personId },
   });
   if (
     exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
+    (exists.account_id !== input.accountId ||
       exists.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.personId,
       resourceType: "person",

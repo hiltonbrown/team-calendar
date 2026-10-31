@@ -6,7 +6,7 @@ interface CleanupDatabase {
   ) => Promise<T>;
 }
 export interface XeroFixtureOwnership {
-  clerkOrgIds: string[];
+  accountIds: string[];
   globalKeys: string[];
   organisationIds: string[];
 }
@@ -42,12 +42,12 @@ export async function assertXeroFixtureInfrastructureOwned(
   const unsafe = await database.$queryRawUnsafe<{ unsafe: boolean }[]>(
     `
     SELECT EXISTS (SELECT 1 FROM xero_connections WHERE xero_authorisation_id IN (${ownedAuthorisationsSql})
-      AND NOT (clerk_org_id = ANY($3::text[]) AND organisation_id::text = ANY($4::text[])))
+      AND NOT (account_id = ANY($3::text[]) AND organisation_id::text = ANY($4::text[])))
     OR EXISTS (SELECT 1 FROM xero_oauth_sessions WHERE xero_authorisation_id IN (${ownedAuthorisationsSql})
-      AND NOT (clerk_org_id = ANY($3::text[]) AND organisation_id::text = ANY($4::text[]))) AS unsafe
+      AND NOT (account_id = ANY($3::text[]) AND organisation_id::text = ANY($4::text[]))) AS unsafe
   `,
     ...infrastructureValues(owned),
-    owned.clerkOrgIds,
+    owned.accountIds,
     owned.organisationIds
   );
   if (unsafe[0]?.unsafe !== false) {

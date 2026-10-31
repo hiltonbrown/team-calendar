@@ -1,5 +1,6 @@
-import { auth } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getSession } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -12,21 +13,27 @@ interface SettingsLayoutProps {
 }
 
 const SettingsLayout = async ({ children }: SettingsLayoutProps) => {
-  const { orgId, orgRole } = await auth();
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
 
-  if (!orgId) {
+  if (!sessionAccountId) {
     redirect("/");
   }
 
-  const isAdminOrOwner = orgRole === "org:owner" || orgRole === "org:admin";
+  const isAdminOrOwner = can(sessionRole, { settings: ["update"] });
 
   if (!isAdminOrOwner) {
     redirect("/");
   }
 
-  const clerkOrgId = orgId as ClerkOrgId;
-  const { organisationId } = await withTenantDb(clerkOrgId, (db) =>
-    resolveActiveOrgPageContext(clerkOrgId, undefined, db)
+  const accountId = sessionAccountId as AccountId;
+  const { organisationId } = await withTenantDb(accountId, (db) =>
+    resolveActiveOrgPageContext(accountId, undefined, db)
   );
 
   return (

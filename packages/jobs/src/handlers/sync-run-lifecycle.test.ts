@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   normaliseInboundLeaveRecord: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
   scopeDatabase: null as Record<string, unknown> | null,
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   syncRunCreate: vi.fn(),
@@ -104,13 +104,13 @@ const {
   isRunCancelled,
   XeroSyncRunFencedError,
 } = await import("./sync-run-lifecycle");
-const CLERK_ORG_ID = "org_sync_lifecycle";
+const ACCOUNT_ID = "org_sync_lifecycle";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const RUN_ID = "10000000-0000-4000-8000-000000000001";
 const XERO_CONNECTION_ID = "20000000-0000-4000-8000-000000000001";
 function input() {
   return {
-    clerkOrgId: CLERK_ORG_ID,
+    accountId: ACCOUNT_ID,
     connectionId: XERO_CONNECTION_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -142,7 +142,7 @@ describe("sync run lifecycle guards", () => {
           status: "failed",
         }),
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: RUN_ID,
           organisation_id: ORGANISATION_ID,
         }),
@@ -158,7 +158,7 @@ describe("sync run lifecycle guards", () => {
     expect(mocks.syncRunFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           organisation_id: ORGANISATION_ID,
           run_type: "leave_records",
           started_at: {
@@ -373,12 +373,12 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           organisationId: ORGANISATION_ID,
         }),
         (db) =>
           assertRunActive(
-            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID },
             RUN_ID,
             db
           )
@@ -390,12 +390,12 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           organisationId: ORGANISATION_ID,
         }),
         (db) =>
           assertRunActive(
-            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID },
             RUN_ID,
             db
           )
@@ -410,12 +410,12 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           organisationId: ORGANISATION_ID,
         }),
         (db) =>
           assertRunActive(
-            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID },
             RUN_ID,
             db
           )
@@ -430,12 +430,12 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId: CLERK_ORG_ID,
+          accountId: ACCOUNT_ID,
           organisationId: ORGANISATION_ID,
         }),
         (db) =>
           assertRunActive(
-            { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+            { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID },
             RUN_ID,
             db
           )
@@ -448,12 +448,12 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     });
     const cancelled = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
       }),
       (db) =>
         isRunCancelled(
-          { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+          { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID },
           RUN_ID,
           db
         )
@@ -464,12 +464,12 @@ describe("acquireSyncRun and fencing lifecycle", () => {
     });
     const notCancelled = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         organisationId: ORGANISATION_ID,
       }),
       (db) =>
         isRunCancelled(
-          { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID },
+          { accountId: ACCOUNT_ID, organisationId: ORGANISATION_ID },
           RUN_ID,
           db
         )

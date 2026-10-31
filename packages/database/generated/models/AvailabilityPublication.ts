@@ -36,7 +36,7 @@ export type AvailabilityPublicationSumAggregateOutputType = {
 
 export type AvailabilityPublicationMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   availability_record_id: string | null
   published_uid: string | null
@@ -54,7 +54,7 @@ export type AvailabilityPublicationMinAggregateOutputType = {
 
 export type AvailabilityPublicationMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   availability_record_id: string | null
   published_uid: string | null
@@ -72,7 +72,7 @@ export type AvailabilityPublicationMaxAggregateOutputType = {
 
 export type AvailabilityPublicationCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   availability_record_id: number
   published_uid: number
@@ -100,7 +100,7 @@ export type AvailabilityPublicationSumAggregateInputType = {
 
 export type AvailabilityPublicationMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   availability_record_id?: true
   published_uid?: true
@@ -118,7 +118,7 @@ export type AvailabilityPublicationMinAggregateInputType = {
 
 export type AvailabilityPublicationMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   availability_record_id?: true
   published_uid?: true
@@ -136,7 +136,7 @@ export type AvailabilityPublicationMaxAggregateInputType = {
 
 export type AvailabilityPublicationCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   availability_record_id?: true
   published_uid?: true
@@ -241,7 +241,7 @@ export type AvailabilityPublicationGroupByArgs<ExtArgs extends runtime.Types.Ext
 
 export type AvailabilityPublicationGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   availability_record_id: string
   published_uid: string
@@ -282,7 +282,7 @@ export type AvailabilityPublicationWhereInput = {
   OR?: Prisma.AvailabilityPublicationWhereInput[]
   NOT?: Prisma.AvailabilityPublicationWhereInput | Prisma.AvailabilityPublicationWhereInput[]
   id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
-  clerk_org_id?: Prisma.StringFilter<"AvailabilityPublication"> | string
+  account_id?: Prisma.StringFilter<"AvailabilityPublication"> | string
   organisation_id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
   availability_record_id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
   published_uid?: Prisma.StringFilter<"AvailabilityPublication"> | string
@@ -302,7 +302,7 @@ export type AvailabilityPublicationWhereInput = {
 
 export type AvailabilityPublicationOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   published_uid?: Prisma.SortOrder
@@ -326,7 +326,7 @@ export type AvailabilityPublicationWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.AvailabilityPublicationWhereInput | Prisma.AvailabilityPublicationWhereInput[]
   OR?: Prisma.AvailabilityPublicationWhereInput[]
   NOT?: Prisma.AvailabilityPublicationWhereInput | Prisma.AvailabilityPublicationWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"AvailabilityPublication"> | string
+  account_id?: Prisma.StringFilter<"AvailabilityPublication"> | string
   organisation_id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
   published_uid?: Prisma.StringFilter<"AvailabilityPublication"> | string
   published_summary?: Prisma.StringFilter<"AvailabilityPublication"> | string
@@ -345,7 +345,7 @@ export type AvailabilityPublicationWhereUniqueInput = Prisma.AtLeast<{
 
 export type AvailabilityPublicationOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   published_uid?: Prisma.SortOrder
@@ -371,7 +371,7 @@ export type AvailabilityPublicationScalarWhereWithAggregatesInput = {
   OR?: Prisma.AvailabilityPublicationScalarWhereWithAggregatesInput[]
   NOT?: Prisma.AvailabilityPublicationScalarWhereWithAggregatesInput | Prisma.AvailabilityPublicationScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"AvailabilityPublication"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"AvailabilityPublication"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"AvailabilityPublication"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"AvailabilityPublication"> | string
   availability_record_id?: Prisma.UuidWithAggregatesFilter<"AvailabilityPublication"> | string
   published_uid?: Prisma.StringWithAggregatesFilter<"AvailabilityPublication"> | string
@@ -389,7 +389,7 @@ export type AvailabilityPublicationScalarWhereWithAggregatesInput = {
 
 export type AvailabilityPublicationCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   published_uid: string
   published_summary: string
   published_description?: string | null
@@ -407,7 +407,7 @@ export type AvailabilityPublicationCreateInput = {
 
 export type AvailabilityPublicationUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   availability_record_id: string
   published_uid: string
@@ -425,7 +425,7 @@ export type AvailabilityPublicationUncheckedCreateInput = {
 
 export type AvailabilityPublicationUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
   published_description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -443,7 +443,7 @@ export type AvailabilityPublicationUpdateInput = {
 
 export type AvailabilityPublicationUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
@@ -461,7 +461,7 @@ export type AvailabilityPublicationUncheckedUpdateInput = {
 
 export type AvailabilityPublicationCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   availability_record_id: string
   published_uid: string
@@ -479,7 +479,7 @@ export type AvailabilityPublicationCreateManyInput = {
 
 export type AvailabilityPublicationUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
   published_description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -495,7 +495,7 @@ export type AvailabilityPublicationUpdateManyMutationInput = {
 
 export type AvailabilityPublicationUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
@@ -528,7 +528,7 @@ export type AvailabilityPublicationNullableScalarRelationFilter = {
 
 export type AvailabilityPublicationCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   published_uid?: Prisma.SortOrder
@@ -550,7 +550,7 @@ export type AvailabilityPublicationAvgOrderByAggregateInput = {
 
 export type AvailabilityPublicationMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   published_uid?: Prisma.SortOrder
@@ -568,7 +568,7 @@ export type AvailabilityPublicationMaxOrderByAggregateInput = {
 
 export type AvailabilityPublicationMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   availability_record_id?: Prisma.SortOrder
   published_uid?: Prisma.SortOrder
@@ -664,7 +664,7 @@ export type AvailabilityPublicationUncheckedUpdateOneWithoutAvailability_recordN
 
 export type AvailabilityPublicationCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   published_uid: string
   published_summary: string
   published_description?: string | null
@@ -681,7 +681,7 @@ export type AvailabilityPublicationCreateWithoutOrganisationInput = {
 
 export type AvailabilityPublicationUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   availability_record_id: string
   published_uid: string
   published_summary: string
@@ -727,7 +727,7 @@ export type AvailabilityPublicationScalarWhereInput = {
   OR?: Prisma.AvailabilityPublicationScalarWhereInput[]
   NOT?: Prisma.AvailabilityPublicationScalarWhereInput | Prisma.AvailabilityPublicationScalarWhereInput[]
   id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
-  clerk_org_id?: Prisma.StringFilter<"AvailabilityPublication"> | string
+  account_id?: Prisma.StringFilter<"AvailabilityPublication"> | string
   organisation_id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
   availability_record_id?: Prisma.UuidFilter<"AvailabilityPublication"> | string
   published_uid?: Prisma.StringFilter<"AvailabilityPublication"> | string
@@ -745,7 +745,7 @@ export type AvailabilityPublicationScalarWhereInput = {
 
 export type AvailabilityPublicationCreateWithoutAvailability_recordInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   published_uid: string
   published_summary: string
   published_description?: string | null
@@ -762,7 +762,7 @@ export type AvailabilityPublicationCreateWithoutAvailability_recordInput = {
 
 export type AvailabilityPublicationUncheckedCreateWithoutAvailability_recordInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   published_uid: string
   published_summary: string
@@ -795,7 +795,7 @@ export type AvailabilityPublicationUpdateToOneWithWhereWithoutAvailability_recor
 
 export type AvailabilityPublicationUpdateWithoutAvailability_recordInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
   published_description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -812,7 +812,7 @@ export type AvailabilityPublicationUpdateWithoutAvailability_recordInput = {
 
 export type AvailabilityPublicationUncheckedUpdateWithoutAvailability_recordInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
@@ -829,7 +829,7 @@ export type AvailabilityPublicationUncheckedUpdateWithoutAvailability_recordInpu
 
 export type AvailabilityPublicationCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   availability_record_id: string
   published_uid: string
   published_summary: string
@@ -846,7 +846,7 @@ export type AvailabilityPublicationCreateManyOrganisationInput = {
 
 export type AvailabilityPublicationUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
   published_description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -863,7 +863,7 @@ export type AvailabilityPublicationUpdateWithoutOrganisationInput = {
 
 export type AvailabilityPublicationUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
@@ -880,7 +880,7 @@ export type AvailabilityPublicationUncheckedUpdateWithoutOrganisationInput = {
 
 export type AvailabilityPublicationUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   availability_record_id?: Prisma.StringFieldUpdateOperationsInput | string
   published_uid?: Prisma.StringFieldUpdateOperationsInput | string
   published_summary?: Prisma.StringFieldUpdateOperationsInput | string
@@ -899,7 +899,7 @@ export type AvailabilityPublicationUncheckedUpdateManyWithoutOrganisationInput =
 
 export type AvailabilityPublicationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   published_uid?: boolean
@@ -919,7 +919,7 @@ export type AvailabilityPublicationSelect<ExtArgs extends runtime.Types.Extensio
 
 export type AvailabilityPublicationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   published_uid?: boolean
@@ -939,7 +939,7 @@ export type AvailabilityPublicationSelectCreateManyAndReturn<ExtArgs extends run
 
 export type AvailabilityPublicationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   published_uid?: boolean
@@ -959,7 +959,7 @@ export type AvailabilityPublicationSelectUpdateManyAndReturn<ExtArgs extends run
 
 export type AvailabilityPublicationSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   availability_record_id?: boolean
   published_uid?: boolean
@@ -975,7 +975,7 @@ export type AvailabilityPublicationSelectScalar = {
   updated_at?: boolean
 }
 
-export type AvailabilityPublicationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "published_uid" | "published_summary" | "published_description" | "published_all_day" | "published_sequence" | "published_at" | "privacy_mode" | "published_starts_at" | "published_ends_at" | "created_at" | "updated_at", ExtArgs["result"]["availabilityPublication"]>
+export type AvailabilityPublicationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "availability_record_id" | "published_uid" | "published_summary" | "published_description" | "published_all_day" | "published_sequence" | "published_at" | "privacy_mode" | "published_starts_at" | "published_ends_at" | "created_at" | "updated_at", ExtArgs["result"]["availabilityPublication"]>
 export type AvailabilityPublicationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   availability_record?: boolean | Prisma.AvailabilityRecordDefaultArgs<ExtArgs>
@@ -997,7 +997,7 @@ export type $AvailabilityPublicationPayload<ExtArgs extends runtime.Types.Extens
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     availability_record_id: string
     published_uid: string
@@ -1437,7 +1437,7 @@ export interface Prisma__AvailabilityPublicationClient<T, Null = never, ExtArgs 
  */
 export interface AvailabilityPublicationFieldRefs {
   readonly id: Prisma.FieldRef<"AvailabilityPublication", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"AvailabilityPublication", 'String'>
+  readonly account_id: Prisma.FieldRef<"AvailabilityPublication", 'String'>
   readonly organisation_id: Prisma.FieldRef<"AvailabilityPublication", 'String'>
   readonly availability_record_id: Prisma.FieldRef<"AvailabilityPublication", 'String'>
   readonly published_uid: Prisma.FieldRef<"AvailabilityPublication", 'String'>

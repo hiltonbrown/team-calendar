@@ -1,4 +1,8 @@
-import { currentUser, requireOrg, requireRole } from "@repo/auth/helpers";
+import {
+  getCurrentUser,
+  hasPermission,
+  requireAccount,
+} from "@repo/auth/helpers";
 import {
   prepareManualSync,
   recordManualSyncDispatch,
@@ -26,14 +30,14 @@ const DispatchSyncRequestSchema = z.object({
 });
 
 export async function POST(request: Request): Promise<Response> {
-  let clerkOrgId: string;
+  let accountId: string;
   try {
-    clerkOrgId = await requireOrg();
+    accountId = await requireAccount();
   } catch {
     return NextResponse.json(notAuthorised(), { status: 401 });
   }
 
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json(notAuthorised(), { status: 401 });
   }
@@ -41,8 +45,8 @@ export async function POST(request: Request): Promise<Response> {
   let role: SyncMonitorRole | null = null;
   try {
     const [isAdmin, isOwner] = await Promise.all([
-      requireRole("org:admin"),
-      requireRole("org:owner"),
+      hasPermission({ xero: ["sync"] }),
+      hasPermission({ ownership: ["manage"] }),
     ]);
     if (isOwner) {
       role = "owner";
@@ -72,16 +76,16 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const syncInput = {
+    accountId,
     actingRole: role,
     actingUserId: user.id,
-    clerkOrgId,
     connectionId: parsed.data.connectionId,
     organisationId: parsed.data.organisationId,
     runType: parsed.data.runType,
   };
   let result: Awaited<ReturnType<typeof sendPreparedManualSync>>;
   try {
-    const prepared = await withTenantDb(clerkOrgId, (db) =>
+    const prepared = await withTenantDb(accountId, (db) =>
       prepareManualSync(syncInput, db)
     );
     const sent = prepared.ok
@@ -89,7 +93,7 @@ export async function POST(request: Request): Promise<Response> {
       : prepared;
     result = sent;
     if (sent.ok && sent.value.queued) {
-      const audited = await withTenantDb(clerkOrgId, (db) =>
+      const audited = await withTenantDb(accountId, (db) =>
         recordManualSyncDispatch(syncInput, db)
       );
       if (!audited.ok) {

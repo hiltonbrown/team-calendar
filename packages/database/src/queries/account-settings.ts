@@ -2,45 +2,45 @@ import { assertTenantDb, type TenantDb } from "../tenant-db";
 
 export type ManagerVisibilityScope = "all_team_leave" | "direct_reports_only";
 const select = {
-  clerk_org_id: true,
+  account_id: true,
   created_at: true,
   id: true,
   manager_visibility_scope: true,
   updated_at: true,
 } as const;
 
-export async function getAccountSettings(clerkOrgId: string, db: TenantDb) {
-  assertTenantDb(db, clerkOrgId);
+export async function getAccountSettings(accountId: string, db: TenantDb) {
+  assertTenantDb(db, accountId);
   const existing = await db.accountSettings.findFirst({
     select,
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
   if (existing) {
     return existing;
   }
   await db.accountSettings.createMany({
-    data: { clerk_org_id: clerkOrgId },
+    data: { account_id: accountId },
     skipDuplicates: true,
   });
   return db.accountSettings.findFirstOrThrow({
     select,
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
 }
 
 export async function updateAccountSettings(
-  clerkOrgId: string,
+  accountId: string,
   managerVisibilityScope: ManagerVisibilityScope,
   db: TenantDb
 ) {
-  assertTenantDb(db, clerkOrgId);
-  await getAccountSettings(clerkOrgId, db);
+  assertTenantDb(db, accountId);
+  await getAccountSettings(accountId, db);
   await db.accountSettings.updateMany({
     data: { manager_visibility_scope: managerVisibilityScope },
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
   return db.accountSettings.findFirstOrThrow({
     select,
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
 }

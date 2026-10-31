@@ -58,17 +58,17 @@ vi.mock("@repo/database", async () => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   captureOnboardingEvent: vi.fn(),
   completeMemberWelcome: vi.fn(),
-  currentUser: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   completeMemberWelcome: mocks.completeMemberWelcome,
@@ -87,11 +87,11 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 describe("completeWelcomeAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
-    mocks.currentUser.mockResolvedValue({ id: "user_m" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "viewer" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_m" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: "org_1", organisationId },
+      value: { accountId: "org_1", organisationId },
     });
     mocks.completeMemberWelcome.mockResolvedValue({
       ok: true,
@@ -105,8 +105,8 @@ describe("completeWelcomeAction", () => {
     ).toEqual({ ok: true, value: { redirectTo: "/" } });
     expect(mocks.completeMemberWelcome).toHaveBeenCalledWith(
       {
-        actingRole: "org:viewer",
-        clerkOrgId: "org_1",
+        accountId: "org_1",
+        actingRole: "viewer",
         organisationId,
         userId: "user_m",
       },

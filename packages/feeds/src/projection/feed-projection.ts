@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  type ClerkOrgId,
+  type AccountId,
   getAvailabilityRecordLabel,
   type OrganisationId,
   PUBLIC_HOLIDAY_DATA_VERSION,
@@ -53,9 +53,9 @@ export interface PreviewEvent {
 }
 
 export interface FeedProjectionContext {
+  accountId: string;
   actingPersonId?: string | null;
   actingRole: FeedRole;
-  clerkOrgId: string;
   feedId: string;
   horizonDays: number;
   organisationId: string | null;
@@ -72,16 +72,16 @@ export async function projectFeedEvents(
   input: FeedProjectionContext,
   db: TenantDb
 ): Promise<Result<PreviewEvent[], FeedProjectionError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const feed = await client.feed.findFirst({
       select: feedProjectionSelect,
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         id: input.feedId,
         organisation_id: input.organisationId,
       },
@@ -94,7 +94,7 @@ export async function projectFeedEvents(
     }
 
     const ownedCompanies = await resolveAccountCompanies(
-      input.clerkOrgId,
+      input.accountId,
       client
     );
     const companyIds = companyIdsForFeed(
@@ -113,8 +113,8 @@ export async function projectFeedEvents(
     const privacyMode = input.privacyMode ?? feed.privacy_mode;
     const peopleResult = await resolvePeopleForFeed(
       {
+        accountId: input.accountId,
         actingPersonId: input.actingPersonId ?? null,
-        clerkOrgId: input.clerkOrgId,
         companyIds,
         createdByUserId: feed.created_by_user_id,
         organisationId: input.organisationId,
@@ -144,9 +144,9 @@ export async function projectFeedEvents(
             orderBy: [{ starts_at: "asc" }, { id: "asc" }],
             select: recordSelect,
             where: {
+              account_id: input.accountId,
               approval_status: "approved",
               archived_at: null,
-              clerk_org_id: input.clerkOrgId,
               ends_at: { gte: horizonStart },
               include_in_feed: true,
               organisation_id: input.organisationId ?? { in: companyIds },
@@ -284,7 +284,7 @@ function projectAvailabilityRecord(
 async function projectPublicHolidays(input: {
   lastRenderedAt: Date | null;
   client: TenantDb;
-  clerkOrgId: string;
+  accountId: string;
   horizonEnd: Date;
   horizonStart: Date;
   organisationId: string;
@@ -294,7 +294,7 @@ async function projectPublicHolidays(input: {
 }): Promise<PreviewEvent[]> {
   const data = await loadHolidayResolutionData(
     {
-      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      accountId: input.accountId as AccountId,
       from: toDateOnly(input.horizonStart),
       organisationId: input.organisationId as OrganisationId,
       to: toDateOnly(input.horizonEnd),
@@ -495,7 +495,7 @@ async function projectScopedFeedHolidays(
     events.push(
       ...(await projectPublicHolidays({
         accountFeed: input.organisationId === null,
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         client,
         horizonEnd,
         horizonStart,

@@ -320,8 +320,8 @@ function assertFeedTransitions(
   }
 }
 const fixtureSchema = z.strictObject({
+  accountId: z.string().min(1),
   alias: z.string().regex(/^fixture-[a-z0-9-]+$/),
-  clerkOrgId: z.string().min(1),
   feedId: z.uuid(),
   organisationId: z.uuid(),
 });

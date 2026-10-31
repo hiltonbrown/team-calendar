@@ -1,6 +1,6 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   advanceWizard,
   ensureCurrentUserPerson,
@@ -10,7 +10,7 @@ import {
   type WizardError,
   type WizardSnapshot,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import {
   afterTenantCommit,
   lockPlanLimitMutations,
@@ -102,7 +102,7 @@ export async function skipXeroAction(
   }
   const result = await runWizardMutation(actor.value, async (db) => {
     const skipped = await setXeroSetupSkipped(
-      actor.value.clerkOrgId,
+      actor.value.accountId,
       actor.value.organisationId,
       true,
       db
@@ -159,33 +159,33 @@ export async function linkSelfAction(
     return actor;
   }
   const scope = {
+    account_id: actor.value.accountId,
     archived_at: null,
-    clerk_org_id: actor.value.clerkOrgId,
     organisation_id: actor.value.organisationId,
   };
   return runWizardMutation(
     actor.value,
     async (db): ReturnType<typeof linkSelfAction> => {
-      await lockPlanLimitMutations(actor.value.clerkOrgId, db);
+      await lockPlanLimitMutations(actor.value.accountId, db);
 
       const alreadyLinked = await db.person.findFirst({
         select: { id: true },
         where: {
+          account_id: actor.value.accountId,
           archived_at: null,
-          clerk_org_id: actor.value.clerkOrgId,
-          clerk_user_id: actor.value.userId,
           organisation: {
+            account_id: actor.value.accountId,
             archived_at: null,
-            clerk_org_id: actor.value.clerkOrgId,
           },
+          user_id: actor.value.userId,
         },
       });
       if (alreadyLinked) {
         return validationError("Your account is already linked to a person.");
       }
       const linked = await db.person.updateMany({
-        data: { clerk_user_id: actor.value.userId },
-        where: { ...scope, clerk_user_id: null, id: parsed.data.personId },
+        data: { user_id: actor.value.userId },
+        where: { ...scope, id: parsed.data.personId, user_id: null },
       });
       if (linked.count === 0) {
         return validationError(
@@ -194,9 +194,9 @@ export async function linkSelfAction(
       }
       await db.auditEvent.create({
         data: {
+          account_id: actor.value.accountId,
           action: "person.linked_to_user",
           actor_user_id: actor.value.userId,
-          clerk_org_id: actor.value.clerkOrgId,
           metadata: { source: "onboarding" },
           organisation_id: actor.value.organisationId,
           resource_id: parsed.data.personId,
@@ -226,7 +226,7 @@ export async function createSelfAction(
   if (!actor.ok) {
     return actor;
   }
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     return validationError();
   }
@@ -235,19 +235,14 @@ export async function createSelfAction(
     async (db): ReturnType<typeof createSelfAction> => {
       const person = await ensureCurrentUserPerson(
         {
-          clerkOrgId: actor.value.clerkOrgId as ClerkOrgId,
+          accountId: actor.value.accountId as AccountId,
           organisationId: actor.value.organisationId as OrganisationId,
         },
         {
-          avatarUrl: user.imageUrl,
-          clerkUserId: user.id,
-          displayName:
-            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-            user.emailAddresses[0]?.emailAddress ||
-            user.id,
-          email: user.emailAddresses[0]?.emailAddress,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          avatarUrl: user.image,
+          displayName: user.name || user.email || user.id,
+          email: user.email,
+          userId: user.id,
         },
         db
       );
@@ -287,7 +282,7 @@ export async function addPersonAction(
     async (db): ReturnType<typeof addPersonAction> => {
       const created = await createManualPerson(
         {
-          clerkOrgId: actor.value.clerkOrgId as ClerkOrgId,
+          accountId: actor.value.accountId as AccountId,
           email: parsed.data.email,
           employmentType: "employee",
           firstName: parsed.data.firstName,
@@ -314,7 +309,7 @@ const InviteRowsSchema = OrganisationInput.extend({
     .array(
       z.object({
         email: z.string().trim().email(),
-        role: z.enum(["org:admin", "org:manager", "org:viewer"]),
+        role: z.enum(["admin", "manager", "viewer"]),
       })
     )
     .min(1, "Choose at least one person to invite.")
@@ -422,8 +417,20 @@ async function advance(
 async function resolveWizardIdentity(
   organisationId: string
 ): Promise<OnboardingActionResult<WizardActor>> {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(orgId && user && isOnboardingAdmin(orgRole))) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user && isOnboardingAdmin(sessionRole))) {
     return {
       error: {
         code: "not_authorised",
@@ -435,8 +442,8 @@ async function resolveWizardIdentity(
   return {
     ok: true,
     value: {
-      actingRole: orgRole,
-      clerkOrgId: orgId,
+      accountId: sessionAccountId,
+      actingRole: sessionRole,
       organisationId,
       userId: user.id,
     },
@@ -463,10 +470,10 @@ async function runWizardMutation<T>(
 ): Promise<OnboardingActionResult<T>> {
   try {
     return await withTenantResult(
-      actor.clerkOrgId,
+      actor.accountId,
       async (db): Promise<OnboardingActionResult<T>> => {
         const company = await getOrganisationById(
-          actor.clerkOrgId as ClerkOrgId,
+          actor.accountId as AccountId,
           actor.organisationId as OrganisationId,
           db
         );
@@ -495,10 +502,10 @@ async function resolveWizardActor(
   }
   try {
     return await withTenantDb(
-      identity.value.clerkOrgId,
+      identity.value.accountId,
       async (db): Promise<OnboardingActionResult<WizardActor>> => {
         const company = await getOrganisationById(
-          identity.value.clerkOrgId as ClerkOrgId,
+          identity.value.accountId as AccountId,
           organisationId as OrganisationId,
           db
         );
