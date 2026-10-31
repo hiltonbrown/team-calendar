@@ -302,15 +302,33 @@ Tasks 1, 3, 4 and 5 touch disjoint files and can run in parallel. Task 2 waits f
 
 ---
 
-## New findings from CI run 41140715790 (Task 2)
+## New findings surfaced during CI execution (Tasks 2 and 6)
 
-| ID | Priority | Finding |
-|---|---|---|
-| F8 | P2 | In CI run 41140715790 (commit `47b5e75`), package boundaries, migrate deploy, restricted-role provisioning, and drift check all succeeded. In `Run unit tests`, `@repo/auth#test` failed due to Vitest test timeouts under concurrency on the 2-core CI runner: `better-auth-runtime.test.ts:242` timed out at default 5000ms (5 scrypt password hashing iterations in sign-in bucket test), and `development-seed.test.ts:114,150` timed out at explicit 15000ms (12 and 24 native user seeds with password hashing). `packages/auth` lacked a `vitest.config.mts` setting `testTimeout: 30_000` (which `packages/jobs` and `packages/database` both configure). |
+| ID | Priority | Finding | Resolution |
+|---|---|---|---|
+| F8 | P2 | In CI run 41140715790, unit tests in `@repo/auth` timed out during scrypt hashing on the 2-core runner. | Added `packages/auth/vitest.config.mts` with `testTimeout: 60_000` and updated test timeouts (`28507d0`, `3d7a18b`). |
+| F9 | P2 | In CI run 41144200408, `app#test:integration` failed because `@repo/database/system` could not be resolved from root. | Added bridge exports in `packages/database` and `@repo/database/*` aliases in app and api Vitest configs (`b379fd1`). |
+| F10 | P2 | In CI run 41144200408, `@repo/xero` integration test encountered a foreign key race condition when concurrent purge deleted the grant before connection creation. | Made grant and connection creation atomic inside `database.$transaction` and disabled integration test file parallelism (`338a6de`). |
+| F11 | P2 | In CI runs 41146460720 and 41147652556, `web#build` failed intermittently with `TypeError: Cannot read properties of undefined (reading 'map')` and PostCSS `CssSyntaxError` on MDX due to experimental Turbopack `workerThreads` task desynchronization between MDX loaders and PostCSS. | Configured `turbopackPluginRuntimeStrategy: "childProcesses"` in `apps/web/next.config.ts` (`3b08288`). |
+| F12 | P2 | In CI run 41146460720, `packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts` failed on `mockInngestSend` assertions lacking `identity_generation: "gen_v1"`. | Updated `rebuild-feed-cache` event expectations in integration tests to match the generation-fenced contract (`872bad8`). |
 
-### Remediation Plan for F8 (Task 2.1)
+---
 
-1. Add `packages/auth/vitest.config.mts` matching `packages/jobs/vitest.config.mts` with `testTimeout: 30_000`, `environment: "node"`, `conditions: ["react-server", "node"]` and `server-only` alias.
-2. In `packages/auth/development-seed.test.ts`, update explicit `15_000` timeouts on lines 149 and 163 to `30_000` so they match the package standard and do not cap the timeout below 30s on slow CI workers.
-3. Verify `bun run --cwd packages/auth test` passes locally.
-4. Commit as `fix(auth): configure vitest 30s timeout for password hashing tests`.
+## Results and Evidence
+
+All findings from the PR #144 review and CI remediation have been resolved and verified with clean gates locally and in CI run 41148514651.
+
+| Finding | Resolution & Evidence | Commit SHA | Verification Status |
+|---|---|---|---|
+| F1 (P1): Database to auth cycle | Relocated seed entry point to `@repo/auth/scripts/seed-development.ts` and created `@repo/database/src/seed/development-seed-runner.ts`. Exported `DevelopmentTenantAccount` and injected `seedAuthAccounts`. | `47b5e75` | PASS: `bun run boundaries` exits 0 (1359 files, 0 issues). |
+| F2 (P1): Missing CI evidence | Fixed boundary cycle (F1), timeouts (F8), Vitest aliases (F9), Xero connection test atomicity (F10), Turbopack web worker strategy (F11), and jobs integration test expectations (F12). CI ran all steps through `Run integration tests` with 0 skipped steps. | `47b5e75`, `28507d0`, `b379fd1`, `338a6de`, `872bad8`, `3b08288` | PASS: CI run 41148514651 `Test` job succeeded (7m32s, 0 skipped steps). |
+| F3 (P2): SSE remote session re-check throttled | Added `SESSION_REVALIDATE_INTERVAL_MS = 30_000` in `apps/api/app/api/notifications/stream/route.ts`. Local expiry continues on every 2s poll; remote revalidation through `/api/auth-context` throttled to 30s. | `d3b39ae` | PASS: `apps/api/app/api/notifications/stream/route.test.ts` (all 21 tests passed). |
+| F4 (P2): CodeQL alerts #33, #40, #41 | Dismissed alerts #33 (HMAC digest), #40 (random lookup token hash), and #41 (ICS deterministic UID) via GitHub API as `false positive`. | External (GitHub) | PASS: CodeQL check green on PR #144. |
+| F5 (P3): Narrow `AuthSocialProvider` | Narrowed `AuthSocialProvider` to `"xero-auth"` in `packages/auth/adapters/better-auth-client.ts`. | `da9de8f` | PASS: `bun run typecheck` exits 0 across all 19 packages. |
+| F6 (P3): Correct stale schema comment | Replaced stale Clerk provider comment in `packages/database/prisma/schema.prisma:1271-1273`. Regenerated client. | `da9de8f` | PASS: `bun run build` and `git status` confirm clean Prisma generation, no migration diff. |
+
+### Manual Verification Note for Owner (Task 6 Step 3)
+On the Vercel preview deployment for this branch, open the product UI, keep a notification stream active, and inspect runtime logs for `/api/auth-context`:
+1. Confirm the request rate is approximately 2 requests per minute per tab (rather than 30/min).
+2. Note whether `x-vercel-forwarded-for` on server-to-server calls corresponds to the outbound IP of the API function. If it does, the shared address bucket in `context-rate-limit.ts` represents a launch risk to be addressed in a separate plan.
+

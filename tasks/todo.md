@@ -1,5 +1,66 @@
 # Current work
 
+## PR #144 Review Remediation (31 October 2026)
+
+- [x] Task 1: Break the database to auth import cycle
+  - [x] Step 1.1: Write failing test in `auth-fixtures.test.ts`
+  - [x] Step 1.2: Run test to verify failure
+  - [x] Step 1.3: Update `auth-fixtures.ts` to accept `seedAuthAccounts`
+  - [x] Step 1.4: Run test to verify pass
+  - [x] Step 1.5: Relocate seed entry point to `development-seed-runner.ts` and `seed-development.ts`, update package.json scripts/exports and docs
+  - [x] Step 1.6: Verify boundaries, phased registry, and smoke run with `NODE_ENV=production`
+  - [x] Step 1.7: Run package gates (`bun run check`, `bun run typecheck`, package unit tests)
+  - [x] Step 1.8: Commit Task 1
+- [x] Task 2: Surface CI evidence early (Pushed commit `47b5e75`, surfaced finding F8 timeouts on 2-core CI runner, resolved in `28507d0`)
+- [x] Task 3: Dismiss CodeQL false positives (Dismissed #33, #40, #41 with documented reasons)
+- [x] Task 4: Throttle SSE remote session re-check to 30 seconds
+  - [x] Step 4.1: Write failing tests in `route.test.ts`
+  - [x] Step 4.2: Run tests to verify failure
+  - [x] Step 4.3: Implement 30s throttling in `route.ts`
+  - [x] Step 4.4: Run route tests to verify pass
+  - [x] Step 4.5: Check documentation for stream revalidation mentions
+  - [x] Step 4.6: Commit Task 4
+- [x] Task 5: Trivial cleanup (P3)
+  - [x] Step 5.1: Narrow `AuthSocialProvider` type in `better-auth-client.ts`
+  - [x] Step 5.2: Correct schema comment in `schema.prisma`, verify `build` and no migration diff
+  - [x] Step 5.3: Commit Task 5
+- [x] Task 6: Full gates and final CI
+  - [x] Step 6.1: Run local verification gates (`build`, `check`, `typecheck`, `boundaries`, `test`)
+  - [x] Step 6.2: Push and verify `gh pr checks 144 --watch` (all 9 checks successful, CI run 41148514651 green across all steps with 0 skipped)
+  - [x] Step 6.3: Note manual check for preview runtime logs
+- [x] Task 7: Reassess and document
+  - [x] Step 7.1: Check against findings F1-F6 and document evidence in plan Results section
+  - [x] Step 7.2: Fill in PR description (updated on GitHub with complete architecture, safety mechanisms, and cutover details)
+  - [x] Step 7.3: Review remediation diff (verified clean, 28 files modified across remediation commits)
+
+Stopping condition: PR #144 review remediation complete; all gates (`check`, `typecheck`, `boundaries`, `test`, `test:integration`) pass; CodeQL clean; PR description updated.
+
+Review: PASS.
+1. Boundary cycle broken (F1):
+   - Relocated seed runner to `@repo/auth/scripts/seed-development.ts` and created `@repo/database/src/seed/development-seed-runner.ts`. Exported `DevelopmentTenantAccount` and injected `seedAuthAccounts`.
+   - Verified `bun run boundaries`: 1,359 files in 21 packages checked, 0 issues found.
+2. SSE remote session re-check throttled (F3):
+   - In `apps/api/app/api/notifications/stream/route.ts`, remote session revalidation through `/api/auth-context` throttled to 30s (`SESSION_REVALIDATE_INTERVAL_MS = 30_000`) while local expiry checked on every 2s poll.
+   - All 21 tests pass in `apps/api/app/api/notifications/stream/route.test.ts`.
+3. CodeQL false positives resolved (F4):
+   - Dismissed alerts #33, #40, #41 as `false positive` with documented rationales via GitHub API. CodeQL status is green.
+4. Schema comment and provider cleanup (F5, F6):
+   - Narrowed `AuthSocialProvider` to `"xero-auth"`.
+   - Replaced stale Clerk comment in `schema.prisma`. Verified Prisma generation and no migration diff.
+5. Concurrency and test suite hardening surfaced during CI execution (F8-F12):
+   - Configured `testTimeout: 60_000` in `packages/auth/vitest.config.mts` for scrypt password hashing on 2-core runners (F8).
+   - Configured Vitest aliases and bridge exports for `@repo/database/*` (F9).
+   - Made grant creation and connection setup atomic in `database.$transaction` and disabled integration test file parallelism (F10).
+   - Isolated web MDX/PostCSS compilation with `childProcesses` Turbopack strategy in `apps/web/next.config.ts` (F11).
+   - Expected `identity_generation: "gen_v1"` in `packages/jobs` integration tests (F12).
+6. Final verification gates:
+   - `bun run check`: Checked 1,430 files, 0 errors.
+   - `bun run typecheck`: 19/19 packages passed.
+   - `bun run boundaries`: 0 issues found.
+   - `bun run test`: All package unit test suites passed.
+   - CI Workflow Run 41148514651: `Test` passed in 7m32s with 0 skipped steps (Build, Typecheck, Boundaries, Migrate deploy, Restricted integration login, Drift check, Untestable workspace guard, Unit tests, Release safety tools, Docs links, Email render, Integration tests all green).
+   - PR description on PR #144 updated with full documentation, architectural safety mechanisms, cutover links, and deferred findings.
+
 ## Vercel build failure remediation (31 October 2026)
 
 - [x] Task 1: Identify root causes of Vercel build failure (OOM / SIGKILL 137 on Turbopack build and Next.js App Router entrypoint type violations).
