@@ -42,8 +42,6 @@ Remote leave mutations reuse a durable UUID idempotency key for five minutes fro
 
 Xero calls use small shared, atomic Redis quota counters and expiring concurrency leases across serverless app, API and job workers. They enforce the five-request tenant concurrency limit and documented tenant/app quotas; lease expiry restores capacity after a worker crash. Keys initialise on first use, with no namespace bootstrap. Store failures deny calls as infrastructure failures; provider 429 responses remain separate and retain retry guidance even when their bodies are unreadable. Fixture namespaces isolate tests only.
 
-The [HTTP simplification follow-up](docs/reports/2026-10-08-xero-http-follow-up.md) records the retained-control requirements and current verification.
-
 ## Covers everyone who affects cover, not just payroll
 
 Team Calendar is built for the whole team, not only the people on the pay run. Employees on Xero Payroll get the two-way sync and leave balances. Contractors, directors, and advisors who never appear in payroll can still be added by hand, so their availability shows on the same calendar as everyone else, without touching a pay run. Every entry is labelled by where it came from: synced from Xero, or added manually.
@@ -76,7 +74,7 @@ Slack and Teams notifications, HTML calendar views, and additional payroll conne
 
 ## Current status
 
-Team Calendar is under active development and pre-launch. Core infrastructure, provider-neutral Account tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate architecture, verification and review rulings are recorded in the [final Xero audit](docs/reports/2026-10-07-xero-final-architecture-audit.md) and `tasks/todo.md`. Live provider, browser and deployment evidence is recorded separately from source checks.
+Team Calendar is under active development and pre-launch. Core infrastructure, provider-neutral Account tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate architecture, verification and review rulings are recorded in `tasks/todo.md`. Live provider, browser and deployment evidence is recorded separately from source checks.
 
 Authentication and cookie-session API transport run with Better Auth (`AUTH_CONTEXT_MODE=local` on `app`, `remote` on `api`). Public signup creates an AU Account owned by the new user; invitation signup joins its addressed Account. See the [auth migration design](docs/auth-migration/02-design.md).
 

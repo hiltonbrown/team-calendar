@@ -318,7 +318,7 @@ model Organisation {
   fiscal_year_start       Int?
   working_hours_per_day   Decimal?        @db.Decimal(4, 2)
   reporting_unit          String?
-  /// Furthest setup wizard step reached; see docs/superpowers/specs/2026-10-09-onboarding-design.md.
+  /// Furthest setup wizard step reached.
   onboarding_step         onboarding_step @default(details)
   onboarding_completed_at DateTime?
   /// Set when an admin chooses "Set up without Xero"; cleared when Xero connects.

@@ -5781,7 +5781,7 @@ export type $OrganisationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     working_hours_per_day: runtime.Decimal | null
     reporting_unit: string | null
     /**
-     * Furthest setup wizard step reached; see docs/superpowers/specs/2026-10-09-onboarding-design.md.
+     * Furthest setup wizard step reached.
      */
     onboarding_step: $Enums.onboarding_step
     onboarding_completed_at: Date | null

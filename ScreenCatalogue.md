@@ -270,7 +270,7 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 **Route:** `/onboarding` in the `(setup)` route group (split brand layout, no app sidebar). `?step=` revisits an earlier completed step; later steps cannot be reached.
 **Guard:** Signed-in owner or admin; members are redirected to `/`. The `(authenticated)` layout redirects owners and admins here while `organisations.onboarding_completed_at` is null, except on `/settings/integrations/xero/connect` and `/settings/integrations/xero/matches`. A completed organisation redirects to `/calendar`.
-**Evidence:** `apps/app/app/(setup)/onboarding/{page,_actions}.tsx`; `apps/app/app/(setup)/onboarding/steps/*.tsx`; `apps/app/lib/server/onboarding-gate.ts`; `packages/availability/src/onboarding/*`; `packages/database/src/queries/onboarding.ts`. Spec: `docs/superpowers/specs/2026-10-09-onboarding-design.md`.
+**Evidence:** `apps/app/app/(setup)/onboarding/{page,_actions}.tsx`; `apps/app/app/(setup)/onboarding/steps/*.tsx`; `apps/app/lib/server/onboarding-gate.ts`; `packages/availability/src/onboarding/*`; `packages/database/src/queries/onboarding.ts`.
 
 **Purpose:** Blocking first-run setup that ends on a populated team calendar.
 
@@ -555,7 +555,7 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 **Guard:** `requirePageRole("org:viewer")` on the list. `/feeds/new` renders a permission-denied state for non-admins; creation is enforced in `feeds/_actions.ts` and `packages/feeds`. Access: all roles.
 **Evidence:** `apps/app/app/(authenticated)/feeds/page.tsx`; `feeds/own-feed-actions.tsx`; `apps/app/components/feed/{your-calendar,feed-provider-buttons,other-feeds-list}.tsx`; `apps/app/lib/feeds/{recommend-feed,provider-links}.ts`; `packages/feeds/src/feed-service.ts` (`createOwnFeed`, `getOwnFeedEligibility`).
 
-**Purpose:** Subscribe page for every role. Spec: `docs/superpowers/specs/2026-10-09-calendar-feeds-design.md`.
+**Purpose:** Subscribe page for every role.
 
 **User interactions, as-built:** A "Your calendar" block leads with one recommended feed (own personal feed, then own team feed, then the oldest organisation feed, then the first feed by name). It offers "Add to Apple Calendar" (webcal), "Add to Google Calendar" and "Add to Outlook" (copy the exact URL, then open the provider's add-by-URL page, because neither provider documents a prefilled subscribe link), an "Open in Outlook desktop" webcal link, the complete subscribe URL with Copy URL, and an "Other calendar apps" disclosure. "Create my calendar feed" appears for a linked person without a personal feed; "Create my team feed" appears for a person with active direct reports and no team feed. "Other feeds you can use" lists remaining active and paused feeds as compact rows with an Add popover; other people's personal and team feeds are not listed. No filters, row menus or New feed button.
 
