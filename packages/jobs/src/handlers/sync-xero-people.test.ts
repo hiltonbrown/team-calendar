@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   publishOrganisationNotificationEvent: vi.fn(),
   resolveXeroAccess: vi.fn(),
   scopeDatabase: null as Record<string, unknown> | null,
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   syncRunCreate: vi.fn(),
@@ -128,7 +128,7 @@ vi.mock("@repo/xero", async () => ({
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
   toResolvedXeroConnection: (scope, value) => ({
     ...value,
-    clerk_org_id: scope.clerkOrgId,
+    account_id: scope.accountId,
     id: value.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: value.payrollRegion,
@@ -140,7 +140,7 @@ import { syncXeroPeople } from "./sync-xero-people";
 
 function buildConnection(region: "AU" | "NZ" | "UK" = "NZ") {
   return {
-    clerk_org_id: "org_1",
+    account_id: "org_1",
     id: "00000000-0000-4000-8000-000000000003",
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: region,
@@ -179,7 +179,7 @@ describe("syncXeroPeople unit tests", () => {
   });
   it("rejects invalid input schema with validation_error", async () => {
     const result = await syncXeroPeople({
-      clerkOrgId: "",
+      accountId: "",
       connectionId: "invalid-uuid",
       organisationId: "invalid-uuid",
     });
@@ -221,7 +221,7 @@ describe("syncXeroPeople unit tests", () => {
       },
     });
     const result = await syncXeroPeople({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -245,7 +245,7 @@ describe("syncXeroPeople unit tests", () => {
           last_name: "Tane",
         }),
         where: {
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           organisation_id_source_system_source_person_key: {
             organisation_id: "00000000-0000-4000-8000-000000000001",
             source_person_key: "11111111-1111-4111-8111-111111111111",
@@ -281,7 +281,7 @@ describe("syncXeroPeople unit tests", () => {
       },
     });
     const result = await syncXeroPeople({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -332,7 +332,7 @@ describe("syncXeroPeople unit tests", () => {
       },
     });
     const result = await syncXeroPeople({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -359,7 +359,7 @@ describe("syncXeroPeople unit tests", () => {
       ok: false,
     });
     const result = await syncXeroPeople({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -391,7 +391,7 @@ describe("syncXeroPeople unit tests", () => {
       },
     });
     const result = await syncXeroPeople({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000003",
       organisationId: "00000000-0000-4000-8000-000000000001",
     });

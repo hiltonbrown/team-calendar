@@ -40,7 +40,7 @@ describe("CompanySelector", () => {
     render(<CompanySelector companies={companies} />);
     expect(screen.queryByRole("combobox")).toBeNull();
   });
-  it("shows company names separately from the Clerk account and preserves query filters", async () => {
+  it("shows company names separately from the Account and preserves query filters", async () => {
     render(<CompanySelector companies={companies} />);
     fireEvent.click(screen.getByRole("combobox", { name: "Company" }));
     fireEvent.click(screen.getByRole("option", { name: "Acme Hotels" }));

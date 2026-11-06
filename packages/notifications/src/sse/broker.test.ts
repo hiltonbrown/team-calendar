@@ -71,13 +71,13 @@ describe("notification SSE broker", () => {
 
   it("reads a published event from the matching user channel", async () => {
     await publishNotificationEvent(
-      { clerkOrgId: "clerk-org-a", userId: "user-a" },
+      { accountId: "account-a", userId: "user-a" },
       event
     );
 
     await expect(
       pollNotificationStream(
-        { clerkOrgId: "clerk-org-a", userId: "user-a" },
+        { accountId: "account-a", userId: "user-a" },
         "0-0"
       )
     ).resolves.toEqual([{ event, id: "1000-1" }]);
@@ -85,13 +85,13 @@ describe("notification SSE broker", () => {
 
   it("does not read an event across accounts for the same user", async () => {
     await publishNotificationEvent(
-      { clerkOrgId: "clerk-org-a", userId: "user-a" },
+      { accountId: "account-a", userId: "user-a" },
       event
     );
 
     await expect(
       pollNotificationStream(
-        { clerkOrgId: "clerk-org-b", userId: "user-a" },
+        { accountId: "account-b", userId: "user-a" },
         "0-0"
       )
     ).resolves.toEqual([]);
@@ -99,18 +99,18 @@ describe("notification SSE broker", () => {
 
   it("resolves default recipients through the account-bound client", async () => {
     vi.mocked(recipients.person.findMany).mockResolvedValue([
-      { clerk_user_id: "user-a" },
+      { user_id: "user-a" },
     ] as never);
     await publishOrganisationNotificationEvent(
-      { clerkOrgId: "clerk-org-a", organisationId: "org-a" },
+      { accountId: "account-a", organisationId: "org-a" },
       event
     );
     expect(mocks.withTenantDb).toHaveBeenCalledWith(
-      "clerk-org-a",
+      "account-a",
       expect.any(Function)
     );
     expect(streamClient.append).toHaveBeenCalledWith(
-      "sse:account:clerk-org-a:user-a",
+      "sse:account:account-a:user-a",
       event
     );
   });
@@ -118,37 +118,37 @@ describe("notification SSE broker", () => {
   it("fans organisation events out only to active members across the account", async () => {
     const findMany = vi.mocked(recipients.person.findMany);
     findMany.mockResolvedValue([
-      { clerk_user_id: "user-a" },
-      { clerk_user_id: "user-b" },
+      { user_id: "user-a" },
+      { user_id: "user-b" },
       // Prisma's generic mock requires its full inferred result type here.
     ] as never);
 
     await publishOrganisationNotificationEvent(
-      { clerkOrgId: "clerk-org-a", organisationId: "org-a" },
+      { accountId: "account-a", organisationId: "org-a" },
       event
     );
 
     expect(findMany).toHaveBeenCalledWith({
-      select: { clerk_user_id: true },
+      select: { user_id: true },
       where: {
+        account_id: "account-a",
         archived_at: null,
-        clerk_org_id: "clerk-org-a",
-        clerk_user_id: { not: null },
         is_active: true,
-        organisation: { clerk_org_id: "clerk-org-a" },
+        organisation: { account_id: "account-a" },
+        user_id: { not: null },
       },
     });
     expect(streamClient.append).toHaveBeenCalledTimes(2);
     expect(streamClient.append).toHaveBeenCalledWith(
-      "sse:account:clerk-org-a:user-a",
+      "sse:account:account-a:user-a",
       event
     );
     expect(streamClient.append).toHaveBeenCalledWith(
-      "sse:account:clerk-org-a:user-b",
+      "sse:account:account-a:user-b",
       event
     );
     expect(streamClient.append).not.toHaveBeenCalledWith(
-      "sse:account:clerk-org-b:user-a",
+      "sse:account:account-b:user-a",
       event
     );
   });
@@ -170,7 +170,7 @@ describe("notification SSE broker", () => {
       type: "notification.created" as const,
     };
     await publishNotificationEvent(
-      { clerkOrgId: "account-A", userId: "manager-A" },
+      { accountId: "account-A", userId: "manager-A" },
       created
     );
     expect(streamClient.append).toHaveBeenCalledWith(
@@ -179,24 +179,24 @@ describe("notification SSE broker", () => {
     );
     expect(
       await pollNotificationStream(
-        { clerkOrgId: "account-A", userId: "manager-A" },
+        { accountId: "account-A", userId: "manager-A" },
         "0-0"
       )
     ).toMatchObject([{ event: created }]);
     expect(
       await pollNotificationStream(
-        { clerkOrgId: "account-B", userId: "manager-A" },
+        { accountId: "account-B", userId: "manager-A" },
         "0-0"
       )
     ).toEqual([]);
   });
   it("deduplicates a user when broadcasting a company sync event across the account", async () => {
     vi.mocked(recipients.person.findMany).mockResolvedValue([
-      { clerk_user_id: "manager-A" },
-      { clerk_user_id: "manager-A" },
+      { user_id: "manager-A" },
+      { user_id: "manager-A" },
     ] as never);
     await publishOrganisationNotificationEvent(
-      { clerkOrgId: "account-A", organisationId: "company-B" },
+      { accountId: "account-A", organisationId: "company-B" },
       event
     );
     expect(streamClient.append).toHaveBeenCalledTimes(1);
@@ -207,13 +207,13 @@ describe("notification SSE broker", () => {
 
     await expect(
       publishNotificationEvent(
-        { clerkOrgId: "clerk-org-a", userId: "user-a" },
+        { accountId: "account-a", userId: "user-a" },
         event
       )
     ).resolves.toBeUndefined();
     await expect(
       pollNotificationStream(
-        { clerkOrgId: "clerk-org-a", userId: "user-a" },
+        { accountId: "account-a", userId: "user-a" },
         "0-0"
       )
     ).resolves.toEqual([]);

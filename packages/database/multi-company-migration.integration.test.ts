@@ -1,14 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
-import { isLocalDatabase } from "./src/is-local-database";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { systemDatabase } from "./src/system-client";
 
-const ownerUrl = process.env.DATABASE_URL;
-if (!(ownerUrl && isLocalDatabase(ownerUrl))) {
-  throw new Error(
-    "Multi-company database fixtures require disposable local PostgreSQL"
-  );
+const fixture = allocateLiveTestFixture(
+  "packages/database/multi-company-migration.integration.test.ts"
+);
+const [tenant] = fixture.tenants;
+if (!tenant) {
+  throw new Error("Multi-company migration fixture account is missing");
 }
 
 const migration = readFileSync(
@@ -19,19 +20,25 @@ const migration = readFileSync(
   "utf8"
 );
 const backfill = migration.slice(
-  migration.indexOf("UPDATE feeds f SET organisation_id = NULL")
+  migration.indexOf("UPDATE feeds f SET organisation_id = NULL"),
+  migration.indexOf("-- Update existing Premium accounts")
 );
 
 test("default feed backfill preserves feed/token identities and company custom feeds", async () => {
   await systemDatabase
     .$transaction(async (tx) => {
-      const account = `backfill-${randomUUID()}`;
+      const account = tenant.accountId;
       const company = await tx.organisation.create({
-        data: { clerk_org_id: account, country_code: "AU", name: "Payroll" },
+        data: {
+          account_id: account,
+          country_code: "AU",
+          id: tenant.organisationId,
+          name: "Payroll",
+        },
       });
       const feed = await tx.feed.create({
         data: {
-          clerk_org_id: account,
+          account_id: account,
           name: "All staff",
           organisation_id: company.id,
           slug: "all-staff",
@@ -39,7 +46,7 @@ test("default feed backfill preserves feed/token identities and company custom f
       });
       const custom = await tx.feed.create({
         data: {
-          clerk_org_id: account,
+          account_id: account,
           name: "My team",
           organisation_id: company.id,
           slug: "my-team",
@@ -47,7 +54,7 @@ test("default feed backfill preserves feed/token identities and company custom f
       });
       const token = await tx.feedToken.create({
         data: {
-          clerk_org_id: account,
+          account_id: account,
           feed_id: feed.id,
           organisation_id: company.id,
           token_hash: randomUUID(),
@@ -56,7 +63,7 @@ test("default feed backfill preserves feed/token identities and company custom f
       });
       const scope = await tx.feedScope.create({
         data: {
-          clerk_org_id: account,
+          account_id: account,
           feed_id: feed.id,
           organisation_id: company.id,
           scope_type: "org",
@@ -64,7 +71,7 @@ test("default feed backfill preserves feed/token identities and company custom f
       });
       const publication = await tx.feedEventPublication.create({
         data: {
-          clerk_org_id: account,
+          account_id: account,
           feed_id: feed.id,
           organisation_id: company.id,
           published_at: new Date(),
@@ -75,14 +82,27 @@ test("default feed backfill preserves feed/token identities and company custom f
       });
       await tx.auditEvent.create({
         data: {
+          account_id: account,
           action: "feeds.created",
-          clerk_org_id: account,
           organisation_id: company.id,
           payload: { defaultFeed: true },
           resource_id: feed.id,
           resource_type: "feed",
         },
       });
+      // Historical SQL keeps its original column names. Transaction-local views
+      // expose that shape while current Prisma fixtures retain account_id.
+      for (const table of [
+        "feeds",
+        "feed_tokens",
+        "feed_scopes",
+        "feed_event_publications",
+        "audit_events",
+      ]) {
+        await tx.$executeRawUnsafe(
+          `CREATE TEMP VIEW "${table}" AS SELECT *, account_id AS clerk_org_id FROM public."${table}" WHERE account_id = '${account.replaceAll("'", "''")}'`
+        );
+      }
       for (let attempt = 0; attempt < 2; attempt += 1) {
         for (const statement of backfill
           .split(";")
@@ -124,13 +144,15 @@ test("default feed backfill preserves feed/token identities and company custom f
 test("deployment upgrades the persisted Premium payroll limit to five idempotently", async () => {
   await systemDatabase
     .$transaction(async (tx) => {
-      const plan =
-        (await tx.plan.findFirst({
-          where: { OR: [{ plan_key: "premium" }, { key: "premium" }] },
-        })) ??
-        (await tx.plan.create({
-          data: { key: "premium", name: "Premium", plan_key: "premium" },
-        }));
+      const key = fixture.globalKey("plan_key");
+      const plan = await tx.plan.create({
+        data: {
+          id: fixture.globalKey("plan_id"),
+          key,
+          name: "Owned Premium migration",
+          plan_key: key,
+        },
+      });
       const original = await tx.planLimit.upsert({
         create: {
           limit_type: "payroll_entities",
@@ -147,6 +169,15 @@ test("deployment upgrades the persisted Premium payroll limit to five idempotent
       });
       const pricingBackfill = migration.slice(
         migration.indexOf("UPDATE plan_limits limits SET limit_value = 5")
+      );
+      // The unchanged historical SQL recognises the canonical Premium key.
+      // Project only this owned plan and its limits into that historical shape.
+      const planId = plan.id.replaceAll("'", "''");
+      await tx.$executeRawUnsafe(
+        `CREATE TEMP VIEW plans AS SELECT id, 'premium'::text AS key, 'premium'::text AS plan_key FROM public.plans WHERE id = '${planId}'::uuid`
+      );
+      await tx.$executeRawUnsafe(
+        `CREATE TEMP VIEW plan_limits AS SELECT * FROM public.plan_limits WHERE plan_id = '${planId}'::uuid`
       );
       await tx.$executeRawUnsafe(pricingBackfill);
       const updated = await tx.planLimit.findUnique({

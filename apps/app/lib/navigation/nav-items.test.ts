@@ -8,18 +8,18 @@ import {
 
 describe("isNavItemVisible", () => {
   it("shows items without a roles list to everyone", () => {
-    expect(isNavItemVisible(undefined, "org:viewer")).toBe(true);
+    expect(isNavItemVisible(undefined, "viewer")).toBe(true);
     expect(isNavItemVisible(undefined, null)).toBe(true);
     expect(isNavItemVisible(undefined, undefined)).toBe(true);
   });
 
   it("shows a role-scoped item only to matching roles", () => {
-    const roles = ["org:admin", "org:owner"];
-    expect(isNavItemVisible(roles, "org:admin")).toBe(true);
-    expect(isNavItemVisible(roles, "org:owner")).toBe(true);
-    expect(isNavItemVisible(roles, "org:manager")).toBe(false);
-    expect(isNavItemVisible(roles, "org:viewer")).toBe(false);
-    expect(isNavItemVisible(roles, null)).toBe(false);
+    const permission = { people: ["manage"] } as const;
+    expect(isNavItemVisible(permission, "admin")).toBe(true);
+    expect(isNavItemVisible(permission, "owner")).toBe(true);
+    expect(isNavItemVisible(permission, "manager")).toBe(false);
+    expect(isNavItemVisible(permission, "viewer")).toBe(false);
+    expect(isNavItemVisible(permission, null)).toBe(false);
   });
 });
 
@@ -30,8 +30,8 @@ describe("navigation registry", () => {
       (item) => item.href === "/analytics/leave-reports"
     );
     expect(leaveReports).toBeDefined();
-    expect(isNavItemVisible(leaveReports?.roles, "org:viewer")).toBe(false);
-    expect(isNavItemVisible(leaveReports?.roles, "org:manager")).toBe(true);
+    expect(isNavItemVisible(leaveReports?.permission, "viewer")).toBe(false);
+    expect(isNavItemVisible(leaveReports?.permission, "manager")).toBe(true);
   });
 
   it("keeps every nav href absolute", () => {
@@ -49,16 +49,16 @@ describe("navigation registry", () => {
     const addPerson = quickActions.find(
       (action) => action.href === "/people/new"
     );
-    expect(addPerson?.roles).toBeDefined();
-    expect(isNavItemVisible(addPerson?.roles, "org:manager")).toBe(false);
-    expect(isNavItemVisible(addPerson?.roles, "org:admin")).toBe(true);
+    expect(addPerson?.permission).toBeDefined();
+    expect(isNavItemVisible(addPerson?.permission, "manager")).toBe(false);
+    expect(isNavItemVisible(addPerson?.permission, "admin")).toBe(true);
   });
 
   it("lets any role reach the everyday create actions", () => {
     const newPlan = quickActions.find((action) => action.href === "/plans/new");
-    expect(newPlan?.roles).toBeUndefined();
+    expect(newPlan?.permission).toBeUndefined();
     expect(newPlan?.keywords).toContain("leave");
-    expect(isNavItemVisible(newPlan?.roles, "org:viewer")).toBe(true);
+    expect(isNavItemVisible(newPlan?.permission, "viewer")).toBe(true);
   });
 
   it("uses one canonical plan action for leave and availability", () => {

@@ -59,8 +59,8 @@ vi.mock("@repo/database", async () => ({
   ...(await vi.importActual<
     typeof import("../../../../packages/database/src/queries/account-companies")
   >("../../../../packages/database/src/queries/account-companies")),
-  scopedQuery: (clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: (accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   }),
   ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
@@ -95,8 +95,8 @@ const { DashboardBody } = await import("./dashboard-body");
 const ONBOARDING_SURFACE = /Getting started|Dismiss onboarding|Setup/;
 const companyId = "00000000-0000-4000-8000-000000000001";
 const props = {
-  clerkOrgId: "org_1" as never,
-  orgRole: "org:admin",
+  accountId: "org_1" as never,
+  role: "admin",
   userId: "user_1",
 };
 
@@ -115,7 +115,7 @@ describe("DashboardBody", () => {
 
   it("shows an unlinked member the viewer view", async () => {
     mocks.resolveDashboardRole.mockResolvedValue({ ok: true, value: "viewer" });
-    render(await DashboardBody({ ...props, orgRole: "org:viewer" }));
+    render(await DashboardBody({ ...props, role: "viewer" }));
     expect(screen.getByText("Viewer view")).toBeTruthy();
   });
 });

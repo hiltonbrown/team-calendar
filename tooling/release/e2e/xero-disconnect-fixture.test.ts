@@ -8,7 +8,7 @@ const primary = "11111111-1111-4111-8111-111111111111";
 const foreign = "22222222-2222-4222-8222-222222222222";
 const disposable = "33333333-3333-4333-8333-333333333333";
 const fixture = {
-  clerkOrgId: "owned-account",
+  accountId: "owned-account",
   deleteAcknowledgement: "I_ACKNOWLEDGE_XERO_DEMO_CONNECTION_DELETE",
   organisationId: disposable,
   organisationName: "Disposable Xero disconnect fixture",
@@ -21,7 +21,7 @@ const fixture = {
 };
 const scope = {
   foreignOrganisationId: foreign,
-  ownedClerkOrgIds: ["owned-account"],
+  ownedAccountIds: ["owned-account"],
   ownedOrganisationIds: [primary, foreign, disposable],
   primaryOrganisationId: primary,
   providerAppId: fixture.providerAppId,
@@ -42,7 +42,7 @@ describe("disposable disconnect fixture selection", () => {
   );
   it("refuses unowned account or organisation and a foreign sibling", () => {
     for (const candidate of [
-      { ...fixture, clerkOrgId: "unowned-account" },
+      { ...fixture, accountId: "unowned-account" },
       { ...fixture, organisationId: "77777777-7777-4777-8777-777777777777" },
       { ...fixture, siblingOrganisationId: foreign },
       { ...fixture, siblingOrganisationId: disposable },

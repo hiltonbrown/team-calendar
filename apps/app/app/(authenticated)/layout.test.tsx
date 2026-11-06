@@ -1,34 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
   getOnboardingRecord: vi.fn(),
+  getSession: vi.fn(),
   headers: vi.fn(),
-  listOrganisationsByClerkOrg: vi.fn(),
+  listOrganisationsByAccount: vi.fn(),
   loadWelcomeEligibility: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`redirect:${path}`);
   }),
-  requireOrg: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@repo/auth/helpers", () => ({ requireOrg: mocks.requireOrg }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   isOnboardingAdmin: (role: string | null) =>
-    role === "org:admin" || role === "org:owner",
+    role === "admin" || role === "owner",
   loadWelcomeEligibility: mocks.loadWelcomeEligibility,
 }));
 vi.mock("@repo/database/queries/onboarding", () => ({
   getOnboardingRecord: mocks.getOnboardingRecord,
 }));
 vi.mock("@repo/database/queries/organisations", () => ({
-  listOrganisationsByClerkOrg: mocks.listOrganisationsByClerkOrg,
+  listOrganisationsByAccount: mocks.listOrganisationsByAccount,
 }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
@@ -47,6 +45,10 @@ vi.mock("./components/sidebar", () => ({
 const AppLayout = (await import("./layout")).default;
 const organisationId = "00000000-0000-4000-8000-000000000001";
 
+function sessionFor(role: "owner" | "admin" | "manager" | "viewer" = "admin") {
+  return { accountId: "org_1", role, sessionId: "session_1", userId: "user_1" };
+}
+
 function setPath(pathname: string) {
   mocks.headers.mockResolvedValue(
     new Headers(pathname ? { "x-pathname": pathname } : {})
@@ -56,17 +58,48 @@ function setPath(pathname: string) {
 describe("AppLayout first-run gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireOrg.mockResolvedValue("org_1");
-    mocks.listOrganisationsByClerkOrg.mockResolvedValue({
+    mocks.getCurrentUser.mockResolvedValue({
+      emailVerified: true,
+      id: "user_1",
+    });
+    mocks.getSession.mockResolvedValue(sessionFor());
+    mocks.listOrganisationsByAccount.mockResolvedValue({
       ok: true,
       value: [{ id: organisationId }],
     });
     setPath("/calendar");
   });
 
+  it("rejects an absent session before any tenant lookup", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    await expect(AppLayout({ children: null })).rejects.toThrow(
+      "redirect:/sign-in"
+    );
+    expect(mocks.listOrganisationsByAccount).not.toHaveBeenCalled();
+  });
+  it("requires verified email before first-run lookup", async () => {
+    mocks.getCurrentUser.mockResolvedValue({
+      emailVerified: false,
+      id: "user_1",
+    });
+    await expect(AppLayout({ children: null })).rejects.toThrow(
+      "redirect:/verify-email"
+    );
+    expect(mocks.listOrganisationsByAccount).not.toHaveBeenCalled();
+  });
+  it("requires an active Account before first-run lookup", async () => {
+    mocks.getSession.mockResolvedValue({
+      ...sessionFor(),
+      accountId: null,
+      role: null,
+    });
+    await expect(AppLayout({ children: null })).rejects.toThrow(
+      "redirect:/select-account"
+    );
+    expect(mocks.listOrganisationsByAccount).not.toHaveBeenCalled();
+  });
   it("sends an admin with an unfinished wizard to onboarding", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue(sessionFor("admin"));
     mocks.getOnboardingRecord.mockResolvedValue({
       ok: true,
       value: { completedAt: null, step: "xero", xeroSkippedAt: null },
@@ -78,8 +111,8 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("sends an admin to onboarding before the organisation row exists", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:owner" });
-    mocks.listOrganisationsByClerkOrg.mockResolvedValue({
+    mocks.getSession.mockResolvedValue(sessionFor("owner"));
+    mocks.listOrganisationsByAccount.mockResolvedValue({
       ok: true,
       value: [],
     });
@@ -89,7 +122,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("lets the wizard's Xero selection page render", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue(sessionFor("admin"));
     mocks.getOnboardingRecord.mockResolvedValue({
       ok: true,
       value: { completedAt: null, step: "xero", xeroSkippedAt: null },
@@ -99,7 +132,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("does not lock admins out when the onboarding lookup fails", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue(sessionFor("admin"));
     mocks.getOnboardingRecord.mockResolvedValue({
       error: { code: "internal", message: "down" },
       ok: false,
@@ -108,7 +141,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("sends an eligible member to the welcome", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.getSession.mockResolvedValue(sessionFor("viewer"));
     mocks.loadWelcomeEligibility.mockResolvedValue({
       ok: true,
       value: { eligible: true, personId: "p1" },
@@ -120,7 +153,7 @@ describe("AppLayout first-run gate", () => {
   });
 
   it("leaves an unlinked member on the requested page", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:manager" });
+    mocks.getSession.mockResolvedValue(sessionFor("manager"));
     mocks.loadWelcomeEligibility.mockResolvedValue({
       ok: true,
       value: { eligible: false, personId: null },

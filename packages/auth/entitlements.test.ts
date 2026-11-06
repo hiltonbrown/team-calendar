@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   getAuthoritativeUsageCount: vi.fn(),
   getPlanFeatures: vi.fn(),
   getPlanLimits: vi.fn(),
-  getSubscriptionForOrg: vi.fn(),
-  hasUnresolvedStripeEventForOrg: vi.fn(),
+  getSubscriptionForAccount: vi.fn(),
+  hasUnresolvedStripeEventForAccount: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -26,20 +26,20 @@ vi.mock("@repo/database", async () => ({
   getAuthoritativeUsageCount: mocks.getAuthoritativeUsageCount,
   getPlanFeatures: mocks.getPlanFeatures,
   getPlanLimits: mocks.getPlanLimits,
-  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
-  hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
+  getSubscriptionForAccount: mocks.getSubscriptionForAccount,
+  hasUnresolvedStripeEventForAccount: mocks.hasUnresolvedStripeEventForAccount,
 }));
 
 describe("entitlements", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.unstubAllEnvs();
-    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(false);
+    mocks.hasUnresolvedStripeEventForAccount.mockResolvedValue(false);
   });
 
   describe("withinLimit", () => {
     it("allows usage when current usage is strictly less than limit", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -58,7 +58,7 @@ describe("entitlements", () => {
     });
 
     it("denies usage when current usage equals limit", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -77,7 +77,7 @@ describe("entitlements", () => {
     });
 
     it("denies usage when current usage exceeds limit", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -96,7 +96,7 @@ describe("entitlements", () => {
     });
 
     it("allows usage when limit is -1 (unlimited)", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "enterprise",
         status: "active",
       });
@@ -115,7 +115,7 @@ describe("entitlements", () => {
     });
 
     it("uses authoritative usage when the reporting counter is absent", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -134,7 +134,7 @@ describe("entitlements", () => {
     });
 
     it("reads usage through the supplied transaction client", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue(null);
+      mocks.getSubscriptionForAccount.mockResolvedValue(null);
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(4);
 
@@ -160,7 +160,7 @@ describe("entitlements", () => {
     });
 
     it("returns error result when getPlanLimits throws", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -179,7 +179,7 @@ describe("entitlements", () => {
 
   describe("activePlanKey resolution", () => {
     it("resolves to premium for active subscription with premium plan key", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -195,12 +195,12 @@ describe("entitlements", () => {
 
     it("falls back to basic in paid mode while a newer billing event is unresolved", async () => {
       vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
         stripe_event_created_at: new Date("2026-09-18T00:00:00Z"),
       });
-      mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
+      mocks.hasUnresolvedStripeEventForAccount.mockResolvedValue(true);
       mocks.getPlanLimits.mockReturnValue({ seats: 5 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
@@ -209,7 +209,7 @@ describe("entitlements", () => {
       );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("basic");
-      expect(mocks.hasUnresolvedStripeEventForOrg).toHaveBeenCalledWith(
+      expect(mocks.hasUnresolvedStripeEventForAccount).toHaveBeenCalledWith(
         "org_123",
         new Date("2026-09-18T00:00:00Z")
       );
@@ -217,12 +217,12 @@ describe("entitlements", () => {
 
     it("keeps early-access entitlement behaviour during billing repair", async () => {
       vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "early_access");
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
         stripe_event_created_at: new Date("2026-09-18T00:00:00Z"),
       });
-      mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
+      mocks.hasUnresolvedStripeEventForAccount.mockResolvedValue(true);
       mocks.getPlanLimits.mockReturnValue({ seats: 10 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
@@ -231,11 +231,11 @@ describe("entitlements", () => {
       );
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("premium");
-      expect(mocks.hasUnresolvedStripeEventForOrg).not.toHaveBeenCalled();
+      expect(mocks.hasUnresolvedStripeEventForAccount).not.toHaveBeenCalled();
     });
 
     it("resolves to premium for trialing subscription with premium plan key", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "trialing",
       });
@@ -250,7 +250,7 @@ describe("entitlements", () => {
     });
 
     it("falls back to basic for canceled subscription", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "canceled",
       });
@@ -265,7 +265,7 @@ describe("entitlements", () => {
     });
 
     it("falls back to basic for unrecognised plan key", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "enterprise_legacy",
         status: "active",
       });
@@ -280,7 +280,7 @@ describe("entitlements", () => {
     });
 
     it("falls back to basic when organisation has no subscription", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue(null);
+      mocks.getSubscriptionForAccount.mockResolvedValue(null);
       mocks.getPlanLimits.mockReturnValue({ seats: 5 });
       mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
 
@@ -294,7 +294,7 @@ describe("entitlements", () => {
 
   describe("hasFeature", () => {
     it("returns feature flag value for resolved plan", async () => {
-      mocks.getSubscriptionForOrg.mockResolvedValue({
+      mocks.getSubscriptionForAccount.mockResolvedValue({
         plan_key: "premium",
         status: "active",
       });
@@ -313,7 +313,7 @@ describe("entitlements", () => {
     });
 
     it("returns error result when dependency throws", async () => {
-      mocks.getSubscriptionForOrg.mockRejectedValue(
+      mocks.getSubscriptionForAccount.mockRejectedValue(
         new Error("Connection error")
       );
 

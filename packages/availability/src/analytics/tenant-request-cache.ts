@@ -5,10 +5,10 @@ import { type AggregationCache, createAggregationCache } from "./request-cache";
 const tenantCaches = new WeakMap<TenantDb, AggregationCache>();
 /** Memoised SQL snapshots belong to one active tenant request, including uncommitted rows. */
 export function tenantAggregationCache(
-  clerkOrgId: string,
+  accountId: string,
   db: TenantDb
 ): AggregationCache {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   let cache = tenantCaches.get(db);
   if (!cache) {
     cache = createAggregationCache();

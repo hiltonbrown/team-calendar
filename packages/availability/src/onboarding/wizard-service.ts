@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { assertTenantDb, type TenantDb } from "@repo/database";
 import "server-only";
 
@@ -27,10 +28,8 @@ export interface WizardActor extends WizardContext {
   actingRole: string | null | undefined;
 }
 
-const ADMIN_ROLES = new Set(["admin", "org:admin", "org:owner", "owner"]);
-
 export function isOnboardingAdmin(role: string | null | undefined): boolean {
-  return Boolean(role && ADMIN_ROLES.has(role));
+  return hasPermission(role, { settings: ["update"] });
 }
 
 const STEP_INCOMPLETE_MESSAGES: Record<OnboardingStep, string> = {
@@ -45,7 +44,7 @@ export async function loadWizardSnapshot(
   actor: WizardActor,
   db: TenantDb
 ): Promise<Result<WizardSnapshot, WizardError>> {
-  assertTenantDb(db, actor.clerkOrgId);
+  assertTenantDb(db, actor.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof loadWizardSnapshot> => {
@@ -59,7 +58,7 @@ export async function loadWizardSnapshot(
     return { ok: true, value: buildSnapshot(inputs.value) };
   };
   return await (async () => {
-    assertTenantDb(db, actor.clerkOrgId);
+    assertTenantDb(db, actor.accountId);
     return await run(db);
   })();
 }
@@ -71,7 +70,7 @@ export async function advanceWizard(
   from: OnboardingStep,
   db: TenantDb
 ): Promise<Result<WizardSnapshot, WizardError>> {
-  assertTenantDb(db, actor.clerkOrgId);
+  assertTenantDb(db, actor.accountId);
   const run = async (client: TenantDb): ReturnType<typeof advanceWizard> => {
     const current = await loadWizardSnapshot(actor, client);
     if (!current.ok) {
@@ -100,7 +99,7 @@ export async function advanceWizard(
       };
     }
     const advanced = await advanceOnboardingStep(
-      actor.clerkOrgId,
+      actor.accountId,
       actor.organisationId,
       from,
       nextStep(from),
@@ -112,7 +111,7 @@ export async function advanceWizard(
     return await loadWizardSnapshot(actor, client);
   };
   return await (async () => {
-    assertTenantDb(db, actor.clerkOrgId);
+    assertTenantDb(db, actor.accountId);
     return await run(db);
   })();
 }
@@ -124,7 +123,7 @@ export async function finishWizard(
 ): Promise<
   Result<{ redirectTo: "/calendar"; snapshot: WizardSnapshot }, WizardError>
 > {
-  assertTenantDb(db, actor.clerkOrgId);
+  assertTenantDb(db, actor.accountId);
   const run = async (client: TenantDb): ReturnType<typeof finishWizard> => {
     const current = await loadWizardSnapshot(actor, client);
     if (!current.ok) {
@@ -151,7 +150,7 @@ export async function finishWizard(
         };
       }
       const completed = await completeOnboarding(
-        actor.clerkOrgId,
+        actor.accountId,
         actor.organisationId,
         client
       );
@@ -168,7 +167,7 @@ export async function finishWizard(
     };
   };
   return await (async () => {
-    assertTenantDb(db, actor.clerkOrgId);
+    assertTenantDb(db, actor.accountId);
     return await run(db);
   })();
 }

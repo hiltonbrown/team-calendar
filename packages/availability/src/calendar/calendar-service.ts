@@ -1,9 +1,10 @@
+import { type AuthRole, hasPermission } from "@repo/auth/permissions";
 import type { TenantDb } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { getAccountApprovalSettings } from "../settings/account-approval-settings-service";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import "server-only";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { recordFallsOnDay, recordQueryWindow } from "@repo/core";
 import {
   assertTenantDb,
@@ -27,7 +28,7 @@ import {
 } from "../records/record-type-categories";
 import { getSettings } from "../settings/organisation-settings-service";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
-export type CalendarRole = "admin" | "manager" | "owner" | "viewer";
+export type CalendarRole = AuthRole;
 export type CalendarView = "day" | "month" | "week";
 export type CalendarScope =
   | {
@@ -169,10 +170,10 @@ const ApprovalStatusSchema = z.enum([
 const PersonTypeSchema = z.enum(["contractor", "employee"]);
 const RecordTypeSchema = z.enum(USER_CREATABLE_RECORD_TYPES);
 const RangeInputSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
   actingUserId: z.string().min(1),
   anchorDate: z.coerce.date(),
-  clerkOrgId: z.string().min(1),
   companyIds: z.array(z.string().uuid()).optional(),
   filters: z
     .object({
@@ -193,9 +194,9 @@ const RangeInputSchema = z.object({
   view: ViewSchema,
 });
 const DetailInputSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
   role: RoleSchema,
@@ -209,7 +210,6 @@ type ParsedDetailInput = z.infer<typeof DetailInputSchema>;
 interface ScopedPerson {
   archived_at: Date | null;
   avatar_url: string | null;
-  clerk_user_id: string | null;
   email: string;
   employment_type: string;
   first_name: string;
@@ -232,6 +232,7 @@ interface ScopedPerson {
     name: string;
   } | null;
   team_id: string | null;
+  user_id: string | null;
 }
 interface ScopedRecord {
   all_day: boolean;
@@ -260,13 +261,13 @@ export async function getCalendarRange(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     const tx = db;
 
     const companies = (
-      await resolveAccountCompanies(parsed.data.clerkOrgId, tx)
+      await resolveAccountCompanies(parsed.data.accountId, tx)
     ).map((company) => ({
       ...company,
       timezone: company.timezone ?? "UTC",
@@ -281,8 +282,8 @@ export async function getCalendarRange(
           orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
           select: personSelect,
           where: {
+            account_id: parsed.data.accountId,
             archived_at: null,
-            clerk_org_id: parsed.data.clerkOrgId,
             is_active: true,
             organisation_id: { in: companies.map((company) => company.id) },
           },
@@ -375,9 +376,7 @@ function resolveCompanyInput(
   if (input.organisationId) {
     return { ...input, accountWide: false, organisationId };
   }
-  const actor = people.find(
-    (person) => person.clerk_user_id === input.actingUserId
-  );
+  const actor = people.find((person) => person.user_id === input.actingUserId);
   if (
     !actor &&
     (input.scope.type === "my_self" ||
@@ -402,13 +401,13 @@ async function loadCompanyCalendarRange(
 ): Promise<Result<CalendarRange, CalendarServiceError>> {
   const settingsResult = await getSettings(
     {
-      clerkOrgId: parsed.data.clerkOrgId,
+      accountId: parsed.data.accountId,
       organisationId: parsed.data.organisationId,
     },
     tx
   );
   const accountSettingsResult = await getAccountApprovalSettings(
-    { clerkOrgId: parsed.data.clerkOrgId },
+    { accountId: parsed.data.accountId },
     tx
   );
   const { timezone } = company;
@@ -425,7 +424,7 @@ async function loadCompanyCalendarRange(
   const allPeople = companyPeople;
   const managerReportIds = await authorisedReportIds(
     parsed.data,
-    parsed.data.clerkOrgId,
+    parsed.data.accountId,
     tx
   );
   const scopedPeopleResult = resolvePeopleForScope(parsed.data, allPeople, {
@@ -473,7 +472,7 @@ async function loadCompanyCalendarRange(
   const dayDateOnly = localRange.dateOnlyValues;
   const holidays = await loadPublicHolidayCells(
     {
-      clerkOrgId: parsed.data.clerkOrgId,
+      accountId: parsed.data.accountId,
       dateOnlyValues: dayDateOnly,
       organisationId: parsed.data.organisationId,
       people: visiblePeople,
@@ -504,7 +503,7 @@ async function loadCompanyCalendarRange(
   }));
   const xeroStateResult = await getXeroConnectionStateForScope(
     {
-      clerkOrgId: parsed.data.clerkOrgId,
+      accountId: parsed.data.accountId,
       organisationId: parsed.data.organisationId,
     },
     tx
@@ -605,16 +604,16 @@ export async function getEventDetail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     const client = db;
 
     const record = await client.availabilityRecord.findFirst({
       select: recordSelect,
       where: {
         ...scopedTo({
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           organisationId: parsed.data.organisationId,
         }),
         archived_at: null,
@@ -626,10 +625,10 @@ export async function getEventDetail(
     }
     const allPeople = await loadPeople(
       {
+        accountId: parsed.data.accountId,
         actingPersonId: parsed.data.actingPersonId ?? null,
         actingUserId: parsed.data.actingUserId,
         anchorDate: new Date(),
-        clerkOrgId: parsed.data.clerkOrgId,
         filters: {},
         organisationId: parsed.data.organisationId,
         role: parsed.data.role,
@@ -643,7 +642,7 @@ export async function getEventDetail(
     }
     const managerReportIds = await authorisedReportIds(
       parsed.data,
-      parsed.data.clerkOrgId,
+      parsed.data.accountId,
       client
     );
     if (
@@ -657,7 +656,7 @@ export async function getEventDetail(
       return notAuthorised();
     }
     const company = (
-      await resolveAccountCompanies(parsed.data.clerkOrgId, client)
+      await resolveAccountCompanies(parsed.data.accountId, client)
     ).find((candidate) => candidate.id === parsed.data.organisationId);
     if (!company) {
       return notAuthorised();
@@ -689,7 +688,7 @@ async function loadPeople(
     select: personSelect,
     where: {
       ...scopedTo({
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         organisationId: input.organisationId,
       }),
       archived_at: null,
@@ -848,8 +847,8 @@ async function loadRecords(
     orderBy: [{ starts_at: "asc" }, { person_id: "asc" }, { id: "asc" }],
     select: recordSelect,
     where: {
+      account_id: input.accountId,
       archived_at: null,
-      clerk_org_id: input.clerkOrgId,
       ends_at: { gte: range.start },
       OR: approvalOr,
       organisation_id: { in: [input.organisationId] },
@@ -885,7 +884,7 @@ function approvalStatusesForFilter(
 }
 async function loadPublicHolidayCells(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     dateOnlyValues: string[];
     organisationId: string;
     people: ScopedPerson[];
@@ -908,7 +907,7 @@ async function loadPublicHolidayCells(
   );
   const result = await resolvePublicHolidays(
     {
-      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      accountId: input.accountId as AccountId,
       from,
       organisationId: input.organisationId as OrganisationId,
       to,
@@ -1115,7 +1114,7 @@ function resolveLocalRange(
 }
 async function authorisedReportIds(
   actor: { actingPersonId?: string | null; role: CalendarRole },
-  clerkOrgId: string,
+  accountId: string,
   db: TenantDb
 ): Promise<Set<string>> {
   if (actor.role !== "manager" || !actor.actingPersonId) {
@@ -1123,7 +1122,7 @@ async function authorisedReportIds(
   }
   return new Set(
     await managerScopePersonIds(
-      { actingPersonId: actor.actingPersonId, clerkOrgId },
+      { accountId, actingPersonId: actor.actingPersonId },
       db
     )
   );
@@ -1147,7 +1146,7 @@ function effectivePersonType(
   return person.employment_type === "contractor" ? "contractor" : "employee";
 }
 function isAdminOrOwner(role: CalendarRole): boolean {
-  return role === "admin" || role === "owner";
+  return hasPermission(role, { people: ["manage"] });
 }
 function dateOnlyInTimeZone(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -1243,16 +1242,16 @@ async function recordNotFound(
   client: TenantDb
 ): Promise<Result<never, CalendarServiceError>> {
   const exists = await client.availabilityRecord.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { clerk_org_id: input.clerkOrgId, id: input.recordId },
+    select: { account_id: true, organisation_id: true },
+    where: { account_id: input.accountId, id: input.recordId },
   });
   if (
     exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
+    (exists.account_id !== input.accountId ||
       exists.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.recordId,
       resourceType: "availability_record",
@@ -1296,7 +1295,6 @@ function invalidScope(): Result<never, CalendarServiceError> {
 const personSelect = {
   archived_at: true,
   avatar_url: true,
-  clerk_user_id: true,
   email: true,
   employment_type: true,
   first_name: true,
@@ -1323,6 +1321,7 @@ const personSelect = {
     },
   },
   team_id: true,
+  user_id: true,
 } as const;
 const recordSelect = {
   all_day: true,

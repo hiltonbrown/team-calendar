@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   logError: vi.fn(),
   personFindFirst: vi.fn(),
   personFindMany: vi.fn(),
-  scopedTo: vi.fn((input: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: input.clerkOrgId,
+  scopedTo: vi.fn((input: { accountId: string; organisationId: string }) => ({
+    account_id: input.accountId,
     organisation_id: input.organisationId,
   })),
   teamFindMany: vi.fn(),
@@ -72,9 +72,9 @@ const { createSignedFeedToken, getFeedDetail, listFeeds } = await import(
 );
 
 const baseInput = {
+  accountId: "org_1",
   actingRole: "owner" as const,
   actingUserId: "user_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 const actingPersonId = "00000000-0000-4000-8000-000000000002";
@@ -336,8 +336,7 @@ function buildPerson(input: {
   teamId: string;
 }) {
   return {
-    clerk_org_id: baseInput.clerkOrgId,
-    clerk_user_id: null,
+    account_id: baseInput.accountId,
     display_name: `${input.firstName} ${input.lastName}`,
     first_name: input.firstName,
     id: input.id,
@@ -349,5 +348,6 @@ function buildPerson(input: {
     organisation_id: baseInput.organisationId,
     team: { id: input.teamId, name: "Operations" },
     team_id: input.teamId,
+    user_id: null,
   };
 }

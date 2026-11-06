@@ -78,7 +78,7 @@ test("sets transaction-local context once and returns the callback value", async
   const query = state.clients[0]?.$queryRaw;
   expect(query).toHaveBeenCalledOnce();
   expect(query).toHaveBeenCalledWith(
-    ["SELECT set_config('app.clerk_org_id', ", ", true)"],
+    ["SELECT set_config('app.account_id', ", ", true)"],
     "account-A"
   );
   expect(state.transaction).toHaveBeenCalledWith(
@@ -302,7 +302,7 @@ test.each(["", "   "])(
   async (account) => {
     await expect(
       withTenantDb(account, () => Promise.resolve())
-    ).rejects.toThrow("Clerk organisation");
+    ).rejects.toThrow("Account");
     expect(state.transaction).not.toHaveBeenCalled();
   }
 );

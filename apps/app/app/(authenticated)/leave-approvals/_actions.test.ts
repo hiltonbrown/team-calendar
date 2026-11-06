@@ -4,8 +4,6 @@ const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
   analyticsFlush: vi.fn(),
   approve: vi.fn(),
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     availabilityRecord: { findFirst: vi.fn() },
     person: {
@@ -16,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   dispatchApprovalReconciliation: vi.fn(),
   dispatchXeroLeaveSync: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   managerScopePersonIds: vi.fn(),
   prepareApprovalSync: vi.fn(),
   requestMoreInfo: vi.fn(),
@@ -26,8 +26,8 @@ const mocks = vi.hoisted(() => ({
   transactionOpen: false,
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/analytics/server", () => ({
   analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
@@ -112,7 +112,7 @@ const {
 } = await import("./_actions");
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const recordId = "00000000-0000-4000-8000-000000000002";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 describe("leave approval server actions", () => {
   beforeEach(() => {
@@ -121,7 +121,7 @@ describe("leave approval server actions", () => {
       Promise.resolve({
         ok: true,
         value: {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           connectionId: "00000000-0000-4000-8000-000000000003",
           organisationId: input.organisationId,
           runType,
@@ -137,11 +137,14 @@ describe("leave approval server actions", () => {
       organisation_id: organisationId,
       person_id: "person_report",
     });
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:manager" });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_123",
+      role: "manager",
+    });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.database.person.findMany.mockResolvedValue([{ id: "person_789" }]);
     mocks.approve.mockResolvedValue({
@@ -210,7 +213,7 @@ describe("leave approval server actions", () => {
   });
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers for all actions", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
       const resApprove = await approveAction({ recordId });
       expect(resApprove).toEqual({
         error: {
@@ -234,7 +237,10 @@ describe("leave approval server actions", () => {
       expect(mocks.requestMoreInfo).not.toHaveBeenCalled();
     });
     it("rejects insufficient role for viewer and admin-only actions", async () => {
-      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:viewer" });
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "viewer",
+      });
       const resApprove = await approveAction({ recordId });
       expect(resApprove).toEqual({
         error: {
@@ -244,10 +250,10 @@ describe("leave approval server actions", () => {
         ok: false,
       });
       expect(mocks.approve).not.toHaveBeenCalled();
-      // For dispatchApprovalReconciliationAction, org:manager is insufficient (admin only)
-      mocks.auth.mockResolvedValue({
-        orgId: "org_123",
-        orgRole: "org:manager",
+      // For dispatchApprovalReconciliationAction, manager is insufficient (admin only)
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "manager",
       });
       const resReconcile = await dispatchApprovalReconciliationAction();
       expect(resReconcile).toEqual({
@@ -276,17 +282,17 @@ describe("leave approval server actions", () => {
       }
       expect(mocks.approve).not.toHaveBeenCalled();
     });
-    it("scopes database queries to clerk_org_id and organisation_id", async () => {
+    it("scopes database queries to account_id and organisation_id", async () => {
       await approveAction({ recordId });
       expect(mocks.database.person.findMany).toHaveBeenCalledWith({
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: { id: true },
         take: 2,
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: userId,
           organisation_id: { in: [organisationId] },
+          user_id: userId,
         },
       });
     });
@@ -300,9 +306,9 @@ describe("leave approval server actions", () => {
       expect(result.ok).toBe(true);
       expect(mocks.decline).toHaveBeenCalledWith(
         expect.objectContaining({
+          accountId,
           actingPersonId: "person_789",
           actingUserId: userId,
-          clerkOrgId,
           organisationId,
           reason:
             "Taking annual leave during critical project delivery window.",
@@ -363,7 +369,10 @@ describe("leave approval server actions", () => {
       expect(mocks.revertApprovalAttempt).toHaveBeenCalled();
     });
     it("allows admin to dispatch approval reconciliation", async () => {
-      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "admin",
+      });
       const result = await dispatchApprovalReconciliationAction();
       expect(result).toEqual({
         ok: true,
@@ -381,7 +390,10 @@ describe("leave approval server actions", () => {
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/leave-approvals");
     });
     it("allows admin to dispatch an inbound Xero leave sync", async () => {
-      mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "admin",
+      });
       const result = await dispatchXeroLeaveSyncAction();
       expect(result).toEqual({
         ok: true,

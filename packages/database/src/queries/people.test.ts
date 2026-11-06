@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withTenantResult as withTestTenantResult } from "../tenant-db";
 import { tenantTestAccount } from "../test-fixtures/tenant-scope";
@@ -24,7 +24,7 @@ vi.mock("../tenant-client", () => ({
 const { listPeopleForOrganisation } = await import("./people");
 
 describe("people queries", () => {
-  const clerkOrgId = "org_test_people" as ClerkOrgId;
+  const accountId = "org_test_people" as AccountId;
   const organisationId =
     "44444444-4444-4444-8444-444444444444" as OrganisationId;
 
@@ -32,20 +32,20 @@ describe("people queries", () => {
     vi.clearAllMocks();
   });
 
-  it("listPeopleForOrganisation carries clerk_org_id and organisation_id", async () => {
+  it("listPeopleForOrganisation carries account_id and organisation_id", async () => {
     mocks.findMany.mockResolvedValue([]);
 
     const result = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
+      tenantTestAccount(accountId),
       (db) =>
-        listPeopleForOrganisation(clerkOrgId, organisationId, undefined, db)
+        listPeopleForOrganisation(accountId, organisationId, undefined, db)
     );
 
     expect(result).toEqual({ ok: true, value: [] });
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
         }),
       })

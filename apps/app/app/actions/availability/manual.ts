@@ -1,12 +1,12 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   archiveManualAvailability,
   createManualAvailability,
   updateManualAvailability,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -54,17 +54,28 @@ export async function createManualAvailabilityAction(
     };
   }
 
-  const [authResult, user] = await Promise.all([auth(), currentUser()]);
-  if (!(authResult.orgId && user)) {
+  const [authResult, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+  ]);
+  if (!(authResult.accountId && user)) {
     return { error: "Not authenticated", ok: false };
   }
-  const clerkOrgId = authResult.orgId as ClerkOrgId;
+  const accountId = authResult.accountId as AccountId;
   try {
     const prepared = await withTenantResult(
-      clerkOrgId,
+      accountId,
       async (db): Promise<Result<{ id?: string }, string>> => {
         const company = await getOrganisationById(
-          clerkOrgId,
+          accountId,
           parsed.data.organisationId as OrganisationId,
           db
         );
@@ -72,9 +83,9 @@ export async function createManualAvailabilityAction(
           return { error: company.error.message, ok: false };
         }
         const result = await createManualAvailability(
-          { clerkOrgId, organisationId: company.value.id as OrganisationId },
+          { accountId, organisationId: company.value.id as OrganisationId },
           toServiceInput(parsed.data),
-          { orgRole: authResult.orgRole, userId: user.id },
+          { role: authResult.role, userId: user.id },
           db
         );
 
@@ -116,17 +127,28 @@ export async function updateManualAvailabilityAction(
     };
   }
 
-  const [authResult, user] = await Promise.all([auth(), currentUser()]);
-  if (!(authResult.orgId && user)) {
+  const [authResult, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+  ]);
+  if (!(authResult.accountId && user)) {
     return { error: "Not authenticated", ok: false };
   }
-  const clerkOrgId = authResult.orgId as ClerkOrgId;
+  const accountId = authResult.accountId as AccountId;
   try {
     const prepared = await withTenantResult(
-      clerkOrgId,
+      accountId,
       async (db): Promise<Result<{ id?: string }, string>> => {
         const company = await getOrganisationById(
-          clerkOrgId,
+          accountId,
           parsed.data.organisationId as OrganisationId,
           db
         );
@@ -134,10 +156,10 @@ export async function updateManualAvailabilityAction(
           return { error: company.error.message, ok: false };
         }
         const result = await updateManualAvailability(
-          { clerkOrgId, organisationId: company.value.id as OrganisationId },
+          { accountId, organisationId: company.value.id as OrganisationId },
           recordParsed.data,
           toServiceInput(parsed.data),
-          { orgRole: authResult.orgRole, userId: user.id },
+          { role: authResult.role, userId: user.id },
           db
         );
 
@@ -170,17 +192,28 @@ export async function archiveManualAvailabilityAction(
     return { error: "Invalid availability record", ok: false };
   }
 
-  const [authResult, user] = await Promise.all([auth(), currentUser()]);
-  if (!(authResult.orgId && user)) {
+  const [authResult, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+  ]);
+  if (!(authResult.accountId && user)) {
     return { error: "Not authenticated", ok: false };
   }
-  const clerkOrgId = authResult.orgId as ClerkOrgId;
+  const accountId = authResult.accountId as AccountId;
   try {
     const prepared = await withTenantResult(
-      clerkOrgId,
+      accountId,
       async (db): Promise<Result<{ id?: string }, string>> => {
         const company = await getOrganisationById(
-          clerkOrgId,
+          accountId,
           parsed.data.organisationId as OrganisationId,
           db
         );
@@ -188,9 +221,9 @@ export async function archiveManualAvailabilityAction(
           return { error: company.error.message, ok: false };
         }
         const result = await archiveManualAvailability(
-          { clerkOrgId, organisationId: company.value.id as OrganisationId },
+          { accountId, organisationId: company.value.id as OrganisationId },
           parsed.data.recordId,
-          { orgRole: authResult.orgRole, userId: user.id },
+          { role: authResult.role, userId: user.id },
           db
         );
 

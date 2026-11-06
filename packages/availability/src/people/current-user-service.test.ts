@@ -40,8 +40,8 @@ vi.mock("@repo/database", async () => ({
     },
   ],
 
-  scopedQuery: (inputClerkOrgId: string, inputOrganisationId: string) => ({
-    clerk_org_id: inputClerkOrgId,
+  scopedQuery: (inputAccountId: string, inputOrganisationId: string) => ({
+    account_id: inputAccountId,
     organisation_id: inputOrganisationId,
   }),
 }));
@@ -72,18 +72,18 @@ vi.mock("@repo/feeds", () => ({
   ensureDefaultCalendarFeed: mocks.ensureDefaultCalendarFeed,
 }));
 
-const { ensureCurrentUserPerson, ensureOrganisationForClerk } = await import(
+const { ensureCurrentUserPerson, ensureOrganisationForAccount } = await import(
   "./current-user-service"
 );
 
-const clerkOrgId = "org_current_user_test";
+const accountId = "org_current_user_test";
 const organisationId = "c1000000-0000-4000-8000-000000000001";
 const otherOrganisationId = "c1000000-0000-4000-8000-000000000002";
 const personId = "c2000000-0000-4000-8000-000000000001";
-const tenant = { clerkOrgId, organisationId };
+const tenant = { accountId, organisationId };
 
 const organisation = {
-  clerk_org_id: clerkOrgId,
+  account_id: accountId,
   country_code: "AU",
   created_at: new Date("2026-01-01T00:00:00.000Z"),
   id: organisationId,
@@ -91,9 +91,8 @@ const organisation = {
 };
 
 const person = {
+  account_id: accountId,
   archived_at: null,
-  clerk_org_id: clerkOrgId,
-  clerk_user_id: null,
   display_name: "Case Person",
   email: "case.person@example.com",
   first_name: "Case",
@@ -103,6 +102,7 @@ const person = {
   location: { name: "Brisbane" },
   organisation_id: organisationId,
   team: { name: "Platform" },
+  user_id: null,
 };
 
 describe("current-user-service organisation provisioning", () => {
@@ -125,14 +125,14 @@ describe("current-user-service organisation provisioning", () => {
 
     const result = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId,
+        accountId,
         countryCode: "AU",
         name: "Current user test",
       }),
       (db) =>
-        ensureOrganisationForClerk(
+        ensureOrganisationForAccount(
           {
-            clerkOrgId,
+            accountId,
             countryCode: "AU",
             name: "Current user test",
           },
@@ -140,16 +140,16 @@ describe("current-user-service organisation provisioning", () => {
         )
     );
 
-    expect(result).toEqual({ clerkOrgId, organisationId });
+    expect(result).toEqual({ accountId, organisationId });
     expect(mocks.withinLimit).toHaveBeenCalledWith(
-      clerkOrgId,
+      accountId,
       "00000000-0000-4000-8000-000000000000",
       "payroll_entities",
       expect.any(Object)
     );
     expect(mocks.organisationCreate).toHaveBeenCalledWith({
       data: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         country_code: "AU",
         fiscal_year_start: 7,
         locale: "en-AU",
@@ -160,7 +160,7 @@ describe("current-user-service organisation provisioning", () => {
       },
     });
     expect(mocks.ensureDefaultCalendarFeed).toHaveBeenCalledWith(
-      { clerkOrgId, organisationId },
+      { accountId, organisationId },
       expect.any(Object)
     );
   });
@@ -170,7 +170,7 @@ describe("current-user-service organisation provisioning", () => {
 
     const result = await withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId,
+        accountId,
         countryCode: "NZ",
         fiscalYearStart: 4,
         locale: "en-NZ",
@@ -180,9 +180,9 @@ describe("current-user-service organisation provisioning", () => {
         workingHoursPerDay: 8,
       }),
       (db) =>
-        ensureOrganisationForClerk(
+        ensureOrganisationForAccount(
           {
-            clerkOrgId,
+            accountId,
             countryCode: "NZ",
             fiscalYearStart: 4,
             locale: "en-NZ",
@@ -195,10 +195,10 @@ describe("current-user-service organisation provisioning", () => {
         )
     );
 
-    expect(result).toEqual({ clerkOrgId, organisationId });
+    expect(result).toEqual({ accountId, organisationId });
     expect(mocks.organisationFindFirst).toHaveBeenCalledWith({
       orderBy: { created_at: "asc" },
-      where: { archived_at: null, clerk_org_id: clerkOrgId },
+      where: { account_id: accountId, archived_at: null },
     });
     expect(mocks.withinLimit).not.toHaveBeenCalled();
     expect(mocks.organisationCreate).not.toHaveBeenCalled();
@@ -226,14 +226,14 @@ describe("current-user-service organisation provisioning", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId,
+          accountId,
           countryCode: "AU",
           name: "Blocked organisation",
         }),
         (db) =>
-          ensureOrganisationForClerk(
+          ensureOrganisationForAccount(
             {
-              clerkOrgId,
+              accountId,
               countryCode: "AU",
               name: "Blocked organisation",
             },
@@ -255,14 +255,14 @@ describe("current-user-service organisation provisioning", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId,
+          accountId,
           countryCode: "AU",
           name: "Blocked organisation",
         }),
         (db) =>
-          ensureOrganisationForClerk(
+          ensureOrganisationForAccount(
             {
-              clerkOrgId,
+              accountId,
               countryCode: "AU",
               name: "Blocked organisation",
             },
@@ -292,14 +292,14 @@ describe("current-user-service organisation provisioning", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId,
+          accountId,
           countryCode: "AU",
           name: "Current user test",
         }),
         (db) =>
-          ensureOrganisationForClerk(
+          ensureOrganisationForAccount(
             {
-              clerkOrgId,
+              accountId,
               countryCode: "AU",
               name: "Current user test",
             },
@@ -311,21 +311,21 @@ describe("current-user-service organisation provisioning", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
-          clerkOrgId,
+          accountId,
           countryCode: "AU",
           name: "Current user test",
         }),
         (db) =>
-          ensureOrganisationForClerk(
+          ensureOrganisationForAccount(
             {
-              clerkOrgId,
+              accountId,
               countryCode: "AU",
               name: "Current user test",
             },
             db
           )
       )
-    ).resolves.toEqual({ clerkOrgId, organisationId });
+    ).resolves.toEqual({ accountId, organisationId });
     expect(mocks.organisationCreate).toHaveBeenCalledTimes(1);
     expect(mocks.organisationUpdate).toHaveBeenCalledTimes(1);
     expect(mocks.ensureDefaultCalendarFeed).toHaveBeenCalledTimes(2);
@@ -352,8 +352,8 @@ describe("current-user-service person provisioning", () => {
       );
     mocks.personUpdate.mockResolvedValue({
       ...person,
-      clerk_user_id: "user_case",
       display_name: "Case Updated",
+      user_id: "user_case",
     });
     mocks.withinLimit.mockResolvedValue({
       ok: true,
@@ -364,15 +364,15 @@ describe("current-user-service person provisioning", () => {
   it("returns a pre-linked person without checking email or seat limits", async () => {
     mocks.personFindFirst.mockResolvedValue({
       ...person,
-      clerk_user_id: "user_existing",
+      user_id: "user_existing",
     });
 
     const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_existing",
           email: "different@example.com",
+          userId: "user_existing",
         },
         db
       )
@@ -391,10 +391,10 @@ describe("current-user-service person provisioning", () => {
       include: { location: true, team: true },
       orderBy: [{ created_at: "asc" }, { id: "asc" }],
       where: {
+        account_id: accountId,
         archived_at: null,
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: "user_existing",
         organisation_id: { in: [organisationId] },
+        user_id: "user_existing",
       },
     });
     expect(mocks.personFindMany).not.toHaveBeenCalled();
@@ -409,9 +409,9 @@ describe("current-user-service person provisioning", () => {
         tenant,
         {
           avatarUrl: " https://img.example.com/avatar.png ",
-          clerkUserId: "user_case",
           displayName: " Case Updated ",
           email: " CASE.PERSON@EXAMPLE.COM ",
+          userId: "user_case",
         },
         db
       )
@@ -425,18 +425,18 @@ describe("current-user-service person provisioning", () => {
       include: { location: true, team: true },
       orderBy: [{ created_at: "asc" }, { id: "asc" }],
       where: {
+        account_id: accountId,
         archived_at: null,
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: null,
         email: { equals: "case.person@example.com", mode: "insensitive" },
         organisation_id: { in: [organisationId] },
+        user_id: null,
       },
     });
     expect(mocks.personUpdate).toHaveBeenCalledWith({
       data: {
         avatar_url: "https://img.example.com/avatar.png",
-        clerk_user_id: "user_case",
         display_name: "Case Updated",
+        user_id: "user_case",
       },
       include: { location: true, team: true },
       where: { id: personId },
@@ -454,8 +454,8 @@ describe("current-user-service person provisioning", () => {
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_duplicate",
           email: "case.person@example.com",
+          userId: "user_duplicate",
         },
         db
       )
@@ -465,7 +465,7 @@ describe("current-user-service person provisioning", () => {
       error: {
         code: "conflict",
         message:
-          "Multiple people match this Clerk user's email. Review the people directory before opening plans.",
+          "Multiple people match this user's email. Review the people directory before opening plans.",
       },
       ok: false,
     });
@@ -480,10 +480,10 @@ describe("current-user-service person provisioning", () => {
         tenant,
         {
           avatarUrl: "https://img.example.com/new.png",
-          clerkUserId: "user_new",
           displayName: "New Person",
           email: "NEW.PERSON@EXAMPLE.COM",
           jobTitle: "Designer",
+          userId: "user_new",
         },
         db
       )
@@ -491,16 +491,15 @@ describe("current-user-service person provisioning", () => {
 
     expect(result.ok).toBe(true);
     expect(mocks.withinLimit).toHaveBeenCalledWith(
-      clerkOrgId,
+      accountId,
       organisationId,
       "seats",
       expect.any(Object)
     );
     expect(mocks.personCreateMany).toHaveBeenCalledWith({
       data: {
+        account_id: accountId,
         avatar_url: "https://img.example.com/new.png",
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: "user_new",
         display_name: "New Person",
         email: "new.person@example.com",
         employment_type: "employee",
@@ -509,19 +508,19 @@ describe("current-user-service person provisioning", () => {
         last_name: "Person",
         organisation_id: organisationId,
         source_system: "MANUAL",
+        user_id: "user_new",
       },
       skipDuplicates: true,
     });
   });
 
-  it("uses an internal email when Clerk does not provide one", async () => {
+  it("uses an internal email when the identity profile does not provide one", async () => {
     await withTestTenantResult(tenantTestAccount(tenant), (db) =>
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_new",
-          firstName: "New",
-          lastName: "Person",
+          displayName: "New Person",
+          userId: "user_new",
         },
         db
       )
@@ -545,8 +544,8 @@ describe("current-user-service person provisioning", () => {
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_blocked",
           email: "blocked@example.com",
+          userId: "user_blocked",
         },
         db
       )
@@ -572,8 +571,8 @@ describe("current-user-service person provisioning", () => {
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_error",
           email: "error@example.com",
+          userId: "user_error",
         },
         db
       )
@@ -589,8 +588,8 @@ describe("current-user-service person provisioning", () => {
   it("reuses the winner when concurrent fallback insertion skips a duplicate", async () => {
     const concurrentlyCreated = {
       ...person,
-      clerk_user_id: "user_race",
       id: "c2000000-0000-4000-8000-000000000008",
+      user_id: "user_race",
     };
     mocks.personFindFirst
       .mockResolvedValueOnce(null)
@@ -601,8 +600,8 @@ describe("current-user-service person provisioning", () => {
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_race",
           email: "race@example.com",
+          userId: "user_race",
         },
         db
       )
@@ -615,10 +614,10 @@ describe("current-user-service person provisioning", () => {
     expect(mocks.personFindFirst).toHaveBeenLastCalledWith({
       include: { location: true, team: true },
       where: {
+        account_id: accountId,
         archived_at: null,
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: "user_race",
         organisation_id: organisationId,
+        user_id: "user_race",
       },
     });
   });
@@ -630,8 +629,8 @@ describe("current-user-service person provisioning", () => {
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_missing_winner",
           email: "missing-winner@example.com",
+          userId: "user_missing_winner",
         },
         db
       )
@@ -654,8 +653,8 @@ describe("current-user-service person provisioning", () => {
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_failure",
           email: "failure@example.com",
+          userId: "user_failure",
         },
         db
       )
@@ -672,27 +671,27 @@ describe("current-user-service person provisioning", () => {
     const xeroTargetPerson = {
       ...person,
       archived_at: null,
-      clerk_user_id: null,
       id: "c2000000-0000-4000-8000-000000000099",
       source_system: "XERO",
+      user_id: null,
     };
     mocks.xeroPersonMatchFindFirst.mockResolvedValue({
-      resolved_clerk_user_id: "user_absorbed",
       resolved_person: null,
+      resolved_user_id: "user_absorbed",
       status: "matched",
       xero_person: xeroTargetPerson,
     });
     mocks.personUpdate.mockResolvedValue({
       ...xeroTargetPerson,
-      clerk_user_id: "user_absorbed",
+      user_id: "user_absorbed",
     });
 
     const result = await withTestTenantResult(tenantTestAccount(tenant), (db) =>
       ensureCurrentUserPerson(
         tenant,
         {
-          clerkUserId: "user_absorbed",
           email: "absorbed@example.com",
+          userId: "user_absorbed",
         },
         db
       )
@@ -705,7 +704,7 @@ describe("current-user-service person provisioning", () => {
     expect(mocks.personCreateMany).not.toHaveBeenCalled();
     expect(mocks.personUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ clerk_user_id: "user_absorbed" }),
+        data: expect.objectContaining({ user_id: "user_absorbed" }),
         where: { id: xeroTargetPerson.id },
       })
     );

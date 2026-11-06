@@ -1,17 +1,22 @@
-import { signUpCopy } from "@repo/auth/components/sign-up";
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
+import { authCopy } from "@/components/auth/auth-copy";
+import { SignUpForm } from "@/components/auth/auth-forms";
+import {
+  type AuthPageProperties,
+  authSearchParam,
+} from "@/components/auth/auth-page-params";
 
-const SignUp = dynamic(() =>
-  import("@repo/auth/components/sign-up").then((mod) => mod.SignUp)
-);
+export const metadata: Metadata = createMetadata(authCopy.signUp);
 
-export const metadata: Metadata = createMetadata({
-  description: signUpCopy.description,
-  title: signUpCopy.title,
-});
+const Page = async ({ searchParams }: AuthPageProperties) => {
+  const query = await searchParams;
+  return (
+    <SignUpForm
+      invitationId={authSearchParam(query, "invitationId")}
+      returnTo={authSearchParam(query, "returnTo")}
+    />
+  );
+};
 
-const SignUpPage = () => <SignUp />;
-
-export default SignUpPage;
+export default Page;

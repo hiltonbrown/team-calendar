@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { withTenantResult as withTestTenantResult } from "./src/tenant-db";
@@ -19,17 +19,17 @@ const {
 } = await import("./src/queries/onboarding");
 
 const tenantA = {
-  clerkOrgId: fixture.tenants[0]?.clerkOrgId as ClerkOrgId,
+  accountId: fixture.tenants[0]?.accountId as AccountId,
   organisationId: fixture.tenants[0]?.organisationId as OrganisationId,
 };
 const tenantB = {
-  clerkOrgId: fixture.tenants[1]?.clerkOrgId as ClerkOrgId,
+  accountId: fixture.tenants[1]?.accountId as AccountId,
   organisationId: fixture.tenants[1]?.organisationId as OrganisationId,
 };
-const clerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const accountIds = [tenantA.accountId, tenantB.accountId];
 
 async function clean() {
-  const scope = { clerk_org_id: { in: clerkOrgIds } };
+  const scope = { account_id: { in: accountIds } };
   await database.person.deleteMany({ where: scope });
   await database.organisation.deleteMany({ where: scope });
 }
@@ -37,25 +37,25 @@ async function clean() {
 async function seedTenant(tenant: typeof tenantA) {
   await database.organisation.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       country_code: "AU",
       id: tenant.organisationId,
-      name: `Onboarding ${tenant.clerkOrgId}`,
+      name: `Onboarding ${tenant.accountId}`,
     },
   });
 }
 
-async function seedPerson(tenant: typeof tenantA, clerkUserId: string) {
+async function seedPerson(tenant: typeof tenantA, userId: string) {
   return await database.person.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
-      clerk_user_id: clerkUserId,
-      email: `${clerkUserId}@example.test`,
+      account_id: tenant.accountId,
+      email: `${userId}@example.test`,
       employment_type: "employee",
       first_name: "Test",
       last_name: "Person",
       organisation_id: tenant.organisationId,
       source_system: "MANUAL",
+      user_id: userId,
     },
   });
 }
@@ -74,8 +74,8 @@ describe("onboarding queries", () => {
 
   test("starts at details with no completion or skip", async () => {
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
-        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
+        getOnboardingRecord(tenantA.accountId, tenantA.organisationId, db)
       )
     ).resolves.toEqual({
       ok: true,
@@ -85,9 +85,9 @@ describe("onboarding queries", () => {
 
   test("advances only from the stored step", async () => {
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
         advanceOnboardingStep(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           "details",
           "xero",
@@ -96,9 +96,9 @@ describe("onboarding queries", () => {
       )
     ).resolves.toEqual({ ok: true, value: { advanced: true } });
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
         advanceOnboardingStep(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           "details",
           "xero",
@@ -107,21 +107,20 @@ describe("onboarding queries", () => {
       )
     ).resolves.toEqual({ ok: true, value: { advanced: false } });
     const record = await withTestTenantResult(
-      tenantTestAccount(tenantA.clerkOrgId),
-      (db) =>
-        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
+      tenantTestAccount(tenantA.accountId),
+      (db) => getOnboardingRecord(tenantA.accountId, tenantA.organisationId, db)
     );
     expect(record.ok && record.value.step).toBe("xero");
   });
 
   test("keeps the first completion time", async () => {
     const first = await withTestTenantResult(
-      tenantTestAccount(tenantA.clerkOrgId),
-      (db) => completeOnboarding(tenantA.clerkOrgId, tenantA.organisationId, db)
+      tenantTestAccount(tenantA.accountId),
+      (db) => completeOnboarding(tenantA.accountId, tenantA.organisationId, db)
     );
     const second = await withTestTenantResult(
-      tenantTestAccount(tenantA.clerkOrgId),
-      (db) => completeOnboarding(tenantA.clerkOrgId, tenantA.organisationId, db)
+      tenantTestAccount(tenantA.accountId),
+      (db) => completeOnboarding(tenantA.accountId, tenantA.organisationId, db)
     );
     expect(first.ok && second.ok).toBe(true);
     expect(second.ok && second.value.completedAt).toEqual(
@@ -130,51 +129,48 @@ describe("onboarding queries", () => {
   });
 
   test("sets and clears the Xero skip", async () => {
-    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
-      setXeroSetupSkipped(tenantA.clerkOrgId, tenantA.organisationId, true, db)
+    await withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
+      setXeroSetupSkipped(tenantA.accountId, tenantA.organisationId, true, db)
     );
     let record = await withTestTenantResult(
-      tenantTestAccount(tenantA.clerkOrgId),
-      (db) =>
-        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
+      tenantTestAccount(tenantA.accountId),
+      (db) => getOnboardingRecord(tenantA.accountId, tenantA.organisationId, db)
     );
     expect(record.ok && record.value.xeroSkippedAt).toBeInstanceOf(Date);
-    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
-      setXeroSetupSkipped(tenantA.clerkOrgId, tenantA.organisationId, false, db)
+    await withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
+      setXeroSetupSkipped(tenantA.accountId, tenantA.organisationId, false, db)
     );
     record = await withTestTenantResult(
-      tenantTestAccount(tenantA.clerkOrgId),
-      (db) =>
-        getOnboardingRecord(tenantA.clerkOrgId, tenantA.organisationId, db)
+      tenantTestAccount(tenantA.accountId),
+      (db) => getOnboardingRecord(tenantA.accountId, tenantA.organisationId, db)
     );
     expect(record.ok && record.value.xeroSkippedAt).toBeNull();
   });
 
   test("isolates tenants", async () => {
-    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+    await withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
       advanceOnboardingStep(
-        tenantA.clerkOrgId,
+        tenantA.accountId,
         tenantB.organisationId,
         "details",
         "xero",
         db
       )
     );
-    await withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
-      completeOnboarding(tenantA.clerkOrgId, tenantB.organisationId, db)
+    await withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
+      completeOnboarding(tenantA.accountId, tenantB.organisationId, db)
     );
     const other = await withTestTenantResult(
-      tenantTestAccount(tenantB.clerkOrgId),
-      (db) =>
-        getOnboardingRecord(tenantB.clerkOrgId, tenantB.organisationId, db)
+      tenantTestAccount(tenantB.accountId),
+      (db) => getOnboardingRecord(tenantB.accountId, tenantB.organisationId, db)
     );
     expect(other).toEqual({
       ok: true,
       value: { completedAt: null, step: "details", xeroSkippedAt: null },
     });
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
-        getOnboardingRecord(tenantA.clerkOrgId, tenantB.organisationId, db)
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
+        getOnboardingRecord(tenantA.accountId, tenantB.organisationId, db)
       )
     ).resolves.toMatchObject({ error: { code: "not_found" }, ok: false });
   });
@@ -182,9 +178,9 @@ describe("onboarding queries", () => {
   test("tracks the member welcome for the person's own user only", async () => {
     const person = await seedPerson(tenantA, "user_member");
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
         getWelcomeState(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           "user_member",
           db
@@ -195,9 +191,9 @@ describe("onboarding queries", () => {
       value: { completedAt: null, personId: person.id },
     });
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
         getWelcomeState(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           "user_none",
           db
@@ -205,9 +201,9 @@ describe("onboarding queries", () => {
       )
     ).resolves.toEqual({ ok: true, value: null });
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
         completeWelcome(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           person.id,
           "user_intruder",
@@ -216,9 +212,9 @@ describe("onboarding queries", () => {
       )
     ).resolves.toMatchObject({ error: { code: "not_found" }, ok: false });
     await expect(
-      withTestTenantResult(tenantTestAccount(tenantA.clerkOrgId), (db) =>
+      withTestTenantResult(tenantTestAccount(tenantA.accountId), (db) =>
         completeWelcome(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           person.id,
           "user_member",
@@ -227,10 +223,10 @@ describe("onboarding queries", () => {
       )
     ).resolves.toEqual({ ok: true, value: undefined });
     const state = await withTestTenantResult(
-      tenantTestAccount(tenantA.clerkOrgId),
+      tenantTestAccount(tenantA.accountId),
       (db) =>
         getWelcomeState(
-          tenantA.clerkOrgId,
+          tenantA.accountId,
           tenantA.organisationId,
           "user_member",
           db

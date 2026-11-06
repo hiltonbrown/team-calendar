@@ -5,17 +5,17 @@ import { withTenantDb } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 
 export async function captureXeroConnected(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   connectionId: string;
 }): Promise<void> {
   assertNoTenantTransaction("captureXeroConnected");
   try {
-    const durableConnection = await withTenantDb(input.clerkOrgId, (db) =>
+    const durableConnection = await withTenantDb(input.accountId, (db) =>
       db.xeroConnection.findFirst({
         select: { created_at: true },
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           id: input.connectionId,
           organisation_id: input.organisationId,
         },
@@ -23,10 +23,10 @@ export async function captureXeroConnected(input: {
     );
     if (durableConnection) {
       const connectedEvent = createActivationEvent({
-        deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,
+        deduplicationKey: `${input.accountId}:${input.organisationId}`,
         name: "Xero Connected",
         occurredAt: durableConnection.created_at,
-        subjectId: input.clerkOrgId,
+        subjectId: input.accountId,
       });
       analytics?.capture({
         distinctId: connectedEvent.distinctId,

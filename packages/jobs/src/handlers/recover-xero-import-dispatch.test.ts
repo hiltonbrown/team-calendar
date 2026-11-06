@@ -65,12 +65,12 @@ describe("recoverXeroImportDispatch", () => {
   it("finds active connected tenants missing initial people sync and dispatches initial sync", async () => {
     mocks.xeroConnectionFindMany.mockResolvedValue([
       {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "tenant_uuid_1",
         organisation_id: "org_model_uuid_1",
       },
       {
-        clerk_org_id: "org_2",
+        account_id: "org_2",
         id: "tenant_uuid_2",
         organisation_id: "org_model_uuid_2",
       },
@@ -98,13 +98,13 @@ describe("recoverXeroImportDispatch", () => {
     ).not.toHaveProperty("xero_connection");
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledTimes(2);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenNthCalledWith(1, {
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "tenant_uuid_1",
       organisationId: "org_model_uuid_1",
       triggerType: "scheduled",
     });
     expect(mocks.dispatchInitialXeroSync).toHaveBeenNthCalledWith(2, {
-      clerkOrgId: "org_2",
+      accountId: "org_2",
       connectionId: "tenant_uuid_2",
       organisationId: "org_model_uuid_2",
       triggerType: "scheduled",
@@ -113,7 +113,7 @@ describe("recoverXeroImportDispatch", () => {
   it("skips tenants that already have an active running people sync run", async () => {
     mocks.xeroConnectionFindMany.mockResolvedValue([
       {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "tenant_uuid_1",
         organisation_id: "org_model_uuid_1",
       },
@@ -136,7 +136,7 @@ describe("recoverXeroImportDispatch", () => {
   it("increments skipped count when dispatch fails and records error log", async () => {
     mocks.xeroConnectionFindMany.mockResolvedValue([
       {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "tenant_uuid_1",
         organisation_id: "org_model_uuid_1",
       },

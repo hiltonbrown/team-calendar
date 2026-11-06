@@ -53,10 +53,10 @@ describe("MatchesClient", () => {
     const matches: XeroPersonMatchView[] = [
       {
         candidate_person: {
-          clerk_user_id: "user_cand123",
           email: "sarah.connor@example.com",
           first_name: "Sarah",
           last_name: "Connor",
+          user_id: "user_cand123",
         },
         id: matchId1,
         xero_person: {
@@ -97,12 +97,10 @@ describe("MatchesClient", () => {
     expect(
       screen.getByText("No candidate person was stored for this match.")
     ).toBeDefined();
-    expect(
-      screen.getByPlaceholderText("Enter Clerk user ID to link")
-    ).toBeDefined();
+    expect(screen.getByPlaceholderText("Enter user ID to link")).toBeDefined();
   });
 
-  it("links to Clerk user with custom entered Clerk user ID", async () => {
+  it("links to user with custom entered user ID", async () => {
     mocks.resolveXeroPersonMatchAction.mockResolvedValue({
       ok: true,
       value: { resolved: true },
@@ -111,10 +109,10 @@ describe("MatchesClient", () => {
     const matches: XeroPersonMatchView[] = [
       {
         candidate_person: {
-          clerk_user_id: "user_default",
           email: "sarah@example.com",
           first_name: "Sarah",
           last_name: "Connor",
+          user_id: "user_default",
         },
         id: matchId1,
         xero_person: {
@@ -131,22 +129,22 @@ describe("MatchesClient", () => {
     fireEvent.change(input, { target: { value: "user_custom456" } });
 
     const linkButton = screen.getByRole("button", {
-      name: "Link to Clerk user",
+      name: "Link to user",
     });
     fireEvent.click(linkButton);
 
     await waitFor(() => {
       expect(mocks.resolveXeroPersonMatchAction).toHaveBeenCalledWith({
-        clerkUserId: "user_custom456",
         matchId: matchId1,
         organisationId,
         resolution: "match",
+        userId: "user_custom456",
       });
       expect(mocks.toastSuccess).toHaveBeenCalledWith("Xero person linked.");
     });
   });
 
-  it("links to Clerk user using default candidate person Clerk user ID when none entered", async () => {
+  it("links to user using default candidate person user ID when none entered", async () => {
     mocks.resolveXeroPersonMatchAction.mockResolvedValue({
       ok: true,
       value: { resolved: true },
@@ -155,10 +153,10 @@ describe("MatchesClient", () => {
     const matches: XeroPersonMatchView[] = [
       {
         candidate_person: {
-          clerk_user_id: "user_candidate_default",
           email: "sarah@example.com",
           first_name: "Sarah",
           last_name: "Connor",
+          user_id: "user_candidate_default",
         },
         id: matchId1,
         xero_person: {
@@ -172,16 +170,16 @@ describe("MatchesClient", () => {
     render(<MatchesClient matches={matches} organisationId={organisationId} />);
 
     const linkButton = screen.getByRole("button", {
-      name: "Link to Clerk user",
+      name: "Link to user",
     });
     fireEvent.click(linkButton);
 
     await waitFor(() => {
       expect(mocks.resolveXeroPersonMatchAction).toHaveBeenCalledWith({
-        clerkUserId: "user_candidate_default",
         matchId: matchId1,
         organisationId,
         resolution: "match",
+        userId: "user_candidate_default",
       });
     });
   });

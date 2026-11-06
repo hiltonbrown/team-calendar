@@ -1,6 +1,6 @@
 import {
+  type AccountId,
   appError,
-  type ClerkOrgId,
   type OrganisationId,
   type Result,
   SupportSubmissionCategorySchema,
@@ -20,9 +20,9 @@ const SupportSubmissionAuditPayloadSchema = z.object({
 });
 
 export interface SupportSubmissionAuditData {
+  accountId: string;
   actorUserId: string | null;
   category: z.infer<typeof SupportSubmissionCategorySchema>;
-  clerkOrgId: string;
   createdAt: Date;
   id: string;
   issueNumber: number;
@@ -35,22 +35,22 @@ export interface SupportSubmissionAuditData {
 }
 
 export async function listRecentSupportSubmissionAudits(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   limit: number | undefined,
   db: TenantDb
 ): Promise<Result<SupportSubmissionAuditData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
       const auditEvents = await tenantDb.auditEvent.findMany({
         orderBy: { created_at: "desc" },
         select: {
+          account_id: true,
           action: true,
           actor_user_id: true,
-          clerk_org_id: true,
           created_at: true,
           id: true,
           organisation_id: true,
@@ -58,7 +58,7 @@ export async function listRecentSupportSubmissionAudits(
         },
         take: limit ?? 20,
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           action: "support_submissions.github_issue_created",
         },
       });
@@ -76,9 +76,9 @@ export async function listRecentSupportSubmissionAudits(
 
           return [
             {
+              accountId: event.account_id,
               actorUserId: event.actor_user_id,
               category: parsedPayload.data.category,
-              clerkOrgId: event.clerk_org_id,
               createdAt: event.created_at,
               id: event.id,
               issueNumber: parsedPayload.data.issueNumber,

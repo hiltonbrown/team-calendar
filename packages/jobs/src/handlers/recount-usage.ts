@@ -2,9 +2,10 @@ import { assertTenantDb, type TenantDb, withTenantDb } from "@repo/database";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
+import { readJobEventData } from "../event-context";
 
 const RecountUsageSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -12,30 +13,30 @@ export type RecountUsageInput = z.input<typeof RecountUsageSchema>;
 
 export const recountUsage = async (input: unknown, db: TenantDb) => {
   const parsed = RecountUsageSchema.parse(input);
-  assertTenantDb(db, parsed.clerkOrgId);
+  assertTenantDb(db, parsed.accountId);
   {
-    assertTenantDb(db, parsed.clerkOrgId);
+    assertTenantDb(db, parsed.accountId);
     const client = db;
 
     const [seats, payrollEntities, feeds] = [
       await client.person.count({
         where: {
+          account_id: parsed.accountId,
           archived_at: null,
-          clerk_org_id: parsed.clerkOrgId,
           is_active: true,
         },
       }),
       await client.organisation.count({
         where: {
+          account_id: parsed.accountId,
           archived_at: null,
-          clerk_org_id: parsed.clerkOrgId,
           is_active: true,
         },
       }),
       await client.feed.count({
         where: {
+          account_id: parsed.accountId,
           archived_at: null,
-          clerk_org_id: parsed.clerkOrgId,
           status: "active",
         },
       }),
@@ -49,9 +50,9 @@ export const recountUsage = async (input: unknown, db: TenantDb) => {
       seats,
     })) {
       await client.$executeRaw`
-      INSERT INTO usage_counters (id, clerk_org_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
-      VALUES (gen_random_uuid(), ${parsed.clerkOrgId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
-      ON CONFLICT (clerk_org_id, counter_type) DO UPDATE SET
+      INSERT INTO usage_counters (id, account_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${parsed.accountId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
+      ON CONFLICT (account_id, counter_type) DO UPDATE SET
         current_value = EXCLUDED.current_value,
         metric_key = EXCLUDED.metric_key,
         period_start = EXCLUDED.period_start,
@@ -68,8 +69,10 @@ export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
     id: "recount-usage",
     triggers: { event: "recount-usage" },
   },
-  async ({ event, step }) =>
-    await step.run("recount-usage", async () =>
-      withTenantDb(event.data.clerkOrgId, (db) => recountUsage(event.data, db))
-    )
+  async ({ event, step }) => {
+    const context = readJobEventData(event.data);
+    return await step.run("recount-usage", () =>
+      withTenantDb(context.accountId, (db) => recountUsage(context, db))
+    );
+  }
 );

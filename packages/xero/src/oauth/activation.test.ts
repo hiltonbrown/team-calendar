@@ -54,7 +54,7 @@ vi.mock("@repo/analytics/server", () => ({
 }));
 
 const input = {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   connectionId: "connection-1",
   organisationId: "organisation-1",
 };
@@ -71,16 +71,16 @@ describe("captureXeroConnected", () => {
     expect(mocks.findFirst).toHaveBeenCalledWith({
       select: { created_at: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         id: input.connectionId,
         organisation_id: input.organisationId,
       },
     });
     const expectedEvent = createActivationEvent({
-      deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,
+      deduplicationKey: `${input.accountId}:${input.organisationId}`,
       name: "Xero Connected",
       occurredAt: createdAt,
-      subjectId: input.clerkOrgId,
+      subjectId: input.accountId,
     });
     expect(mocks.capture).toHaveBeenCalledWith(expectedEvent);
     await captureXeroConnected({ ...input, connectionId: "replacement-link" });

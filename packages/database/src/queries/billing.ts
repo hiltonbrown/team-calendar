@@ -13,9 +13,9 @@ export type AuthoritativeUsageClient = Pick<
   "feed" | "organisation" | "person" | "xeroConnection"
 >;
 export interface SubscriptionMirrorInput {
+  accountId: string;
   authoritativeTie?: boolean;
   cancelAtPeriodEnd: boolean;
-  clerkOrgId: string;
   currentPeriodEnd: Date | null;
   endedAt: Date | null;
   planKey: PlanKey;
@@ -25,8 +25,8 @@ export interface SubscriptionMirrorInput {
   stripeSubscriptionId: string | null;
 }
 export interface BillingSubscriptionRow {
+  account_id: string;
   cancel_at_period_end: boolean;
-  clerk_org_id: string;
   current_period_end: Date | null;
   ended_at: Date | null;
   plan_key: string;
@@ -35,18 +35,18 @@ export interface BillingSubscriptionRow {
   stripe_event_created_at: Date | null;
   stripe_subscription_id: string | null;
 }
-export const getSubscriptionForOrg = async (
-  clerkOrgId: string,
+export const getSubscriptionForAccount = async (
+  accountId: string,
   db: TenantDb
 ): Promise<BillingSubscriptionRow | null> => {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const tenantDb = db;
 
   const rows = await tenantDb.$queryRaw<BillingSubscriptionRow[]>`
-    SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
+    SELECT account_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
-    FROM clerk_org_subscriptions
-    WHERE clerk_org_id = ${clerkOrgId}
+    FROM account_subscriptions
+    WHERE account_id = ${accountId}
     LIMIT 1
   `;
   return rows[0] ?? null;
@@ -55,9 +55,9 @@ export const getSubscriptionForStripeCustomer = async (
   stripeCustomerId: string
 ): Promise<BillingSubscriptionRow | null> => {
   const rows = await systemDatabase.$queryRaw<BillingSubscriptionRow[]>`
-    SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
+    SELECT account_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
-    FROM clerk_org_subscriptions
+    FROM account_subscriptions
     WHERE stripe_customer_id = ${stripeCustomerId}
     LIMIT 1
   `;
@@ -67,9 +67,9 @@ export const getSubscriptionForStripeSubscription = async (
   stripeSubscriptionId: string
 ): Promise<BillingSubscriptionRow | null> => {
   const rows = await systemDatabase.$queryRaw<BillingSubscriptionRow[]>`
-    SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
+    SELECT account_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
-    FROM clerk_org_subscriptions
+    FROM account_subscriptions
     WHERE stripe_subscription_id = ${stripeSubscriptionId}
     LIMIT 1
   `;
@@ -77,11 +77,11 @@ export const getSubscriptionForStripeSubscription = async (
 };
 export const getSubscriptionByStripeCustomerId =
   getSubscriptionForStripeCustomer;
-export const getFirstActiveOrganisationIdForClerkOrg = async (
-  clerkOrgId: string,
+export const getFirstActiveOrganisationIdForAccount = async (
+  accountId: string,
   db: TenantDb
 ): Promise<string | null> => {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const tenantDb2 = db;
 
   const rows = await tenantDb2.$queryRaw<
@@ -91,7 +91,7 @@ export const getFirstActiveOrganisationIdForClerkOrg = async (
   >`
     SELECT id
     FROM organisations
-    WHERE clerk_org_id = ${clerkOrgId}
+    WHERE account_id = ${accountId}
       AND archived_at IS NULL
     ORDER BY created_at ASC, name ASC
     LIMIT 1
@@ -121,11 +121,11 @@ export const getPlanLimits = async (planKey: PlanKey) => {
 export const getPlanFeatures = (planKey: PlanKey) =>
   getPlanDefinition(planKey).features;
 export const getUsageCounter = async (
-  clerkOrgId: string,
+  accountId: string,
   counterType: LimitType,
   db: TenantDb
 ) => {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const tenantDb3 = db;
 
   const rows = await tenantDb3.$queryRaw<
@@ -134,7 +134,7 @@ export const getUsageCounter = async (
     }>
   >`
     SELECT current_value FROM usage_counters
-    WHERE clerk_org_id = ${clerkOrgId} AND (counter_type::text = ${counterType} OR metric_key = ${counterType})
+    WHERE account_id = ${accountId} AND (counter_type::text = ${counterType} OR metric_key = ${counterType})
     ORDER BY updated_at DESC LIMIT 1
   `;
   return rows[0] ?? null;
@@ -144,27 +144,27 @@ export const getUsageCounter = async (
  * reporting projection in usage_counters.
  */
 export const getAuthoritativeUsageCount = async (
-  clerkOrgId: string,
+  accountId: string,
   usageType: AuthoritativeUsageType,
   db: TenantDb
 ): Promise<number> => {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const client = db;
 
   switch (usageType) {
     case "seats":
       return await client.person.count({
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           is_active: true,
         },
       });
     case "feeds":
       return await client.feed.count({
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           status: "active",
         },
       });
@@ -172,15 +172,15 @@ export const getAuthoritativeUsageCount = async (
     case "payroll_entities":
       return await client.organisation.count({
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           is_active: true,
         },
       });
     case "connections":
       return await client.xeroConnection.count({
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           disconnected_at: null,
           status: "active",
         },
@@ -192,15 +192,15 @@ export const getAuthoritativeUsageCount = async (
   }
 };
 /**
- * Serialises plan-limited mutations for one Clerk Organisation for the life of
+ * Serialises plan-limited mutations for one Account for the life of
  * the surrounding transaction. A hash collision can only cause harmless extra
  * serialisation because every subsequent count remains tenant-scoped.
  */
 export const lockPlanLimitMutations = async (
-  clerkOrgId: string,
+  accountId: string,
   db: TenantDb
 ): Promise<void> => {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const client = db;
 
   await client.$queryRaw<
@@ -209,7 +209,7 @@ export const lockPlanLimitMutations = async (
     }>
   >`
     SELECT pg_advisory_xact_lock(
-      hashtextextended(${`team-calendar:plan-limits:${clerkOrgId}`}, 0)
+      hashtextextended(${`team-calendar:plan-limits:${accountId}`}, 0)
     )::text AS acquired
   `;
 };
@@ -217,19 +217,19 @@ export const upsertSubscriptionFromWebhook = async (
   input: SubscriptionMirrorInput,
   db: TenantDb
 ) => {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const tenantDb4 = db;
   return await tenantDb4.$executeRaw`
-    INSERT INTO clerk_org_subscriptions (
-      id, clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
+    INSERT INTO account_subscriptions (
+      id, account_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at,
       created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), ${input.clerkOrgId}, ${input.planKey}, ${input.status}, ${input.currentPeriodEnd},
+      gen_random_uuid(), ${input.accountId}, ${input.planKey}, ${input.status}, ${input.currentPeriodEnd},
       ${input.stripeCustomerId}, ${input.stripeSubscriptionId}, ${input.cancelAtPeriodEnd},
       ${input.endedAt}, ${input.stripeEventCreatedAt}, NOW(), NOW()
     )
-    ON CONFLICT (clerk_org_id) DO UPDATE SET
+    ON CONFLICT (account_id) DO UPDATE SET
       plan_key = EXCLUDED.plan_key,
       status = EXCLUDED.status,
       current_period_end = EXCLUDED.current_period_end,
@@ -239,10 +239,10 @@ export const upsertSubscriptionFromWebhook = async (
       ended_at = EXCLUDED.ended_at,
       stripe_event_created_at = EXCLUDED.stripe_event_created_at,
       updated_at = NOW()
-    WHERE clerk_org_subscriptions.stripe_event_created_at IS NULL
+    WHERE account_subscriptions.stripe_event_created_at IS NULL
        OR EXCLUDED.stripe_event_created_at IS NULL
-       OR clerk_org_subscriptions.stripe_event_created_at < EXCLUDED.stripe_event_created_at
-       OR (${input.authoritativeTie ?? false} AND clerk_org_subscriptions.stripe_event_created_at = EXCLUDED.stripe_event_created_at)
+       OR account_subscriptions.stripe_event_created_at < EXCLUDED.stripe_event_created_at
+       OR (${input.authoritativeTie ?? false} AND account_subscriptions.stripe_event_created_at = EXCLUDED.stripe_event_created_at)
   `;
 };
 export const isStripeEventProcessed = async (
@@ -263,24 +263,24 @@ export const recordStripeEvent = async (
   eventId: string,
   type: string,
   context: {
-    clerkOrgId: string | null;
+    accountId: string | null;
     eventCreatedAt: Date | null;
     stripeCustomerId: string | null;
-  } = { clerkOrgId: null, eventCreatedAt: null, stripeCustomerId: null }
+  } = { accountId: null, eventCreatedAt: null, stripeCustomerId: null }
 ): Promise<void> => {
   await systemDatabase.$executeRaw`
     INSERT INTO stripe_events (
-      id, stripe_event_id, type, delivery_state, attempt_count, clerk_org_id,
+      id, stripe_event_id, type, delivery_state, attempt_count, account_id,
       stripe_customer_id, event_created_at, last_attempted_at, processed_at,
       created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), ${eventId}, ${type}, 'processed', 1, ${context.clerkOrgId},
+      gen_random_uuid(), ${eventId}, ${type}, 'processed', 1, ${context.accountId},
       ${context.stripeCustomerId}, ${context.eventCreatedAt}, NOW(), NOW(), NOW(), NOW()
     )
     ON CONFLICT (stripe_event_id) DO UPDATE SET
       delivery_state = 'processed',
       attempt_count = stripe_events.attempt_count + 1,
-      clerk_org_id = COALESCE(EXCLUDED.clerk_org_id, stripe_events.clerk_org_id),
+      account_id = COALESCE(EXCLUDED.account_id, stripe_events.account_id),
       stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, stripe_events.stripe_customer_id),
       event_created_at = COALESCE(EXCLUDED.event_created_at, stripe_events.event_created_at),
       error_category = NULL,
@@ -308,7 +308,7 @@ export const recordStripeEventIgnored = async (
   `;
 };
 export const recordStripeEventFailure = async (input: {
-  clerkOrgId: string | null;
+  accountId: string | null;
   errorCategory: string;
   eventCreatedAt: Date | null;
   eventId: string;
@@ -321,17 +321,17 @@ export const recordStripeEventFailure = async (input: {
     }>
   >`
     INSERT INTO stripe_events (
-      id, stripe_event_id, type, delivery_state, attempt_count, clerk_org_id,
+      id, stripe_event_id, type, delivery_state, attempt_count, account_id,
       stripe_customer_id, event_created_at, error_category, last_attempted_at,
       processed_at, created_at, updated_at
     ) VALUES (
       gen_random_uuid(), ${input.eventId}, ${input.type}, 'failed', 1,
-      ${input.clerkOrgId}, ${input.stripeCustomerId}, ${input.eventCreatedAt},
+      ${input.accountId}, ${input.stripeCustomerId}, ${input.eventCreatedAt},
       ${input.errorCategory}, NOW(), NULL, NOW(), NOW()
     )
     ON CONFLICT (stripe_event_id) DO UPDATE SET
       delivery_state = 'failed', attempt_count = stripe_events.attempt_count + 1,
-      clerk_org_id = COALESCE(EXCLUDED.clerk_org_id, stripe_events.clerk_org_id),
+      account_id = COALESCE(EXCLUDED.account_id, stripe_events.account_id),
       stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, stripe_events.stripe_customer_id),
       event_created_at = COALESCE(EXCLUDED.event_created_at, stripe_events.event_created_at),
       error_category = EXCLUDED.error_category, last_attempted_at = NOW(),
@@ -346,24 +346,24 @@ export const recordStripeEventFailure = async (input: {
   );
 };
 export interface FailedStripeEventSummary {
-  clerkOrgId?: string | null;
+  accountId?: string | null;
   errorCategory: string;
   eventId: string;
   lastAttemptedAt: Date;
 }
 const mapFailedStripeEvent = (row: {
-  clerk_org_id?: string | null;
+  account_id?: string | null;
   error_category: string;
   last_attempted_at: Date;
   stripe_event_id: string;
 }): FailedStripeEventSummary => ({
-  ...(row.clerk_org_id === undefined ? {} : { clerkOrgId: row.clerk_org_id }),
+  ...(row.account_id === undefined ? {} : { accountId: row.account_id }),
   errorCategory: row.error_category,
   eventId: row.stripe_event_id,
   lastAttemptedAt: row.last_attempted_at,
 });
-export const getUnresolvedStripeEventsForOrg = async (
-  clerkOrgId: string
+export const getUnresolvedStripeEventsForAccount = async (
+  accountId: string
 ): Promise<FailedStripeEventSummary[]> => {
   const rows = await systemDatabase.$queryRaw<
     Array<{
@@ -374,7 +374,7 @@ export const getUnresolvedStripeEventsForOrg = async (
   >`
     SELECT stripe_event_id, error_category, last_attempted_at
     FROM stripe_events
-    WHERE clerk_org_id = ${clerkOrgId} AND delivery_state = 'failed'
+    WHERE account_id = ${accountId} AND delivery_state = 'failed'
     ORDER BY last_attempted_at DESC
     LIMIT 20
   `;
@@ -385,13 +385,13 @@ export const getFailedStripeEventsForOperators = async (): Promise<
 > => {
   const rows = await systemDatabase.$queryRaw<
     Array<{
-      clerk_org_id: string | null;
+      account_id: string | null;
       error_category: string;
       last_attempted_at: Date;
       stripe_event_id: string;
     }>
   >`
-    SELECT stripe_event_id, clerk_org_id, error_category, last_attempted_at
+    SELECT stripe_event_id, account_id, error_category, last_attempted_at
     FROM stripe_events
     WHERE delivery_state = 'failed'
     ORDER BY last_attempted_at DESC
@@ -399,8 +399,8 @@ export const getFailedStripeEventsForOperators = async (): Promise<
   `;
   return rows.map(mapFailedStripeEvent);
 };
-export const hasUnresolvedStripeEventForOrg = async (
-  clerkOrgId: string,
+export const hasUnresolvedStripeEventForAccount = async (
+  accountId: string,
   mirroredAt: Date | null
 ): Promise<boolean> => {
   const rows = await systemDatabase.$queryRaw<
@@ -410,7 +410,7 @@ export const hasUnresolvedStripeEventForOrg = async (
   >`
     SELECT EXISTS (
       SELECT 1 FROM stripe_events
-      WHERE clerk_org_id = ${clerkOrgId}
+      WHERE account_id = ${accountId}
         AND delivery_state = 'failed'
         AND (${mirroredAt}::timestamptz IS NULL OR event_created_at IS NULL OR event_created_at >= ${mirroredAt})
     ) AS exists

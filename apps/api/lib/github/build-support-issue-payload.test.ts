@@ -147,10 +147,10 @@ describe("buildSupportIssueMarkdownBody", () => {
 
   it("renders all optional fields when provided and tags each as untrusted", () => {
     const input = SupportSubmissionIssueInputSchema.parse({
+      account_id: "org_account_123",
       actual_outcome: "Balance shows 0 days.",
       app_version: "2026.04.22",
       category: "feedback",
-      clerk_org_id: "org_clerk_123",
       current_route: "/support",
       environment: "production",
       expected_outcome: "Balance should show 5 days.",
@@ -167,7 +167,7 @@ describe("buildSupportIssueMarkdownBody", () => {
 
     expect(body).toContain("- Category: Feedback");
     expect(body).toContain("- Priority: High");
-    expect(body).toContain("- Clerk organisation ID: org_clerk_123");
+    expect(body).toContain("- Account ID: org_account_123");
     expect(body).toContain(
       "- Organisation ID: 00000000-0000-4000-8000-000000000001"
     );
@@ -192,8 +192,8 @@ describe("buildSupportIssueMarkdownBody", () => {
 
   it("strictly excludes personal names, email addresses, and organisation names from metadata and body", () => {
     const input = SupportSubmissionIssueInputSchema.parse({
+      account_id: "org_123",
       category: "support",
-      clerk_org_id: "org_123",
       email_override: "override@example.com",
       message: "Need help with integration",
       organisation_id: "00000000-0000-4000-8000-000000000001",
@@ -218,7 +218,7 @@ describe("buildSupportIssueMarkdownBody", () => {
     expect(body).not.toContain("Organisation name");
 
     // Retains opaque identifiers
-    expect(body).toContain("- Clerk organisation ID: org_123");
+    expect(body).toContain("- Account ID: org_123");
     expect(body).toContain(
       "- Organisation ID: 00000000-0000-4000-8000-000000000001"
     );

@@ -75,7 +75,7 @@ export function matchRawProviderLeave(
   );
 }
 export async function readIndependentAuLeave(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   expectedTenantId: string;
   providerAppId: string;
@@ -108,8 +108,8 @@ export async function readIndependentAuLeave(input: {
   const deadline = createXeroDeadline(90_000);
   await input.assertAuthority();
   const access = await resolveXeroAccess({
+    accountId: input.accountId,
     capability: ["payroll.employees.read", "payroll.settings.read"],
-    clerkOrgId: input.clerkOrgId,
     deadline,
     organisationId: input.organisationId,
   });
@@ -131,8 +131,8 @@ export async function readIndependentAuLeave(input: {
     const response = await xeroFetch({
       accessContext: toResolvedXeroConnection(
         {
+          accountId: input.accountId,
           capability: ["payroll.employees.read", "payroll.settings.read"],
-          clerkOrgId: input.clerkOrgId,
           organisationId: input.organisationId,
         },
         access.value
@@ -185,7 +185,7 @@ export async function readIndependentAuLeave(input: {
 }
 
 export async function readIndependentAuImport(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   expectedTenantId: string;
   providerAppId: string;
@@ -204,8 +204,8 @@ export async function readIndependentAuImport(input: {
   const deadline = createXeroDeadline(90_000);
   await input.assertAuthority();
   const access = await resolveXeroAccess({
+    accountId: input.accountId,
     capability: ["payroll.employees.read", "payroll.settings.read"],
-    clerkOrgId: input.clerkOrgId,
     deadline,
     organisationId: input.organisationId,
   });
@@ -221,8 +221,8 @@ export async function readIndependentAuImport(input: {
     const response = await xeroFetch({
       accessContext: toResolvedXeroConnection(
         {
+          accountId: input.accountId,
           capability: ["payroll.employees.read", "payroll.settings.read"],
-          clerkOrgId: input.clerkOrgId,
           organisationId: input.organisationId,
         },
         access.value

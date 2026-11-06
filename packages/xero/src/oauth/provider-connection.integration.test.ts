@@ -57,7 +57,7 @@ let toContext: typeof import("../adapter/resolved-tenant")["toResolvedXeroConnec
 let encrypt: typeof import("../crypto/tokens")["encryptXeroToken"];
 const originalEnv = { ...process.env };
 const scope = (tenant = target) => ({
-  clerkOrgId: tenant.clerkOrgId,
+  accountId: tenant.accountId,
   connectionId: tenant.connectionId,
   organisationId: tenant.organisationId,
 });
@@ -114,7 +114,7 @@ async function cleanup() {
     return;
   }
   const where = {
-    clerk_org_id: { in: tenants.map((tenant) => tenant.clerkOrgId) },
+    account_id: { in: tenants.map((tenant) => tenant.accountId) },
   };
   await database.xeroSyncCursor.deleteMany({ where });
   await database.availabilityRecord.deleteMany({ where });
@@ -148,7 +148,7 @@ beforeEach(async () => {
   for (const tenant of tenants) {
     await database.organisation.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         country_code: "AU",
         id: tenant.organisationId,
         name: "Owned provider status fixture",
@@ -156,7 +156,7 @@ beforeEach(async () => {
     });
     await database.xeroConnection.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         id: tenant.connectionId,
         initial_sync_completed_at: new Date("2026-10-06T00:10:00Z"),
         initial_sync_requested_at: new Date("2026-10-06T00:00:00Z"),
@@ -170,8 +170,8 @@ beforeEach(async () => {
     });
     await database.person.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
-        email: `${tenant.clerkOrgId}@example.test`,
+        account_id: tenant.accountId,
+        email: `${tenant.accountId}@example.test`,
         employment_type: "employee",
         first_name: "Provider",
         id: tenant.personId,
@@ -184,9 +184,9 @@ beforeEach(async () => {
     });
     await database.availabilityRecord.create({
       data: {
+        account_id: tenant.accountId,
         all_day: true,
         approval_status: "approved",
-        clerk_org_id: tenant.clerkOrgId,
         contactability: "unavailable",
         derived_uid_key: tenant.recordId,
         ends_at: new Date("2026-10-10T00:00:00Z"),
@@ -203,7 +203,7 @@ beforeEach(async () => {
     });
     await database.xeroSyncCursor.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         entity_type: "leave_records",
         id: tenant.cursorId,
         modified_since: new Date("2026-10-06T00:00:00Z"),
@@ -347,12 +347,12 @@ describe("confirmed external disconnect with PostgreSQL scope and race guards", 
       })
     ).toMatchObject({ status: "active" });
   });
-  it.each(["clerk", "organisation", "connection"])(
+  it.each(["account", "organisation", "connection"])(
     "changes zero rows for a forged %s scope",
     async (key) => {
       const captured = await context();
       const overrides = {
-        clerk: { clerk_org_id: sibling.clerkOrgId },
+        account: { account_id: sibling.accountId },
         connection: { id: sibling.connectionId },
         organisation: { organisation_id: sibling.organisationId },
       };

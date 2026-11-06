@@ -13,9 +13,11 @@ async function availabilityUidKey(parts: string[]): Promise<string> {
   return `${createHash("sha256").update(parts.join("|")).digest("hex")}${icsUidSuffix}`;
 }
 
-// getFeedDetail builds the full subscribe URL from the API origin and
-// requires it to be configured. Provide one for the integration environment.
-process.env.NEXT_PUBLIC_API_URL ||= "https://api.test.local";
+// Keep creation and detail reads on the fixture origin, regardless of inherited configuration.
+vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.test.local");
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 vi.mock("server-only", () => ({}));
 
 const fixture = allocateLiveTestFixture(
@@ -147,10 +149,10 @@ const tenant = {
 const otherTenant = {
   ...fixture.tenants[1],
 };
-if (!(tenant.clerkOrgId && otherTenant.clerkOrgId && fixture.tenants[2])) {
+if (!(tenant.accountId && otherTenant.accountId && fixture.tenants[2])) {
   throw new Error("Feeds live fixture tenants were not allocated");
 }
-const clerkOrgIds = [tenant.clerkOrgId, otherTenant.clerkOrgId];
+const accountIds = [tenant.accountId, otherTenant.accountId];
 const TOKEN_PATTERN = /^tc1\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/;
 const INITIAL_TOKEN_EXISTS_PATTERN =
   /^This feed already has (an active )?token\.$/;
@@ -166,7 +168,7 @@ describe("feed services", () => {
     await cleanTestData();
     await expect(
       database.organisation.count({
-        where: { clerk_org_id: { in: clerkOrgIds } },
+        where: { account_id: { in: accountIds } },
       })
     ).resolves.toBe(0);
     await database.$disconnect();
@@ -178,23 +180,23 @@ describe("feed services", () => {
       throw new Error("Second company fixture missing");
     }
     await createTenant({
-      clerkOrgId: tenant.clerkOrgId,
+      accountId: tenant.accountId,
       organisationId: secondOrganisationId,
     });
     const first = await seedRepresentationRecord();
     const second = await seedRepresentationRecord({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: secondOrganisationId,
     });
     const foreign = await seedRepresentationRecord({
-      clerk_org_id: otherTenant.clerkOrgId,
+      account_id: otherTenant.accountId,
       organisation_id: otherTenant.organisationId,
     });
     for (const record of [first, second, foreign]) {
       await database.availabilityRecord.update({
         data: {
           derived_uid_key: await availabilityUidKey([
-            record.scope.clerk_org_id,
+            record.scope.account_id,
             record.scope.organisation_id,
             record.personId,
             "xero_leave",
@@ -214,13 +216,13 @@ describe("feed services", () => {
     }
     const created = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -251,18 +253,18 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: tenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: tenant.clerkOrgId,
           organisationId: null,
           tokenId: created.value.token.tokenId,
         }),
         (db) =>
           revokeToken(
             {
-              actingRole: "org:admin",
+              accountId: tenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: tenant.clerkOrgId,
               organisationId: null,
               tokenId: created.value.token.tokenId,
             },
@@ -289,13 +291,13 @@ describe("feed services", () => {
     }
     const created = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -311,13 +313,13 @@ describe("feed services", () => {
   test("replaces account feed scopes and revokes its active token when archived from a company", async () => {
     const created = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -327,9 +329,9 @@ describe("feed services", () => {
       throw new Error("Default feed missing");
     }
     const command = {
-      actingRole: "org:admin",
+      accountId: tenant.accountId,
+      actingRole: "admin",
       actingUserId: "user_admin",
-      clerkOrgId: tenant.clerkOrgId,
       feedId: created.value.feedId,
       organisationId: tenant.organisationId,
     };
@@ -408,7 +410,7 @@ describe("feed services", () => {
     await expect(
       database.feedEventPublication.count({
         where: {
-          clerk_org_id: otherTenant.clerkOrgId,
+          account_id: otherTenant.accountId,
           organisation_id: otherTenant.organisationId,
         },
       })
@@ -425,15 +427,15 @@ describe("feed services", () => {
     expect(
       await withTestTenantResult(
         tenantTestAccount({
+          accountId: tenant.accountId,
           availabilityRecordId: old.recordId,
-          clerkOrgId: tenant.clerkOrgId,
           organisationId: tenant.organisationId,
         }),
         (db) =>
           materialiseAvailabilityPublication(
             {
+              accountId: tenant.accountId,
               availabilityRecordId: old.recordId,
-              clerkOrgId: tenant.clerkOrgId,
               organisationId: tenant.organisationId,
             },
             db
@@ -455,15 +457,15 @@ describe("feed services", () => {
     expect(
       await withTestTenantResult(
         tenantTestAccount({
+          accountId: tenant.accountId,
           availabilityRecordId: fresh.recordId,
-          clerkOrgId: tenant.clerkOrgId,
           organisationId: tenant.organisationId,
         }),
         (db) =>
           materialiseAvailabilityPublication(
             {
+              accountId: tenant.accountId,
               availabilityRecordId: fresh.recordId,
-              clerkOrgId: tenant.clerkOrgId,
               organisationId: tenant.organisationId,
             },
             db
@@ -644,9 +646,9 @@ describe("feed services", () => {
   test("restores, issues exactly one new token, resumes, and keeps predecessor revoked", async () => {
     const created = await createTestFeed();
     const input = {
-      actingRole: "org:admin",
+      accountId: tenant.accountId,
+      actingRole: "admin",
       actingUserId: "user_admin",
-      clerkOrgId: tenant.clerkOrgId,
       feedId: created.feedId,
       organisationId: tenant.organisationId,
     };
@@ -690,14 +692,14 @@ describe("feed services", () => {
       await withTestTenantResult(
         tenantTestAccount({
           ...input,
-          clerkOrgId: otherTenant.clerkOrgId,
+          accountId: otherTenant.accountId,
           organisationId: otherTenant.organisationId,
         }),
         (db) =>
           issueToken(
             {
               ...input,
-              clerkOrgId: otherTenant.clerkOrgId,
+              accountId: otherTenant.accountId,
               organisationId: otherTenant.organisationId,
             },
             db
@@ -709,9 +711,9 @@ describe("feed services", () => {
   test("serialises token issuance with archive so restore cannot resurrect an issued token", async () => {
     const feed = await createFeedWithoutToken();
     const input = {
-      actingRole: "org:admin",
+      accountId: tenant.accountId,
+      actingRole: "admin",
       actingUserId: "user_admin",
-      clerkOrgId: tenant.clerkOrgId,
       feedId: feed.id,
       organisationId: tenant.organisationId,
     };
@@ -727,7 +729,7 @@ describe("feed services", () => {
     await expect(
       database.feedToken.count({
         where: {
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           feed_id: feed.id,
           organisation_id: tenant.organisationId,
           status: "active",
@@ -766,17 +768,17 @@ describe("feed services", () => {
   test("allows only one concurrent initial token", async () => {
     const feed = await createFeedWithoutToken();
     const input = {
+      accountId: tenant.accountId,
       actingUserId: "user_admin",
-      clerkOrgId: tenant.clerkOrgId,
       feedId: feed.id,
       organisationId: tenant.organisationId,
     };
 
     const results = await Promise.all([
-      withTenantDb(input.clerkOrgId, (tx) =>
+      withTenantDb(input.accountId, (tx) =>
         createInitialTokenWithClient(tx, input)
       ),
-      withTenantDb(input.clerkOrgId, (tx) =>
+      withTenantDb(input.accountId, (tx) =>
         createInitialTokenWithClient(tx, input)
       ),
     ]);
@@ -796,9 +798,9 @@ describe("feed services", () => {
     const created = await createTestFeed();
     const initialTokenId = signedFeedTokenId(created.plaintext);
     const input = {
+      accountId: tenant.accountId,
       actingRole: "owner",
       actingUserId: "user_owner",
-      clerkOrgId: tenant.clerkOrgId,
       feedId: created.feedId,
       organisationId: tenant.organisationId,
     };
@@ -849,9 +851,9 @@ describe("feed services", () => {
   test("creates feeds with a signed URL that can be loaded again", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: tenant.accountId,
+        actingRole: "admin",
         actingUserId: "user_admin",
-        clerkOrgId: tenant.clerkOrgId,
         includesPublicHolidays: false,
         name: "All staff",
         organisationId: tenant.organisationId,
@@ -861,9 +863,9 @@ describe("feed services", () => {
       (db) =>
         createFeed(
           {
-            actingRole: "org:admin",
+            accountId: tenant.accountId,
+            actingRole: "admin",
             actingUserId: "user_admin",
-            clerkOrgId: tenant.clerkOrgId,
             includesPublicHolidays: false,
             name: "All staff",
             organisationId: tenant.organisationId,
@@ -890,18 +892,18 @@ describe("feed services", () => {
 
     const detail = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: tenant.accountId,
+        actingRole: "admin",
         actingUserId: "user_admin",
-        clerkOrgId: tenant.clerkOrgId,
         feedId: result.value.feedId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         getFeedDetail(
           {
-            actingRole: "org:admin",
+            accountId: tenant.accountId,
+            actingRole: "admin",
             actingUserId: "user_admin",
-            clerkOrgId: tenant.clerkOrgId,
             feedId: result.value.feedId,
             organisationId: tenant.organisationId,
           },
@@ -919,13 +921,13 @@ describe("feed services", () => {
   test("provisions a default all-staff feed with an org scope and active token", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -943,7 +945,7 @@ describe("feed services", () => {
       where: { id: result.value.feedId },
     });
     expect(feed).toMatchObject({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       includes_public_holidays: false,
       name: "All staff",
       organisation_id: null,
@@ -957,7 +959,7 @@ describe("feed services", () => {
     });
     expect(scopes).toHaveLength(1);
     expect(scopes[0]).toMatchObject({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: null,
       scope_type: "org",
       scope_value: null,
@@ -968,7 +970,7 @@ describe("feed services", () => {
     });
     expect(tokens).toHaveLength(1);
     expect(tokens[0]).toMatchObject({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: null,
       status: "active",
     });
@@ -978,13 +980,13 @@ describe("feed services", () => {
   test("does not duplicate the default feed, scope, or token", async () => {
     const first = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -997,13 +999,13 @@ describe("feed services", () => {
 
     const second = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -1017,7 +1019,7 @@ describe("feed services", () => {
     await expect(
       database.feed.count({
         where: {
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           organisation_id: null,
         },
       })
@@ -1025,7 +1027,7 @@ describe("feed services", () => {
     await expect(
       database.feedScope.count({
         where: {
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           organisation_id: null,
         },
       })
@@ -1033,7 +1035,7 @@ describe("feed services", () => {
     await expect(
       database.feedToken.count({
         where: {
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           organisation_id: null,
         },
       })
@@ -1044,13 +1046,13 @@ describe("feed services", () => {
     const results = await Promise.all([
       withTestTenantResult(
         tenantTestAccount({
-          clerkOrgId: tenant.clerkOrgId,
+          accountId: tenant.accountId,
           organisationId: tenant.organisationId,
         }),
         (db) =>
           ensureDefaultCalendarFeed(
             {
-              clerkOrgId: tenant.clerkOrgId,
+              accountId: tenant.accountId,
               organisationId: tenant.organisationId,
             },
             db
@@ -1058,13 +1060,13 @@ describe("feed services", () => {
       ),
       withTestTenantResult(
         tenantTestAccount({
-          clerkOrgId: tenant.clerkOrgId,
+          accountId: tenant.accountId,
           organisationId: tenant.organisationId,
         }),
         (db) =>
           ensureDefaultCalendarFeed(
             {
-              clerkOrgId: tenant.clerkOrgId,
+              accountId: tenant.accountId,
               organisationId: tenant.organisationId,
             },
             db
@@ -1079,7 +1081,7 @@ describe("feed services", () => {
     await expect(
       database.feed.count({
         where: {
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           organisation_id: null,
         },
       })
@@ -1093,7 +1095,7 @@ describe("feed services", () => {
     ]);
     await database.usageCounter.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         counter_type: "feeds",
         current_value: 0,
         metric_key: "feeds",
@@ -1105,9 +1107,9 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: tenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: tenant.clerkOrgId,
           includesPublicHolidays: false,
           name: "Blocked feed",
           organisationId: tenant.organisationId,
@@ -1117,9 +1119,9 @@ describe("feed services", () => {
         (db) =>
           createFeed(
             {
-              actingRole: "org:admin",
+              accountId: tenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: tenant.clerkOrgId,
               includesPublicHolidays: false,
               name: "Blocked feed",
               organisationId: tenant.organisationId,
@@ -1144,9 +1146,9 @@ describe("feed services", () => {
     const results = await Promise.all([
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: tenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: tenant.clerkOrgId,
           includesPublicHolidays: false,
           name: "Concurrent one",
           organisationId: tenant.organisationId,
@@ -1156,9 +1158,9 @@ describe("feed services", () => {
         (db) =>
           createFeed(
             {
-              actingRole: "org:admin",
+              accountId: tenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: tenant.clerkOrgId,
               includesPublicHolidays: false,
               name: "Concurrent one",
               organisationId: tenant.organisationId,
@@ -1170,9 +1172,9 @@ describe("feed services", () => {
       ),
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: tenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: tenant.clerkOrgId,
           includesPublicHolidays: false,
           name: "Concurrent two",
           organisationId: tenant.organisationId,
@@ -1182,9 +1184,9 @@ describe("feed services", () => {
         (db) =>
           createFeed(
             {
-              actingRole: "org:admin",
+              accountId: tenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: tenant.clerkOrgId,
               includesPublicHolidays: false,
               name: "Concurrent two",
               organisationId: tenant.organisationId,
@@ -1207,8 +1209,8 @@ describe("feed services", () => {
     await expect(
       database.feed.count({
         where: {
+          account_id: tenant.accountId,
           archived_at: null,
-          clerk_org_id: tenant.clerkOrgId,
           status: "active",
         },
       })
@@ -1218,19 +1220,19 @@ describe("feed services", () => {
   test("keeps one account default feed and exactly the existing token when another company is added", async () => {
     const secondOrganisationId = fixture.tenants[2]?.organisationId as string;
     await createTenant({
-      clerkOrgId: tenant.clerkOrgId,
+      accountId: tenant.accountId,
       organisationId: secondOrganisationId,
     });
 
     const first = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -1238,13 +1240,13 @@ describe("feed services", () => {
     );
     const second = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: secondOrganisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: secondOrganisationId,
           },
           db
@@ -1260,7 +1262,7 @@ describe("feed services", () => {
     const feeds = await database.feed.findMany({
       orderBy: { slug: "asc" },
       select: { organisation_id: true, slug: true },
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     });
     expect(feeds).toEqual([{ organisation_id: null, slug: "all-staff" }]);
     expect(second.value).toEqual({
@@ -1283,8 +1285,8 @@ describe("feed services", () => {
   test("does not recreate a default feed after an admin archived one", async () => {
     const archived = await database.feed.create({
       data: {
+        account_id: tenant.accountId,
         archived_at: new Date("2026-01-01T00:00:00.000Z"),
-        clerk_org_id: tenant.clerkOrgId,
         name: "Archived all staff",
         organisation_id: tenant.organisationId,
         privacy_mode: "named",
@@ -1296,8 +1298,8 @@ describe("feed services", () => {
 
     await database.auditEvent.create({
       data: {
+        account_id: tenant.accountId,
         action: "feeds.created",
-        clerk_org_id: tenant.clerkOrgId,
         organisation_id: tenant.organisationId,
         payload: { defaultFeed: true },
         resource_id: archived.id,
@@ -1306,13 +1308,13 @@ describe("feed services", () => {
     });
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         ensureDefaultCalendarFeed(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -1326,7 +1328,7 @@ describe("feed services", () => {
     await expect(
       database.feed.count({
         where: {
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           organisation_id: tenant.organisationId,
         },
       })
@@ -1337,18 +1339,18 @@ describe("feed services", () => {
     const created = await createTestFeed();
     const rotated = await withTestTenantResult(
       tenantTestAccount({
+        accountId: tenant.accountId,
         actingRole: "owner",
         actingUserId: "user_owner",
-        clerkOrgId: tenant.clerkOrgId,
         feedId: created.feedId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         rotateToken(
           {
+            accountId: tenant.accountId,
             actingRole: "owner",
             actingUserId: "user_owner",
-            clerkOrgId: tenant.clerkOrgId,
             feedId: created.feedId,
             organisationId: tenant.organisationId,
           },
@@ -1374,7 +1376,7 @@ describe("feed services", () => {
     const created = await createTestFeed();
     const token = await database.feedToken.findFirstOrThrow({
       where: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         feed_id: created.feedId,
         organisation_id: tenant.organisationId,
         status: "active",
@@ -1384,18 +1386,18 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: otherTenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: otherTenant.clerkOrgId,
           feedId: created.feedId,
           organisationId: otherTenant.organisationId,
         }),
         (db) =>
           rotateToken(
             {
-              actingRole: "org:admin",
+              accountId: otherTenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: otherTenant.clerkOrgId,
               feedId: created.feedId,
               organisationId: otherTenant.organisationId,
             },
@@ -1410,18 +1412,18 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: otherTenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: otherTenant.clerkOrgId,
           organisationId: otherTenant.organisationId,
           tokenId: token.id,
         }),
         (db) =>
           revokeToken(
             {
-              actingRole: "org:admin",
+              accountId: otherTenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: otherTenant.clerkOrgId,
               organisationId: otherTenant.organisationId,
               tokenId: token.id,
             },
@@ -1437,7 +1439,7 @@ describe("feed services", () => {
       where: { id: token.id },
     });
     expect(activeToken).toMatchObject({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       feed_id: created.feedId,
       organisation_id: tenant.organisationId,
       status: "active",
@@ -1453,7 +1455,7 @@ describe("feed services", () => {
       where: { id: initialTokenId ?? "" },
     });
     expect(initialToken).toMatchObject({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       feed_id: created.feedId,
       organisation_id: tenant.organisationId,
       status: "active",
@@ -1461,18 +1463,18 @@ describe("feed services", () => {
 
     const rotated = await withTestTenantResult(
       tenantTestAccount({
+        accountId: tenant.accountId,
         actingRole: "owner",
         actingUserId: "user_owner",
-        clerkOrgId: tenant.clerkOrgId,
         feedId: created.feedId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         rotateToken(
           {
+            accountId: tenant.accountId,
             actingRole: "owner",
             actingUserId: "user_owner",
-            clerkOrgId: tenant.clerkOrgId,
             feedId: created.feedId,
             organisationId: tenant.organisationId,
           },
@@ -1503,13 +1505,13 @@ describe("feed services", () => {
 
     const revoked = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         revokeAllFeedTokens(
           {
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             organisationId: tenant.organisationId,
           },
           db
@@ -1522,7 +1524,7 @@ describe("feed services", () => {
 
     const activeTokens = await database.feedToken.findMany({
       where: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         feed_id: created.feedId,
         organisation_id: tenant.organisationId,
         status: "active",
@@ -1537,18 +1539,18 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: otherTenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: otherTenant.clerkOrgId,
           feedId: created.feedId,
           organisationId: otherTenant.organisationId,
         }),
         (db) =>
           pauseFeed(
             {
-              actingRole: "org:admin",
+              accountId: otherTenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: otherTenant.clerkOrgId,
               feedId: created.feedId,
               organisationId: otherTenant.organisationId,
             },
@@ -1562,18 +1564,18 @@ describe("feed services", () => {
 
     const paused = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: tenant.accountId,
+        actingRole: "admin",
         actingUserId: "user_admin",
-        clerkOrgId: tenant.clerkOrgId,
         feedId: created.feedId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         pauseFeed(
           {
-            actingRole: "org:admin",
+            accountId: tenant.accountId,
+            actingRole: "admin",
             actingUserId: "user_admin",
-            clerkOrgId: tenant.clerkOrgId,
             feedId: created.feedId,
             organisationId: tenant.organisationId,
           },
@@ -1595,7 +1597,7 @@ describe("feed services", () => {
     const employee = await seedLinkedPerson({ firstName: "Ava" });
     await database.organisationSettings.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         default_feed_privacy_mode: "masked",
         feeds_include_public_holidays_default: true,
         organisation_id: tenant.organisationId,
@@ -1622,7 +1624,7 @@ describe("feed services", () => {
     ]);
     const feed = await database.feed.findFirstOrThrow({
       include: { scopes: true, tokens: true },
-      where: { clerk_org_id: tenant.clerkOrgId, id: first.value.feedId },
+      where: { account_id: tenant.accountId, id: first.value.feedId },
     });
     expect(feed).toMatchObject({
       created_by_user_id: employee.userId,
@@ -1711,25 +1713,25 @@ describe("feed services", () => {
       throw new Error("Second company missing");
     }
     await createTenant({
-      clerkOrgId: tenant.clerkOrgId,
+      accountId: tenant.accountId,
       organisationId: companyB,
     });
     const managerA = await seedLinkedPerson({ firstName: "Multi" });
     const managerB = await database.person.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
-        clerk_user_id: managerA.userId,
+        account_id: tenant.accountId,
         email: "manager-b@example.test",
         employment_type: "employee",
         first_name: "Multi",
         last_name: "Manager",
         organisation_id: companyB,
         source_system: "MANUAL",
+        user_id: managerA.userId,
       },
     });
     const reportA = await seedRepresentationRecord();
     const reportB = await seedRepresentationRecord({
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: companyB,
     });
     await database.person.update({
@@ -1789,15 +1791,15 @@ describe("feed services", () => {
     await seedLinkedPerson({ firstName: "Eve", managerPersonId: manager.id });
     const eligibility = await withTestTenantResult(
       tenantTestAccount({
+        accountId: tenant.accountId,
         actingUserId: manager.userId,
-        clerkOrgId: tenant.clerkOrgId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         getOwnFeedEligibility(
           {
+            accountId: tenant.accountId,
             actingUserId: manager.userId,
-            clerkOrgId: tenant.clerkOrgId,
             organisationId: tenant.organisationId,
           },
           db
@@ -1820,7 +1822,7 @@ describe("feed services", () => {
     const feed = await database.feed.findFirstOrThrow({
       include: { scopes: true },
       where: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         id: created.ok ? created.value.feedId : "",
       },
     });
@@ -1921,9 +1923,9 @@ describe("feed services", () => {
     }
     const demotedAdminFeed = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: tenant.accountId,
+        actingRole: "admin",
         actingUserId: other.userId,
-        clerkOrgId: tenant.clerkOrgId,
         name: "Everyone",
         organisationId: tenant.organisationId,
         privacyMode: "named",
@@ -1932,9 +1934,9 @@ describe("feed services", () => {
       (db) =>
         createFeed(
           {
-            actingRole: "org:admin",
+            accountId: tenant.accountId,
+            actingRole: "admin",
             actingUserId: other.userId,
-            clerkOrgId: tenant.clerkOrgId,
             name: "Everyone",
             organisationId: tenant.organisationId,
             privacyMode: "named",
@@ -1989,9 +1991,9 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:viewer",
+          accountId: tenant.accountId,
+          actingRole: "viewer",
           actingUserId: owner.userId,
-          clerkOrgId: tenant.clerkOrgId,
           name: "Sneaky",
           organisationId: tenant.organisationId,
           privacyMode: "named",
@@ -2000,9 +2002,9 @@ describe("feed services", () => {
         (db) =>
           createFeed(
             {
-              actingRole: "org:viewer",
+              accountId: tenant.accountId,
+              actingRole: "viewer",
               actingUserId: owner.userId,
-              clerkOrgId: tenant.clerkOrgId,
               name: "Sneaky",
               organisationId: tenant.organisationId,
               privacyMode: "named",
@@ -2015,9 +2017,9 @@ describe("feed services", () => {
     await expect(
       withTestTenantResult(
         tenantTestAccount({
-          actingRole: "org:admin",
+          accountId: tenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: tenant.clerkOrgId,
           feedId: personal.value.feedId,
           organisationId: tenant.organisationId,
           patch: { name: "Admin rename" },
@@ -2025,9 +2027,9 @@ describe("feed services", () => {
         (db) =>
           updateFeed(
             {
-              actingRole: "org:admin",
+              accountId: tenant.accountId,
+              actingRole: "admin",
               actingUserId: "user_admin",
-              clerkOrgId: tenant.clerkOrgId,
               feedId: personal.value.feedId,
               organisationId: tenant.organisationId,
               patch: { name: "Admin rename" },
@@ -2064,27 +2066,27 @@ describe("feed services", () => {
     );
     const orgFeed = await createTestFeed();
     const base = {
+      accountId: tenant.accountId,
       actingUserId: "user_admin",
-      clerkOrgId: tenant.clerkOrgId,
       organisationId: tenant.organisationId,
     };
     await expect(
       withTestTenantResult(
-        tenantTestAccount({ ...base, actingRole: "org:admin" }),
-        (db) => getFeedOversightCounts({ ...base, actingRole: "org:admin" }, db)
+        tenantTestAccount({ ...base, actingRole: "admin" }),
+        (db) => getFeedOversightCounts({ ...base, actingRole: "admin" }, db)
       )
     ).resolves.toEqual({ ok: true, value: { personal: 1, total: 2 } });
     await withTestTenantResult(
       tenantTestAccount({
         ...base,
-        actingRole: "org:admin",
+        actingRole: "admin",
         feedId: orgFeed.feedId,
       }),
       (db) =>
         archiveFeed(
           {
             ...base,
-            actingRole: "org:admin",
+            actingRole: "admin",
             feedId: orgFeed.feedId,
           },
           db
@@ -2092,31 +2094,30 @@ describe("feed services", () => {
     );
     await expect(
       withTestTenantResult(
-        tenantTestAccount({ ...base, actingRole: "org:admin" }),
-        (db) => getFeedOversightCounts({ ...base, actingRole: "org:admin" }, db)
+        tenantTestAccount({ ...base, actingRole: "admin" }),
+        (db) => getFeedOversightCounts({ ...base, actingRole: "admin" }, db)
       )
     ).resolves.toEqual({ ok: true, value: { personal: 1, total: 1 } });
     await expect(
       withTestTenantResult(
-        tenantTestAccount({ ...base, actingRole: "org:viewer" }),
-        (db) =>
-          getFeedOversightCounts({ ...base, actingRole: "org:viewer" }, db)
+        tenantTestAccount({ ...base, actingRole: "viewer" }),
+        (db) => getFeedOversightCounts({ ...base, actingRole: "viewer" }, db)
       )
     ).resolves.toMatchObject({ error: { code: "not_authorised" }, ok: false });
     await expect(
       withTestTenantResult(
         tenantTestAccount({
           ...base,
-          actingRole: "org:admin",
-          clerkOrgId: otherTenant.clerkOrgId,
+          accountId: otherTenant.accountId,
+          actingRole: "admin",
           organisationId: otherTenant.organisationId,
         }),
         (db) =>
           getFeedOversightCounts(
             {
               ...base,
-              actingRole: "org:admin",
-              clerkOrgId: otherTenant.clerkOrgId,
+              accountId: otherTenant.accountId,
+              actingRole: "admin",
               organisationId: otherTenant.organisationId,
             },
             db
@@ -2139,24 +2140,24 @@ describe("feed services", () => {
     await database.feedToken.updateMany({
       data: { last_used_at: fetchedAt },
       where: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         feed_id: personal.value.feedId,
       },
     });
 
     const all = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: tenant.accountId,
+        actingRole: "admin",
         actingUserId: "user_admin",
-        clerkOrgId: tenant.clerkOrgId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         listFeeds(
           {
-            actingRole: "org:admin",
+            accountId: tenant.accountId,
+            actingRole: "admin",
             actingUserId: "user_admin",
-            clerkOrgId: tenant.clerkOrgId,
             organisationId: tenant.organisationId,
           },
           db
@@ -2181,18 +2182,18 @@ describe("feed services", () => {
 
     const personalOnly = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: tenant.accountId,
+        actingRole: "admin",
         actingUserId: "user_admin",
-        clerkOrgId: tenant.clerkOrgId,
         filters: { status: ["active", "paused"], type: ["self"] },
         organisationId: tenant.organisationId,
       }),
       (db) =>
         listFeeds(
           {
-            actingRole: "org:admin",
+            accountId: tenant.accountId,
+            actingRole: "admin",
             actingUserId: "user_admin",
-            clerkOrgId: tenant.clerkOrgId,
             filters: { status: ["active", "paused"], type: ["self"] },
             organisationId: tenant.organisationId,
           },
@@ -2205,17 +2206,17 @@ describe("feed services", () => {
 
     const own = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:viewer",
+        accountId: tenant.accountId,
+        actingRole: "viewer",
         actingUserId: employee.userId,
-        clerkOrgId: tenant.clerkOrgId,
         organisationId: tenant.organisationId,
       }),
       (db) =>
         listFeeds(
           {
-            actingRole: "org:viewer",
+            accountId: tenant.accountId,
+            actingRole: "viewer",
             actingUserId: employee.userId,
-            clerkOrgId: tenant.clerkOrgId,
             organisationId: tenant.organisationId,
           },
           db
@@ -2227,17 +2228,17 @@ describe("feed services", () => {
 
     const otherTenantList = await withTestTenantResult(
       tenantTestAccount({
-        actingRole: "org:admin",
+        accountId: otherTenant.accountId,
+        actingRole: "admin",
         actingUserId: "user_admin",
-        clerkOrgId: otherTenant.clerkOrgId,
         organisationId: otherTenant.organisationId,
       }),
       (db) =>
         listFeeds(
           {
-            actingRole: "org:admin",
+            accountId: otherTenant.accountId,
+            actingRole: "admin",
             actingUserId: "user_admin",
-            clerkOrgId: otherTenant.clerkOrgId,
             organisationId: otherTenant.organisationId,
           },
           db
@@ -2249,16 +2250,16 @@ describe("feed services", () => {
 
 function tenantScope() {
   return {
-    clerk_org_id: tenant.clerkOrgId,
+    account_id: tenant.accountId,
     organisation_id: tenant.organisationId,
   };
 }
 
 function ownFeedRequest(userId: string, kind: "personal" | "team") {
   return {
-    actingRole: "org:viewer",
+    accountId: tenant.accountId,
+    actingRole: "viewer",
     actingUserId: userId,
-    clerkOrgId: tenant.clerkOrgId,
     kind,
     organisationId: tenant.organisationId,
   };
@@ -2266,9 +2267,9 @@ function ownFeedRequest(userId: string, kind: "personal" | "team") {
 
 function ownerCommand(userId: string) {
   return {
-    actingRole: "org:viewer",
+    accountId: tenant.accountId,
+    actingRole: "viewer",
     actingUserId: userId,
-    clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
   };
 }
@@ -2281,13 +2282,13 @@ async function seedLinkedPerson(input: {
   const person = await database.person.create({
     data: {
       ...tenantScope(),
-      clerk_user_id: userId,
       email: `${userId}@example.test`,
       employment_type: "employee",
       first_name: input.firstName,
       last_name: "Person",
       manager_person_id: input.managerPersonId ?? null,
       source_system: "MANUAL",
+      user_id: userId,
     },
   });
   return { id: person.id, userId };
@@ -2295,7 +2296,7 @@ async function seedLinkedPerson(input: {
 
 async function seedRepresentationRecord(
   scope = {
-    clerk_org_id: tenant.clerkOrgId,
+    account_id: tenant.accountId,
     organisation_id: tenant.organisationId,
   }
 ) {
@@ -2348,9 +2349,9 @@ async function seedRepresentationRecord(
 async function createTestFeed() {
   const result = await withTestTenantResult(
     tenantTestAccount({
-      actingRole: "org:admin",
+      accountId: tenant.accountId,
+      actingRole: "admin",
       actingUserId: "user_admin",
-      clerkOrgId: tenant.clerkOrgId,
       includesPublicHolidays: false,
       name: "Calendar feed",
       organisationId: tenant.organisationId,
@@ -2360,9 +2361,9 @@ async function createTestFeed() {
     (db) =>
       createFeed(
         {
-          actingRole: "org:admin",
+          accountId: tenant.accountId,
+          actingRole: "admin",
           actingUserId: "user_admin",
-          clerkOrgId: tenant.clerkOrgId,
           includesPublicHolidays: false,
           name: "Calendar feed",
           organisationId: tenant.organisationId,
@@ -2385,7 +2386,7 @@ async function createTestFeed() {
 async function createFeedWithoutToken() {
   return await database.feed.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       created_by_user_id: "user_admin",
       name: "Concurrent token feed",
       organisation_id: tenant.organisationId,
@@ -2400,7 +2401,7 @@ async function createFeedWithoutToken() {
 async function seedActiveFeed(id: string, slug: string) {
   await database.feed.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id,
       name: slug,
       organisation_id: tenant.organisationId,
@@ -2414,10 +2415,10 @@ async function seedActiveFeed(id: string, slug: string) {
 async function createTenant(input: typeof tenant) {
   await database.organisation.create({
     data: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       country_code: "AU",
       id: input.organisationId,
-      name: `Feed services ${input.clerkOrgId}`,
+      name: `Feed services ${input.accountId}`,
     },
   });
 }
@@ -2426,7 +2427,7 @@ async function cleanTestData() {
   const feeds = await database.feed.findMany({
     select: { id: true },
     where: {
-      clerk_org_id: { in: clerkOrgIds },
+      account_id: { in: accountIds },
       organisation_id: {
         in: [tenant.organisationId, otherTenant.organisationId],
       },
@@ -2437,52 +2438,52 @@ async function cleanTestData() {
   });
 
   await database.notification.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
-  await database.clerkOrgSubscription.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+  await database.accountSubscription.deleteMany({
+    where: { account_id: { in: accountIds } },
   });
   await database.usageCounter.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.auditEvent.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.publicHolidayPreference.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.publicHoliday.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.feedEventPublication.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.feedToken.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.feedScope.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.feed.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.availabilityPublication.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.availabilityRecord.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.person.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.location.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   // Audit rows reference the organisation; clear them by organisation just
   // before it goes so a late write from the previous test cannot block cleanup.
   const organisations = await database.organisation.findMany({
     select: { id: true },
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
   await database.auditEvent.deleteMany({
     where: {
@@ -2492,6 +2493,6 @@ async function cleanTestData() {
     },
   });
   await database.organisation.deleteMany({
-    where: { clerk_org_id: { in: clerkOrgIds } },
+    where: { account_id: { in: accountIds } },
   });
 }

@@ -1,14 +1,15 @@
+import { hasPermission as can } from "@repo/auth/permissions";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  currentUser: vi.fn(),
   dispatchManualSync: vi.fn(),
+  getCurrentUser: vi.fn(),
   getXeroConnectionState: vi.fn(),
+  hasPermission: vi.fn(),
   prepareManualSync: vi.fn(),
   reconcileXeroApprovalState: vi.fn(),
   recordManualSyncDispatch: vi.fn(),
-  requireOrg: vi.fn(),
-  requireRole: vi.fn(),
+  requireAccount: vi.fn(),
   syncRunFindFirst: vi.fn(),
   syncXeroLeaveBalances: vi.fn(),
   syncXeroLeaveRecords: vi.fn(),
@@ -17,9 +18,9 @@ const mocks = vi.hoisted(() => ({
   xeroTenantFindFirst: vi.fn(),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  currentUser: mocks.currentUser,
-  requireOrg: mocks.requireOrg,
-  requireRole: mocks.requireRole,
+  getCurrentUser: mocks.getCurrentUser,
+  hasPermission: mocks.hasPermission,
+  requireAccount: mocks.requireAccount,
 }));
 vi.mock("@repo/availability", () => ({
   prepareManualSync: mocks.prepareManualSync,
@@ -109,10 +110,11 @@ describe("manual sync dispatch route", () => {
     mocks.xeroTenantFindFirst.mockResolvedValue({ id: input.connectionId });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     vi.stubEnv("NODE_ENV", "test");
-    mocks.requireOrg.mockResolvedValue("org_123");
-    mocks.currentUser.mockResolvedValue({ id: "user_123" });
-    mocks.requireRole.mockImplementation((role: string) =>
-      Promise.resolve(role === "org:admin")
+    mocks.requireAccount.mockResolvedValue("org_123");
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_123" });
+    mocks.hasPermission.mockImplementation(
+      (permissionRequest: import("@repo/auth/permissions").PermissionRequest) =>
+        Promise.resolve(can("admin", permissionRequest))
     );
     mocks.dispatchManualSync.mockResolvedValue({
       ok: true,
@@ -128,27 +130,31 @@ describe("manual sync dispatch route", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
-  it.each(["org:admin", "org:owner"])(
+  it.each(["admin", "owner"])(
     "allows %s to dispatch scoped sync",
-    async (orgRole) => {
-      mocks.requireRole.mockImplementation((role: string) =>
-        Promise.resolve(role === orgRole)
+    async (role) => {
+      mocks.hasPermission.mockImplementation(
+        (
+          permissionRequest: import("@repo/auth/permissions").PermissionRequest
+        ) => Promise.resolve(can(role, permissionRequest))
       );
       expect((await POST(request(input))).status).toBe(202);
       expect(mocks.dispatchManualSync).toHaveBeenCalledWith(
         expect.objectContaining({
-          actingRole: orgRole === "org:owner" ? "owner" : "admin",
-          clerkOrgId: "org_123",
+          accountId: "org_123",
+          actingRole: role === "owner" ? "owner" : "admin",
           organisationId: input.organisationId,
         })
       );
     }
   );
-  it.each(["org:manager", "org:viewer"])(
+  it.each(["manager", "viewer"])(
     "refuses %s before reading a malformed body",
-    async (orgRole) => {
-      mocks.requireRole.mockImplementation((role: string) =>
-        Promise.resolve(role === orgRole)
+    async (role) => {
+      mocks.hasPermission.mockImplementation(
+        (
+          permissionRequest: import("@repo/auth/permissions").PermissionRequest
+        ) => Promise.resolve(can(role, permissionRequest))
       );
       const malformed = request({});
       const parseBody = vi.spyOn(malformed, "json");
@@ -178,13 +184,13 @@ describe("manual sync dispatch route", () => {
     expect(mocks.syncRunFindFirst).not.toHaveBeenCalled();
   });
   it("rejects unauthenticated callers", async () => {
-    mocks.requireOrg.mockRejectedValueOnce(new Error("No organisation"));
+    mocks.requireAccount.mockRejectedValueOnce(new Error("No organisation"));
     const response = await POST(request(input));
     expect(response.status).toBe(401);
     expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
   });
   it("rejects callers who are not admins or owners", async () => {
-    mocks.requireRole.mockResolvedValue(false);
+    mocks.hasPermission.mockResolvedValue(false);
     const response = await POST(request(input));
     expect(response.status).toBe(403);
     expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
@@ -198,9 +204,9 @@ describe("manual sync dispatch route", () => {
     const response = await POST(request(input));
     expect(response.status).toBe(202);
     expect(mocks.dispatchManualSync).toHaveBeenCalledWith({
+      accountId: "org_123",
       actingRole: "admin",
       actingUserId: "user_123",
-      clerkOrgId: "org_123",
       connectionId: input.connectionId,
       organisationId: input.organisationId,
       runType: "people",
@@ -251,7 +257,7 @@ describe("manual sync dispatch route", () => {
       expect(response.status).toBe(200);
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith({
-        clerkOrgId: "org_123",
+        accountId: "org_123",
         connectionId: input.connectionId,
         organisationId: input.organisationId,
         triggeredByUserId: "user_123",
@@ -296,7 +302,7 @@ describe("manual sync dispatch route", () => {
     expect(mocks.xeroTenantFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          clerk_org_id: "org_123",
+          account_id: "org_123",
           id: input.connectionId,
           organisation_id: input.organisationId,
         },
@@ -377,7 +383,7 @@ describe("manual sync dispatch route", () => {
       expect(mocks.syncRunFindFirst).toHaveBeenCalledWith({
         select: { error_summary: true },
         where: {
-          clerk_org_id: "org_123",
+          account_id: "org_123",
           id: "run_1",
           organisation_id: input.organisationId,
         },

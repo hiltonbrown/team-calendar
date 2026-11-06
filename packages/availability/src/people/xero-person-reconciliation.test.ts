@@ -57,8 +57,8 @@ vi.mock("@repo/database", async () => ({
   resolveAccountCompanies: async () => [
     { id: "10000000-0000-4000-8000-000000000001", name: "Company A" },
   ],
-  scopedTo: (context: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: context.clerkOrgId,
+  scopedTo: (context: { accountId: string; organisationId: string }) => ({
+    account_id: context.accountId,
     organisation_id: context.organisationId,
   }),
 }));
@@ -124,9 +124,9 @@ const { reconcileXeroPerson, mergeCandidateIntoXeroPerson, ignorePersonMatch } =
   await import("./xero-person-reconciliation");
 
 describe("xero-person-reconciliation", () => {
-  const clerkOrgId = "org_reconcile_test";
+  const accountId = "org_reconcile_test";
   const organisationId = "10000000-0000-4000-8000-000000000001";
-  const context = { clerkOrgId, organisationId };
+  const context = { accountId, organisationId };
   const employeeId = "20000000-0000-4000-8000-000000000002";
   const xeroPersonId = "30000000-0000-4000-8000-000000000003";
   const candidatePersonId = "40000000-0000-4000-8000-000000000004";
@@ -207,7 +207,6 @@ describe("xero-person-reconciliation", () => {
     it("upgrades single unambiguous manual person in place when verified email matches", async () => {
       mocks.personFindFirst.mockResolvedValue(null); // No exact xero_employee_id
       const manualPerson = {
-        clerk_user_id: "user_manual_1",
         email: "alice@example.com",
         first_name: "Alice",
         id: candidatePersonId,
@@ -215,6 +214,7 @@ describe("xero-person-reconciliation", () => {
         last_name: "Smith",
         location_id: "loc-1",
         team_id: "team-1",
+        user_id: "user_manual_1",
         xero_employee_id: null,
       };
 
@@ -367,25 +367,25 @@ describe("xero-person-reconciliation", () => {
 
   describe("mergeCandidateIntoXeroPerson", () => {
     const xeroPerson = {
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
-      clerk_user_id: null,
       id: xeroPersonId,
       location_id: null,
       manager_person_id: null,
       organisation_id: organisationId,
       team_id: null,
+      user_id: null,
     };
 
     const candidatePerson = {
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
-      clerk_user_id: "user_cand_1",
       id: candidatePersonId,
       location_id: "loc_cand",
       manager_person_id: "mgr_cand",
       organisation_id: organisationId,
       team_id: "team_cand",
+      user_id: "user_cand_1",
     };
 
     it("returns not_found error if Xero person does not exist", async () => {
@@ -397,9 +397,9 @@ describe("xero-person-reconciliation", () => {
           mergeCandidateIntoXeroPerson(
             context,
             {
+              accountId,
               actorUserId: "user_admin",
               candidatePersonId,
-              clerkOrgId,
               organisationId,
               xeroPersonId,
             },
@@ -424,9 +424,9 @@ describe("xero-person-reconciliation", () => {
           mergeCandidateIntoXeroPerson(
             context,
             {
+              accountId,
               actorUserId: "user_admin",
               candidatePersonId,
-              clerkOrgId,
               organisationId,
               xeroPersonId,
             },
@@ -443,7 +443,7 @@ describe("xero-person-reconciliation", () => {
       });
     });
 
-    it("rejects if resolved Clerk user ID is already linked to a third person in the account", async () => {
+    it("rejects if resolved user ID is already linked to a third person in the account", async () => {
       mocks.personFindFirst
         .mockResolvedValueOnce(xeroPerson)
         .mockResolvedValueOnce(candidatePerson)
@@ -455,11 +455,11 @@ describe("xero-person-reconciliation", () => {
           mergeCandidateIntoXeroPerson(
             context,
             {
+              accountId,
               actorUserId: "user_admin",
               candidatePersonId,
-              clerkOrgId,
-              clerkUserId: "user_cand_1",
               organisationId,
+              userId: "user_cand_1",
               xeroPersonId,
             },
             db
@@ -490,9 +490,9 @@ describe("xero-person-reconciliation", () => {
           mergeCandidateIntoXeroPerson(
             context,
             {
+              accountId,
               actorUserId: "user_admin",
               candidatePersonId,
-              clerkOrgId,
               organisationId,
               xeroPersonId,
             },
@@ -552,13 +552,13 @@ describe("xero-person-reconciliation", () => {
           mergeCandidateIntoXeroPerson(
             context,
             {
+              accountId,
               actorDisplay: "Admin User",
               actorUserId: "user_admin",
               candidatePersonId,
-              clerkOrgId,
-              clerkUserId: "user_cand_1",
               matchId,
               organisationId,
+              userId: "user_cand_1",
               xeroPersonId,
             },
             db
@@ -631,21 +631,21 @@ describe("xero-person-reconciliation", () => {
         where: { id: "fs2" },
       });
 
-      // Assert candidate person archived and clerk_user_id cleared
+      // Assert candidate person archived and user_id cleared
       expect(mocks.personUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             archived_at: expect.any(Date),
-            clerk_user_id: null,
+            user_id: null,
           }),
           where: { id: candidatePersonId },
         })
       );
 
-      // Assert Xero person linked to Clerk user ID
+      // Assert Xero person linked to user ID
       expect(mocks.personUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ clerk_user_id: "user_cand_1" }),
+          data: expect.objectContaining({ user_id: "user_cand_1" }),
           where: { id: xeroPersonId },
         })
       );
@@ -654,8 +654,8 @@ describe("xero-person-reconciliation", () => {
       expect(mocks.xeroPersonMatchUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            resolved_clerk_user_id: "user_cand_1",
             resolved_person_id: xeroPersonId,
+            resolved_user_id: "user_cand_1",
             status: "matched",
           }),
           where: { id: matchId },

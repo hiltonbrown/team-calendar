@@ -38,8 +38,8 @@ export async function executeWithXeroAuthRecovery<T>(
     return first;
   }
   const scope = {
+    accountId: xeroConnection.account_id,
     capability: xeroConnection.capability,
-    clerkOrgId: xeroConnection.clerk_org_id,
     organisationId: xeroConnection.organisation_id,
   };
   const refreshed = await resolveXeroAccess({

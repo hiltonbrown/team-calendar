@@ -21,14 +21,14 @@ const uuid = () => {
 describe("protected manifest fixture ownership", () => {
   it("allocates the complete registry without duplicate ownership", () => {
     const ownership = createLiveManifestOwnership({ runId, uuid });
-    expect(ownership.clerkOrgIds).toHaveLength(
+    expect(ownership.accountIds).toHaveLength(
       REQUIRED_LIVE_FIXTURE_TENANT_SLOTS
     );
     expect(ownership.organisationIds).toHaveLength(
       REQUIRED_LIVE_FIXTURE_TENANT_SLOTS
     );
-    expect(new Set(ownership.clerkOrgIds)).toHaveLength(
-      ownership.clerkOrgIds.length
+    expect(new Set(ownership.accountIds)).toHaveLength(
+      ownership.accountIds.length
     );
     expect(new Set(ownership.organisationIds)).toHaveLength(
       ownership.organisationIds.length

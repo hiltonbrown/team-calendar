@@ -61,13 +61,13 @@ const writeErrorCertainty = (
 };
 
 async function getTenant(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   operation: keyof typeof XERO_OPERATION_CAPABILITIES
 ) {
   const scope = {
+    accountId,
     capability: XERO_OPERATION_CAPABILITIES[operation],
-    clerkOrgId,
     organisationId,
   };
   const resolved = await resolveXeroAccess({
@@ -114,7 +114,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
       return missingMutationIdentity();
     }
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "approveLeaveApplication"
     );
@@ -144,7 +144,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
       return missingMutationIdentity();
     }
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "declineLeaveApplication"
     );
@@ -169,7 +169,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
   },
   async findLeaveApplicationCandidates(input) {
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "findLeaveApplicationCandidates"
     );
@@ -235,7 +235,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     } as const;
     const operation = operations[input.action];
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       operation
     );
@@ -262,11 +262,11 @@ export const XeroWriteAdapter: ExternalWritePort = {
   },
   async resolveEmployeeId(input: {
     personId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   }): Promise<Result<string, ProviderResolutionError>> {
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "resolveEmployeeId"
     );
@@ -298,11 +298,11 @@ export const XeroWriteAdapter: ExternalWritePort = {
   async resolveLeaveTypeId(input: {
     personId: string;
     recordType: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   }): Promise<Result<string, ProviderResolutionError>> {
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "resolveLeaveTypeId"
     );
@@ -350,7 +350,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
       return missingMutationIdentity();
     }
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "submitLeaveApplication"
     );
@@ -390,7 +390,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
       return missingMutationIdentity();
     }
     const resolution = await getTenant(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "withdrawLeaveApplication"
     );
@@ -459,7 +459,7 @@ export async function resolveWriteEmployeeId(
 ) {
   assertNoTenantTransaction("resolveWriteEmployeeId");
   try {
-    return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
+    return await withTenantResult(input.xeroConnection.account_id, (db) =>
       resolveXeroEmployeeId(input, db)
     );
   } catch {
@@ -471,7 +471,7 @@ export async function resolveWriteLeaveTypeId(
 ) {
   assertNoTenantTransaction("resolveWriteLeaveTypeId");
   try {
-    return await withTenantResult(input.xeroConnection.clerk_org_id, (db) =>
+    return await withTenantResult(input.xeroConnection.account_id, (db) =>
       resolveXeroLeaveTypeId(input, db)
     );
   } catch {

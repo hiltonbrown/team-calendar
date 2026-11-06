@@ -47,8 +47,8 @@ export type PayrollRegion = "AU" | "NZ" | "UK";
 
 export interface XeroAccessContext {
   accessToken: string;
+  account_id: string;
   capability?: string | readonly string[];
-  clerk_org_id: string;
   deadline: XeroDeadline;
   dispatchState?: { accessToken: string };
   id: string;

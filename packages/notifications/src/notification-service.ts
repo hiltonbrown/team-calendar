@@ -64,7 +64,7 @@ const CategorySchema = z.enum([
 ]);
 
 const ListSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   filters: z
     .object({
       category: z.array(CategorySchema).optional(),
@@ -84,7 +84,7 @@ const ListSchema = z.object({
 });
 
 const ScopedUserSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   userId: z.string().min(1),
 });
 
@@ -118,7 +118,7 @@ export async function listForUser(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof listForUser> => {
     const filters = normaliseFilters(parsed.data.filters);
     if (!filters.ok) {
@@ -165,7 +165,7 @@ export async function listForUser(
       },
     };
   };
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   return await run(db);
 }
 
@@ -182,16 +182,16 @@ export async function markAsRead(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof markAsRead> => {
     const ownedDb = client;
 
     const existing = await client.notification.findFirst({
       select: notificationSelect,
       where: {
-        clerk_org_id: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         id: parsed.data.notificationId,
-        organisation: { clerk_org_id: parsed.data.clerkOrgId },
+        organisation: { account_id: parsed.data.accountId },
       },
     });
     if (!existing) {
@@ -212,9 +212,9 @@ export async function markAsRead(
       await client.notification.updateMany({
         data: { read_at: readAt },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           id: parsed.data.notificationId,
-          organisation: { clerk_org_id: parsed.data.clerkOrgId },
+          organisation: { account_id: parsed.data.accountId },
           read_at: null,
           recipient_user_id: parsed.data.userId,
         },
@@ -227,7 +227,7 @@ export async function markAsRead(
       invalidateUnreadCount(parsed.data);
       await publishNotificationEvent(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           userId: parsed.data.userId,
         },
         {
@@ -244,7 +244,7 @@ export async function markAsRead(
     return { ok: true, value: { notification: item, unreadCount } };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -259,15 +259,15 @@ export async function markAllAsRead(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof markAllAsRead> => {
     const ownedDb = client;
 
     const result = await client.notification.updateMany({
       data: { read_at: new Date() },
       where: {
-        clerk_org_id: parsed.data.clerkOrgId,
-        organisation: { clerk_org_id: parsed.data.clerkOrgId },
+        account_id: parsed.data.accountId,
+        organisation: { account_id: parsed.data.accountId },
         read_at: null,
         recipient_user_id: parsed.data.userId,
       },
@@ -276,7 +276,7 @@ export async function markAllAsRead(
       invalidateUnreadCount(parsed.data);
       await publishNotificationEvent(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           userId: parsed.data.userId,
         },
         { payload: { unreadCount: 0 }, type: "notification.all_read" }
@@ -288,7 +288,7 @@ export async function markAllAsRead(
     };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -301,7 +301,7 @@ export async function getUnreadCount(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof getUnreadCount> => {
     const ownedDb = client;
     const key = cacheKey(parsed.data);
@@ -318,7 +318,7 @@ export async function getUnreadCount(
     });
     return { ok: true, value };
   };
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   return await run(db);
 }
 
@@ -330,7 +330,7 @@ export async function listRecentUnread(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof listRecentUnread> => {
     const limit = parsed.data.limit ?? 3;
 
@@ -339,8 +339,8 @@ export async function listRecentUnread(
       select: notificationSelect,
       take: limit,
       where: {
-        clerk_org_id: parsed.data.clerkOrgId,
-        organisation: { clerk_org_id: parsed.data.clerkOrgId },
+        account_id: parsed.data.accountId,
+        organisation: { account_id: parsed.data.accountId },
         read_at: null,
         recipient_user_id: parsed.data.userId,
       },
@@ -352,12 +352,12 @@ export async function listRecentUnread(
     );
     return { ok: true, value: rows.map((row) => toListItem(row, actors)) };
   };
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   return await run(db);
 }
 
 export function invalidateUnreadCount(input: {
-  clerkOrgId: string;
+  accountId: string;
   userId: string;
 }): void {
   unreadCountCache.delete(cacheKey(input));
@@ -365,20 +365,20 @@ export function invalidateUnreadCount(input: {
 
 async function countUnreadDirect(
   client: TenantDb,
-  input: { clerkOrgId: string; userId: string }
+  input: { accountId: string; userId: string }
 ): Promise<number> {
   return await client.notification.count({
     where: {
-      clerk_org_id: input.clerkOrgId,
-      organisation: { clerk_org_id: input.clerkOrgId },
+      account_id: input.accountId,
+      organisation: { account_id: input.accountId },
       read_at: null,
       recipient_user_id: input.userId,
     },
   });
 }
 
-function cacheKey(input: { clerkOrgId: string; userId: string }): string {
-  return `${input.clerkOrgId}:${input.userId}`;
+function cacheKey(input: { accountId: string; userId: string }): string {
+  return `${input.accountId}:${input.userId}`;
 }
 
 function normaliseFilters(
@@ -407,7 +407,7 @@ function normaliseFilters(
 }
 
 function buildWhere(
-  input: { clerkOrgId: string; userId: string },
+  input: { accountId: string; userId: string },
   filters: NotificationFilters,
   cursor?: DecodedCursor | null
 ): Prisma.NotificationWhereInput {
@@ -426,8 +426,8 @@ function buildWhere(
   const hasTypeConstraint = Boolean(requestedTypes || categoryTypes);
 
   return {
-    clerk_org_id: input.clerkOrgId,
-    organisation: { clerk_org_id: input.clerkOrgId },
+    account_id: input.accountId,
+    organisation: { account_id: input.accountId },
     recipient_user_id: input.userId,
     ...(filters.unreadOnly ? { read_at: null } : {}),
     ...(hasTypeConstraint ? { type: { in: typeFilter ?? [] } } : {}),
@@ -484,7 +484,7 @@ interface NotificationRow {
 
 async function loadActorDisplays(
   client: TenantDb,
-  input: { clerkOrgId: string },
+  input: { accountId: string },
   actorUserIds: Array<string | null>
 ): Promise<Map<string, string>> {
   const unique = [
@@ -495,21 +495,21 @@ async function loadActorDisplays(
   }
   const people = await client.person.findMany({
     select: {
-      clerk_user_id: true,
       first_name: true,
       last_name: true,
+      user_id: true,
     },
     where: {
-      clerk_org_id: input.clerkOrgId,
-      clerk_user_id: { in: unique },
-      organisation: { clerk_org_id: input.clerkOrgId },
+      account_id: input.accountId,
+      organisation: { account_id: input.accountId },
+      user_id: { in: unique },
     },
   });
   return new Map(
     people
-      .filter((person) => person.clerk_user_id)
+      .filter((person) => person.user_id)
       .map((person) => [
-        person.clerk_user_id ?? "",
+        person.user_id ?? "",
         `${person.first_name} ${person.last_name.charAt(0)}.`,
       ])
   );

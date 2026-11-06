@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import "server-only";
 
 import type { Result } from "@repo/core";
@@ -31,9 +32,9 @@ export type AuditLogServiceError =
   | { code: "validation_error"; message: string };
 
 const BaseSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.enum(["admin", "manager", "owner", "viewer"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -80,7 +81,7 @@ export async function listEvents(
     AuditLogServiceError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = ListSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -116,7 +117,7 @@ export async function listEvents(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 
@@ -124,7 +125,7 @@ export async function getEventDetail(
   input: z.input<typeof DetailSchema>,
   db: TenantDb
 ): Promise<Result<AuditEventDetail, AuditLogServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = DetailSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -135,7 +136,7 @@ export async function getEventDetail(
   const run = async (client: TenantDb): ReturnType<typeof getEventDetail> => {
     const event = await client.auditEvent.findFirst({
       where: {
-        clerk_org_id: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         id: parsed.data.eventId,
         organisation_id: parsed.data.organisationId,
       },
@@ -157,7 +158,7 @@ export async function getEventDetail(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 
@@ -167,7 +168,7 @@ export async function exportCsv(
 ): Promise<
   Result<{ csvContent: string; filename: string }, AuditLogServiceError>
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = ExportSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -203,9 +204,9 @@ export async function exportCsv(
 
     await client.auditEvent.create({
       data: {
+        account_id: parsed.data.accountId,
         action: "audit_log.exported",
         actor_user_id: parsed.data.actingUserId,
-        clerk_org_id: parsed.data.clerkOrgId,
         entity_id: parsed.data.organisationId,
         entity_type: "audit_log",
         metadata: {
@@ -247,7 +248,7 @@ export async function exportCsv(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -294,10 +295,10 @@ function mapEvent(event: {
 
 function whereFor(input: z.infer<typeof ListSchema>) {
   return {
+    account_id: input.accountId,
     action: input.filters.action?.length
       ? { in: input.filters.action }
       : undefined,
-    clerk_org_id: input.clerkOrgId,
     created_at: {
       ...(input.filters.dateFrom ? { gte: input.filters.dateFrom } : {}),
       ...(input.filters.dateTo ? { lte: input.filters.dateTo } : {}),
@@ -317,7 +318,7 @@ function whereFor(input: z.infer<typeof ListSchema>) {
 }
 
 function canViewAuditLog(role: "admin" | "manager" | "owner" | "viewer") {
-  return role === "admin" || role === "owner";
+  return hasPermission(role, { audit: ["read"] });
 }
 
 function dateStamp(value?: Date): string {

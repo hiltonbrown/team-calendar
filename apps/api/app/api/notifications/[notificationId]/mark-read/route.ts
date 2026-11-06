@@ -1,4 +1,4 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
+import { getCurrentUser, requireAccount } from "@repo/auth/helpers";
 import { withTenantResult } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { markAsRead } from "@repo/notifications";
@@ -9,9 +9,9 @@ export async function POST(
   { params }: { params: Promise<{ notificationId: string }> }
 ): Promise<Response> {
   assertNoTenantTransaction("POST");
-  let clerkOrgId: string;
+  let accountId: string;
   try {
-    clerkOrgId = await requireOrg();
+    accountId = await requireAccount();
   } catch {
     return Response.json(
       {
@@ -22,7 +22,7 @@ export async function POST(
     );
   }
 
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     return Response.json(
       { error: { code: "unauthorised", message: "User not found" }, ok: false },
@@ -44,10 +44,10 @@ export async function POST(
     );
   }
 
-  const result = await withTenantResult(clerkOrgId, (db) =>
+  const result = await withTenantResult(accountId, (db) =>
     markAsRead(
       {
-        clerkOrgId,
+        accountId,
         notificationId: parsed.data.notificationId,
         userId: user.id,
       },

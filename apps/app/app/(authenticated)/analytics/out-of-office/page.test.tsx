@@ -1,5 +1,5 @@
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_1"),
+  requireAccount: () => Promise.resolve("org_1"),
 }));
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -7,17 +7,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   aggregateOutOfOffice: vi.fn(),
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   database: { organisation: { findFirst: vi.fn() } },
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
   resolveDateRange: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   aggregateOutOfOffice: mocks.aggregateOutOfOffice,
@@ -43,9 +43,9 @@ vi.mock("@repo/database", async () => ({
 function buildTenantTestDatabase() {
   return mocks.database;
 }
-vi.mock("@/lib/auth/require-page-role", () => ({
+vi.mock("@/lib/auth/require-page-permission", () => ({
   PermissionDeniedError: class PermissionDeniedError extends Error {},
-  requirePageRole: mocks.requirePageRole,
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -71,10 +71,10 @@ const Page = (await import("./page")).default;
 
 describe("OutOfOfficePage", () => {
   beforeEach(() => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: "user-1" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user-1" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
     });
     mocks.database.organisation.findFirst.mockResolvedValue({
@@ -112,7 +112,7 @@ describe("OutOfOfficePage", () => {
 
     expect(mocks.aggregateOutOfOffice).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         filters: {
           includeArchivedPeople: false,
           personType: "employee",

@@ -13,8 +13,8 @@ const mocks = vi.hoisted(() => ({
   failedRecordFindMany: vi.fn(),
   getRegisteredSyncEventName: vi.fn(),
   metadata: vi.fn(),
-  scopedTo: vi.fn((input: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: input.clerkOrgId,
+  scopedTo: vi.fn((input: { accountId: string; organisationId: string }) => ({
+    account_id: input.accountId,
     organisation_id: input.organisationId,
   })),
   state: vi.fn(),
@@ -95,9 +95,9 @@ const {
   listTenantSummaries,
 } = await import("./sync-monitor-service");
 const baseInput = {
+  accountId: "org_1",
   actingRole: "admin" as const,
   actingUserId: "user_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 function completedRunFixture(input: {
@@ -261,7 +261,7 @@ describe("sync-monitor-service", () => {
     );
     expect(mocks.metadata).toHaveBeenCalledWith(
       {
-        clerkOrgId: baseInput.clerkOrgId,
+        accountId: baseInput.accountId,
         connectionId: "tenant_metadata",
         organisationId: baseInput.organisationId,
       },
@@ -440,7 +440,7 @@ describe("sync-monitor-service", () => {
     expect(mocks.failedRecordFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: baseInput.clerkOrgId,
+          account_id: baseInput.accountId,
           id: "00000000-0000-4000-8000-000000000031",
           organisation_id: baseInput.organisationId,
           sync_run_id: "00000000-0000-4000-8000-000000000021",
@@ -739,7 +739,7 @@ describe("sync-monitor-service", () => {
     });
     expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: baseInput.clerkOrgId,
+        accountId: baseInput.accountId,
         connectionId: validTenantId,
         organisationId: baseInput.organisationId,
         runType: "people",

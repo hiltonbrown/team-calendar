@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import "server-only";
 
 import { withinLimit } from "@repo/auth/server";
@@ -31,7 +32,6 @@ import {
   findActingPersonId,
   isAdminOrOwner,
   loadFeedScopeData,
-  normaliseRole,
   type ResolvedFeedScope,
   resolveScopeRows,
   scopeSummary,
@@ -98,12 +98,12 @@ export interface FeedDetail {
 }
 
 const PrivacyModeSchema = z.enum(["named", "masked", "private"]);
-const RoleSchema = z.string().min(1).transform(normaliseRole);
+const RoleSchema = z.enum(["owner", "admin", "manager", "viewer"]);
 
 const CreateFeedSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   description: z.string().trim().max(500).optional(),
   includesPublicHolidays: z.boolean().default(false),
   name: z.string().trim().min(1).max(120),
@@ -113,8 +113,8 @@ const CreateFeedSchema = z.object({
 });
 
 const DefaultCalendarFeedSchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1).optional().nullable(),
-  clerkOrgId: z.string().min(1),
   includesPublicHolidays: z.boolean().default(false),
   name: z.string().trim().min(1).max(120).default("All staff"),
   organisationId: z.string().uuid(),
@@ -122,9 +122,9 @@ const DefaultCalendarFeedSchema = z.object({
 });
 
 const UpdateFeedSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid(),
   patch: z
@@ -141,18 +141,18 @@ const UpdateFeedSchema = z.object({
 });
 
 const FeedCommandSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid(),
 });
 
 const ListFeedsSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   filters: z
     .object({
       privacyMode: z.array(PrivacyModeSchema).optional(),
@@ -175,25 +175,25 @@ const ListFeedsSchema = z.object({
 });
 
 const DetailSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid(),
 });
 
 const OwnFeedSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   kind: z.enum(["personal", "team"]),
   organisationId: z.string().uuid(),
 });
 
 const OwnFeedEligibilitySchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -205,9 +205,9 @@ export interface OwnFeedEligibility {
 }
 
 const FeedCountsSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -222,10 +222,10 @@ class RollbackError extends Error {
 
 const assertWithinFeedLimit = async (
   tx: TenantDb,
-  input: { clerkOrgId: string; organisationId: string }
+  input: { accountId: string; organisationId: string }
 ): Promise<void> => {
   const entitlement = await withinLimit(
-    input.clerkOrgId,
+    input.accountId,
     input.organisationId,
     "feeds",
     tx
@@ -246,9 +246,9 @@ const assertWithinFeedLimit = async (
 
 const enforceFeedLimit = async (
   tx: TenantDb,
-  input: { clerkOrgId: string; organisationId: string }
+  input: { accountId: string; organisationId: string }
 ): Promise<void> => {
-  await lockPlanLimitMutations(input.clerkOrgId, tx);
+  await lockPlanLimitMutations(input.accountId, tx);
   await assertWithinFeedLimit(tx, input);
 };
 
@@ -262,7 +262,7 @@ export async function createFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb2: TenantDb): ReturnType<typeof createFeed> => {
     if (!isAdminOrOwner(parsed.data.actingRole)) {
       return notAuthorised();
@@ -278,7 +278,7 @@ export async function createFeed(
       const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
       const feed = await tx.feed.create({
         data: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           created_by_user_id: parsed.data.actingUserId,
           description: emptyToNull(parsed.data.description),
           includes_public_holidays: parsed.data.includesPublicHolidays,
@@ -287,7 +287,7 @@ export async function createFeed(
           privacy_mode: parsed.data.privacyMode,
           scopes: {
             create: createScopeRows({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: parsed.data.organisationId,
               scopes: scopes.value,
             }),
@@ -299,8 +299,8 @@ export async function createFeed(
       });
 
       const token = await createInitialTokenWithClient(tx, {
+        accountId: parsed.data.accountId,
         actingUserId: parsed.data.actingUserId,
-        clerkOrgId: parsed.data.clerkOrgId,
         feedId: feed.id,
         organisationId: parsed.data.organisationId,
       });
@@ -324,7 +324,7 @@ export async function createFeed(
   };
   try {
     return await (async () => {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -349,7 +349,7 @@ export async function ensureDefaultCalendarFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     tenantDb3: TenantDb
   ): ReturnType<typeof ensureDefaultCalendarFeed> => {
@@ -357,12 +357,12 @@ export async function ensureDefaultCalendarFeed(
       parsed.data.actingUserId ?? "system:default-calendar-feed";
 
     const result = await (async (tx: TenantDb) => {
-      await lockPlanLimitMutations(parsed.data.clerkOrgId, tx);
+      await lockPlanLimitMutations(parsed.data.accountId, tx);
       const defaultMarkers = await tx.auditEvent.findMany({
         select: { resource_id: true },
         where: {
+          account_id: parsed.data.accountId,
           action: "feeds.created",
-          clerk_org_id: parsed.data.clerkOrgId,
           payload: { equals: true, path: ["defaultFeed"] },
           resource_type: "feed",
         },
@@ -374,7 +374,7 @@ export async function ensureDefaultCalendarFeed(
         orderBy: { created_at: "asc" },
         select: { id: true },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           id: { in: defaultFeedIds },
         },
       });
@@ -386,7 +386,7 @@ export async function ensureDefaultCalendarFeed(
       const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
       const feed = await tx.feed.create({
         data: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           created_by_user_id: parsed.data.actingUserId ?? null,
           includes_public_holidays: parsed.data.includesPublicHolidays,
           name: parsed.data.name,
@@ -394,7 +394,7 @@ export async function ensureDefaultCalendarFeed(
           privacy_mode: parsed.data.privacyMode,
           scopes: {
             create: createScopeRows({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: null,
               scopes: [{ scopeType: "org", scopeValue: null }],
             }),
@@ -406,8 +406,8 @@ export async function ensureDefaultCalendarFeed(
       });
 
       const token = await createInitialTokenWithClient(tx, {
+        accountId: parsed.data.accountId,
         actingUserId,
-        clerkOrgId: parsed.data.clerkOrgId,
         feedId: feed.id,
         organisationId: null,
       });
@@ -418,8 +418,8 @@ export async function ensureDefaultCalendarFeed(
       await auditFeed(
         tx,
         {
+          accountId: parsed.data.accountId,
           actingUserId,
-          clerkOrgId: parsed.data.clerkOrgId,
           organisationId: parsed.data.organisationId,
         },
         "feeds.created",
@@ -443,7 +443,7 @@ export async function ensureDefaultCalendarFeed(
   };
   try {
     return await (async () => {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -463,7 +463,7 @@ export async function updateFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb4: TenantDb): ReturnType<typeof updateFeed> => {
     const permission = await authoriseFeedChange(parsed.data, tenantDb4);
     if (!permission.ok) {
@@ -476,7 +476,7 @@ export async function updateFeed(
     const scopes = parsed.data.patch.scopes
       ? await validateScopes(
           {
-            clerkOrgId: parsed.data.clerkOrgId,
+            accountId: parsed.data.accountId,
             organisationId: parsed.data.organisationId,
             scopes: parsed.data.patch.scopes,
           },
@@ -526,14 +526,14 @@ export async function updateFeed(
       if (scopes?.ok) {
         await tx.feedScope.deleteMany({
           where: {
-            clerk_org_id: parsed.data.clerkOrgId,
+            account_id: parsed.data.accountId,
             feed_id: parsed.data.feedId,
             organisation_id: feed.value.organisationId,
           },
         });
         await tx.feedScope.createMany({
           data: createScopeRows({
-            clerkOrgId: parsed.data.clerkOrgId,
+            accountId: parsed.data.accountId,
             organisationId: feed.value.organisationId,
             scopes: scopes.value,
           }).map((scope) => ({ ...scope, feed_id: parsed.data.feedId })),
@@ -554,7 +554,7 @@ export async function updateFeed(
   };
   try {
     return await (async () => {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -580,7 +580,7 @@ export async function archiveFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb5: TenantDb): ReturnType<typeof archiveFeed> => {
     const permission = await authoriseFeedChange(parsed.data, tenantDb5);
     if (!permission.ok) {
@@ -599,7 +599,7 @@ export async function archiveFeed(
       await tx.feedToken.updateMany({
         data: { revoked_at: new Date(), status: "revoked" },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           feed_id: parsed.data.feedId,
           organisation_id: feed.value.organisationId,
           status: "active",
@@ -615,7 +615,7 @@ export async function archiveFeed(
   };
   try {
     return await (async () => {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -635,7 +635,7 @@ export async function restoreFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb6: TenantDb): ReturnType<typeof restoreFeed> => {
     if (!isAdminOrOwner(parsed.data.actingRole)) {
       return notAuthorised();
@@ -665,7 +665,7 @@ export async function restoreFeed(
     return await getFeedDetail(parsed.data, tenantDb6);
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -678,14 +678,14 @@ export async function listFeeds(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb7: TenantDb): ReturnType<typeof listFeeds> => {
     const role = parsed.data.actingRole;
     const actingPersonId =
       parsed.data.actingPersonId ??
       (await findActingPersonId(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           organisationId: parsed.data.organisationId,
           userId: parsed.data.actingUserId,
         },
@@ -700,7 +700,7 @@ export async function listFeeds(
       feeds.length > 0
         ? await loadFeedScopeData(
             {
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: parsed.data.organisationId,
             },
             tenantDb7
@@ -720,8 +720,8 @@ export async function listFeeds(
       }));
       const visible = await canViewFeed(
         {
+          accountId: parsed.data.accountId,
           actingPersonId,
-          clerkOrgId: parsed.data.clerkOrgId,
           createdByUserId: feed.created_by_user_id,
           organisationId: feed.organisation_id,
           preloaded: preloadedForFeed(feed.organisation_id, preloadedScopeData),
@@ -735,7 +735,7 @@ export async function listFeeds(
       }
       const labels = await resolveScopeRows(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           organisationId: feed.organisation_id,
           preloaded: preloadedForFeed(feed.organisation_id, preloadedScopeData),
           scopes: feed.scopes,
@@ -754,7 +754,7 @@ export async function listFeeds(
     return { ok: true, value: visibleItems };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -767,14 +767,14 @@ export async function getFeedDetail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb8: TenantDb): ReturnType<typeof getFeedDetail> => {
     const role = parsed.data.actingRole;
     const actingPersonId =
       parsed.data.actingPersonId ??
       (await findActingPersonId(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           organisationId: parsed.data.organisationId,
           userId: parsed.data.actingUserId,
         },
@@ -794,8 +794,8 @@ export async function getFeedDetail(
     }));
     const visible = await canViewFeed(
       {
+        accountId: parsed.data.accountId,
         actingPersonId,
-        clerkOrgId: parsed.data.clerkOrgId,
         createdByUserId: feed.created_by_user_id,
         organisationId: feed.organisation_id,
         role,
@@ -812,7 +812,7 @@ export async function getFeedDetail(
 
     const resolvedScopes = await resolveScopeRows(
       {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         organisationId: feed.organisation_id,
         scopes: feed.scopes,
       },
@@ -851,7 +851,7 @@ export async function getFeedDetail(
     };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -864,7 +864,7 @@ export async function getOwnFeedEligibility(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     tenantDb9: TenantDb
   ): ReturnType<typeof getOwnFeedEligibility> => {
@@ -882,7 +882,7 @@ export async function getOwnFeedEligibility(
     };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -898,16 +898,16 @@ export async function createOwnFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     tenantDb10: TenantDb
   ): ReturnType<typeof createOwnFeed> => {
     const kind: OwnFeedKind = parsed.data.kind;
 
     const result = await (async (tx: TenantDb) => {
-      // Serialises concurrent self-service requests for the Clerk org, so a
+      // Serialises concurrent self-service requests for the Account, so a
       // double submit returns the feed the first request created.
-      await lockPlanLimitMutations(parsed.data.clerkOrgId, tx);
+      await lockPlanLimitMutations(parsed.data.accountId, tx);
       const state = await loadOwnFeedState(tx, parsed.data);
       if (!state.person) {
         throw new RollbackError({
@@ -935,7 +935,7 @@ export async function createOwnFeed(
           feeds_include_public_holidays_default: true,
         },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           organisation_id: parsed.data.organisationId,
         },
       });
@@ -945,7 +945,7 @@ export async function createOwnFeed(
       const scopeType = ownFeedScopeType(kind);
       const feed = await tx.feed.create({
         data: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           created_by_user_id: parsed.data.actingUserId,
           includes_public_holidays:
             settings?.feeds_include_public_holidays_default ?? false,
@@ -954,7 +954,7 @@ export async function createOwnFeed(
           privacy_mode: privacyMode,
           scopes: {
             create: createScopeRows({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: null,
               scopes: [{ scopeType, scopeValue: null }],
             }),
@@ -966,8 +966,8 @@ export async function createOwnFeed(
       });
 
       const token = await createInitialTokenWithClient(tx, {
+        accountId: parsed.data.accountId,
         actingUserId: parsed.data.actingUserId,
-        clerkOrgId: parsed.data.clerkOrgId,
         feedId: feed.id,
         organisationId: null,
       });
@@ -993,7 +993,7 @@ export async function createOwnFeed(
   };
   try {
     return await (async () => {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -1013,7 +1013,7 @@ export async function getFeedOversightCounts(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     tenantDb: TenantDb
   ): ReturnType<typeof getFeedOversightCounts> => {
@@ -1021,8 +1021,8 @@ export async function getFeedOversightCounts(
       return notAuthorised();
     }
     const where = {
+      account_id: parsed.data.accountId,
       archived_at: null,
-      clerk_org_id: parsed.data.clerkOrgId,
       OR: [
         { organisation_id: parsed.data.organisationId },
         { organisation_id: null },
@@ -1042,7 +1042,7 @@ export async function getFeedOversightCounts(
     return { ok: true, value: { personal, total } };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -1058,7 +1058,7 @@ async function transitionFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     tenantDb11: TenantDb
   ): ReturnType<typeof transitionFeed> => {
@@ -1094,7 +1094,7 @@ async function transitionFeed(
     return await getFeedDetail(parsed.data, tenantDb11);
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -1103,7 +1103,7 @@ type FeedReadClient = TenantDb;
 
 async function loadOwnFeedState(
   client: FeedReadClient,
-  input: { actingUserId: string; clerkOrgId: string; organisationId: string }
+  input: { actingUserId: string; accountId: string; organisationId: string }
 ): Promise<{
   hasDirectReports: boolean;
   person: { firstName: string; id: string } | null;
@@ -1111,10 +1111,10 @@ async function loadOwnFeedState(
   teamFeedId: string | null;
 }> {
   const companyIds = (
-    await resolveAccountCompanies(input.clerkOrgId, client)
+    await resolveAccountCompanies(input.accountId, client)
   ).map((company) => company.id);
   const scope = {
-    clerk_org_id: input.clerkOrgId,
+    account_id: input.accountId,
     organisation_id: { in: companyIds },
   };
   const person = await client.person.findFirst({
@@ -1122,10 +1122,10 @@ async function loadOwnFeedState(
     where: {
       ...scope,
       archived_at: null,
-      clerk_user_id: input.actingUserId,
       // Feed scope resolution skips inactive people, so their own feed
       // would publish nobody.
       is_active: true,
+      user_id: input.actingUserId,
     },
   });
   const ownFeed = (scopeType: "manager_team" | "self") =>
@@ -1133,8 +1133,8 @@ async function loadOwnFeedState(
       orderBy: { created_at: "asc" },
       select: { id: true },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         created_by_user_id: input.actingUserId,
         OR: [
           { organisation_id: null },
@@ -1155,10 +1155,10 @@ async function loadOwnFeedState(
             archived_at: null,
             is_active: true,
             manager: {
+              account_id: input.accountId,
               archived_at: null,
-              clerk_org_id: input.clerkOrgId,
-              clerk_user_id: input.actingUserId,
               is_active: true,
+              user_id: input.actingUserId,
             },
           },
         })
@@ -1186,14 +1186,14 @@ async function authoriseFeedChange(
   input: {
     actingRole: string;
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     feedId: string;
     organisationId: string;
   },
   db: TenantDb
 ): Promise<Result<{ isAdmin: boolean }, FeedServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
-  if (isAdminOrOwner(normaliseRole(input.actingRole))) {
+  assertTenantDb(db, input.accountId);
+  if (hasPermission(input.actingRole, { feeds: ["manageAll"] })) {
     return { ok: true, value: { isAdmin: true } };
   }
   try {
@@ -1222,17 +1222,17 @@ async function authoriseFeedChange(
 
 function creatorNamesByUserId(
   people: {
-    clerk_user_id: string | null;
+    user_id: string | null;
     first_name: string;
     last_name: string;
   }[]
 ): Map<string, string> {
   return new Map(
     people.flatMap((person) =>
-      person.clerk_user_id
+      person.user_id
         ? [
             [
-              person.clerk_user_id,
+              person.user_id,
               [person.first_name, person.last_name].filter(Boolean).join(" "),
             ] as const,
           ]
@@ -1294,7 +1294,7 @@ function lastFetchedAt(tokens: TokenRow[]): Date | null {
 
 async function loadFeedForUpdate(
   tx: TenantDb,
-  input: { clerkOrgId: string; feedId: string; organisationId: string }
+  input: { accountId: string; feedId: string; organisationId: string }
 ): Promise<
   Result<{ id: string; organisationId: string | null }, FeedServiceError>
 > {
@@ -1321,7 +1321,7 @@ async function loadFeedForUpdate(
 
 async function makeUniqueSlug(
   tx: TenantDb,
-  input: { clerkOrgId: string; organisationId: string },
+  input: { accountId: string; organisationId: string },
   name: string
 ): Promise<string> {
   const base = slugify(name);
@@ -1331,7 +1331,7 @@ async function makeUniqueSlug(
     await tx.feed.findFirst({
       select: { id: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         slug,
       },
     })
@@ -1353,16 +1353,16 @@ function slugify(value: string): string {
 
 function auditFeed(
   tx: TenantDb,
-  input: { actingUserId: string; clerkOrgId: string; organisationId: string },
+  input: { actingUserId: string; accountId: string; organisationId: string },
   action: string,
   feedId: string,
   payload: Record<string, string | number | boolean | null>
 ) {
   return tx.auditEvent.create({
     data: {
+      account_id: input.accountId,
       action,
       actor_user_id: input.actingUserId,
-      clerk_org_id: input.clerkOrgId,
       organisation_id: input.organisationId,
       payload,
       resource_id: feedId,
@@ -1595,7 +1595,7 @@ function findFeedListRows(
     skip: input.pagination.cursor ? 1 : 0,
     take: input.pagination.pageSize,
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       name: input.filters.search
         ? { contains: input.filters.search, mode: "insensitive" }
         : undefined,

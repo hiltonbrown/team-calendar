@@ -79,6 +79,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("canonical OAuth sessions", () => {
   test("selection uses canonical authorisation reference without session tokens", async () => {
     mocked.findFirst.mockResolvedValue({
+      account_id: "account",
       available_tenants_json: {
         tenants: [
           {
@@ -89,7 +90,6 @@ describe("canonical OAuth sessions", () => {
           },
         ],
       },
-      clerk_org_id: "account",
       created_by_user_id: "user",
       expires_at: new Date(Date.now() + 60_000),
       id: "session",
@@ -101,7 +101,7 @@ describe("canonical OAuth sessions", () => {
       { country_code: "AU", id: "payroll", name: "Payroll" },
     ]);
     const result = await getPendingXeroOAuthSession({
-      clerkOrgId: "account",
+      accountId: "account",
       sessionId: "session",
       userId: "user",
     });

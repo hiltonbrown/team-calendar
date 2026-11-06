@@ -35,10 +35,10 @@ vi.mock("@repo/database", async () => {
       return await companies;
     },
     scopedTo: (requestInput: {
-      clerkOrgId: string;
+      accountId: string;
       organisationId: string;
     }) => ({
-      clerk_org_id: requestInput.clerkOrgId,
+      account_id: requestInput.accountId,
       organisation_id: requestInput.organisationId,
     }),
   };
@@ -86,10 +86,9 @@ function person(
   manager_person_id: string | null
 ) {
   return {
+    account_id: "account-A",
     archived_at: null,
     avatar_url: null,
-    clerk_org_id: "account-A",
-    clerk_user_id: id === actorId ? "user-1" : null,
     email: null,
     employment_type: "full_time",
     first_name,
@@ -104,13 +103,14 @@ function person(
     person_type: "employee",
     team: null,
     team_id: null,
+    user_id: id === actorId ? "user-1" : null,
   };
 }
 const input = {
+  accountId: "account-A",
   actingPersonId: actorId,
   actingUserId: "user-1",
   anchorDate: new Date("2026-10-15T12:00:00Z"),
-  clerkOrgId: "account-A",
   filters: {},
   scope: { type: "all_teams" },
   view: "day",
@@ -127,7 +127,7 @@ beforeEach(() => {
         person(reportId, companyB, "Report", state.report ? actorId : null),
       ];
       const matching = (where: {
-        clerk_org_id: string;
+        account_id: string;
         organisation_id: string | { in: string[] };
       }) => {
         state.queries(where);
@@ -137,7 +137,7 @@ beforeEach(() => {
             : where.organisation_id.in;
         return people.filter(
           (row) =>
-            row.clerk_org_id === where.clerk_org_id &&
+            row.account_id === where.account_id &&
             ids.includes(row.organisation_id)
         );
       };
@@ -248,7 +248,7 @@ test("a manager sees their report across companies with manager privacy", async 
   );
 });
 test("range preparation reuses its caller's database client", async () => {
-  await withTenantDb(input.clerkOrgId, async (db) => {
+  await withTenantDb(input.accountId, async (db) => {
     await getCalendarRange({ ...input, role: "owner" }, db);
   });
   expect(state.transaction).toHaveBeenCalledOnce();

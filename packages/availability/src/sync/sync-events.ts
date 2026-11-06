@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Result } from "@repo/core";
+import { currentJobIdentityGeneration, type Result } from "@repo/core";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { Inngest } from "inngest";
 import { z } from "zod";
@@ -35,7 +35,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
   "people",
 ]);
 const SyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -50,7 +50,7 @@ const SyncEventSchema = z.object({
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
 });
 const CancelSyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
   runId: z.string().uuid(),
 });
@@ -99,9 +99,10 @@ export async function dispatchSyncEvent(
     const runId = parsed.data.runId ?? randomUUID();
     const sent = await inngest.send({
       data: {
-        clerkOrgId: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
-        organisationId: parsed.data.organisationId,
+        identity_generation: currentJobIdentityGeneration(),
+        organisation_id: parsed.data.organisationId,
         personId: parsed.data.personId,
         runId,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
@@ -147,7 +148,12 @@ export async function dispatchCancelSyncRun(
   }
   try {
     await inngest.send({
-      data: parsed.data,
+      data: {
+        account_id: parsed.data.accountId,
+        identity_generation: currentJobIdentityGeneration(),
+        organisation_id: parsed.data.organisationId,
+        runId: parsed.data.runId,
+      },
       name: "cancel-sync-run",
     });
     return { ok: true, value: { queued: true } };

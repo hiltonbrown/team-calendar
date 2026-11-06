@@ -52,7 +52,7 @@ const STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const DEFAULT_XERO_RETURN_TO = "/settings/integrations/xero";
 
 interface OAuthStatePayload {
-  clerkOrgId: string;
+  accountId: string;
   issuedAt: number;
   nonce: string;
   organisationId: string | null;
@@ -136,7 +136,7 @@ export function isLocalApplicationPath(value: string): boolean {
 }
 
 async function resolveOrganisationForTenantSelection(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: null | string;
   tenantName: string;
   tenantPayrollRegion: "AU" | "NZ" | "UK";
@@ -153,15 +153,15 @@ async function resolveOrganisationForTenantSelection(input: {
   }
 
   const { organisationId } = input;
-  const organisation = await withTenantDb(input.clerkOrgId, (db) =>
+  const organisation = await withTenantDb(input.accountId, (db) =>
     db.organisation.findFirst({
       select: {
         country_code: true,
         id: true,
       },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         id: organisationId,
       },
     })
@@ -183,7 +183,7 @@ async function resolveOrganisationForTenantSelection(input: {
       error: {
         code: "invalid_country",
         message:
-          "The selected Xero tenant does not match this Clerk organisation country.",
+          "The selected Xero tenant does not match this Account country.",
       },
       ok: false,
     };
@@ -373,7 +373,17 @@ function deriveStateSigningKey(clientSecret: string): Buffer {
 }
 
 function signState(payload: OAuthStatePayload, clientSecret: string): string {
-  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const encoded = Buffer.from(
+    JSON.stringify({
+      accountId: payload.accountId,
+      issuedAt: payload.issuedAt,
+      nonce: payload.nonce,
+      organisationId: payload.organisationId,
+      returnTo: payload.returnTo,
+      sessionId: payload.sessionId,
+      userId: payload.userId,
+    })
+  ).toString("base64url");
   const signingKey = deriveStateSigningKey(clientSecret);
   const signature = createHmac("sha256", signingKey)
     .update(encoded)
@@ -414,10 +424,17 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
   try {
     const payload = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8")
-    ) as Partial<OAuthStatePayload>;
+    ) as Partial<OAuthStatePayload & { clerkOrgId?: string }>;
+    let accountId: string | null = null;
+    const { accountId: rawAccountId, clerkOrgId } = payload;
+    if (typeof rawAccountId === "string" && rawAccountId) {
+      accountId = rawAccountId;
+    } else if (typeof clerkOrgId === "string" && clerkOrgId) {
+      accountId = clerkOrgId;
+    }
     if (
       typeof payload.sessionId !== "string" ||
-      typeof payload.clerkOrgId !== "string" ||
+      !accountId ||
       typeof payload.returnTo !== "string" ||
       typeof payload.nonce !== "string" ||
       (payload.organisationId !== null &&
@@ -437,7 +454,7 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
     return {
       ok: true,
       value: {
-        clerkOrgId: payload.clerkOrgId,
+        accountId,
         issuedAt: payload.issuedAt,
         nonce: payload.nonce,
         organisationId: payload.organisationId,
@@ -495,13 +512,13 @@ function constantTimeStringEqual(left: string, right: string): boolean {
   );
 }
 async function loadPendingSession(input: {
-  clerkOrgId: string;
+  accountId: string;
   sessionId: string;
   userId: string;
 }): Promise<Result<XeroOAuthSession, XeroOAuthError>> {
   const session = await systemDatabase.xeroOAuthSession.findFirst({
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       created_by_user_id: input.userId,
       expires_at: { gt: new Date() },
       id: input.sessionId,
@@ -519,7 +536,7 @@ async function loadPendingSession(input: {
       };
 }
 export async function getPendingXeroOAuthSession(input: {
-  clerkOrgId: string;
+  accountId: string;
   sessionId: string;
   userId: string;
 }): Promise<
@@ -546,7 +563,7 @@ export async function getPendingXeroOAuthSession(input: {
     return session;
   }
 
-  const organisations = await withTenantDb(input.clerkOrgId, (db) =>
+  const organisations = await withTenantDb(input.accountId, (db) =>
     db.organisation.findMany({
       orderBy: [{ created_at: "asc" }, { name: "asc" }],
       select: {
@@ -555,19 +572,19 @@ export async function getPendingXeroOAuthSession(input: {
         name: true,
       },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
       },
     })
   );
 
   const tenants = readAvailableTenants(session.value.available_tenants_json);
   const ownership = await listXeroTenantOwnership(
-    input.clerkOrgId,
+    input.accountId,
     tenants.map((tenant) => tenant.tenantId)
   );
-  const allowance = await withTenantDb(input.clerkOrgId, (tx) =>
-    checkPayrollEntityEntitlement(input.clerkOrgId, tx)
+  const allowance = await withTenantDb(input.accountId, (tx) =>
+    checkPayrollEntityEntitlement(input.accountId, tx)
   );
   if (!allowance.ok) {
     return {
@@ -614,7 +631,7 @@ export async function getPendingXeroOAuthSession(input: {
 }
 
 export async function buildXeroOAuthStartUrl(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId?: string | null;
   returnTo?: string;
   userId?: string | null;
@@ -628,7 +645,7 @@ export async function buildXeroOAuthStartUrl(input: {
   if (!(secret && clientId)) {
     return oauthNotConfigured();
   }
-  if (!(input.userId && input.clerkOrgId)) {
+  if (!(input.userId && input.accountId)) {
     return invalidState();
   }
   if (input.returnTo !== undefined && !isLocalApplicationPath(input.returnTo)) {
@@ -637,11 +654,11 @@ export async function buildXeroOAuthStartUrl(input: {
   const { organisationId } = input;
   if (
     organisationId &&
-    !(await withTenantDb(input.clerkOrgId, (db) =>
+    !(await withTenantDb(input.accountId, (db) =>
       db.organisation.findFirst({
         where: {
+          account_id: input.accountId,
           archived_at: null,
-          clerk_org_id: input.clerkOrgId,
           id: organisationId,
         },
       })
@@ -658,7 +675,7 @@ export async function buildXeroOAuthStartUrl(input: {
   const nonce = randomBytes(32).toString("base64url");
   const session = await systemDatabase.xeroOAuthSession.create({
     data: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       created_by_user_id: input.userId ?? null,
       expires_at: new Date(Date.now() + STATE_MAX_AGE_MS),
       nonce_hash: hashOAuthSessionToken(nonce),
@@ -670,7 +687,7 @@ export async function buildXeroOAuthStartUrl(input: {
   });
   const state = signState(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       issuedAt: Date.now(),
       nonce,
       organisationId: input.organisationId ?? null,
@@ -683,7 +700,7 @@ export async function buildXeroOAuthStartUrl(input: {
   await systemDatabase.xeroOAuthSession.updateMany({
     data: { state_hash: hashOAuthSessionToken(state) },
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       id: session.id,
       organisation_id: session.organisation_id,
     },
@@ -709,7 +726,7 @@ async function prepareOAuthTenantSelection(
   },
   signed: OAuthStatePayload,
   scope: {
-    clerk_org_id: string;
+    account_id: string;
     created_by_user_id: string | null;
     organisation_id: string | null;
     id: string;
@@ -775,7 +792,7 @@ async function prepareOAuthTenantSelection(
   const existing = signed.organisationId
     ? await tx.xeroConnection.findFirst({
         where: {
-          clerk_org_id: signed.clerkOrgId,
+          account_id: signed.accountId,
           organisation_id: signed.organisationId,
         },
       })
@@ -831,7 +848,7 @@ async function prepareOAuthTenantSelection(
 }
 
 export async function completeXeroOAuth(input: {
-  authenticatedClerkOrgId?: string | null;
+  authenticatedAccountId?: string | null;
   authenticatedUserId?: string | null;
   code: string;
   nonce: string | null;
@@ -855,17 +872,17 @@ export async function completeXeroOAuth(input: {
   if (
     !(
       input.nonce &&
-      input.authenticatedClerkOrgId &&
+      input.authenticatedAccountId &&
       input.authenticatedUserId &&
       constantTimeStringEqual(input.nonce, signed.nonce)
     ) ||
-    input.authenticatedClerkOrgId !== signed.clerkOrgId ||
+    input.authenticatedAccountId !== signed.accountId ||
     input.authenticatedUserId !== signed.userId
   ) {
     return invalidState();
   }
   const scope = {
-    clerk_org_id: signed.clerkOrgId,
+    account_id: signed.accountId,
     created_by_user_id: signed.userId,
     id: signed.sessionId,
     organisation_id: signed.organisationId,
@@ -953,7 +970,7 @@ export async function completeXeroOAuth(input: {
       signed.organisationId
     ) {
       const selected = await completeXeroTenantSelection({
-        clerkOrgId: signed.clerkOrgId,
+        accountId: signed.accountId,
         organisationId: signed.organisationId,
         sessionId: signed.sessionId,
         tenantId: onlyTenant.tenantId,
@@ -998,7 +1015,7 @@ export async function completeXeroOAuth(input: {
   }
 }
 export async function cancelXeroOAuth(input: {
-  authenticatedClerkOrgId?: string | null;
+  authenticatedAccountId?: string | null;
   authenticatedUserId?: string | null;
   nonce: string | null;
   state: string;
@@ -1012,11 +1029,11 @@ export async function cancelXeroOAuth(input: {
   if (
     !(
       input.nonce &&
-      input.authenticatedClerkOrgId &&
+      input.authenticatedAccountId &&
       input.authenticatedUserId &&
       constantTimeStringEqual(input.nonce, signed.nonce)
     ) ||
-    input.authenticatedClerkOrgId !== signed.clerkOrgId ||
+    input.authenticatedAccountId !== signed.accountId ||
     input.authenticatedUserId !== signed.userId
   ) {
     return invalidState();
@@ -1030,7 +1047,7 @@ export async function cancelXeroOAuth(input: {
       xero_authorisation_id: null,
     },
     where: {
-      clerk_org_id: signed.clerkOrgId,
+      account_id: signed.accountId,
       created_by_user_id: signed.userId,
       expires_at: { gt: new Date() },
       id: signed.sessionId,
@@ -1055,7 +1072,7 @@ export async function cancelXeroOAuth(input: {
 }
 async function closeOAuthSession(
   scope: {
-    clerk_org_id: string;
+    account_id: string;
     id: string;
     created_by_user_id: string | null;
     organisation_id: string | null;
@@ -1181,7 +1198,7 @@ function multiTenantSelectionFailureCode(
 }
 
 async function completeSingleXeroTenantSelection(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId?: string | null;
   sessionId: string;
   tenantId: string;
@@ -1309,7 +1326,7 @@ async function completeSingleXeroTenantSelection(input: {
   const targetOrganisationId =
     session.organisation_id ?? input.organisationId ?? null;
   const connectionSnapshot = targetOrganisationId
-    ? await withTenantDb(input.clerkOrgId, (db) =>
+    ? await withTenantDb(input.accountId, (db) =>
         db.xeroConnection.findFirst({
           select: {
             id: true,
@@ -1320,7 +1337,7 @@ async function completeSingleXeroTenantSelection(input: {
             xero_tenant_id: true,
           },
           where: {
-            clerk_org_id: input.clerkOrgId,
+            account_id: input.accountId,
             organisation_id: targetOrganisationId,
             released_at: null,
           },
@@ -1379,7 +1396,7 @@ async function completeSingleXeroTenantSelection(input: {
     };
   }
   const organisation = await resolveOrganisationForTenantSelection({
-    clerkOrgId: input.clerkOrgId,
+    accountId: input.accountId,
     organisationId: session.organisation_id ?? input.organisationId ?? null,
     tenantName: selected.tenantName,
     tenantPayrollRegion: region.value.payrollRegion,
@@ -1406,7 +1423,7 @@ async function completeSingleXeroTenantSelection(input: {
               : (connectionSnapshot?.xero_authorisation_id ?? null),
         },
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           created_by_user_id: input.userId,
           expires_at: { gt: new Date() },
           id: session.id,
@@ -1420,7 +1437,7 @@ async function completeSingleXeroTenantSelection(input: {
       }
       const ownership = await claimXeroTenant(
         tx,
-        { clerkOrgId: input.clerkOrgId },
+        { accountId: input.accountId },
         selected.tenantId
       );
       if (
@@ -1433,10 +1450,10 @@ async function completeSingleXeroTenantSelection(input: {
       const { id: scopedOrganisationId } = organisation.value;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-organisation:${scopedOrganisationId}`}, 0))::text`;
       const scope = {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: scopedOrganisationId,
       };
-      await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${scopedOrganisationId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM xero_connections WHERE account_id = ${input.accountId} AND organisation_id = ${scopedOrganisationId}::uuid FOR UPDATE`;
       const current = await tx.xeroConnection.findFirst({ where: scope });
       if (
         Boolean(current) !== Boolean(connectionSnapshot) ||
@@ -1587,7 +1604,7 @@ export interface XeroMultiTenantSelectionResult {
   returnTo: string;
 }
 interface SelectionScope {
-  clerkOrgId: string;
+  accountId: string;
   organisationId?: string | null;
   sessionId: string;
   userId: string;
@@ -1659,7 +1676,7 @@ async function completeMultiXeroTenantSelection(
   }
   const session = await systemDatabase.xeroOAuthSession.findFirst({
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       created_by_user_id: input.userId,
       expires_at: { gt: new Date() },
       id: input.sessionId,
@@ -1768,13 +1785,13 @@ async function completeMultiXeroTenantSelection(
     };
   };
   const ownershipSnapshots = await listXeroTenantOwnership(
-    input.clerkOrgId,
+    input.accountId,
     ids.data
   );
-  const connectionSnapshots = await withTenantDb(input.clerkOrgId, (db) =>
+  const connectionSnapshots = await withTenantDb(input.accountId, (db) =>
     db.xeroConnection.findMany({
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         OR: [
           { xero_tenant_id: { in: ids.data } },
           ...(session.organisation_id
@@ -1839,10 +1856,10 @@ async function completeMultiXeroTenantSelection(
         try {
           // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Ownership, quota, company creation and session progress are one atomic OAuth lifecycle transaction.
           outcome = await systemDatabase.$transaction(async (tx) => {
-            await tx.$queryRaw`SELECT id FROM xero_oauth_sessions WHERE id = ${session.id}::uuid AND clerk_org_id = ${input.clerkOrgId} FOR UPDATE`;
+            await tx.$queryRaw`SELECT id FROM xero_oauth_sessions WHERE id = ${session.id}::uuid AND account_id = ${input.accountId} FOR UPDATE`;
             const activeSession = await tx.xeroOAuthSession.findFirst({
               where: {
-                clerk_org_id: input.clerkOrgId,
+                account_id: input.accountId,
                 created_by_user_id: input.userId,
                 expires_at: { gt: new Date() },
                 id: session.id,
@@ -1861,7 +1878,7 @@ async function completeMultiXeroTenantSelection(
             }
             const ownership = await claimXeroTenant(
               tx,
-              { clerkOrgId: input.clerkOrgId },
+              { accountId: input.accountId },
               tenantId
             );
             if (ownership.status === "owned_elsewhere") {
@@ -1888,10 +1905,10 @@ async function completeMultiXeroTenantSelection(
               // Lock the original binding before any quota check or company creation.
               // Remove uses this row lock too, so its release must be observed here.
               await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-organisation:${tenantSnapshot.organisation_id}`}, 0))::text`;
-              await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${tenantSnapshot.id}::uuid AND clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${tenantSnapshot.organisation_id}::uuid FOR UPDATE`;
+              await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${tenantSnapshot.id}::uuid AND account_id = ${input.accountId} AND organisation_id = ${tenantSnapshot.organisation_id}::uuid FOR UPDATE`;
               const original = await tx.xeroConnection.findFirst({
                 where: {
-                  clerk_org_id: input.clerkOrgId,
+                  account_id: input.accountId,
                   id: tenantSnapshot.id,
                   organisation_id: tenantSnapshot.organisation_id,
                 },
@@ -1926,8 +1943,8 @@ async function completeMultiXeroTenantSelection(
             if (organisationId) {
               const organisation = await tx.organisation.findFirst({
                 where: {
+                  account_id: input.accountId,
                   archived_at: null,
-                  clerk_org_id: input.clerkOrgId,
                   id: organisationId,
                   is_active: true,
                 },
@@ -1937,7 +1954,7 @@ async function completeMultiXeroTenantSelection(
               }
             } else {
               const entitlement = await checkPayrollEntityEntitlement(
-                input.clerkOrgId,
+                input.accountId,
                 tx
               );
               if (!(entitlement.ok && entitlement.value.allowed)) {
@@ -1945,7 +1962,7 @@ async function completeMultiXeroTenantSelection(
               }
               const created = await createCompany(
                 {
-                  clerkOrgId: input.clerkOrgId,
+                  accountId: input.accountId,
                   countryCode: "AU",
                   name: selected.tenantName,
                   timezone: input.timezone,
@@ -1955,9 +1972,9 @@ async function completeMultiXeroTenantSelection(
               organisationId = created.id;
             }
             await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-organisation:${organisationId}`}, 0))::text`;
-            await tx.$queryRaw`SELECT id FROM xero_connections WHERE clerk_org_id = ${input.clerkOrgId} AND organisation_id = ${organisationId}::uuid FOR UPDATE`;
+            await tx.$queryRaw`SELECT id FROM xero_connections WHERE account_id = ${input.accountId} AND organisation_id = ${organisationId}::uuid FOR UPDATE`;
             const scope = {
-              clerk_org_id: input.clerkOrgId,
+              account_id: input.accountId,
               organisation_id: organisationId,
             };
             const current = await tx.xeroConnection.findFirst({ where: scope });
@@ -2083,10 +2100,10 @@ async function completeMultiXeroTenantSelection(
     outcomes.push(outcome);
   }
   const finalizedOutcomes = await systemDatabase.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM xero_oauth_sessions WHERE id = ${session.id}::uuid AND clerk_org_id = ${input.clerkOrgId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM xero_oauth_sessions WHERE id = ${session.id}::uuid AND account_id = ${input.accountId} FOR UPDATE`;
     const latest = await tx.xeroOAuthSession.findFirst({
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         created_by_user_id: input.userId,
         id: session.id,
       },
@@ -2122,10 +2139,10 @@ async function completeMultiXeroTenantSelection(
     [...obsoleteGrants, grantId].map(cleanupUnusedSelectionGrant)
   );
   if (outcomes.some((outcome) => outcome.ok)) {
-    const phaseInput1 = { clerkOrgId: input.clerkOrgId } satisfies Parameters<
+    const phaseInput1 = { accountId: input.accountId } satisfies Parameters<
       typeof invalidateAccountFeedCaches
     >[0];
-    await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+    await withTenantResult(phaseInput1.accountId, (db) =>
       invalidateAccountFeedCaches(phaseInput1, db)
     );
   }

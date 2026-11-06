@@ -110,11 +110,11 @@ import {
 } from "./disconnect";
 
 const input = {
-  clerkOrgId: "clerk-account",
+  accountId: "account-test",
   connectionId: "local-connection",
   destructive: false,
   organisationId: "local-payroll",
-  performedByUserId: "clerk-admin-b",
+  performedByUserId: "admin-b",
 };
 function makeGrant() {
   const access = encryptXeroToken("synthetic-access-secret");
@@ -166,8 +166,8 @@ beforeEach(() => {
   busy = false;
   auditEvents = [];
   connection = {
+    account_id: input.accountId,
     authorisation: grant,
-    clerk_org_id: input.clerkOrgId,
     id: input.connectionId,
     last_connected_at: new Date("2026-10-08T00:00:00Z"),
     organisation_id: input.organisationId,
@@ -179,7 +179,7 @@ beforeEach(() => {
   };
   mocks.scoped.mockImplementation((scope: typeof input) =>
     Promise.resolve(
-      scope.clerkOrgId === connection.clerk_org_id &&
+      scope.accountId === connection.account_id &&
         scope.organisationId === connection.organisation_id &&
         scope.connectionId === connection.id
         ? { ok: true, value: { ...connection, authorisation: { ...grant } } }
@@ -244,7 +244,7 @@ function expectNoBusinessDataPurge() {
 describe("disconnect all outcomes", () => {
   it("continues after a sibling disconnect fails", async () => {
     expect(
-      await disconnectAllXeroConnections({ clerkOrgId: input.clerkOrgId })
+      await disconnectAllXeroConnections({ accountId: input.accountId })
     ).toMatchObject({
       ok: true,
       value: {
@@ -280,7 +280,7 @@ describe("remote-first Xero disconnect", () => {
         url: "https://api.xero.com/connections/stored-remote%2Flink",
       });
       expect(connection).toMatchObject({
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         disconnected_at: expect.any(Date),
         disconnected_by_user_id: input.performedByUserId,
         id: input.connectionId,
@@ -294,15 +294,15 @@ describe("remote-first Xero disconnect", () => {
       expect(grantPresent).toBe(false);
       expect(auditEvents).toMatchObject([
         {
+          account_id: input.accountId,
           action: "xero.connection_disconnected_soft",
           actor_user_id: input.performedByUserId,
-          clerk_org_id: input.clerkOrgId,
           organisation_id: input.organisationId,
           resource_id: input.connectionId,
         },
       ]);
       expect(mocks.connectionUpdate.mock.calls[0]?.[0].where).toEqual({
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         id: input.connectionId,
         organisation_id: input.organisationId,
       });
@@ -310,7 +310,7 @@ describe("remote-first Xero disconnect", () => {
     }
   );
   it.each([
-    { clerkOrgId: "different-clerk" },
+    { accountId: "different-account" },
     { organisationId: "sibling-payroll" },
     { connectionId: "sibling-connection" },
   ])(
@@ -418,14 +418,34 @@ describe("remote-first Xero disconnect", () => {
 });
 
 describe("Remove company", () => {
-  it("refuses administrators before reading credentials", async () => {
-    expect(await removeXeroCompany({ ...input, role: "admin" })).toMatchObject({
-      error: { code: "forbidden" },
-      ok: false,
-    });
-    expect(mocks.scoped).not.toHaveBeenCalled();
-    expect(mocks.http).not.toHaveBeenCalled();
-  });
+  it.each(["admin", "manager", "viewer"] as const)(
+    "refuses %s before reading credentials",
+    async (role) => {
+      expect(await removeXeroCompany({ ...input, role })).toMatchObject({
+        error: { code: "forbidden" },
+        ok: false,
+      });
+      expect(mocks.scoped).not.toHaveBeenCalled();
+      expect(mocks.http).not.toHaveBeenCalled();
+    }
+  );
+  it.each([undefined, "unexpected"])(
+    "refuses unrecognised role %s before reading credentials",
+    async (role) => {
+      expect(
+        await disconnectXeroOAuthConnection({
+          ...input,
+          removeCompany: true,
+          role,
+        })
+      ).toMatchObject({
+        error: { code: "forbidden" },
+        ok: false,
+      });
+      expect(mocks.scoped).not.toHaveBeenCalled();
+      expect(mocks.http).not.toHaveBeenCalled();
+    }
+  );
   it.each([403, 500])(
     "keeps ownership and company state when DELETE is uncertain %s",
     async (status) => {

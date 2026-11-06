@@ -1,6 +1,8 @@
 "use server";
-import { requireRole } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+
+import { hasPermission } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import {
   afterTenantCommit,
@@ -78,9 +80,25 @@ export async function connectXeroAction(input: {
     return context;
   }
   const env = coreKeys();
-  const baseUrl = env.NEXT_PUBLIC_API_URL ?? env.NEXT_PUBLIC_APP_URL;
+  const appOrigin = env.NEXT_PUBLIC_APP_URL
+    ? new URL(env.NEXT_PUBLIC_APP_URL)
+    : null;
+  const apiOrigin = env.NEXT_PUBLIC_API_URL
+    ? new URL(env.NEXT_PUBLIC_API_URL)
+    : null;
+  const unrelatedPreview =
+    appOrigin?.protocol === "https:" &&
+    apiOrigin &&
+    appOrigin.hostname !== apiOrigin.hostname &&
+    !(
+      appOrigin.origin === "https://app.teamcalendar.online" &&
+      apiOrigin.origin === "https://api.teamcalendar.online"
+    );
+  const baseUrl = unrelatedPreview
+    ? env.NEXT_PUBLIC_APP_URL
+    : (env.NEXT_PUBLIC_API_URL ?? env.NEXT_PUBLIC_APP_URL);
   const redirectUrl = new URL("/api/xero/oauth/start", baseUrl);
-  redirectUrl.searchParams.set("clerkOrgId", context.value.clerkOrgId);
+  redirectUrl.searchParams.set("accountId", context.value.accountId);
   if (parsed.data.organisationId) {
     redirectUrl.searchParams.set("organisationId", parsed.data.organisationId);
   }
@@ -112,12 +130,12 @@ export async function disconnectXeroAction(input: {
     return context;
   }
   const prepared = await withTenantResult(
-    context.value.clerkOrgId,
+    context.value.accountId,
     async (client): Promise<ActionResult<void>> => {
       const organisation = await client.organisation.findFirst({
         select: { name: true },
         where: {
-          clerk_org_id: context.value.clerkOrgId,
+          account_id: context.value.accountId,
           id: context.value.organisationId,
         },
       });
@@ -129,7 +147,7 @@ export async function disconnectXeroAction(input: {
       const connection = await client.xeroConnection.findFirst({
         select: { id: true },
         where: {
-          clerk_org_id: context.value.clerkOrgId,
+          account_id: context.value.accountId,
           id: parsed.data.connectionId,
           organisation_id: context.value.organisationId,
         },
@@ -147,7 +165,7 @@ export async function disconnectXeroAction(input: {
   }
   return await (async () => {
     const result = await disconnectXeroOAuthConnection({
-      clerkOrgId: context.value.clerkOrgId,
+      accountId: context.value.accountId,
       connectionId: parsed.data.connectionId,
       destructive: false,
       organisationId: context.value.organisationId,
@@ -215,12 +233,12 @@ async function updateTenantPauseState(
     return context;
   }
   return withTenantResult(
-    context.value.clerkOrgId,
+    context.value.accountId,
     async (db): Promise<ActionResult<{ paused: true }>> => {
       const company = await db.organisation.findFirst({
         select: { id: true },
         where: {
-          clerk_org_id: context.value.clerkOrgId,
+          account_id: context.value.accountId,
           id: context.value.organisationId,
         },
       });
@@ -230,7 +248,7 @@ async function updateTenantPauseState(
       const updated = await db.xeroConnection.updateMany({
         data: { sync_paused_at: paused ? new Date() : null },
         where: {
-          clerk_org_id: context.value.clerkOrgId,
+          account_id: context.value.accountId,
           id: parsed.data.connectionId,
           organisation_id: context.value.organisationId,
         },
@@ -265,28 +283,41 @@ async function updateTenantPauseState(
 
 async function canManageXero(): Promise<boolean> {
   const [admin, owner] = await Promise.all([
-    requireRole("org:admin"),
-    requireRole("org:owner"),
+    hasPermission({ xero: ["manage"] }),
+    hasPermission({ xero: ["removeCompany"] }),
   ]);
   return admin || owner;
 }
 async function resolveAccountContext(): Promise<
   ActionResult<{
-    clerkOrgId: string;
+    accountId: string;
     actingUserId: string;
     organisationId: null;
   }>
 > {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (
-    !(orgId && user) ||
-    (orgRole !== "org:admin" && orgRole !== "org:owner")
-  ) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user && can(sessionRole, { xero: ["manage"] }))) {
     return notAuthorised();
   }
   return {
     ok: true,
-    value: { actingUserId: user.id, clerkOrgId: orgId, organisationId: null },
+    value: {
+      accountId: sessionAccountId,
+      actingUserId: user.id,
+      organisationId: null,
+    },
   };
 }
 export async function removeCompanyAction(input: {
@@ -295,7 +326,7 @@ export async function removeCompanyAction(input: {
   confirmationText: string;
 }): Promise<ActionResult<{ removed: true }>> {
   assertNoTenantTransaction("removeCompanyAction");
-  if (!(await requireRole("org:owner"))) {
+  if (!(await hasPermission({ xero: ["removeCompany"] }))) {
     return notAuthorised();
   }
   const parsed = DisconnectSchema.omit({ mode: true }).safeParse(input);
@@ -306,12 +337,12 @@ export async function removeCompanyAction(input: {
   if (!context.ok) {
     return context;
   }
-  const company = await withTenantDb(context.value.clerkOrgId, (db) =>
+  const company = await withTenantDb(context.value.accountId, (db) =>
     db.organisation.findFirst({
       select: { name: true },
       where: {
+        account_id: context.value.accountId,
         archived_at: null,
-        clerk_org_id: context.value.clerkOrgId,
         id: context.value.organisationId,
       },
     })
@@ -320,7 +351,7 @@ export async function removeCompanyAction(input: {
     return validationError("Type the company name to confirm removal.");
   }
   const result = await removeXeroCompany({
-    clerkOrgId: context.value.clerkOrgId,
+    accountId: context.value.accountId,
     connectionId: parsed.data.connectionId,
     organisationId: context.value.organisationId,
     performedByUserId: context.value.actingUserId,
@@ -344,22 +375,34 @@ async function resolveAdminIdentity(
   ActionResult<{
     actingUserId: string;
     actorDisplay: string;
-    clerkOrgId: string;
+    accountId: string;
     ipAddress: null | string;
     organisationId: string;
     userAgent: null | string;
   }>
 > {
-  const [{ orgId, orgRole }, user, requestHeaders] = await Promise.all([
-    auth(),
-    currentUser(),
+  const [
+    { accountId: sessionAccountId, role: sessionRole },
+    user,
+    requestHeaders,
+  ] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
     headers(),
   ]);
   if (
     !(
-      (orgRole === "org:owner" || (!ownerOnly && orgRole === "org:admin")) &&
+      (sessionRole === "owner" || (!ownerOnly && sessionRole === "admin")) &&
       user &&
-      orgId
+      sessionAccountId
     )
   ) {
     return notAuthorised();
@@ -367,12 +410,9 @@ async function resolveAdminIdentity(
   return {
     ok: true,
     value: {
+      accountId: sessionAccountId,
       actingUserId: user.id,
-      actorDisplay:
-        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-        user.emailAddresses[0]?.emailAddress ||
-        "Unknown user",
-      clerkOrgId: orgId,
+      actorDisplay: user.name || user.email || "Unknown user",
       ipAddress: requestHeaders.get("x-forwarded-for"),
       organisationId,
       userAgent: requestHeaders.get("user-agent"),
@@ -387,10 +427,10 @@ async function resolveAdminContext(
   if (!identity.ok) {
     return identity;
   }
-  const company = await withTenantDb(identity.value.clerkOrgId, (db) =>
+  const company = await withTenantDb(identity.value.accountId, (db) =>
     db.organisation.findFirst({
       select: { id: true },
-      where: { clerk_org_id: identity.value.clerkOrgId, id: organisationId },
+      where: { account_id: identity.value.accountId, id: organisationId },
     })
   );
   return company ? identity : notAuthorised();
@@ -399,15 +439,15 @@ async function resolveAdminContext(
 function auditBase(input: {
   actingUserId: string;
   actorDisplay: string;
-  clerkOrgId: string;
+  accountId: string;
   ipAddress: null | string;
   organisationId: string;
   userAgent: null | string;
 }) {
   return {
+    account_id: input.accountId,
     actor_display: input.actorDisplay,
     actor_user_id: input.actingUserId,
-    clerk_org_id: input.clerkOrgId,
     ip_address: input.ipAddress,
     organisation_id: input.organisationId,
     user_agent: input.userAgent,

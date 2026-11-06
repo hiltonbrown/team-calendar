@@ -88,10 +88,10 @@ export async function GET(
         return;
       }
       const event = createActivationEvent({
-        deduplicationKey: `${activation.clerkOrgId}:${activation.organisationId}`,
+        deduplicationKey: `${activation.accountId}:${activation.organisationId}`,
         name: "First Feed Accessed",
         occurredAt: activation.occurredAt,
-        subjectId: activation.clerkOrgId,
+        subjectId: activation.accountId,
       });
       analytics?.capture({
         distinctId: event.distinctId,

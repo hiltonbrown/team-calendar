@@ -1,6 +1,9 @@
 "use server";
 
-import { auth, clerkClient } from "@repo/auth/server";
+import { updateAccount } from "@repo/auth/accounts";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getSession } from "@repo/auth/server";
 import { withTenantResult } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { revalidatePath } from "next/cache";
@@ -24,12 +27,18 @@ export const updateOrg = async (
   input: UpdateOrgInput
 ): Promise<Result<void>> => {
   assertNoTenantTransaction("updateOrg");
-  const { orgId, orgRole } = await auth();
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
 
-  if (!orgId) {
+  if (!sessionAccountId) {
     return { error: "No active organisation", ok: false };
   }
-  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+  if (!can(sessionRole, { settings: ["update"] })) {
     return {
       error: "You do not have permission to update organisation settings",
       ok: false,
@@ -56,11 +65,11 @@ export const updateOrg = async (
 
   try {
     const result = await withTenantResult(
-      orgId,
+      sessionAccountId,
       async (db): Promise<Result<void>> => {
         const company = await db.organisation.findFirst({
           select: { id: true },
-          where: { clerk_org_id: orgId, id: organisationId },
+          where: { account_id: sessionAccountId, id: organisationId },
         });
         if (!company) {
           return { error: "Organisation not found", ok: false };
@@ -74,7 +83,7 @@ export const updateOrg = async (
             timezone,
             working_hours_per_day: workingHoursPerDay,
           },
-          where: { clerk_org_id: orgId, id: organisationId },
+          where: { account_id: sessionAccountId, id: organisationId },
         });
         return updated.count === 1
           ? { ok: true, value: undefined }
@@ -85,8 +94,7 @@ export const updateOrg = async (
       return result;
     }
 
-    const clerk = await clerkClient();
-    await clerk.organizations.updateOrganization(orgId, {
+    await updateAccount(sessionAccountId, {
       name,
       publicMetadata: {
         fiscalYearStart,

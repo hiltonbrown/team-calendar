@@ -1,17 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  currentUser: vi.fn(),
+  getRequestAuthContext: vi.fn(),
   logError: vi.fn(),
   logWarn: vi.fn(),
   organisationFindFirst: vi.fn(),
   pollNotificationStream: vi.fn(),
-  requireOrg: vi.fn(),
 }));
 
-vi.mock("@repo/auth/helpers", () => ({
-  currentUser: mocks.currentUser,
-  requireOrg: mocks.requireOrg,
+vi.mock("@repo/auth/transport", () => ({
+  getRequestAuthContext: mocks.getRequestAuthContext,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -55,8 +53,14 @@ describe("notifications stream route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
-    mocks.requireOrg.mockResolvedValue("org_1");
+    mocks.getRequestAuthContext.mockResolvedValue({
+      context: {
+        expiresAt: null,
+        session: { accountId: "org_1", role: "owner", userId: "user_1" },
+        user: { emailVerified: true, id: "user_1" },
+      },
+      responseHeaders: new Headers(),
+    });
     mocks.organisationFindFirst.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000001",
     });
@@ -78,7 +82,10 @@ describe("notifications stream route", () => {
   });
 
   it("rejects missing authenticated account context", async () => {
-    mocks.requireOrg.mockRejectedValue(new Error("Not authenticated"));
+    mocks.getRequestAuthContext.mockResolvedValue({
+      context: null,
+      responseHeaders: new Headers(),
+    });
 
     const response = await GET(
       new Request(
@@ -92,13 +99,13 @@ describe("notifications stream route", () => {
   it("uses the authenticated account rather than account or company query parameters", async () => {
     const response = await GET(
       new Request(
-        "http://api.test/api/notifications/stream?clerkOrgId=foreign-account&organisationId=foreign-company"
+        "http://api.test/api/notifications/stream?accountId=foreign-account&organisationId=foreign-company"
       )
     );
     expect(response.status).toBe(200);
     await response.body?.cancel();
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
-      { clerkOrgId: "org_1", userId: "user_1" },
+      { accountId: "org_1", userId: "user_1" },
       expect.any(String)
     );
     expect(mocks.organisationFindFirst).not.toHaveBeenCalled();
@@ -159,6 +166,87 @@ describe("notifications stream route", () => {
     await response.body?.cancel();
   });
 
+  it("re-checks the session remotely at most once every 30 seconds while polling", async () => {
+    vi.useFakeTimers();
+    const response = await GET(
+      new Request("http://api.test/api/notifications/stream")
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(mocks.getRequestAuthContext).toHaveBeenCalledTimes(3);
+    expect(mocks.pollNotificationStream.mock.calls.length).toBeGreaterThan(25);
+    await response.body?.cancel();
+  });
+
+  it.each(["revoked", "account switched", "role changed"])(
+    "closes within 30 seconds, before reading more notifications, when the session is %s",
+    async (change) => {
+      vi.useFakeTimers();
+      const response = await GET(
+        new Request("http://api.test/api/notifications/stream")
+      );
+      const reader = response.body?.getReader();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
+      const context =
+        change === "revoked"
+          ? null
+          : {
+              expiresAt: null,
+              session: {
+                accountId:
+                  change === "account switched" ? "other-account" : "org_1",
+                role: change === "role changed" ? "viewer" : "owner",
+                userId: "user_1",
+              },
+              user: { emailVerified: true, id: "user_1" },
+            };
+      mocks.getRequestAuthContext.mockResolvedValue({
+        context,
+        responseHeaders: new Headers(),
+      });
+      await vi.advanceTimersByTimeAsync(29_000);
+      const polled = mocks.pollNotificationStream.mock.calls.length;
+      expect(polled).toBeGreaterThan(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(polled);
+      let next = await reader?.read();
+      while (!next?.done) {
+        next = await reader?.read();
+      }
+      expect(next).toEqual({ done: true, value: undefined });
+    }
+  );
+
+  it("closes at the original session expiry even if a later lookup might renew it", async () => {
+    vi.useFakeTimers();
+    mocks.getRequestAuthContext.mockResolvedValue({
+      context: {
+        expiresAt: new Date(Date.now() + 1500).toISOString(),
+        session: { accountId: "org_1", role: "owner", userId: "user_1" },
+        user: { emailVerified: true, id: "user_1" },
+      },
+      responseHeaders: new Headers(),
+    });
+    const response = await GET(
+      new Request("http://api.test/api/notifications/stream")
+    );
+    const reader = response.body?.getReader();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
+    await reader?.read();
+    expect(await reader?.read()).toEqual({ done: true, value: undefined });
+  });
+
+  it("propagates resolver outages instead of returning a signed-out response", async () => {
+    const error = new Error("Auth resolver unavailable");
+    mocks.getRequestAuthContext.mockRejectedValue(error);
+    await expect(
+      GET(new Request("http://api.test/api/notifications/stream"))
+    ).rejects.toBe(error);
+  });
+
   it("stops polling and clears timers when the stream is cancelled", async () => {
     vi.useFakeTimers();
 
@@ -195,7 +283,7 @@ describe("notifications stream route", () => {
     expect(mocks.logWarn).toHaveBeenCalledWith(
       "Notification stream poll failed",
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         consecutiveFailures: 1,
         userId: "user_1",
       })
@@ -214,7 +302,7 @@ describe("notifications stream route", () => {
     expect(mocks.logError).toHaveBeenCalledWith(
       "Notification stream closing after consecutive poll failures",
       expect.objectContaining({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         consecutiveFailures: 3,
         userId: "user_1",
       })
@@ -372,7 +460,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         userId: "user_1",
       },
       "1724500000000-5"
@@ -394,7 +482,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mocks.pollNotificationStream).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         userId: "user_1",
       },
       expect.stringMatching(WALL_CLOCK_FALLBACK_PATTERN)
@@ -453,7 +541,7 @@ describe("notifications stream route", () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(mocks.pollNotificationStream).toHaveBeenLastCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         userId: "user_1",
       },
       "1724500000000-2"

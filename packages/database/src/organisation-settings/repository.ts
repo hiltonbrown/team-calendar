@@ -1,9 +1,9 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 export interface OrganisationSettingsRow {
-  clerk_org_id: string;
+  account_id: string;
   created_at: Date;
   default_feed_privacy_mode: "masked" | "named" | "private";
   default_leave_request_advance_days: number;
@@ -30,7 +30,7 @@ export interface OrganisationSettingsUpdateInput {
 }
 
 const organisationSettingsSelect = {
-  clerk_org_id: true,
+  account_id: true,
   created_at: true,
   default_feed_privacy_mode: true,
   default_leave_request_advance_days: true,
@@ -47,18 +47,18 @@ const organisationSettingsSelect = {
 
 export async function getOrCreateForOrganisation(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: OrganisationId;
   },
   db: TenantDb
 ): Promise<OrganisationSettingsRow> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const existing = await client.organisationSettings.findFirst({
       select: organisationSettingsSelect,
-      where: scopedQuery(input.clerkOrgId, input.organisationId),
+      where: scopedQuery(input.accountId, input.organisationId),
     });
     if (existing) {
       return existing;
@@ -68,40 +68,40 @@ export async function getOrCreateForOrganisation(
     // when another request wins the organisation's unique settings row.
     await client.organisationSettings.createMany({
       data: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
       },
       skipDuplicates: true,
     });
     return await client.organisationSettings.findFirstOrThrow({
       select: organisationSettingsSelect,
-      where: scopedQuery(input.clerkOrgId, input.organisationId),
+      where: scopedQuery(input.accountId, input.organisationId),
     });
   }
 }
 
 export async function updateForOrganisation(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: OrganisationId;
     patch: OrganisationSettingsUpdateInput;
   },
   db: TenantDb
 ): Promise<OrganisationSettingsRow> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     await getOrCreateForOrganisation(input, client);
 
     await client.organisationSettings.updateMany({
       data: input.patch,
-      where: scopedQuery(input.clerkOrgId, input.organisationId),
+      where: scopedQuery(input.accountId, input.organisationId),
     });
 
     return await client.organisationSettings.findFirstOrThrow({
       select: organisationSettingsSelect,
-      where: scopedQuery(input.clerkOrgId, input.organisationId),
+      where: scopedQuery(input.accountId, input.organisationId),
     });
   }
 }

@@ -51,7 +51,7 @@ vi.mock("@repo/database", async () => {
 const { resolveXeroEmployeeId } = await import("./resolve-employee");
 const xeroConnection = {
   accessToken: "access-token",
-  clerk_org_id: "org_1",
+  account_id: "org_1",
   deadline: { expiresAtMs: Date.now() + 120_000 },
   id: "tenant_1",
   organisation_id: "00000000-0000-4000-8000-000000000001",
@@ -85,7 +85,7 @@ describe("resolveXeroEmployeeId", () => {
     expect(mocks.personFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           organisation_id: xeroConnection.organisation_id,
         }),
       })

@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   availabilityFindMany: vi.fn(),
   personFindFirst: vi.fn(),
   personFindMany: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
 }));
@@ -47,7 +47,6 @@ const { analyticsRecordSelect } = await import("./analytics-record-select");
 
 const person = {
   archived_at: null,
-  clerk_user_id: "user_1",
   employment_type: "employee",
   first_name: "Priya",
   id: "00000000-0000-4000-8000-000000000013",
@@ -66,6 +65,7 @@ const person = {
     name: "Operations",
   },
   team_id: "00000000-0000-4000-8000-000000000101",
+  user_id: "user_1",
 };
 
 const record = {
@@ -108,8 +108,8 @@ describe("out of office service", () => {
     it("aggregates approved manual records only with fixed maths", async () => {
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           dateRange: {
             end: new Date("2026-05-09T00:00:00.000Z"),
             label: "May",
@@ -122,8 +122,8 @@ describe("out of office service", () => {
         (db) =>
           aggregateOutOfOffice(
             {
+              accountId: "org_1",
               actingUserId: "user_1",
-              clerkOrgId: "org_1",
               dateRange: {
                 end: new Date("2026-05-09T00:00:00.000Z"),
                 label: "May",
@@ -174,9 +174,9 @@ describe("out of office service", () => {
       expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
+            account_id: "org_1",
             approval_status: "approved",
             archived_at: null,
-            clerk_org_id: "org_1",
             organisation_id: "00000000-0000-4000-8000-000000000001",
             source_type: "manual",
           }),
@@ -187,8 +187,8 @@ describe("out of office service", () => {
     it("issues aggregate query with select rather than include and omits audit columns", async () => {
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           dateRange: {
             end: new Date("2026-05-09T00:00:00.000Z"),
             label: "May",
@@ -201,8 +201,8 @@ describe("out of office service", () => {
         (db) =>
           aggregateOutOfOffice(
             {
+              accountId: "org_1",
               actingUserId: "user_1",
-              clerkOrgId: "org_1",
               dateRange: {
                 end: new Date("2026-05-09T00:00:00.000Z"),
                 label: "May",
@@ -230,8 +230,8 @@ describe("out of office service", () => {
     it("issues drilldown query with take and the same projection omitting audit columns", async () => {
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           dateRange: {
             end: new Date("2026-05-09T00:00:00.000Z"),
             label: "May",
@@ -245,8 +245,8 @@ describe("out of office service", () => {
         (db) =>
           listOutOfOfficeRecordsForDrilldown(
             {
+              accountId: "org_1",
               actingUserId: "user_1",
-              clerkOrgId: "org_1",
               dateRange: {
                 end: new Date("2026-05-09T00:00:00.000Z"),
                 label: "May",

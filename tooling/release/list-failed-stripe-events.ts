@@ -6,7 +6,7 @@ if (failures.length === 0) {
 } else {
   for (const failure of failures) {
     process.stdout.write(
-      `${failure.eventId}\t${failure.errorCategory}\t${failure.clerkOrgId ?? "unmatched"}\t${failure.lastAttemptedAt.toISOString()}\n`
+      `${failure.eventId}\t${failure.errorCategory}\t${failure.accountId ?? "unmatched"}\t${failure.lastAttemptedAt.toISOString()}\n`
     );
   }
 }

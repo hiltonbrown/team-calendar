@@ -22,7 +22,7 @@ export const appError = (code: AppErrorCode, message: string): AppError => ({
 
 export type Brand<T, TBrand extends string> = T & { readonly __brand: TBrand };
 
-export type ClerkOrgId = Brand<string, "ClerkOrgId">;
+export type AccountId = Brand<string, "AccountId">;
 export type OrganisationId = Brand<string, "OrganisationId">;
 export type PersonId = Brand<string, "PersonId">;
 export type AvailabilityRecordId = Brand<string, "AvailabilityRecordId">;
@@ -90,6 +90,10 @@ export {
   recordQueryWindow,
   zonedStartOfDay,
 } from "./src/date-keys";
+export {
+  currentJobIdentityGeneration,
+  DEFAULT_JOB_IDENTITY_GENERATION,
+} from "./src/job-generation";
 export type {
   ApproveLeaveInput,
   DeclineLeaveInput,

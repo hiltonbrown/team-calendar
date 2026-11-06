@@ -55,33 +55,33 @@ vi.mock("@repo/database", async () => ({
   >("../../../../../packages/database/src/queries/organisations")),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_1"),
+  requireAccount: () => Promise.resolve("org_1"),
 }));
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
   getOwnFeedEligibility: vi.fn(),
+  getSession: vi.fn(),
   listFeeds: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/feeds", () => ({
   getOwnFeedEligibility: mocks.getOwnFeedEligibility,
   listFeeds: mocks.listFeeds,
   normaliseRole: (role: string | null) => role,
 }));
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -145,10 +145,10 @@ async function renderPage() {
 
 describe("FeedPage", () => {
   beforeEach(() => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
+    mocks.getSession.mockResolvedValue({ role: "viewer" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
       orgQueryValue: organisationId,
     });
@@ -179,7 +179,7 @@ describe("FeedPage", () => {
   });
 
   it("gives admins a link to manage all feeds", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     await renderPage();
     expect(
       screen.getByRole("link", { name: MANAGE_ALL }).getAttribute("href")

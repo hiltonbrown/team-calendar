@@ -38,7 +38,7 @@ describe("checkSupportRateLimit", () => {
     setSupportRateLimiterClientForTests({ eval: evalCall });
 
     const result = await checkSupportRateLimit({
-      clerkOrgId: "org_clerk_123",
+      accountId: "org_account_123",
       userId: "user_123",
     });
 
@@ -47,7 +47,7 @@ describe("checkSupportRateLimit", () => {
       expect.any(String),
       [
         `ratelimit:support:user:${hashSupportRateLimitIdentifier("user_123")}`,
-        `ratelimit:support:organisation:${hashSupportRateLimitIdentifier("org_clerk_123")}`,
+        `ratelimit:support:organisation:${hashSupportRateLimitIdentifier("org_account_123")}`,
       ],
       [
         SUPPORT_RATE_LIMITS.USER.windowSeconds,
@@ -57,7 +57,7 @@ describe("checkSupportRateLimit", () => {
 
     const keys = evalCall.mock.calls[0]?.[1] as string[];
     expect(keys.join(":")).not.toContain("user_123");
-    expect(keys.join(":")).not.toContain("org_clerk_123");
+    expect(keys.join(":")).not.toContain("org_account_123");
   });
 
   it("rejects the sixth user attempt for the remaining user window", async () => {
@@ -67,7 +67,7 @@ describe("checkSupportRateLimit", () => {
 
     await expect(
       checkSupportRateLimit({
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         userId: "user_123",
       })
     ).resolves.toEqual({ allowed: false, retryAfter: 75 });
@@ -80,7 +80,7 @@ describe("checkSupportRateLimit", () => {
 
     await expect(
       checkSupportRateLimit({
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         userId: "user_123",
       })
     ).resolves.toEqual({ allowed: false, retryAfter: 900 });
@@ -93,7 +93,7 @@ describe("checkSupportRateLimit", () => {
 
     await expect(
       checkSupportRateLimit({
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         userId: "user_123",
       })
     ).resolves.toEqual({ allowed: false, retryAfter: 800 });
@@ -101,12 +101,12 @@ describe("checkSupportRateLimit", () => {
 
   it("fails open with safe warning metadata when Redis is unavailable", async () => {
     setSupportRateLimiterClientForTests({
-      eval: () => Promise.reject(new Error("org_clerk_123 user_123")),
+      eval: () => Promise.reject(new Error("org_account_123 user_123")),
     });
 
     await expect(
       checkSupportRateLimit({
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         userId: "user_123",
       })
     ).resolves.toEqual({ allowed: true });
@@ -115,7 +115,7 @@ describe("checkSupportRateLimit", () => {
       { errorType: "Error" }
     );
     expect(JSON.stringify(mocks.logWarn.mock.calls)).not.toContain(
-      "org_clerk_123"
+      "org_account_123"
     );
     expect(JSON.stringify(mocks.logWarn.mock.calls)).not.toContain("user_123");
   });

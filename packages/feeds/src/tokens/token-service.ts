@@ -1,3 +1,4 @@
+import { type AuthRole, hasPermission } from "@repo/auth/permissions";
 import "server-only";
 
 import {
@@ -19,12 +20,7 @@ import { invalidateFeedCache } from "../cache/feed-cache";
 import { isFeedOwner } from "../scope/feed-ownership";
 import { scopedFeed } from "../scope/scoped-feed";
 
-export type FeedActorRole =
-  | "admin"
-  | "manager"
-  | "owner"
-  | "viewer"
-  | `org:${string}`;
+export type FeedActorRole = AuthRole;
 
 export type TokenServiceError =
   | { code: "active_token_conflict"; message: string }
@@ -58,20 +54,20 @@ export interface ActiveTokenHint {
 }
 
 const BaseTokenInputSchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid().nullable(),
 });
 
 const InitialTokenInputSchema = BaseTokenInputSchema;
 const RotateTokenInputSchema = BaseTokenInputSchema.extend({
-  actingRole: z.string().min(1),
+  actingRole: z.enum(["owner", "admin", "manager", "viewer"]),
 });
 const RevokeTokenInputSchema = z.object({
-  actingRole: z.string().min(1),
+  accountId: z.string().min(1),
+  actingRole: z.enum(["owner", "admin", "manager", "viewer"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid().nullable(),
   tokenId: z.string().uuid(),
 });
@@ -150,7 +146,7 @@ export async function createInitialTokenWithClient(
   tx: TenantDb,
   input: InitialTokenInput
 ): Promise<Result<TokenDisclosure, TokenServiceError>> {
-  assertTenantDb(tx, input.clerkOrgId);
+  assertTenantDb(tx, input.accountId);
   const feed = await tx.feed.findFirst({
     select: { id: true, organisation_id: true },
     where: scopedFeed(input),
@@ -162,7 +158,7 @@ export async function createInitialTokenWithClient(
   const existing = await tx.feedToken.findFirst({
     select: { id: true },
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       feed_id: input.feedId,
       organisation_id: input.organisationId,
     },
@@ -182,7 +178,7 @@ export async function createInitialTokenWithClient(
   const plaintext = createSignedFeedToken({ tokenHash, tokenId });
   const hint = plaintext.slice(-4);
   const token = await insertActiveToken(tx, {
-    clerkOrgId: input.clerkOrgId,
+    accountId: input.accountId,
     feedId: input.feedId,
     hint,
     organisationId: feed.organisation_id,
@@ -218,7 +214,7 @@ export async function issueToken(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   if (!isAdminOrOwner(parsed.data.actingRole)) {
     return notAuthorised();
   }
@@ -241,7 +237,7 @@ export async function issueToken(
       const plaintext = createSignedFeedToken({ tokenHash, tokenId });
       const hint = plaintext.slice(-4);
       const token = await insertActiveToken(tx, {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         feedId: parsed.data.feedId,
         hint,
         organisationId: feed.organisation_id,
@@ -261,7 +257,7 @@ export async function issueToken(
       return { ok: true, value: { hint, plaintext, tokenId: token.id } };
     })(tenantDb4);
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -278,7 +274,7 @@ export async function rotateToken(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb2: TenantDb): ReturnType<typeof rotateToken> => {
     const isAdmin = isAdminOrOwner(parsed.data.actingRole);
 
@@ -322,7 +318,7 @@ export async function rotateToken(
         orderBy: { created_at: "desc" },
         select: { id: true },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           feed_id: parsed.data.feedId,
           ...(parsed.data.organisationId === null
             ? { organisation_id: null }
@@ -349,7 +345,7 @@ export async function rotateToken(
       await tx.feedToken.updateMany({
         data: { revoked_at: new Date(), status: "revoked" },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           feed_id: parsed.data.feedId,
           ...(parsed.data.organisationId === null
             ? { organisation_id: null }
@@ -368,7 +364,7 @@ export async function rotateToken(
       const plaintext = createSignedFeedToken({ tokenHash, tokenId });
       const hint = plaintext.slice(-4);
       const token = await insertActiveToken(tx, {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         feedId: parsed.data.feedId,
         hint,
         organisationId: feed.organisation_id,
@@ -410,7 +406,7 @@ export async function rotateToken(
   };
   try {
     return await (async () => {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -430,7 +426,7 @@ async function lockFeedForTokenChange(
   await tx.$queryRaw`
     SELECT "id" FROM "feeds"
     WHERE "id" = ${input.feedId}::uuid
-      AND "clerk_org_id" = ${input.clerkOrgId}
+      AND "account_id" = ${input.accountId}
       AND ("organisation_id" IS NOT DISTINCT FROM ${input.organisationId}::uuid OR "organisation_id" IS NULL)
     FOR UPDATE
   `;
@@ -439,7 +435,7 @@ async function lockFeedForTokenChange(
 async function insertActiveToken(
   tx: TenantDb,
   input: {
-    clerkOrgId: string;
+    accountId: string;
     feedId: string;
     hint: string;
     organisationId: string | null;
@@ -451,7 +447,7 @@ async function insertActiveToken(
   const rows = await tx.$queryRaw<Array<{ id: string }>>`
     INSERT INTO "feed_tokens" (
       "id",
-      "clerk_org_id",
+      "account_id",
       "organisation_id",
       "feed_id",
       "token_hash",
@@ -463,7 +459,7 @@ async function insertActiveToken(
     )
     VALUES (
       ${input.tokenId}::uuid,
-      ${input.clerkOrgId},
+      ${input.accountId},
       ${input.organisationId}::uuid,
       ${input.feedId}::uuid,
       ${input.tokenHash},
@@ -498,7 +494,7 @@ export async function revokeToken(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (tenantDb3: TenantDb): ReturnType<typeof revokeToken> => {
     if (!isAdminOrOwner(parsed.data.actingRole)) {
       return notAuthorised();
@@ -508,7 +504,7 @@ export async function revokeToken(
       const token = await tx.feedToken.findFirst({
         select: { feed_id: true, id: true, status: true, token_hint: true },
         where: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           id: parsed.data.tokenId,
           ...(parsed.data.organisationId === null
             ? { organisation_id: null }
@@ -553,26 +549,26 @@ export async function revokeToken(
     return result;
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
 
 export async function revokeAllFeedTokens(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string | null;
   },
   db: TenantDb
 ): Promise<Result<{ revokedCount: number }, TokenServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (
     tenantDb: TenantDb
   ): ReturnType<typeof revokeAllFeedTokens> => {
     const result = await tenantDb.feedToken.updateMany({
       data: { revoked_at: new Date(), status: "revoked" },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
         status: "active",
       },
@@ -580,7 +576,7 @@ export async function revokeAllFeedTokens(
     const feeds = await tenantDb.feed.findMany({
       select: { id: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
       },
     });
@@ -590,7 +586,7 @@ export async function revokeAllFeedTokens(
     return { ok: true, value: { revokedCount: result.count } };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -613,7 +609,7 @@ async function auditToken(
   tx: TenantDb,
   input: {
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string | null;
   },
   action: string,
@@ -622,15 +618,15 @@ async function auditToken(
 ) {
   const organisationId =
     input.organisationId ??
-    (await resolveAccountCompanies(input.clerkOrgId, tx))[0]?.id;
+    (await resolveAccountCompanies(input.accountId, tx))[0]?.id;
   if (!organisationId) {
     throw new Error("Feed audit requires an active owned company.");
   }
   return tx.auditEvent.create({
     data: {
+      account_id: input.accountId,
       action,
       actor_user_id: input.actingUserId,
-      clerk_org_id: input.clerkOrgId,
       organisation_id: organisationId,
       payload,
       resource_id: tokenId,
@@ -640,12 +636,7 @@ async function auditToken(
 }
 
 function isAdminOrOwner(role: string): boolean {
-  return (
-    role === "admin" ||
-    role === "owner" ||
-    role === "org:admin" ||
-    role === "org:owner"
-  );
+  return hasPermission(role, { feeds: ["manageAll"] });
 }
 
 function notAuthorised(): Result<never, TokenServiceError> {

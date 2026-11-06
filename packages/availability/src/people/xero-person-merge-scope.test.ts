@@ -44,7 +44,7 @@ import {
 } from "@repo/database";
 import { mergeCandidateIntoXeroPerson } from "./xero-person-reconciliation";
 
-const context = { clerkOrgId: "account-A", organisationId: "company-A" };
+const context = { accountId: "account-A", organisationId: "company-A" };
 const input = {
   ...context,
   actorUserId: "user-admin",
@@ -52,14 +52,14 @@ const input = {
   xeroPersonId: "xero",
 };
 const person = (id: string) => ({
+  account_id: "account-A",
   archived_at: null,
-  clerk_org_id: "account-A",
-  clerk_user_id: null,
   id,
   location_id: null,
   manager_person_id: null,
   organisation_id: "company-A",
   team_id: null,
+  user_id: null,
 });
 beforeEach(() => {
   vi.clearAllMocks();
@@ -71,8 +71,8 @@ beforeEach(() => {
   state.audit.mockResolvedValue({});
   state.updateMany.mockResolvedValue({ count: 1 });
   state.invalidate.mockImplementation(
-    async (scope: { clerkOrgId: string }, db: TenantDb) => {
-      assertTenantDb(db, scope.clerkOrgId);
+    async (scope: { accountId: string }, db: TenantDb) => {
+      assertTenantDb(db, scope.accountId);
       expect(isTenantScopeActive()).toBe(true);
       afterTenantCommit(db, async () => {
         expect(isTenantScopeActive()).toBe(false);
@@ -135,7 +135,7 @@ test("merge transfers cross-company direct reports and recipients in one scope, 
     })
   );
   expect(state.invalidate).toHaveBeenCalledWith(
-    { clerkOrgId: "account-A" },
+    { accountId: "account-A" },
     expect.any(Object)
   );
 });

@@ -62,8 +62,8 @@ describe("independent raw AU provider oracle", () => {
     const requests: string[] = [];
     transport.fetch.mockImplementation((input) => {
       expect(input.accessContext).toMatchObject({
+        account_id: "account-owned",
         capability: ["payroll.employees.read", "payroll.settings.read"],
-        clerk_org_id: "account-owned",
         id: "connection-owned",
         organisation_id: "organisation-owned",
         payroll_region: "AU",
@@ -79,8 +79,8 @@ describe("independent raw AU provider oracle", () => {
       );
     });
     const result = await readIndependentAuImport({
+      accountId: "account-owned",
       assertAuthority: vi.fn(),
-      clerkOrgId: "account-owned",
       expectedTenantId: "tenant-owned",
       organisationId: "organisation-owned",
       ownedEmployeeIds: ["employee-owned"],
@@ -126,8 +126,8 @@ describe("independent raw AU provider oracle", () => {
     try {
       await expect(
         readIndependentAuLeave({
+          accountId: "org-owned",
           assertAuthority: () => Promise.reject(new Error("authority revoked")),
-          clerkOrgId: "org-owned",
           expectedTenantId: "owned",
           organisationId: "owned",
           providerAppId: "owned",
@@ -146,8 +146,8 @@ describe("independent raw AU provider oracle", () => {
     vi.stubGlobal("fetch", fetch);
     await expect(
       readIndependentAuLeave({
+        accountId: "org-owned",
         assertAuthority: vi.fn(),
-        clerkOrgId: "org-owned",
         expectedTenantId: "owned",
         organisationId: "owned",
         providerAppId: "owned",

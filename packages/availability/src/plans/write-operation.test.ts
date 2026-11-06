@@ -32,9 +32,9 @@ const request = {
 };
 const port = { prepareLeaveMutation: vi.fn() };
 const input = {
+  accountId: "org",
   action: "approve" as const,
   actorUserId: "actor",
-  clerkOrgId: "org",
   employeeId: "employee",
   endsAt: new Date(),
   expectedFailedAction: null,

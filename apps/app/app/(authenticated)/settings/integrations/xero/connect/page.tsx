@@ -1,8 +1,8 @@
-import { auth } from "@repo/auth/server";
+import { getSession } from "@repo/auth/server";
 import { getPendingXeroOAuthSession } from "@repo/xero";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { SettingsSectionHeader } from "../../../components/settings-section-header";
 import { XeroConnectClient } from "./connect-client";
 
@@ -18,18 +18,27 @@ interface XeroConnectPageProps {
 export default async function XeroConnectPage({
   searchParams,
 }: XeroConnectPageProps) {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ xero: ["manage"] });
 
-  const [{ orgId, userId }, { session }] = await Promise.all([
-    auth(),
-    searchParams,
-  ]);
-  if (!(orgId && session && userId)) {
+  const [{ accountId: sessionAccountId, userId }, { session }] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      searchParams,
+    ]);
+  if (!(sessionAccountId && session && userId)) {
     notFound();
   }
 
   const pending = await getPendingXeroOAuthSession({
-    clerkOrgId: orgId,
+    accountId: sessionAccountId,
     sessionId: session,
     userId,
   });

@@ -1,5 +1,5 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { getCurrentUser, requireAccount } from "@repo/auth/helpers";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { SupportSubmissionPayloadSchema } from "@repo/core";
 import { withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
@@ -36,20 +36,20 @@ interface SupportGitHubIssueSuccessResponse {
 export async function POST(request: Request): Promise<Response> {
   assertNoTenantTransaction("POST");
   try {
-    let clerkOrgId: string;
+    let accountId: string;
     try {
-      clerkOrgId = await requireOrg();
+      accountId = await requireAccount();
     } catch {
       return jsonFailure(401, "unauthorised", "Not authenticated");
     }
 
-    const user = await currentUser();
+    const user = await getCurrentUser();
     if (!user) {
       return jsonFailure(401, "unauthorised", "User not found");
     }
 
     const rateLimitResult = await checkSupportRateLimit({
-      clerkOrgId,
+      accountId,
       userId: user.id,
     });
 
@@ -77,7 +77,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const pageUrl = new URL(parsedBody.data.page_url);
     const organisationContext = await resolveOrganisationContext(
-      clerkOrgId,
+      accountId,
       pageUrl
     );
 
@@ -86,7 +86,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const result = await createSupportGitHubIssue({
-      clerk_org_id: clerkOrgId,
+      account_id: accountId,
       current_route: `${pageUrl.pathname}${pageUrl.search}`,
       environment: getRuntimeEnvironment(),
       organisation_id: organisationContext.value?.organisationId,
@@ -109,8 +109,8 @@ export async function POST(request: Request): Promise<Response> {
 
     if (organisationContext.value?.organisationId) {
       const phaseInput1 = {
+        accountId: accountId as AccountId,
         category: parsedBody.data.category,
-        clerkOrgId: clerkOrgId as ClerkOrgId,
         issueNumber: result.value.issueNumber,
         issueUrl: result.value.issueUrl,
         labelAssignmentSucceeded: result.value.labelAssignmentSucceeded,
@@ -122,13 +122,13 @@ export async function POST(request: Request): Promise<Response> {
         userId: user.id,
       } satisfies Parameters<typeof persistSupportSubmissionAudit>[0];
       // The issue already exists, so an audit failure is logged, never surfaced.
-      const auditResult = await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+      const auditResult = await withTenantResult(phaseInput1.accountId, (db) =>
         persistSupportSubmissionAudit(phaseInput1, db)
       ).catch((error: unknown) => ({ error, ok: false as const }));
 
       if (!auditResult.ok) {
         log.error("Failed to persist support submission audit event", {
-          clerkOrgId,
+          accountId,
           error: auditResult.error,
           issueNumber: result.value.issueNumber,
           organisationId: organisationContext.value.organisationId,
@@ -156,7 +156,7 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 async function resolveOrganisationContext(
-  clerkOrgId: string,
+  accountId: string,
   pageUrl: URL
 ): Promise<
   | {
@@ -189,10 +189,10 @@ async function resolveOrganisationContext(
   }
 
   const organisationResult = await withTenantResult(
-    clerkOrgId as ClerkOrgId,
+    accountId as AccountId,
     (db) =>
       getOrganisationById(
-        clerkOrgId as ClerkOrgId,
+        accountId as AccountId,
         parsedOrganisationId.data as OrganisationId,
         db
       )
@@ -207,7 +207,7 @@ async function resolveOrganisationContext(
     }
 
     log.error("Failed to resolve support organisation context", {
-      clerkOrgId,
+      accountId,
       organisationId: parsedOrganisationId.data,
     });
 

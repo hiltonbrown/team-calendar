@@ -22,7 +22,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 try {
   const result = await pool.query<{
     approval_status: string;
-    clerk_org_id: string;
+    account_id: string;
     known_remote_id: string | null;
     organisation_id: string;
     request_employee_id: string | null;
@@ -34,7 +34,7 @@ try {
     request_units: string | null;
     source_remote_id: string | null;
   }>(
-    `SELECT ar.approval_status, ar.clerk_org_id, ar.organisation_id,
+    `SELECT ar.approval_status, ar.account_id, ar.organisation_id,
             ar.source_remote_id, op.known_remote_id, op.request_employee_id,
             op.request_ends_at, op.request_fingerprint,
             op.request_leave_type_id, op.request_starts_at, op.request_title,
@@ -42,12 +42,12 @@ try {
      FROM availability_records ar
      LEFT JOIN outbound_operations op
        ON op.availability_record_id = ar.id AND op.action = 'approve'
-       AND op.clerk_org_id = ar.clerk_org_id
+       AND op.account_id = ar.account_id
        AND op.organisation_id = ar.organisation_id
      WHERE ar.id = $1::uuid
-       AND ar.clerk_org_id = ANY($2::text[])
+       AND ar.account_id = ANY($2::text[])
        AND ar.organisation_id = ANY($3::uuid[])`,
-    [recordId, manifest.owned.clerkOrgIds, manifest.owned.organisationIds]
+    [recordId, manifest.owned.accountIds, manifest.owned.organisationIds]
   );
   if (result.rows.length !== 1) {
     throw new Error("Provider verification record is not exact");
@@ -71,7 +71,7 @@ try {
   if (
     !(
       manifest.owned.organisationIds.includes(row.organisation_id) &&
-      manifest.owned.clerkOrgIds.includes(row.clerk_org_id)
+      manifest.owned.accountIds.includes(row.account_id)
     )
   ) {
     throw new Error("Provider verification record is outside the manifest");
@@ -84,7 +84,7 @@ try {
       import("../../../packages/availability/src/plans/submit-service.js"),
     ]);
   const candidates = await XeroWriteAdapter.findLeaveApplicationCandidates?.({
-    clerkOrgId: row.clerk_org_id,
+    accountId: row.account_id,
     employeeId: row.request_employee_id,
     organisationId: row.organisation_id,
   });

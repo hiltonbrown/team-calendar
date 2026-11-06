@@ -38,7 +38,7 @@ const {
 } = await import("./teams");
 
 const scope = {
-  clerkOrgId: "org_test_teams",
+  accountId: "org_test_teams",
   organisationId: "55555555-5555-4555-8555-555555555555",
 };
 const teamA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -118,12 +118,12 @@ describe("team queries", () => {
       });
       const query = mocks.teamFindMany.mock.calls[0]?.[0];
       expect(query.where).toEqual({
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         organisation_id: scope.organisationId,
       });
       expect(query.select._count.select.people.where).toEqual({
+        account_id: scope.accountId,
         archived_at: null,
-        clerk_org_id: scope.clerkOrgId,
         is_active: true,
         organisation_id: scope.organisationId,
       });
@@ -176,7 +176,7 @@ describe("team queries", () => {
         },
       });
       const where = {
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         id: teamA,
         organisation_id: scope.organisationId,
       };
@@ -226,7 +226,7 @@ describe("team queries", () => {
       };
 
       mocks.delegateOverride = tx;
-      const result = await withTenantDb(scope.clerkOrgId, (db) =>
+      const result = await withTenantDb(scope.accountId, (db) =>
         setTeamCoverageMinimum({ ...scope, minimum: null, teamId: teamA }, db)
       );
 
@@ -249,16 +249,16 @@ describe("team queries", () => {
 
       const query = mocks.recordFindMany.mock.calls[0]?.[0];
       expect(query.where).toEqual({
+        account_id: scope.accountId,
         approval_status: "approved",
         archived_at: null,
-        clerk_org_id: scope.clerkOrgId,
         // Brisbane is UTC+10: from 12 October local midnight, through the
         // end of the all-day UTC date 14 October.
         ends_at: { gte: new Date("2026-10-11T14:00:00.000Z") },
         organisation_id: scope.organisationId,
         person: {
+          account_id: scope.accountId,
           archived_at: null,
-          clerk_org_id: scope.clerkOrgId,
           is_active: true,
           organisation_id: scope.organisationId,
           team_id: { in: [teamA, teamB] },

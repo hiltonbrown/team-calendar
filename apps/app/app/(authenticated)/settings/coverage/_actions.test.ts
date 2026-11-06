@@ -58,16 +58,16 @@ vi.mock("@repo/database", async () => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   revalidatePath: vi.fn(),
   updateTeamCoverageMinimum: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   updateTeamCoverageMinimum: mocks.updateTeamCoverageMinimum,
@@ -83,7 +83,7 @@ const { updateTeamCoverageMinimumAction } = await import("./_actions");
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const teamId = "00000000-0000-4000-8000-000000000002";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 const notAuthorised = {
   error: {
@@ -96,11 +96,11 @@ const notAuthorised = {
 describe("settings/coverage server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.updateTeamCoverageMinimum.mockResolvedValue({
       ok: true,
@@ -109,7 +109,7 @@ describe("settings/coverage server actions", () => {
   });
 
   it("rejects unauthenticated callers", async () => {
-    mocks.currentUser.mockResolvedValue(null);
+    mocks.getCurrentUser.mockResolvedValue(null);
 
     const result = await updateTeamCoverageMinimumAction({
       minimum: 2,
@@ -121,8 +121,8 @@ describe("settings/coverage server actions", () => {
     expect(mocks.updateTeamCoverageMinimum).not.toHaveBeenCalled();
   });
 
-  it.each(["org:manager", "org:viewer"])("rejects %s", async (orgRole) => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+  it.each(["manager", "viewer"])("rejects %s", async (role) => {
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
 
     const result = await updateTeamCoverageMinimumAction({
       minimum: 2,
@@ -150,8 +150,8 @@ describe("settings/coverage server actions", () => {
     expect(tenantPoolMocks.organisationFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       })
@@ -169,11 +169,11 @@ describe("settings/coverage server actions", () => {
       error: { code: "validation_error" },
       ok: false,
     });
-    expect(mocks.auth).not.toHaveBeenCalled();
+    expect(mocks.getSession).not.toHaveBeenCalled();
   });
 
   it("passes both tenancy keys and the owner role to the service", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:owner" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "owner" });
 
     await updateTeamCoverageMinimumAction({
       minimum: 2,
@@ -183,9 +183,9 @@ describe("settings/coverage server actions", () => {
 
     expect(mocks.updateTeamCoverageMinimum).toHaveBeenCalledWith(
       {
+        accountId,
         actingRole: "owner",
         actingUserId: userId,
-        clerkOrgId,
         minimum: 2,
         organisationId,
         teamId,

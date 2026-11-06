@@ -3,6 +3,7 @@ import type { Result } from "@repo/core";
 import { assertNoTenantTransaction, withTenantDb } from "@repo/database";
 import { ensureXeroInitialSyncRequested } from "@repo/database/queries/xero-sync-cursors";
 import { z } from "zod";
+import { currentJobIdentityGeneration } from "../keys";
 import { inngest } from "./client";
 export const syncEventNames = {
   approval_state_reconciliation: "reconcile-xero-approval-state",
@@ -18,7 +19,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
   "people",
 ]);
 const SyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
@@ -34,7 +35,7 @@ const SyncEventSchema = z.object({
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
 });
 const CancelSyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
   runId: z.string().uuid(),
 });
@@ -65,10 +66,11 @@ export function getUtcCadenceSlot(
 export function getScheduledSyncEventId(
   connectionId: string,
   runType: RegisteredSyncRunType,
-  date: Date = new Date()
+  date: Date = new Date(),
+  identityGeneration: string = currentJobIdentityGeneration()
 ): string {
   const slot = getUtcCadenceSlot(runType, date);
-  return `scheduled-sync:${connectionId}:${runType}:${slot}`;
+  return `scheduled-sync:${identityGeneration}:${connectionId}:${runType}:${slot}`;
 }
 export interface DispatchSyncEventOptions {
   eventId?: string;
@@ -114,21 +116,23 @@ export async function dispatchSyncEvent(
     const payload: {
       name: string;
       data: {
-        clerkOrgId: string;
-        organisationId: string;
+        account_id: string;
+        connectionId: string;
+        identity_generation: string;
+        organisation_id: string;
         mode?: "full" | "incremental";
         personId?: string;
         runId: string;
         triggeredByUserId: string | null;
         triggerType: "scheduled" | "manual" | "webhook";
-        connectionId: string;
       };
       id?: string;
     } = {
       data: {
-        clerkOrgId: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
-        organisationId: parsed.data.organisationId,
+        identity_generation: currentJobIdentityGeneration(),
+        organisation_id: parsed.data.organisationId,
         ...(["people", "leave_records"].includes(parsed.data.runType)
           ? {
               mode:
@@ -186,7 +190,12 @@ export async function dispatchCancelSyncRun(
   }
   try {
     await inngest.send({
-      data: parsed.data,
+      data: {
+        account_id: parsed.data.accountId,
+        identity_generation: currentJobIdentityGeneration(),
+        organisation_id: parsed.data.organisationId,
+        runId: parsed.data.runId,
+      },
       name: "cancel-sync-run",
     });
     return { ok: true, value: { queued: true } };
@@ -203,12 +212,13 @@ export async function dispatchCancelSyncRun(
 export const initialXeroSyncEventName = "initial-xero-sync";
 export function getInitialSyncEventId(
   connectionId: string,
-  requestedAt: string
+  requestedAt: string,
+  identityGeneration: string = currentJobIdentityGeneration()
 ): string {
-  return `initial-sync:${connectionId}:${requestedAt}`;
+  return `initial-sync:${identityGeneration}:${connectionId}:${requestedAt}`;
 }
 const InitialXeroSyncEventSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   requestedAt: z.string().datetime().optional(),
@@ -246,7 +256,7 @@ export async function dispatchInitialXeroSync(
     };
   }
   try {
-    const requestedAt = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+    const requestedAt = await withTenantDb(parsed.data.accountId, (db) =>
       ensureXeroInitialSyncRequested(parsed.data, db)
     );
     if (
@@ -266,9 +276,10 @@ export async function dispatchInitialXeroSync(
       getInitialSyncEventId(parsed.data.connectionId, requestedAt);
     const payload = {
       data: {
-        clerkOrgId: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         connectionId: parsed.data.connectionId,
-        organisationId: parsed.data.organisationId,
+        identity_generation: currentJobIdentityGeneration(),
+        organisation_id: parsed.data.organisationId,
         requestedAt,
         runId: parsed.data.runId ?? randomUUID(),
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,

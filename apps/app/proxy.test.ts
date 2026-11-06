@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import {
   buildContentSecurityPolicy,
-  clerkFrontendOrigin,
   generateNonce,
   handleProxyWithNonce,
   isPublicAppRoute,
@@ -17,8 +16,13 @@ describe("Proxy nonce and CSP generation", () => {
     ["/sign-in", true],
     ["/sign-in/factor-one", true],
     ["/sign-up", true],
+    ["/verify-email", true],
+    ["/forgot-password", true],
+    ["/reset-password", true],
+    ["/magic-link", true],
+    ["/accept-invitation/invitation-id", true],
     ["/api/csp-report", true],
-    ["/__clerk/v1/client", true],
+    ["/__clerk/v1/client", false],
     ["/calendar", false],
     ["/api/future-sensitive-route", false],
   ])("classifies %s public=%s", (path, expected) => {
@@ -47,31 +51,12 @@ describe("Proxy nonce and CSP generation", () => {
     expect(csp).toContain(`script-src 'self' 'nonce-${nonce}'`);
     expect(csp).not.toContain("'unsafe-inline' in script-src");
     expect(csp).not.toContain("'unsafe-eval'");
-    expect(csp).toContain("https://*.clerk.accounts.dev");
-    expect(csp).toContain("https://*.clerk.com");
+    expect(csp).not.toContain("clerk");
     expect(csp).toContain("https://challenges.cloudflare.com");
     expect(csp).toContain("https://va.vercel-scripts.com");
     expect(csp).toContain("https://www.googletagmanager.com");
     expect(csp).toContain("https://*.google-analytics.com");
   });
-
-  it("allows only the exact Clerk frontend origin encoded by the configured key", () => {
-    const key = `pk_live_${Buffer.from("clerk.teamcalendar.online$").toString("base64url")}`;
-    expect(clerkFrontendOrigin(key)).toBe("https://clerk.teamcalendar.online");
-    const csp = buildContentSecurityPolicy(
-      "nonce",
-      false,
-      clerkFrontendOrigin(key)
-    );
-    expect(csp).toContain("script-src 'self' 'nonce-nonce'");
-    expect(csp).toContain("https://clerk.teamcalendar.online");
-    expect(csp).not.toContain("https://*.teamcalendar.online");
-  });
-
-  it.each(["", "pk_live_invalid", "sk_live_secret"])(
-    "rejects an invalid Clerk publishable key (%s)",
-    (key) => expect(clerkFrontendOrigin(key)).toBeNull()
-  );
 
   it("includes unsafe-eval in script-src only in development", () => {
     const nonce = "dev-nonce-456";
@@ -89,8 +74,7 @@ describe("Proxy nonce and CSP generation", () => {
     const csp = buildContentSecurityPolicy(nonce, false);
 
     expect(csp).toContain("connect-src 'self'");
-    expect(csp).toContain("https://*.clerk.accounts.dev");
-    expect(csp).toContain("https://*.clerk.com");
+    expect(csp).not.toContain("clerk");
     expect(csp).toContain("https://*.sentry.io");
     expect(csp).toContain("https://us.i.posthog.com");
     expect(csp).toContain("https://*.posthog.com");

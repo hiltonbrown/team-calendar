@@ -1,10 +1,11 @@
+import { type AuthRole, hasPermission } from "@repo/auth/permissions";
 import {
   TENANT_READ_TRANSACTION_OPTIONS,
   withTenantResult,
 } from "@repo/database";
 import "server-only";
 import type {
-  ClerkOrgId,
+  AccountId,
   ExternalWritePort,
   OrganisationId,
   ProviderResolutionError,
@@ -63,7 +64,7 @@ import {
   XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
 
-export type ApprovalRole = "admin" | "manager" | "owner";
+export type ApprovalRole = Exclude<AuthRole, "viewer">;
 export type ApprovalAction =
   | "approve"
   | "decline"
@@ -140,6 +141,7 @@ export type ApprovalServiceError =
       xeroError: ProviderWriteError;
     };
 export interface ApprovalListItem {
+  accountId: string;
   allDay: boolean;
   approvalNote: string | null;
   approvalStatus: availability_approval_status;
@@ -152,7 +154,6 @@ export interface ApprovalListItem {
     leaveBalanceUpdatedAt: Date | null;
     unit: string | null;
   } | null;
-  clerkOrgId: string;
   createdAt: Date;
   durationWorkingDays: number | null;
   endsAt: Date;
@@ -220,18 +221,18 @@ const FiltersSchema = z.object({
   status: z.array(ApprovalStatusSchema).optional(),
 });
 const ListSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable(),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   cursor: z.string().uuid().nullable().optional(),
   filters: FiltersSchema.optional(),
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
   role: RoleSchema,
 });
 const DetailSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable(),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
   role: RoleSchema,
@@ -249,8 +250,8 @@ const InfoSchema = CommandSchema.extend({
   question: z.string().trim().min(3).max(1000),
 });
 const DispatchSchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   role: RoleSchema,
 });
@@ -303,9 +304,9 @@ export async function listForApprover(
     ApprovalServiceError
   >
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = ListSchema.safeParse(input);
@@ -333,12 +334,12 @@ async function loadApproverPage(
     ApprovalServiceError
   >
 > {
-  assertTenantDb(db, data.clerkOrgId);
+  assertTenantDb(db, data.accountId);
   {
-    assertTenantDb(db, data.clerkOrgId);
+    assertTenantDb(db, data.accountId);
     const client = db;
 
-    const companies = await resolveAccountCompanies(data.clerkOrgId, client);
+    const companies = await resolveAccountCompanies(data.accountId, client);
     const managedPersonIds = await resolveManagedPersonIds(data, client);
     const branches: Prisma.AvailabilityRecordWhereInput[] = [];
     for (const company of companies) {
@@ -363,8 +364,8 @@ async function loadApproverPage(
       skip: data.cursor ? 1 : 0,
       take: pageSize + 1,
       where: {
+        account_id: data.accountId,
         archived_at: null,
-        clerk_org_id: data.clerkOrgId,
         OR: branches,
         organisation_id: { in: companies.map((company) => company.id) },
         source_type: { in: ["team_calendar_leave", "xero_leave"] },
@@ -410,14 +411,14 @@ async function resolveListFilters(
     status: ApprovalStatus[];
   }
 > {
-  assertTenantDb(db, data.clerkOrgId);
+  assertTenantDb(db, data.accountId);
   {
-    assertTenantDb(db, data.clerkOrgId);
+    assertTenantDb(db, data.accountId);
     const client = db;
 
     const settingsResult = await getSettings(
       {
-        clerkOrgId: data.clerkOrgId,
+        accountId: data.accountId,
         organisationId: data.organisationId,
       },
       client
@@ -426,7 +427,7 @@ async function resolveListFilters(
       log.warn(
         "Failed to load organisation settings for list approvals, using default view",
         {
-          clerkOrgId: data.clerkOrgId,
+          accountId: data.accountId,
           error: settingsResult.error,
           organisationId: data.organisationId,
         }
@@ -449,14 +450,14 @@ async function resolveListFilters(
 async function resolveManagedPersonIds(
   data: {
     actingPersonId: string | null;
-    clerkOrgId: string;
+    accountId: string;
     role: ApprovalRole;
   },
   db: TenantDb
 ): Promise<string[]> {
-  assertTenantDb(db, data.clerkOrgId);
+  assertTenantDb(db, data.accountId);
   {
-    assertTenantDb(db, data.clerkOrgId);
+    assertTenantDb(db, data.accountId);
     const client = db;
 
     if (!(data.role === "manager" && data.actingPersonId)) {
@@ -464,8 +465,8 @@ async function resolveManagedPersonIds(
     }
     const personIds = await managerScopePersonIds(
       {
+        accountId: data.accountId,
         actingPersonId: data.actingPersonId,
-        clerkOrgId: data.clerkOrgId,
       },
       client
     );
@@ -509,9 +510,9 @@ export async function getApprovalDetail(
   input: z.input<typeof AccountDetailSchema>,
   db: TenantDb
 ): Promise<Result<ApprovalDetail, ApprovalServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = AccountDetailSchema.safeParse(input);
@@ -531,8 +532,8 @@ export async function getApprovalDetail(
         payload: true,
       },
       where: {
+        account_id: parsed.data.accountId,
         action: { in: HISTORY_ACTIONS },
-        clerk_org_id: parsed.data.clerkOrgId,
         organisation_id: authorised.value.organisation_id,
         resource_id: parsed.data.recordId,
         resource_type: "availability_record",
@@ -556,14 +557,14 @@ export async function getApprovalSummaryCounts(
   input: {
     actingPersonId: string | null;
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     role: ApprovalRole;
   },
   db: TenantDb
 ): Promise<Result<ApprovalSummaryCounts, ApprovalServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = ListSchema.omit({ filters: true }).safeParse(input);
@@ -573,14 +574,14 @@ export async function getApprovalSummaryCounts(
     if (parsed.data.role === "manager" && !parsed.data.actingPersonId) {
       return notAuthorised();
     }
-    const companies = await resolveAccountCompanies(input.clerkOrgId, client);
+    const companies = await resolveAccountCompanies(input.accountId, client);
     const managedPersonIds = await resolveManagedPersonIds(parsed.data, client);
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
     const baseWhere = {
+      account_id: parsed.data.accountId,
       archived_at: null,
-      clerk_org_id: parsed.data.clerkOrgId,
       organisation_id: { in: companies.map((company) => company.id) },
       source_type: { in: ["team_calendar_leave", "xero_leave"] },
       ...(parsed.data.role === "manager"
@@ -653,14 +654,14 @@ export async function decline(
     return validationError(parsed.error);
   }
   try {
-    const policy = await withTenantDb(input.clerkOrgId, async (db) => {
+    const policy = await withTenantDb(input.accountId, async (db) => {
       const authorised = await loadAndAuthorise(parsed.data, db);
       if (!authorised.ok) {
         return authorised;
       }
       const settings = await getSettings(
         {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           organisationId: authorised.value.organisation_id,
         },
         db
@@ -689,7 +690,7 @@ export async function decline(
     return logAndReturnUnknown(
       error,
       {
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         operation: "decline_policy",
         organisationId: input.organisationId,
       },
@@ -712,7 +713,7 @@ export async function retryDecline(
     return validationError(parsed.error);
   }
   try {
-    const authorised = await withTenantResult(parsed.data.clerkOrgId, (db) =>
+    const authorised = await withTenantResult(parsed.data.accountId, (db) =>
       loadAndAuthorise(parsed.data, db)
     );
     if (!authorised.ok) {
@@ -726,10 +727,10 @@ export async function retryDecline(
       return invalidState("invalid_state_for_retry");
     }
     const phaseInput1 = {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       organisationId: authorised.value.organisation_id,
     } satisfies Parameters<typeof getSettings>[0];
-    const settings = await withTenantResult(phaseInput1.clerkOrgId, (db) =>
+    const settings = await withTenantResult(phaseInput1.accountId, (db) =>
       getSettings(phaseInput1, db)
     );
     if (!settings.ok) {
@@ -772,7 +773,7 @@ export async function retryDecline(
     return logAndReturnUnknown(
       error,
       {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         operation: "retry_decline_preflight",
         organisationId: parsed.data.organisationId,
         recordId: parsed.data.recordId,
@@ -785,7 +786,7 @@ export async function requestMoreInfo(
   input: InfoInput,
   db: TenantDb
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (client: TenantDb): ReturnType<typeof requestMoreInfo> => {
     const parsed = InfoSchema.safeParse(input);
     if (!parsed.success) {
@@ -803,7 +804,7 @@ export async function requestMoreInfo(
       await notifyUser(tx, parsed.data, record, {
         actionUrl: `/plans?recordId=${record.id}`,
         payload: { body: parsed.data.question },
-        recipientUserId: record.person.clerk_user_id,
+        recipientUserId: record.person.user_id,
         type: "leave_info_requested",
       });
       await tx.auditEvent.create({
@@ -818,7 +819,7 @@ export async function requestMoreInfo(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -831,7 +832,7 @@ export async function revertApprovalAttempt(
     return validationError(parsed.error);
   }
   try {
-    const authorised = await withTenantResult(parsed.data.clerkOrgId, (db) =>
+    const authorised = await withTenantResult(parsed.data.accountId, (db) =>
       loadAndAuthorise(parsed.data, db)
     );
     if (!authorised.ok) {
@@ -844,7 +845,7 @@ export async function revertApprovalAttempt(
     ) {
       return invalidState("invalid_state_for_revert");
     }
-    await withTenantDb(input.clerkOrgId, async (tx: TenantDb) => {
+    await withTenantDb(input.accountId, async (tx: TenantDb) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_note:
@@ -873,7 +874,7 @@ export async function revertApprovalAttempt(
         }),
       });
     });
-    const updated = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+    const updated = await withTenantDb(parsed.data.accountId, (db) =>
       loadRecord(parsed.data, db)
     );
     if (!updated) {
@@ -882,7 +883,7 @@ export async function revertApprovalAttempt(
     await materialiseApprovalPublication(parsed.data);
     return {
       ok: true,
-      value: await withTenantDb(updated.clerk_org_id, (db) =>
+      value: await withTenantDb(updated.account_id, (db) =>
         toApprovalListItem(updated, undefined, db)
       ),
     };
@@ -893,7 +894,7 @@ export async function revertApprovalAttempt(
     return logAndReturnUnknown(
       error,
       {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         operation: "revert_approval_attempt",
         organisationId: parsed.data.organisationId,
         recordId: parsed.data.recordId,
@@ -916,7 +917,7 @@ export function dispatchApprovalReconciliation(input: DispatchInput): Promise<
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
   }
-  if (!(parsed.data.role === "admin" || parsed.data.role === "owner")) {
+  if (!hasPermission(parsed.data.role, { xero: ["sync"] })) {
     return Promise.resolve(notAuthorised());
   }
   return dispatchPreparedApprovalSync(
@@ -940,7 +941,7 @@ export function dispatchXeroLeaveSync(
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
   }
-  if (!(parsed.data.role === "admin" || parsed.data.role === "owner")) {
+  if (!hasPermission(parsed.data.role, { xero: ["sync"] })) {
     return Promise.resolve(notAuthorised());
   }
   return dispatchPreparedApprovalSync(parsed.data, "leave_records");
@@ -952,7 +953,7 @@ async function dispatchPreparedApprovalSync(
   input: DispatchInput,
   runType: ApprovalSyncRunType
 ): Promise<Result<{ queued: boolean; reason?: string }, ApprovalServiceError>> {
-  const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+  const prepared = await withTenantDb(input.accountId, (db) =>
     prepareApprovalSync(input, runType, db)
   );
   return prepared.ok ? sendPreparedApprovalSync(prepared.value) : prepared;
@@ -963,18 +964,18 @@ export async function prepareApprovalSync(
   runType: ApprovalSyncRunType,
   db: TenantDb
 ): Promise<Result<PreparedApprovalSync, ApprovalServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = DispatchSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (!(parsed.data.role === "admin" || parsed.data.role === "owner")) {
+  if (!hasPermission(parsed.data.role, { xero: ["sync"] })) {
     return notAuthorised();
   }
   const tenant = await db.xeroConnection.findFirst({
     orderBy: { created_at: "asc" },
     where: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       organisation_id: input.organisationId,
     },
   });
@@ -983,7 +984,7 @@ export async function prepareApprovalSync(
   }
   const xeroStateResult = await getXeroConnectionStateForScope(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       organisationId: input.organisationId,
     },
     db
@@ -1018,7 +1019,7 @@ export async function prepareApprovalSync(
   return {
     ok: true,
     value: {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       connectionId: tenant.id,
       organisationId: input.organisationId,
       runType,
@@ -1082,7 +1083,7 @@ async function performApproval(
     if (prepared.value.completed) {
       return {
         ok: true,
-        value: await withTenantDb(record.clerk_org_id, (db) =>
+        value: await withTenantDb(record.account_id, (db) =>
           toApprovalListItem(record, undefined, db)
         ),
       };
@@ -1123,10 +1124,10 @@ async function performApproval(
       };
     }
     journalAttempt = {
+      accountId: parsed.data.accountId,
       action: "approve",
       attemptGeneration: journal.value.attemptGeneration,
       availabilityRecordId: record.id,
-      clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     };
     ({ claimedAt } = journal.value);
@@ -1140,17 +1141,17 @@ async function performApproval(
       journal.value.actorUserId === parsed.data.actingUserId
         ? parsed.data.actingPersonId
         : ((
-            await withTenantDb(parsed.data.clerkOrgId, (db) =>
+            await withTenantDb(parsed.data.accountId, (db) =>
               db.person.findFirst({
                 select: { id: true },
                 where: {
+                  account_id: parsed.data.accountId,
                   archived_at: null,
-                  clerk_org_id: parsed.data.clerkOrgId,
-                  clerk_user_id: journal.value.actorUserId,
                   organisation: {
+                    account_id: parsed.data.accountId,
                     archived_at: null,
-                    clerk_org_id: parsed.data.clerkOrgId,
                   },
+                  user_id: journal.value.actorUserId,
                 },
               })
             )
@@ -1159,7 +1160,7 @@ async function performApproval(
     const response = journal.value.providerAccepted
       ? { ok: true as const, value: undefined }
       : await externalWritePort.approveLeaveApplication({
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           employeeId: xeroEmployeeId,
           mutation: journal.value.mutation,
           organisationId: parsed.data.organisationId,
@@ -1191,7 +1192,7 @@ async function performApproval(
     xeroWriteSucceeded = true;
     failureStage = "local_transaction";
     const now = new Date();
-    await withTenantDb(parsed.data.clerkOrgId, async (tx: TenantDb) => {
+    await withTenantDb(parsed.data.accountId, async (tx: TenantDb) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "approved",
@@ -1223,20 +1224,20 @@ async function performApproval(
     failureStage = "notification";
     if (
       !(await completeXeroWriteSideEffects({
+        accountId: parsed.data.accountId,
         actorUserId: journal.value.actorUserId,
         attempt: journalAttempt,
-        clerkOrgId: parsed.data.clerkOrgId,
-        manager: record.person.manager?.clerk_user_id
+        manager: record.person.manager?.user_id
           ? {
-              clerkUserId: record.person.manager.clerk_user_id,
               personId: record.person.manager.id,
+              userId: record.person.manager.user_id,
             }
           : null,
         organisationId: parsed.data.organisationId,
-        recipient: record.person.clerk_user_id
+        recipient: record.person.user_id
           ? {
-              clerkUserId: record.person.clerk_user_id,
               personId: record.person.id,
+              userId: record.person.user_id,
             }
           : null,
         recordId: record.id,
@@ -1247,7 +1248,7 @@ async function performApproval(
       );
     }
     failureStage = "reload";
-    const updated = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+    const updated = await withTenantDb(parsed.data.accountId, (db) =>
       loadRecord(parsed.data, db)
     );
     if (!updated) {
@@ -1256,7 +1257,7 @@ async function performApproval(
     failureStage = "projection";
     return {
       ok: true,
-      value: await withTenantDb(updated.clerk_org_id, (db) =>
+      value: await withTenantDb(updated.account_id, (db) =>
         toApprovalListItem(updated, undefined, db)
       ),
     };
@@ -1265,14 +1266,14 @@ async function performApproval(
       const phaseInput2 = { ...parsed.data, claimedAt } satisfies Parameters<
         typeof releaseXeroWriteClaim
       >[0];
-      await withTenantDb(phaseInput2.clerkOrgId, (db) =>
+      await withTenantDb(phaseInput2.accountId, (db) =>
         releaseXeroWriteClaim(phaseInput2, db)
       );
     }
     return handleApprovalWriteFailure(
       error,
       {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         failureStage,
         operation: options.retry ? "retry_approve" : "approve",
         organisationId: parsed.data.organisationId,
@@ -1315,7 +1316,7 @@ async function performDecline(
     if (prepared.value.completed) {
       return {
         ok: true,
-        value: await withTenantDb(record.clerk_org_id, (db) =>
+        value: await withTenantDb(record.account_id, (db) =>
           toApprovalListItem(record, undefined, db)
         ),
       };
@@ -1362,10 +1363,10 @@ async function performDecline(
     }
     if (journal?.ok) {
       journalAttempt = {
+        accountId: input.accountId,
         action: "decline",
         attemptGeneration: journal.value.attemptGeneration,
         availabilityRecordId: record.id,
-        clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
       };
     }
@@ -1378,7 +1379,7 @@ async function performDecline(
     } satisfies Parameters<typeof acquireXeroWriteClaim>[0];
     claimedAt = journal?.ok
       ? journal.value.claimedAt
-      : await withTenantDb(phaseInput3.clerkOrgId, (db) =>
+      : await withTenantDb(phaseInput3.accountId, (db) =>
           acquireXeroWriteClaim(phaseInput3, db)
         );
     if (!claimedAt) {
@@ -1394,17 +1395,17 @@ async function performDecline(
       originalActorUserId === input.actingUserId
         ? input.actingPersonId
         : ((
-            await withTenantDb(input.clerkOrgId, (db) =>
+            await withTenantDb(input.accountId, (db) =>
               db.person.findFirst({
                 select: { id: true },
                 where: {
+                  account_id: input.accountId,
                   archived_at: null,
-                  clerk_org_id: input.clerkOrgId,
-                  clerk_user_id: originalActorUserId,
                   organisation: {
+                    account_id: input.accountId,
                     archived_at: null,
-                    clerk_org_id: input.clerkOrgId,
                   },
+                  user_id: originalActorUserId,
                 },
               })
             )
@@ -1449,7 +1450,7 @@ async function performDecline(
     xeroWriteSucceeded = xeroLeaveApplicationId !== null;
     failureStage = "local_transaction";
     const now = new Date();
-    await withTenantDb(input.clerkOrgId, async (tx: TenantDb) => {
+    await withTenantDb(input.accountId, async (tx: TenantDb) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_note: journal?.ok
@@ -1486,21 +1487,21 @@ async function performDecline(
     if (journal?.ok && journalAttempt) {
       if (
         !(await completeXeroWriteSideEffects({
+          accountId: input.accountId,
           actorUserId: journal.value.actorUserId,
           attempt: journalAttempt,
-          clerkOrgId: input.clerkOrgId,
           declineReason: journal.value.requestReason,
-          manager: record.person.manager?.clerk_user_id
+          manager: record.person.manager?.user_id
             ? {
-                clerkUserId: record.person.manager.clerk_user_id,
                 personId: record.person.manager.id,
+                userId: record.person.manager.user_id,
               }
             : null,
           organisationId: input.organisationId,
-          recipient: record.person.clerk_user_id
+          recipient: record.person.user_id
             ? {
-                clerkUserId: record.person.clerk_user_id,
                 personId: record.person.id,
+                userId: record.person.user_id,
               }
             : null,
           recordId: record.id,
@@ -1519,7 +1520,7 @@ async function performDecline(
       await materialiseApprovalPublication(input);
     }
     failureStage = "reload";
-    const updated = await withTenantDb(input.clerkOrgId, (db) =>
+    const updated = await withTenantDb(input.accountId, (db) =>
       loadRecord(input, db)
     );
     if (!updated) {
@@ -1528,7 +1529,7 @@ async function performDecline(
     failureStage = "projection";
     return {
       ok: true,
-      value: await withTenantDb(updated.clerk_org_id, (db) =>
+      value: await withTenantDb(updated.account_id, (db) =>
         toApprovalListItem(updated, undefined, db)
       ),
     };
@@ -1537,14 +1538,14 @@ async function performDecline(
       const phaseInput4 = { ...input, claimedAt } satisfies Parameters<
         typeof releaseXeroWriteClaim
       >[0];
-      await withTenantDb(phaseInput4.clerkOrgId, (db) =>
+      await withTenantDb(phaseInput4.accountId, (db) =>
         releaseXeroWriteClaim(phaseInput4, db)
       );
     }
     return handleApprovalWriteFailure(
       error,
       {
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         failureStage,
         operation: options.retry ? "retry_decline" : "decline",
         organisationId: input.organisationId,
@@ -1578,7 +1579,7 @@ async function prepareApprovalWrite(
     ApprovalServiceError
   >
 > {
-  const authorised = await withTenantResult(input.clerkOrgId, (db) =>
+  const authorised = await withTenantResult(input.accountId, (db) =>
     loadAndAuthorise(input, db)
   );
   if (!authorised.ok) {
@@ -1592,17 +1593,17 @@ async function prepareApprovalWrite(
     (
       await withTenantDb(
         {
+          accountId: input.accountId,
           action,
           availabilityRecordId: record.id,
-          clerkOrgId: input.clerkOrgId,
           organisationId: input.organisationId,
-        }.clerkOrgId,
+        }.accountId,
         (db) =>
           getSubmitOperation(
             {
+              accountId: input.accountId,
               action,
               availabilityRecordId: record.id,
-              clerkOrgId: input.clerkOrgId,
               organisationId: input.organisationId,
             },
             db
@@ -1631,15 +1632,15 @@ async function prepareApprovalWrite(
   if (
     (await withTenantDb(
       {
+        accountId: input.accountId,
         availabilityRecordId: record.id,
-        clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
-      }.clerkOrgId,
+      }.accountId,
       (db) =>
         hasUnresolvedSubmitOperation(
           {
+            accountId: input.accountId,
             availabilityRecordId: record.id,
-            clerkOrgId: input.clerkOrgId,
             organisationId: input.organisationId,
           },
           db
@@ -1665,7 +1666,7 @@ async function prepareApprovalWrite(
     return { ok: true, value: { record, xeroEmployeeId: "" } };
   }
 
-  const xeroStateResult = await withTenantResult(input.clerkOrgId, (db) =>
+  const xeroStateResult = await withTenantResult(input.accountId, (db) =>
     getXeroConnectionStateForScope(input, db)
   );
   if (!xeroStateResult.ok) {
@@ -1696,7 +1697,7 @@ async function prepareApprovalWrite(
     return xeroNotConnected();
   }
   const employee = await externalWritePort.resolveEmployeeId({
-    clerkOrgId: input.clerkOrgId,
+    accountId: input.accountId,
     organisationId: input.organisationId,
     personId: record.person_id,
   });
@@ -1718,7 +1719,7 @@ async function persistApprovalFailure(input: {
   error: ProviderWriteError;
 }): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   const { userMessage: plainMessage } = input.error;
-  await withTenantDb(input.input.clerkOrgId, async (tx: TenantDb) => {
+  await withTenantDb(input.input.accountId, async (tx: TenantDb) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
         approval_note: input.approvalNote ?? input.record.approval_note,
@@ -1757,7 +1758,7 @@ async function persistApprovalFailure(input: {
   await notifyApprovalFailureBestEffort(input.input, input.record, {
     actionUrl: `/leave-approvals?recordId=${input.record.id}`,
   });
-  const updated = await withTenantDb(input.input.clerkOrgId, (db) =>
+  const updated = await withTenantDb(input.input.accountId, (db) =>
     loadRecord(input.input, db)
   );
   if (!updated) {
@@ -1766,28 +1767,28 @@ async function persistApprovalFailure(input: {
   await materialiseApprovalPublication(input.input);
   return {
     ok: true,
-    value: await withTenantDb(updated.clerk_org_id, (db) =>
+    value: await withTenantDb(updated.account_id, (db) =>
       toApprovalListItem(updated, undefined, db)
     ),
   };
 }
 async function loadRecord(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId?: string;
     recordId: string;
   },
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
     return await client.availabilityRecord.findFirst({
       include: recordInclude,
       where: {
-        clerk_org_id: input.clerkOrgId,
-        organisation: { archived_at: null, clerk_org_id: input.clerkOrgId },
+        account_id: input.accountId,
+        organisation: { account_id: input.accountId, archived_at: null },
         ...(input.organisationId
           ? { organisation_id: input.organisationId }
           : {}),
@@ -1797,17 +1798,17 @@ async function loadRecord(
   }
 }
 async function materialiseApprovalPublication(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   recordId: string;
 }): Promise<void> {
   const phaseInput5 = {
+    accountId: input.accountId,
     availabilityRecordId: input.recordId,
-    clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
   } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
   const publication = await withTenantResult(
-    phaseInput5.clerkOrgId,
+    phaseInput5.accountId,
     (db) => materialiseAvailabilityPublication(phaseInput5, db),
     TENANT_READ_TRANSACTION_OPTIONS
   );
@@ -1816,8 +1817,8 @@ async function materialiseApprovalPublication(input: {
     // feed projection rather than failing the write; it is corrected on the next
     // successful materialisation for the record.
     log.error("Failed to materialise availability publication", {
+      accountId: input.accountId,
       availabilityRecordId: input.recordId,
-      clerkOrgId: input.clerkOrgId,
       error: publication.error.message,
       organisationId: input.organisationId,
     });
@@ -1843,14 +1844,14 @@ async function loadApprovalListContext(
   if (!firstRecord) {
     throw new Error("Approval records changed while loading list context");
   }
-  assertTenantDb(db, firstRecord.clerk_org_id);
+  assertTenantDb(db, firstRecord.account_id);
   {
-    assertTenantDb(db, firstRecord.clerk_org_id);
+    assertTenantDb(db, firstRecord.account_id);
     const client = db;
 
-    const { clerk_org_id: clerkOrgId } = firstRecord;
+    const { account_id: accountId } = firstRecord;
     const { organisation_id: organisationId } = firstRecord;
-    const settings = await getSettings({ clerkOrgId, organisationId }, client);
+    const settings = await getSettings({ accountId, organisationId }, client);
     const requireDeclineReason = settings.ok
       ? settings.value.requireDeclineReason
       : true;
@@ -1872,7 +1873,7 @@ async function loadApprovalListContext(
                 timezone: true,
               },
               where: {
-                ...scoped({ clerkOrgId, organisationId }),
+                ...scoped({ accountId, organisationId }),
                 id: { in: locationIds },
               },
             })
@@ -1885,8 +1886,8 @@ async function loadApprovalListContext(
             timezone: true,
           },
           where: {
+            account_id: accountId,
             archived_at: null,
-            clerk_org_id: clerkOrgId,
             id: organisationId,
           },
         });
@@ -1918,7 +1919,7 @@ async function loadApprovalListContext(
       `approval-list:holidays:${yearList.join(",")}`,
       () =>
         loadHolidaysForYears(
-          clerkOrgId as ClerkOrgId,
+          accountId as AccountId,
           organisationId as OrganisationId,
           yearList,
           client
@@ -1945,7 +1946,7 @@ async function loadApprovalListContext(
               updated_at: true,
             },
             where: {
-              ...scoped({ clerkOrgId, organisationId }),
+              ...scoped({ accountId, organisationId }),
               person_id: { in: personIds },
               record_type: { in: recordTypes },
             },
@@ -1977,9 +1978,9 @@ async function loadAndAuthorise(
   input: Omit<CommandInput, "organisationId"> & { organisationId?: string },
   db: TenantDb
 ): Promise<Result<LoadedApprovalRecord, ApprovalServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const record = await loadRecord(input, client);
@@ -1998,16 +1999,16 @@ async function toApprovalListItem(
   context: ApprovalListContext | undefined,
   db: TenantDb
 ): Promise<ApprovalListItem> {
-  assertTenantDb(db, record.clerk_org_id);
+  assertTenantDb(db, record.account_id);
   {
-    assertTenantDb(db, record.clerk_org_id);
+    assertTenantDb(db, record.account_id);
     const client = db;
 
     const settings = context
       ? null
       : await getSettings(
           {
-            clerkOrgId: record.clerk_org_id,
+            accountId: record.account_id,
             organisationId: record.organisation_id,
           },
           client
@@ -2024,13 +2025,13 @@ async function toApprovalListItem(
     );
     const availableActions = actionsForRecord(record);
     return {
+      accountId: record.account_id,
       allDay: record.all_day,
       approvalNote: record.approval_note,
       approvalStatus: record.approval_status,
       approvedAt: record.approved_at,
       availableActions,
       balanceSnapshot,
-      clerkOrgId: record.clerk_org_id,
       createdAt: record.created_at,
       durationWorkingDays: duration,
       endsAt: record.ends_at,
@@ -2048,7 +2049,7 @@ async function toApprovalListItem(
         locationId: record.person.location_id,
         managerPersonId: record.person.manager_person_id,
         teamName: record.person.team?.name ?? null,
-        userId: record.person.clerk_user_id,
+        userId: record.person.user_id,
       },
       recordType: record.record_type,
       requireDeclineReason,
@@ -2066,9 +2067,9 @@ async function computeDuration(
   context: ApprovalListContext | undefined,
   db: TenantDb
 ): Promise<number | null> {
-  assertTenantDb(db, record.clerk_org_id);
+  assertTenantDb(db, record.account_id);
   {
-    assertTenantDb(db, record.clerk_org_id);
+    assertTenantDb(db, record.account_id);
     const client = db;
 
     const input = workingDaysInputForRecord(record);
@@ -2083,8 +2084,8 @@ async function computeDuration(
 }
 function workingDaysInputForRecord(record: LoadedApprovalRecord) {
   return {
+    accountId: record.account_id,
     allDay: record.all_day,
-    clerkOrgId: record.clerk_org_id,
     endsAt: record.ends_at,
     locationId: record.person.location_id,
     organisationId: record.organisation_id,
@@ -2103,9 +2104,9 @@ async function loadBalanceSnapshot(
   context: ApprovalListContext | undefined,
   db: TenantDb
 ): Promise<ApprovalListItem["balanceSnapshot"]> {
-  assertTenantDb(db, record.clerk_org_id);
+  assertTenantDb(db, record.account_id);
   {
-    assertTenantDb(db, record.clerk_org_id);
+    assertTenantDb(db, record.account_id);
     const client = db;
 
     if (!isXeroLeaveType(record.record_type)) {
@@ -2125,7 +2126,7 @@ async function loadBalanceSnapshot(
           },
           where: {
             ...scoped({
-              clerkOrgId: record.clerk_org_id,
+              accountId: record.account_id,
               organisationId: record.organisation_id,
             }),
             person_id: record.person_id,
@@ -2234,12 +2235,12 @@ async function canActOnRecord(
   record: LoadedApprovalRecord,
   db: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    if (input.role === "admin" || input.role === "owner") {
+    if (hasPermission(input.role, { plans: ["manageAll"] })) {
       return true;
     }
     if (!(input.role === "manager" && input.actingPersonId)) {
@@ -2247,8 +2248,8 @@ async function canActOnRecord(
     }
     const visiblePersonIds = await managerScopePersonIds(
       {
+        accountId: input.accountId,
         actingPersonId: input.actingPersonId,
-        clerkOrgId: input.clerkOrgId,
         excludeSelf: true,
       },
       client
@@ -2257,7 +2258,7 @@ async function canActOnRecord(
   }
 }
 function canUseApprovals(role: ApprovalRole): boolean {
-  return role === "admin" || role === "owner" || role === "manager";
+  return hasPermission(role, { approvals: ["review"] });
 }
 async function notifyUser(
   tx: TenantDb,
@@ -2280,10 +2281,10 @@ async function notifyUser(
   }
   const result = await dispatchNotification(
     {
+      accountId: input.accountId,
       actionUrl: options.actionUrl,
       actorUserId: input.actingUserId,
       body: notificationBody(record, options.type, options.payload?.body),
-      clerkOrgId: input.clerkOrgId,
       objectId: record.id,
       objectType: "availability_record",
       organisationId: input.organisationId,
@@ -2310,7 +2311,7 @@ async function notifyManagersIfEnabled(
 ) {
   const settingsResult = await getSettings(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       organisationId: input.organisationId,
     },
     tx
@@ -2319,7 +2320,7 @@ async function notifyManagersIfEnabled(
     log.warn(
       "Failed to load organisation settings for manager notification, skipping notification",
       {
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         error: settingsResult.error,
         organisationId: input.organisationId,
       }
@@ -2329,12 +2330,12 @@ async function notifyManagersIfEnabled(
   if (!settingsResult.value.notifyManagersOnStatusChange) {
     return;
   }
-  const managerUserId = record.person.manager?.clerk_user_id;
+  const managerUserId = record.person.manager?.user_id;
   const managerPersonId = record.person.manager?.id ?? null;
   if (!managerUserId || managerUserId === input.actingUserId) {
     return;
   }
-  if (managerUserId === record.person.clerk_user_id) {
+  if (managerUserId === record.person.user_id) {
     return;
   }
   const personName = `${record.person.first_name} ${record.person.last_name}`;
@@ -2361,11 +2362,11 @@ async function notifyApprovalBestEffort(
   }
 ): Promise<void> {
   try {
-    await withTenantDb(input.clerkOrgId, (db) =>
+    await withTenantDb(input.accountId, (db) =>
       notifyUser(db, input, record, {
         actionUrl: options.actionUrl,
         payload: options.payload,
-        recipientUserId: record.person.clerk_user_id,
+        recipientUserId: record.person.user_id,
         type: options.type,
       })
     );
@@ -2373,7 +2374,7 @@ async function notifyApprovalBestEffort(
     logApprovalNotificationFailure(error, input, record, options.type);
   }
   try {
-    await withTenantDb(input.clerkOrgId, (db) =>
+    await withTenantDb(input.accountId, (db) =>
       notifyManagersIfEnabled(db, input, record, {
         actionUrl: `/leave-approvals?recordId=${record.id}`,
         type: options.type,
@@ -2390,8 +2391,8 @@ function logApprovalNotificationFailure(
   type: "leave_approved" | "leave_declined" | "leave_xero_sync_failed"
 ): void {
   log.error("Failed to dispatch approval notification", {
+    accountId: input.accountId,
     availabilityRecordId: record.id,
-    clerkOrgId: input.clerkOrgId,
     error: error instanceof Error ? error.message : "Unknown error",
     organisationId: input.organisationId,
     type,
@@ -2405,7 +2406,7 @@ async function notifyApprovalFailureBestEffort(
   }
 ): Promise<void> {
   try {
-    await withTenantDb(input.clerkOrgId, (db) =>
+    await withTenantDb(input.accountId, (db) =>
       notifyOwnerAndApprover(db, input, record, {
         actionUrl: options.actionUrl,
       })
@@ -2428,7 +2429,7 @@ async function notifyOwnerAndApprover(
   }
 ) {
   const recipientUserIds = [
-    { personId: record.person.id, userId: record.person.clerk_user_id },
+    { personId: record.person.id, userId: record.person.user_id },
     { personId: input.actingPersonId, userId: input.actingUserId },
   ].filter(
     (
@@ -2504,9 +2505,9 @@ function auditData(
   payload: Record<string, JsonValue>
 ) {
   return {
+    account_id: input.accountId,
     action,
     actor_user_id: input.actingUserId,
-    clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
     payload: {
       actingPersonId: input.actingPersonId,
@@ -2621,7 +2622,7 @@ type ApprovalFailureOperation =
   | "decline_policy"
   | "retry_decline";
 interface ApprovalFailureContext {
-  clerkOrgId: string;
+  accountId: string;
   failureStage?: ApprovalFailureStage;
   operation: ApprovalFailureOperation;
   organisationId?: string;
@@ -2712,7 +2713,6 @@ const recordInclude = {
   },
   person: {
     select: {
-      clerk_user_id: true,
       email: true,
       first_name: true,
       id: true,
@@ -2720,8 +2720,8 @@ const recordInclude = {
       location_id: true,
       manager: {
         select: {
-          clerk_user_id: true,
           id: true,
+          user_id: true,
         },
       },
       manager_person_id: true,
@@ -2730,18 +2730,19 @@ const recordInclude = {
           name: true,
         },
       },
+      user_id: true,
     },
   },
 } satisfies Prisma.AvailabilityRecordInclude;
 // Explicit projection: source_payload_json and xero_write_error_raw are audit
 // data and must never cross the RSC boundary to a client component.
 const approvalRecordSelect = {
+  account_id: true,
   all_day: true,
   approval_note: true,
   approval_status: true,
   approved_at: true,
   archived_at: true,
-  clerk_org_id: true,
   created_at: true,
   created_by_user_id: true,
   ends_at: true,
@@ -2810,14 +2811,14 @@ async function approveLocalRequest(
   retry: boolean | undefined
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   const created = await createLeaveOnApproval(
-    { ...input, actingOrgRole: `org:${input.role}` },
+    { ...input, actingRole: input.role },
     externalWritePort,
     retry
   );
   if (!created.ok) {
     return { error: approvalCreateError(created.error), ok: false };
   }
-  const updated = await withTenantDb(input.clerkOrgId, (db) =>
+  const updated = await withTenantDb(input.accountId, (db) =>
     loadRecord(input, db)
   );
   if (!updated) {
@@ -2825,7 +2826,7 @@ async function approveLocalRequest(
   }
   return {
     ok: true,
-    value: await withTenantDb(updated.clerk_org_id, (db) =>
+    value: await withTenantDb(updated.account_id, (db) =>
       toApprovalListItem(updated, undefined, db)
     ),
   };
@@ -2842,7 +2843,7 @@ async function declineRemoteIfPresent(
     return { ok: true as const, value: undefined };
   }
   return await port.declineLeaveApplication({
-    clerkOrgId: input.clerkOrgId,
+    accountId: input.accountId,
     employeeId,
     mutation,
     organisationId: input.organisationId,

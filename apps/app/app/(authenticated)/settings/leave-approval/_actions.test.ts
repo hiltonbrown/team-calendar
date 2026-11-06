@@ -58,18 +58,18 @@ vi.mock("@repo/database", async () => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   defaultOrganisationSettingsPatch: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   revalidatePath: vi.fn(),
   updateAccountApprovalSettings: vi.fn(),
   updateSettings: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   defaultOrganisationSettingsPatch: mocks.defaultOrganisationSettingsPatch,
@@ -90,17 +90,17 @@ const {
 } = await import("./_actions");
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 
 describe("settings/leave-approval server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.defaultOrganisationSettingsPatch.mockReturnValue({
       requireDeclineReason: true,
@@ -113,7 +113,7 @@ describe("settings/leave-approval server actions", () => {
 
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
 
       const result = await updateLeaveApprovalSettingsAction({
         organisationId,
@@ -132,9 +132,9 @@ describe("settings/leave-approval server actions", () => {
     });
 
     it("rejects non-admin roles (manager, viewer)", async () => {
-      mocks.auth.mockResolvedValue({
-        orgId: "org_123",
-        orgRole: "org:manager",
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "manager",
       });
 
       const result = await updateLeaveApprovalSettingsAction({
@@ -169,7 +169,7 @@ describe("settings/leave-approval server actions", () => {
       expect(mocks.updateSettings).not.toHaveBeenCalled();
     });
 
-    it("scopes settings update to clerkOrgId and organisationId", async () => {
+    it("scopes settings update to accountId and organisationId", async () => {
       await updateLeaveApprovalSettingsAction({
         organisationId,
         patch: { requireDeclineReason: true },
@@ -177,9 +177,9 @@ describe("settings/leave-approval server actions", () => {
 
       expect(mocks.updateSettings).toHaveBeenCalledWith(
         {
+          accountId,
           actingRole: "admin",
           actingUserId: userId,
-          clerkOrgId,
           organisationId,
           patch: { requireDeclineReason: true },
         },
@@ -257,9 +257,9 @@ describe("settings/leave-approval server actions", () => {
 });
 
 it("account manager visibility uses the authenticated account and admin role", async () => {
-  mocks.auth.mockResolvedValue({
-    orgId: clerkOrgId,
-    orgRole: "org:admin",
+  mocks.getSession.mockResolvedValue({
+    accountId,
+    role: "admin",
     userId,
   });
   mocks.updateAccountApprovalSettings.mockResolvedValue({
@@ -273,18 +273,18 @@ it("account manager visibility uses the authenticated account and admin role", a
   ).toMatchObject({ ok: true });
   expect(mocks.updateAccountApprovalSettings).toHaveBeenCalledWith(
     expect.objectContaining({
+      accountId,
       actingRole: "admin",
       actingUserId: userId,
-      clerkOrgId,
       managerVisibilityScope: "all_team_leave",
     }),
     expect.any(Object)
   );
 });
 it("managers cannot change account visibility", async () => {
-  mocks.auth.mockResolvedValue({
-    orgId: clerkOrgId,
-    orgRole: "org:manager",
+  mocks.getSession.mockResolvedValue({
+    accountId,
+    role: "manager",
     userId,
   });
   expect(

@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import type { TenantDb } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
@@ -21,10 +21,10 @@ vi.mock("@repo/database", async () => {
   return {
     ...core,
     loadHolidayResolutionData: (
-      input: { clerkOrgId: string; from: string; to: string },
+      input: { accountId: string; from: string; to: string },
       db: Parameters<typeof core.assertTenantDb>[0]
     ) => {
-      core.assertTenantDb(db, input.clerkOrgId);
+      core.assertTenantDb(db, input.accountId);
       return Promise.resolve({
         customHolidays: [],
         from: input.from,
@@ -35,7 +35,7 @@ vi.mock("@repo/database", async () => {
       });
     },
     scopedQuery: (account: string, company: string) => ({
-      clerk_org_id: account,
+      account_id: account,
       organisation_id: company,
     }),
   };
@@ -59,10 +59,10 @@ import {
 } from "./resolve-public-holidays";
 
 // These fixture identifiers are valid account/company ids, branded at this test boundary.
-const clerkOrgId = "account-A" as ClerkOrgId;
+const accountId = "account-A" as AccountId;
 const organisationId = "11111111-1111-4111-8111-111111111111" as OrganisationId;
 const holidayId = "22222222-2222-4222-8222-222222222222";
-const scope = { clerkOrgId, organisationId };
+const scope = { accountId, organisationId };
 const actor = {
   ...scope,
   actingRole: "owner" as const,
@@ -96,7 +96,7 @@ const cases: { name: string; run: (db: TenantDb) => Promise<unknown> }[] = [
   },
   {
     name: "delete custom holiday",
-    run: (db) => deleteCustomHoliday(clerkOrgId, organisationId, holidayId, db),
+    run: (db) => deleteCustomHoliday(accountId, organisationId, holidayId, db),
   },
   {
     name: "hide custom holiday",
@@ -184,10 +184,10 @@ beforeEach(() => {
 test.each(cases)(
   "$name opens one scope or reuses the caller scope",
   async ({ run }) => {
-    await withTenantDb(scope.clerkOrgId, (db) => run(db));
+    await withTenantDb(scope.accountId, (db) => run(db));
     expect(state.transaction).toHaveBeenCalledTimes(1);
     state.transaction.mockClear();
-    await withTenantDb(clerkOrgId, async (db) => {
+    await withTenantDb(accountId, async (db) => {
       await run(db);
       expect(state.transaction).toHaveBeenCalledTimes(1);
     });

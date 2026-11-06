@@ -53,7 +53,7 @@ function allocateTenant(index: number) {
 }
 const tenantA = allocateTenant(0),
   tenantB = allocateTenant(1);
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const testAccountIds = [tenantA.accountId, tenantB.accountId];
 let database: typeof import("@repo/database")["systemDatabase"];
 let disconnectXeroOAuthConnection: typeof import("./disconnect")["disconnectXeroOAuthConnection"];
 let encryptXeroToken: typeof import("../crypto/tokens")["encryptXeroToken"];
@@ -71,7 +71,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   await cleanTestData();
-  process.env.XERO_CLIENT_ID = `disconnect-${tenantA.clerkOrgId}-${Date.now()}`;
+  process.env.XERO_CLIENT_ID = `disconnect-${tenantA.accountId}-${Date.now()}`;
   process.env.XERO_APP_TIER = "starter";
   await createTenantFixture(tenantA);
   await createTenantFixture(tenantB);
@@ -90,7 +90,7 @@ async function cleanTestData() {
   if (!database) {
     return;
   }
-  const where = { clerk_org_id: { in: testClerkOrgIds } };
+  const where = { account_id: { in: testAccountIds } };
   await database.notificationEmailQueue.deleteMany({ where });
   await database.notification.deleteMany({ where });
   await database.notificationPreference.deleteMany({ where });
@@ -117,7 +117,7 @@ async function cleanTestData() {
 }
 function disconnect(destructive = false) {
   return disconnectXeroOAuthConnection({
-    clerkOrgId: tenantA.clerkOrgId,
+    accountId: tenantA.accountId,
     connectionId: tenantA.connectionId,
     destructive,
     organisationId: tenantA.organisationId,
@@ -159,7 +159,7 @@ function providerPort(
           input.action === "create"
             ? "https://api.xero.com/payroll.xro/1.0/LeaveApplications"
             : `https://api.xero.com/payroll.xro/1.0/LeaveApplications/${input.remoteId}/${input.action === "approve" ? "approve" : "reject"}`,
-        xeroTenantId: `xero-${input.clerkOrgId}`,
+        xeroTenantId: `xero-${input.accountId}`,
       },
     })),
     resolveEmployeeId: vi.fn(async () => ({
@@ -185,7 +185,7 @@ describe("canonical disconnect isolation", () => {
       );
       expect(
         await removeXeroCompany({
-          clerkOrgId: tenantA.clerkOrgId,
+          accountId: tenantA.accountId,
           connectionId: tenantA.connectionId,
           organisationId: tenantA.organisationId,
           role: "owner",
@@ -208,7 +208,7 @@ describe("canonical disconnect isolation", () => {
     const { removeXeroCompany } = await import("./disconnect");
     expect(
       await removeXeroCompany({
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
         connectionId: tenantA.connectionId,
         organisationId: tenantA.organisationId,
         role: "owner",
@@ -246,7 +246,7 @@ describe("canonical disconnect isolation", () => {
       const { removeXeroCompany } = await import("./disconnect");
       expect(
         await removeXeroCompany({
-          clerkOrgId: tenantA.clerkOrgId,
+          accountId: tenantA.accountId,
           connectionId: tenantA.connectionId,
           organisationId: tenantA.organisationId,
           role: "owner",
@@ -270,8 +270,8 @@ describe("canonical disconnect isolation", () => {
       expect(
         await database.auditEvent.findFirst({
           where: {
+            account_id: tenantA.accountId,
             action: "company_removed",
-            clerk_org_id: tenantA.clerkOrgId,
             resource_id: tenantA.connectionId,
           },
         })
@@ -291,7 +291,7 @@ describe("canonical disconnect isolation", () => {
     const { removeXeroCompany } = await import("./disconnect");
     expect(
       await removeXeroCompany({
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
         connectionId: tenantA.connectionId,
         organisationId: tenantA.organisationId,
         role: "owner",
@@ -316,7 +316,7 @@ describe("canonical disconnect isolation", () => {
     const { removeXeroCompany } = await import("./disconnect");
     expect(
       await removeXeroCompany({
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
         connectionId: tenantA.connectionId,
         organisationId: tenantA.organisationId,
         role: "owner",
@@ -333,7 +333,7 @@ describe("canonical disconnect isolation", () => {
     const { removeXeroCompany } = await import("./disconnect");
     await database.xeroOAuthSession.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         expires_at: new Date(Date.now() + 60_000),
         id: tenantA.sessionId,
         organisation_id: null,
@@ -344,7 +344,7 @@ describe("canonical disconnect isolation", () => {
     });
     const companyFeed = await database.feed.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         name: "Manual company calendar",
         organisation_id: tenantA.organisationId,
         slug: `remove-${tenantA.connectionId}`,
@@ -352,7 +352,7 @@ describe("canonical disconnect isolation", () => {
     });
     const companyToken = await database.feedToken.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         feed_id: companyFeed.id,
         organisation_id: tenantA.organisationId,
         token_hash: `synthetic-${companyFeed.id}`,
@@ -361,7 +361,7 @@ describe("canonical disconnect isolation", () => {
     });
     const accountFeed = await database.feed.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         name: "Account",
         organisation_id: null,
         slug: `account-${tenantA.connectionId}`,
@@ -369,7 +369,7 @@ describe("canonical disconnect isolation", () => {
     });
     const holidayPublication = await database.feedEventPublication.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         feed_id: accountFeed.id,
         organisation_id: null,
         published_at: new Date(),
@@ -382,7 +382,7 @@ describe("canonical disconnect isolation", () => {
       where: { id: tenantB.connectionId },
     });
     const input = {
-      clerkOrgId: tenantA.clerkOrgId,
+      accountId: tenantA.accountId,
       connectionId: tenantA.connectionId,
       organisationId: tenantA.organisationId,
       role: "owner" as const,
@@ -440,7 +440,7 @@ describe("canonical disconnect isolation", () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     expect(
       await database.auditEvent.count({
-        where: { action: "company_removed", clerk_org_id: tenantA.clerkOrgId },
+        where: { account_id: tenantA.accountId, action: "company_removed" },
       })
     ).toBe(1);
     expect(
@@ -450,7 +450,7 @@ describe("canonical disconnect isolation", () => {
   it("keeps the closing session reference for a normal scheduler retry after prune failure", async () => {
     await database.xeroOAuthSession.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         expires_at: new Date(Date.now() + 60_000),
         id: tenantA.sessionId,
         organisation_id: tenantA.organisationId,
@@ -503,7 +503,7 @@ describe("canonical disconnect isolation", () => {
   it("prunes a session-protected unused grant when its final selecting session expires", async () => {
     await database.xeroOAuthSession.create({
       data: {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         expires_at: new Date(Date.now() + 60_000),
         id: tenantA.sessionId,
         organisation_id: tenantA.organisationId,
@@ -537,7 +537,7 @@ describe("canonical disconnect isolation", () => {
     "allows local decline and withdrawal while the connection is %s",
     async (status) => {
       await database.person.update({
-        data: { clerk_user_id: null },
+        data: { user_id: null },
         where: { id: tenantA.xeroPersonId },
       });
       await database.availabilityRecord.update({
@@ -556,9 +556,9 @@ describe("canonical disconnect isolation", () => {
       const { withdrawSubmission } = await import("@repo/availability");
       const port = providerPort();
       const command = {
+        accountId: tenantA.accountId,
         actingPersonId: null,
         actingUserId: "admin_1",
-        clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         reason: "Local decision",
         recordId: tenantA.availabilityRecordId,
@@ -570,10 +570,7 @@ describe("canonical disconnect isolation", () => {
         where: { id: tenantA.availabilityRecordId },
       });
       expect(
-        await withdrawSubmission(
-          { ...command, actingOrgRole: "org:admin" },
-          port
-        )
+        await withdrawSubmission({ ...command, actingRole: "admin" }, port)
       ).toMatchObject({ ok: true });
       expect(port.approveLeaveApplication).not.toHaveBeenCalled();
       expect(port.declineLeaveApplication).not.toHaveBeenCalled();
@@ -600,7 +597,7 @@ describe("canonical disconnect isolation", () => {
     "persists %s failure certainty %s and permits disconnect only for definitive failure",
     async (action, certainty) => {
       await database.person.update({
-        data: { clerk_user_id: null },
+        data: { user_id: null },
         where: { id: tenantA.xeroPersonId },
       });
       await database.availabilityRecord.update({
@@ -615,9 +612,9 @@ describe("canonical disconnect isolation", () => {
       const { withdrawSubmission } = await import("@repo/availability");
       const port = providerPort(certainty);
       const command = {
+        accountId: tenantA.accountId,
         actingPersonId: null,
         actingUserId: "admin_1",
-        clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         reason: "Provider decision",
         recordId: tenantA.availabilityRecordId,
@@ -627,7 +624,7 @@ describe("canonical disconnect isolation", () => {
         approve: () => approve(command, port),
         decline: () => decline(command, port),
         withdraw: () =>
-          withdrawSubmission({ ...command, actingOrgRole: "org:admin" }, port),
+          withdrawSubmission({ ...command, actingRole: "admin" }, port),
       };
       const failed = await mutations[action]();
       expect(failed).toMatchObject({ ok: true });
@@ -697,7 +694,7 @@ describe("canonical disconnect isolation", () => {
     const provider = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", provider);
     await database.$executeRawUnsafe(
-      `CREATE FUNCTION ${functionName}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.clerk_org_id = '${tenantA.clerkOrgId}' AND NEW.action LIKE 'xero.connection_disconnected_%' THEN RAISE EXCEPTION 'owned disconnect audit failure'; END IF; RETURN NEW; END $$`
+      `CREATE FUNCTION ${functionName}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.account_id = '${tenantA.accountId}' AND NEW.action LIKE 'xero.connection_disconnected_%' THEN RAISE EXCEPTION 'owned disconnect audit failure'; END IF; RETURN NEW; END $$`
     );
     await database.$executeRawUnsafe(
       `CREATE TRIGGER ${functionName} BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION ${functionName}()`
@@ -709,7 +706,7 @@ describe("canonical disconnect isolation", () => {
       await expectTenantDataPresent(tenantA);
       expect(
         await database.auditEvent.count({
-          where: { clerk_org_id: tenantA.clerkOrgId },
+          where: { account_id: tenantA.accountId },
         })
       ).toBe(0);
     } finally {
@@ -740,7 +737,7 @@ describe("canonical disconnect isolation", () => {
     ]) {
       expect(
         await disconnectXeroOAuthConnection({
-          clerkOrgId: tenantA.clerkOrgId,
+          accountId: tenantA.accountId,
           ...target,
           destructive: false,
         })
@@ -761,7 +758,7 @@ describe("canonical disconnect isolation", () => {
 
   it("purges imported leave without removing manual entries from the same person's feed", async () => {
     const scope = {
-      clerk_org_id: tenantA.clerkOrgId,
+      account_id: tenantA.accountId,
       organisation_id: tenantA.organisationId,
     };
     await database.feed.create({
@@ -789,7 +786,7 @@ describe("canonical disconnect isolation", () => {
         all_day: true,
         approval_status: "approved",
         contactability: "unavailable",
-        derived_uid_key: `manual-${tenantA.clerkOrgId}`,
+        derived_uid_key: `manual-${tenantA.accountId}`,
         ends_at: new Date(Date.now() + 172_800_000),
         id: tenantA.manualRecordId,
         person_id: tenantA.xeroPersonId,
@@ -803,14 +800,12 @@ describe("canonical disconnect isolation", () => {
     });
     const { establishFeedRepresentation } = await import("@repo/feeds");
     const feedScope = {
-      clerkOrgId: tenantA.clerkOrgId,
+      accountId: tenantA.accountId,
       feedId: tenantA.feedId,
       organisationId: tenantA.organisationId,
     };
     const before = await establishFeedRepresentation(feedScope);
-    expect(
-      before.ok && before.value.events.map((event) => event.sourceRecordId)
-    ).toEqual(
+    expect(before.value.events.map((event) => event.sourceRecordId)).toEqual(
       expect.arrayContaining([
         tenantA.availabilityRecordId,
         tenantA.manualRecordId,
@@ -859,7 +854,7 @@ describe("canonical disconnect isolation", () => {
     async (kind) => {
       await database.xeroOAuthSession.create({
         data: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           expires_at: new Date(
             Date.now() + (kind === "expired" ? -10_000 : 60_000)
           ),
@@ -901,7 +896,7 @@ describe("canonical disconnect isolation", () => {
       await expectTenantDataPresent(tenantA);
       expect(
         await database.auditEvent.count({
-          where: { clerk_org_id: tenantA.clerkOrgId },
+          where: { account_id: tenantA.accountId },
         })
       ).toBe(0);
     }
@@ -929,7 +924,7 @@ describe("canonical disconnect isolation", () => {
     const { acquireXeroWriteClaim } = await import("@repo/availability");
     const claiming = withTestTenantDb(
       tenantTestAccount({
-        clerkOrgId: tenantA.clerkOrgId,
+        accountId: tenantA.accountId,
         expectedSequence: 0,
         expectedStatus: "approved",
         organisationId: tenantA.organisationId,
@@ -938,7 +933,7 @@ describe("canonical disconnect isolation", () => {
       (db) =>
         acquireXeroWriteClaim(
           {
-            clerkOrgId: tenantA.clerkOrgId,
+            accountId: tenantA.accountId,
             expectedSequence: 0,
             expectedStatus: "approved",
             organisationId: tenantA.organisationId,
@@ -984,11 +979,11 @@ describe("canonical disconnect isolation", () => {
     await deleting;
     const { prepareAndClaimSubmitOperation } = await import("@repo/database");
     const preparing = prepareAndClaimSubmitOperation({
+      accountId: tenantA.accountId,
       action: "approve",
       actorUserId: "admin_1",
       availabilityRecordId: tenantA.availabilityRecordId,
       claimableBefore: new Date(0),
-      clerkOrgId: tenantA.clerkOrgId,
       expectedFailedAction: null,
       expectedSequence: 0,
       expectedStatus: "submitted",
@@ -997,7 +992,7 @@ describe("canonical disconnect isolation", () => {
         body: "[]",
         method: "POST",
         url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
-        xeroTenantId: `xero-${tenantA.clerkOrgId}`,
+        xeroTenantId: `xero-${tenantA.accountId}`,
       },
       requestEmployeeId: "employee",
       requestEndsAt: new Date(),
@@ -1012,7 +1007,7 @@ describe("canonical disconnect isolation", () => {
     expect(await preparing).toBeNull();
     expect(
       await database.outboundOperation.count({
-        where: { clerk_org_id: tenantA.clerkOrgId },
+        where: { account_id: tenantA.accountId },
       })
     ).toBe(0);
   });
@@ -1026,8 +1021,8 @@ describe("canonical disconnect isolation", () => {
     expect(
       await database.auditEvent.findFirst({
         where: {
+          account_id: tenantA.accountId,
           action: "xero.connection_disconnected_soft",
-          clerk_org_id: tenantA.clerkOrgId,
           organisation_id: tenantA.organisationId,
         },
       })
@@ -1041,10 +1036,10 @@ describe("canonical disconnect isolation", () => {
     async (status) => {
       await database.outboundOperation.create({
         data: {
+          account_id: tenantA.accountId,
           action: "approve",
           actor_user_id: "admin_1",
           availability_record_id: tenantA.availabilityRecordId,
-          clerk_org_id: tenantA.clerkOrgId,
           organisation_id: tenantA.organisationId,
           request_fingerprint: "owned-operation",
           status,
@@ -1126,12 +1121,12 @@ describe("canonical disconnect isolation", () => {
     await expectConnectionActive(tenantA);
     await expectTenantDataPresent(tenantA);
   });
-  it("rejects a foreign Clerk account before provider DELETE", async () => {
+  it("rejects a foreign Account before provider DELETE", async () => {
     const provider = vi.fn();
     vi.stubGlobal("fetch", provider);
     expect(
       await disconnectXeroOAuthConnection({
-        clerkOrgId: tenantB.clerkOrgId,
+        accountId: tenantB.accountId,
         connectionId: tenantA.connectionId,
         destructive: false,
         organisationId: tenantA.organisationId,
@@ -1153,10 +1148,10 @@ describe("canonical disconnect isolation", () => {
 async function createTenantFixture(tenant: typeof tenantA) {
   await database.organisation.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       country_code: "AU",
       id: tenant.organisationId,
-      name: `Disconnect fixture ${tenant.clerkOrgId}`,
+      name: `Disconnect fixture ${tenant.accountId}`,
     },
   });
   const a = encryptXeroToken("access-token"),
@@ -1181,7 +1176,7 @@ async function createTenantFixture(tenant: typeof tenantA) {
   });
   await database.xeroConnection.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.connectionId,
       organisation_id: tenant.organisationId,
       payroll_region: "AU",
@@ -1189,28 +1184,28 @@ async function createTenantFixture(tenant: typeof tenantA) {
       status: "active",
       tenant_name: "Payroll",
       xero_authorisation_id: tenant.authorisationId,
-      xero_tenant_id: `xero-${tenant.clerkOrgId}`,
+      xero_tenant_id: `xero-${tenant.accountId}`,
     },
   });
   await database.person.createMany({
     data: [
       {
-        clerk_org_id: tenant.clerkOrgId,
-        clerk_user_id: `user_${tenant.clerkOrgId}`,
-        email: `${tenant.clerkOrgId}.xero@example.com`,
+        account_id: tenant.accountId,
+        email: `${tenant.accountId}.xero@example.com`,
         employment_type: "employee",
         first_name: "Xero",
         id: tenant.xeroPersonId,
         is_active: true,
         last_name: "Person",
         organisation_id: tenant.organisationId,
-        source_person_key: `employee-${tenant.clerkOrgId}`,
+        source_person_key: `employee-${tenant.accountId}`,
         source_system: "XERO",
-        xero_employee_id: `employee-${tenant.clerkOrgId}`,
+        user_id: `user_${tenant.accountId}`,
+        xero_employee_id: `employee-${tenant.accountId}`,
       },
       {
-        clerk_org_id: tenant.clerkOrgId,
-        email: `${tenant.clerkOrgId}.candidate@example.com`,
+        account_id: tenant.accountId,
+        email: `${tenant.accountId}.candidate@example.com`,
         employment_type: "employee",
         first_name: "Candidate",
         id: tenant.candidatePersonId,
@@ -1225,12 +1220,12 @@ async function createTenantFixture(tenant: typeof tenantA) {
   });
   await database.leaveBalance.create({
     data: {
+      account_id: tenant.accountId,
       balance: 76,
       balance_unit: "hours",
-      clerk_org_id: tenant.clerkOrgId,
       id: tenant.leaveBalanceId,
       leave_type_name: "Annual Leave",
-      leave_type_xero_id: `annual-${tenant.clerkOrgId}`,
+      leave_type_xero_id: `annual-${tenant.accountId}`,
       organisation_id: tenant.organisationId,
       person_id: tenant.xeroPersonId,
       record_type: "annual_leave",
@@ -1239,8 +1234,8 @@ async function createTenantFixture(tenant: typeof tenantA) {
   });
   await database.xeroPersonMatch.create({
     data: {
+      account_id: tenant.accountId,
       candidate_person_id: tenant.candidatePersonId,
-      clerk_org_id: tenant.clerkOrgId,
       detected_reason: "email_match",
       id: tenant.matchId,
       organisation_id: tenant.organisationId,
@@ -1250,11 +1245,11 @@ async function createTenantFixture(tenant: typeof tenantA) {
   });
   await database.availabilityRecord.create({
     data: {
+      account_id: tenant.accountId,
       all_day: true,
       approval_status: "approved",
-      clerk_org_id: tenant.clerkOrgId,
       contactability: "unavailable",
-      derived_uid_key: `uid-${tenant.clerkOrgId}`,
+      derived_uid_key: `uid-${tenant.accountId}`,
       ends_at: new Date("2026-06-05T00:00:00.000Z"),
       id: tenant.availabilityRecordId,
       organisation_id: tenant.organisationId,
@@ -1262,7 +1257,7 @@ async function createTenantFixture(tenant: typeof tenantA) {
       privacy_mode: "named",
       publish_status: "eligible",
       record_type: "annual_leave",
-      source_remote_id: `leave-${tenant.clerkOrgId}`,
+      source_remote_id: `leave-${tenant.accountId}`,
       source_type: "xero_leave",
       starts_at: new Date("2026-06-04T00:00:00.000Z"),
       title: "Annual leave",
@@ -1270,7 +1265,7 @@ async function createTenantFixture(tenant: typeof tenantA) {
   });
   await database.syncRun.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.syncRunId,
       organisation_id: tenant.organisationId,
       run_type: "leave_records",
@@ -1282,7 +1277,7 @@ async function createTenantFixture(tenant: typeof tenantA) {
   });
   await database.xeroSyncCursor.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       entity_type: "leave_records",
       id: tenant.cursorId,
       modified_since: new Date(),
@@ -1336,22 +1331,22 @@ async function expectTenantDataPresent(
 ) {
   await expect(
     database.leaveBalance.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(1);
   await expect(
     database.xeroPersonMatch.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(1);
   await expect(
     database.syncRun.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(1);
   await expect(
     database.xeroSyncCursor.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(disconnected ? 0 : 1);
 
@@ -1359,8 +1354,8 @@ async function expectTenantDataPresent(
     where: { id: tenant.xeroPersonId },
   });
   expect(person.archived_at).toBeNull();
-  expect(person.clerk_user_id).toBe(`user_${tenant.clerkOrgId}`);
-  expect(person.xero_employee_id).toBe(`employee-${tenant.clerkOrgId}`);
+  expect(person.user_id).toBe(`user_${tenant.accountId}`);
+  expect(person.xero_employee_id).toBe(`employee-${tenant.accountId}`);
 
   const record = await database.availabilityRecord.findUniqueOrThrow({
     where: { id: tenant.availabilityRecordId },
@@ -1372,22 +1367,22 @@ async function expectTenantDataPresent(
 async function expectTargetTenantDestroyed(tenant: typeof tenantA) {
   await expect(
     database.leaveBalance.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(0);
   await expect(
     database.xeroPersonMatch.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(0);
   await expect(
     database.syncRun.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(0);
   await expect(
     database.xeroSyncCursor.count({
-      where: { clerk_org_id: tenant.clerkOrgId },
+      where: { account_id: tenant.accountId },
     })
   ).resolves.toBe(0);
 
@@ -1395,7 +1390,7 @@ async function expectTargetTenantDestroyed(tenant: typeof tenantA) {
     where: { id: tenant.xeroPersonId },
   });
   expect(person.archived_at).toBeInstanceOf(Date);
-  expect(person.clerk_user_id).toBeNull();
+  expect(person.user_id).toBeNull();
   expect(person.xero_employee_id).toBeNull();
 
   const record = await database.availabilityRecord.findUniqueOrThrow({

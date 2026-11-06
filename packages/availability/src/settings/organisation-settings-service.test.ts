@@ -39,7 +39,7 @@ function buildTestDatabase() {
 const service = await import("./organisation-settings-service");
 
 const baseRow = {
-  clerk_org_id: "org_1",
+  account_id: "org_1",
   created_at: new Date("2026-04-19T00:00:00.000Z"),
   default_feed_privacy_mode: "named" as const,
   default_leave_request_advance_days: 0,
@@ -64,13 +64,13 @@ describe("organisation-settings-service", () => {
   it("returns full defaults from getSettings", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: baseRow.clerk_org_id,
+        accountId: baseRow.account_id,
         organisationId: baseRow.organisation_id,
       }),
       (db) =>
         service.getSettings(
           {
-            clerkOrgId: baseRow.clerk_org_id,
+            accountId: baseRow.account_id,
             organisationId: baseRow.organisation_id,
           },
           db
@@ -89,7 +89,7 @@ describe("organisation-settings-service", () => {
 
   it("recovers on the next read after a settings load fails", async () => {
     const input = {
-      clerkOrgId: "org_settings_recovery",
+      accountId: "org_settings_recovery",
       organisationId: baseRow.organisation_id,
     };
     mocks.getOrCreateOrganisationSettings.mockRejectedValueOnce(
@@ -117,7 +117,7 @@ describe("organisation-settings-service", () => {
 
   it("isolates settings reads in separate transaction roots", async () => {
     const input = {
-      clerkOrgId: "org_settings_concurrent",
+      accountId: "org_settings_concurrent",
       organisationId: baseRow.organisation_id,
     };
     let resolveSettings: ((row: typeof baseRow) => void) | undefined;
@@ -158,9 +158,9 @@ describe("organisation-settings-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseRow.account_id,
         actingRole: "admin",
         actingUserId: "user_1",
-        clerkOrgId: baseRow.clerk_org_id,
         organisationId: baseRow.organisation_id,
         patch: {
           notifyManagersOnStatusChange: false,
@@ -169,9 +169,9 @@ describe("organisation-settings-service", () => {
       (db) =>
         service.updateSettings(
           {
+            accountId: baseRow.account_id,
             actingRole: "admin",
             actingUserId: "user_1",
-            clerkOrgId: baseRow.clerk_org_id,
             organisationId: baseRow.organisation_id,
             patch: {
               notifyManagersOnStatusChange: false,
@@ -189,7 +189,7 @@ describe("organisation-settings-service", () => {
     });
     expect(mocks.updateOrganisationSettings).toHaveBeenCalledWith(
       {
-        clerkOrgId: baseRow.clerk_org_id,
+        accountId: baseRow.account_id,
         organisationId: baseRow.organisation_id,
         patch: {
           notify_managers_on_status_change: false,
@@ -215,9 +215,9 @@ describe("organisation-settings-service", () => {
   it("rejects unknown keys with a validation error", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseRow.account_id,
         actingRole: "admin",
         actingUserId: "user_1",
-        clerkOrgId: baseRow.clerk_org_id,
         organisationId: baseRow.organisation_id,
         patch: {
           unknown: true,
@@ -226,9 +226,9 @@ describe("organisation-settings-service", () => {
       (db) =>
         service.updateSettings(
           {
+            accountId: baseRow.account_id,
             actingRole: "admin",
             actingUserId: "user_1",
-            clerkOrgId: baseRow.clerk_org_id,
             organisationId: baseRow.organisation_id,
             patch: {
               unknown: true,
@@ -247,9 +247,9 @@ describe("organisation-settings-service", () => {
   it("rejects invalid enum values", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseRow.account_id,
         actingRole: "owner",
         actingUserId: "user_1",
-        clerkOrgId: baseRow.clerk_org_id,
         organisationId: baseRow.organisation_id,
         patch: {
           managerVisibilityScope: "invalid-scope",
@@ -258,9 +258,9 @@ describe("organisation-settings-service", () => {
       (db) =>
         service.updateSettings(
           {
+            accountId: baseRow.account_id,
             actingRole: "owner",
             actingUserId: "user_1",
-            clerkOrgId: baseRow.clerk_org_id,
             organisationId: baseRow.organisation_id,
             patch: {
               managerVisibilityScope: "invalid-scope",
@@ -284,13 +284,13 @@ describe("organisation-settings-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_legacy",
+        accountId: "org_legacy",
         organisationId: baseRow.organisation_id,
       }),
       (db) =>
         service.getSettings(
           {
-            clerkOrgId: "org_legacy",
+            accountId: "org_legacy",
             organisationId: baseRow.organisation_id,
           },
           db
@@ -306,9 +306,9 @@ describe("organisation-settings-service", () => {
   it("rejects attempts to make decline reasons optional without persisting", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseRow.account_id,
         actingRole: "admin",
         actingUserId: "user_1",
-        clerkOrgId: baseRow.clerk_org_id,
         organisationId: baseRow.organisation_id,
         // Test-only type escape: exercise domain validation of the legacy false value.
         patch: { requireDeclineReason: false } as never,
@@ -316,9 +316,9 @@ describe("organisation-settings-service", () => {
       (db) =>
         service.updateSettings(
           {
+            accountId: baseRow.account_id,
             actingRole: "admin",
             actingUserId: "user_1",
-            clerkOrgId: baseRow.clerk_org_id,
             organisationId: baseRow.organisation_id,
             // Test-only type escape: exercise domain validation of the legacy false value.
             patch: { requireDeclineReason: false } as never,
@@ -348,18 +348,18 @@ describe("organisation-settings-service", () => {
   ] as const)("authorises %s correctly", async (actingRole, expectedOk) => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseRow.account_id,
         actingRole,
         actingUserId: "user_1",
-        clerkOrgId: baseRow.clerk_org_id,
         organisationId: baseRow.organisation_id,
         patch: { showPendingOnCalendar: false },
       }),
       (db) =>
         service.updateSettings(
           {
+            accountId: baseRow.account_id,
             actingRole,
             actingUserId: "user_1",
-            clerkOrgId: baseRow.clerk_org_id,
             organisationId: baseRow.organisation_id,
             patch: { showPendingOnCalendar: false },
           },
@@ -379,13 +379,13 @@ describe("organisation-settings-service", () => {
   it("reuses the request-scoped cache for repeated reads", async () => {
     const first = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: baseRow.clerk_org_id,
+        accountId: baseRow.account_id,
         organisationId: baseRow.organisation_id,
       }),
       (db) =>
         service.getSettings(
           {
-            clerkOrgId: baseRow.clerk_org_id,
+            accountId: baseRow.account_id,
             organisationId: baseRow.organisation_id,
           },
           db
@@ -393,13 +393,13 @@ describe("organisation-settings-service", () => {
     );
     const second = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: baseRow.clerk_org_id,
+        accountId: baseRow.account_id,
         organisationId: baseRow.organisation_id,
       }),
       (db) =>
         service.getSettings(
           {
-            clerkOrgId: baseRow.clerk_org_id,
+            accountId: baseRow.account_id,
             organisationId: baseRow.organisation_id,
           },
           db

@@ -5,14 +5,14 @@ vi.mock("server-only", () => ({}));
 import { toXeroPersonMatchView, xeroPersonMatchSelect } from "./_match-view";
 
 const forbiddenMatchFields = [
-  "clerk_org_id",
+  "account_id",
   "created_at",
   "match_reason",
   "organisation_id",
   "resolution_note",
   "resolved_at",
   "resolved_by_user_id",
-  "resolved_clerk_user_id",
+  "resolved_user_id",
   "resolved_person_id",
   "source_payload_json",
   "status",
@@ -30,10 +30,10 @@ describe("xeroPersonMatchSelect", () => {
     expect(xeroPersonMatchSelect.id).toBe(true);
     expect(xeroPersonMatchSelect.candidate_person).toEqual({
       select: {
-        clerk_user_id: true,
         email: true,
         first_name: true,
         last_name: true,
+        user_id: true,
       },
     });
     expect(xeroPersonMatchSelect.xero_person).toEqual({
@@ -51,10 +51,10 @@ describe("toXeroPersonMatchView", () => {
     const matchId = "00000000-0000-4000-8000-000000000001";
     const view = toXeroPersonMatchView({
       candidate_person: {
-        clerk_user_id: "user_123",
         email: "sarah@example.com",
         first_name: "Sarah",
         last_name: "Connor",
+        user_id: "user_123",
       },
       id: matchId,
       xero_person: {
@@ -66,10 +66,10 @@ describe("toXeroPersonMatchView", () => {
 
     expect(view).toEqual({
       candidate_person: {
-        clerk_user_id: "user_123",
         email: "sarah@example.com",
         first_name: "Sarah",
         last_name: "Connor",
+        user_id: "user_123",
       },
       id: matchId,
       xero_person: {
@@ -110,10 +110,10 @@ describe("toXeroPersonMatchView", () => {
     const matchId = "00000000-0000-4000-8000-000000000003";
     const view = toXeroPersonMatchView({
       candidate_person: {
-        clerk_user_id: null,
         email: "",
         first_name: "Alex",
         last_name: "Smith",
+        user_id: null,
       },
       id: matchId,
       xero_person: {
@@ -126,6 +126,6 @@ describe("toXeroPersonMatchView", () => {
     expect(view.id).toBe(matchId);
     expect(view.xero_person.email).toBe("");
     expect(view.candidate_person?.email).toBe("");
-    expect(view.candidate_person?.clerk_user_id).toBeNull();
+    expect(view.candidate_person?.user_id).toBeNull();
   });
 });

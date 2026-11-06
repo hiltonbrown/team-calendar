@@ -42,7 +42,7 @@ const { loadManagerCoverage, NO_TEAM_NAME } = await import(
 const TIMEZONE = "Australia/Brisbane";
 const TODAY = new Date("2026-10-09T02:00:00.000Z");
 const scope = {
-  clerkOrgId: "org_coverage",
+  accountId: "org_coverage",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
 

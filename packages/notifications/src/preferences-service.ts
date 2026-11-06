@@ -36,7 +36,7 @@ export interface PreferencesServiceDatabase {
 }
 
 const ScopedUserSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
   userId: z.string().min(1),
 });
@@ -60,7 +60,7 @@ export async function listPreferences(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof listPreferences> => {
     const storedRows = await client.notificationPreference.findMany({
       select: {
@@ -69,7 +69,7 @@ export async function listPreferences(
         notification_type: true,
       },
       where: {
-        clerk_org_id: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         organisation_id: parsed.data.organisationId,
         user_id: parsed.data.userId,
       },
@@ -93,7 +93,7 @@ export async function listPreferences(
       }),
     };
   };
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   return await run(db);
 }
 
@@ -105,7 +105,7 @@ export async function upsertPreference(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (client: TenantDb): ReturnType<typeof upsertPreference> => {
     if (!isKnownNotificationType(parsed.data.notificationType)) {
       return invalidType();
@@ -122,7 +122,7 @@ export async function upsertPreference(
 
     const row = await client.notificationPreference.upsert({
       create: {
-        clerk_org_id: parsed.data.clerkOrgId,
+        account_id: parsed.data.accountId,
         email_enabled: parsed.data.emailEnabled,
         in_app_enabled: parsed.data.inAppEnabled,
         notification_type: parsed.data.notificationType,
@@ -156,7 +156,7 @@ export async function upsertPreference(
     };
   };
   return await (async () => {
-    assertTenantDb(db, parsed.data.clerkOrgId);
+    assertTenantDb(db, parsed.data.accountId);
     return await run(db);
   })();
 }
@@ -169,7 +169,7 @@ export async function shouldDeliverToChannel(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof shouldDeliverToChannel> => {
@@ -205,7 +205,7 @@ export async function shouldDeliverToChannel(
       value: parsed.data.channel === "in_app" ? defaults.inApp : defaults.email,
     };
   };
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   return await run(db);
 }
 

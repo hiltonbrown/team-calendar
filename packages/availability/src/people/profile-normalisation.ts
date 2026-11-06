@@ -2,11 +2,9 @@ const WHITESPACE_PATTERN = /\s+/;
 
 export interface CurrentUserProfileInput {
   avatarUrl?: string | null;
-  clerkUserId: string;
   displayName?: string | null;
   email?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
+  userId: string;
 }
 
 export interface NormalisedCurrentUserProfile {
@@ -21,21 +19,10 @@ export function normaliseCurrentUserProfile(
   input: CurrentUserProfileInput
 ): NormalisedCurrentUserProfile {
   const email = normaliseEmail(input.email);
-  const displayName =
-    cleanString(input.displayName) ??
-    cleanString(
-      [cleanString(input.firstName), cleanString(input.lastName)]
-        .filter(Boolean)
-        .join(" ")
-    ) ??
-    email ??
-    input.clerkUserId;
+  const displayName = cleanString(input.displayName) ?? email ?? input.userId;
   const nameParts = displayName.split(WHITESPACE_PATTERN);
-  const firstName = cleanString(input.firstName) ?? nameParts[0] ?? "User";
-  const lastName =
-    cleanString(input.lastName) ??
-    cleanString(nameParts.slice(1).join(" ")) ??
-    input.clerkUserId;
+  const firstName = nameParts[0] ?? "User";
+  const lastName = cleanString(nameParts.slice(1).join(" ")) ?? input.userId;
 
   return {
     avatarUrl: cleanString(input.avatarUrl) ?? null,

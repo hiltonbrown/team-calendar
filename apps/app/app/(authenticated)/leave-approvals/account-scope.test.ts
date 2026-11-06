@@ -3,11 +3,11 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   approve: vi.fn(),
-  auth: vi.fn(),
+  getSession: vi.fn(),
   open: false,
   people: vi.fn(),
   records: vi.fn(),
-  role: "org:admin",
+  role: "admin",
   send: vi.fn(),
   transaction: vi.fn(),
   warn: vi.fn(),
@@ -32,13 +32,13 @@ vi.mock("@repo/database", async () => {
   };
 });
 vi.mock("@repo/auth/server", () => ({
-  auth: state.auth,
-  currentUser: async () => {
+  getCurrentUser: async () => {
     if (state.open) {
-      throw new Error("Clerk called inside SQL scope");
+      throw new Error("Auth called inside SQL scope");
     }
     return await { id: "user-1" };
   },
+  getSession: state.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   approve: state.approve,
@@ -76,13 +76,13 @@ const recordId = "66666666-6666-4666-8666-666666666666";
 beforeEach(() => {
   vi.clearAllMocks();
   state.open = false;
-  state.role = "org:admin";
+  state.role = "admin";
   state.people.mockResolvedValue([{ id: actorId }]);
-  state.auth.mockImplementation(async () => {
+  state.getSession.mockImplementation(async () => {
     if (state.open) {
       throw new Error("Auth called inside SQL scope");
     }
-    return await { orgId: "account-A", orgRole: state.role };
+    return await { accountId: "account-A", role: state.role };
   });
   state.records.mockResolvedValue({
     organisation_id: companies[1].id,
@@ -135,11 +135,11 @@ beforeEach(() => {
   });
 });
 test("manager employed in A routes a B decision through the record-derived company", async () => {
-  state.role = "org:manager";
+  state.role = "manager";
   expect((await approveAction({ recordId })).ok).toBe(true);
   expect(state.approve.mock.calls[0]?.[0]).toMatchObject({
+    accountId: "account-A",
     actingPersonId: actorId,
-    clerkOrgId: "account-A",
     organisationId: companies[1].id,
     recordId,
   });
@@ -158,17 +158,17 @@ test("duplicate acting people warn and keep the earliest match without blocking 
   });
   expect(state.warn).toHaveBeenCalledWith(
     "Multiple person records match the approval actor",
-    { clerkOrgId: "account-A", selectedPersonId: actorId }
+    { accountId: "account-A", selectedPersonId: actorId }
   );
   expect(state.people).toHaveBeenCalledWith({
     orderBy: [{ created_at: "asc" }, { id: "asc" }],
     select: { id: true },
     take: 2,
     where: {
+      account_id: "account-A",
       archived_at: null,
-      clerk_org_id: "account-A",
-      clerk_user_id: "user-1",
       organisation_id: { in: companies.map((company) => company.id) },
+      user_id: "user-1",
     },
   });
 });
@@ -185,7 +185,7 @@ test("an admin without a person can approve without a duplicate warning", async 
   expect(state.warn).not.toHaveBeenCalled();
 });
 test("a manager without a person cannot approve", async () => {
-  state.role = "org:manager";
+  state.role = "manager";
   state.people.mockResolvedValue([]);
   expect((await approveAction({ recordId })).ok).toBe(false);
   expect(state.approve).not.toHaveBeenCalled();
@@ -218,14 +218,14 @@ test("one failed company dispatch does not prevent the third company from queuin
   expect(state.transaction).toHaveBeenCalledTimes(1);
 });
 test("a manager cannot dispatch an account-wide sync", async () => {
-  state.role = "org:manager";
+  state.role = "manager";
   expect((await dispatchXeroLeaveSyncAction()).ok).toBe(false);
   expect(state.transaction).not.toHaveBeenCalled();
   expect(state.send).not.toHaveBeenCalled();
 });
-test("phased action rejects an enclosing transaction before Clerk authentication", async () => {
+test("phased action rejects an enclosing transaction before authentication", async () => {
   await expect(
     withTenantDb("account-A", () => approveAction({ recordId }))
   ).rejects.toBeInstanceOf(TenantPhaseError);
-  expect(state.auth).not.toHaveBeenCalled();
+  expect(state.getSession).not.toHaveBeenCalled();
 });

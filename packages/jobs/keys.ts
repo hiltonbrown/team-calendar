@@ -1,5 +1,11 @@
+import { DEFAULT_JOB_IDENTITY_GENERATION } from "@repo/core";
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
+
+export {
+  currentJobIdentityGeneration,
+  DEFAULT_JOB_IDENTITY_GENERATION,
+} from "@repo/core";
 
 export const keys = () => {
   const env = createEnv({
@@ -10,6 +16,7 @@ export const keys = () => {
       INNGEST_DEV: process.env.INNGEST_DEV,
       INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
       INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
+      JOB_IDENTITY_GENERATION: process.env.JOB_IDENTITY_GENERATION,
     },
     server: {
       INNGEST_DEV: z
@@ -17,6 +24,10 @@ export const keys = () => {
         .optional(),
       INNGEST_EVENT_KEY: z.string().min(1).optional(),
       INNGEST_SIGNING_KEY: z.string().startsWith("signkey-").optional(),
+      JOB_IDENTITY_GENERATION: z
+        .string()
+        .min(1)
+        .default(DEFAULT_JOB_IDENTITY_GENERATION),
     },
   });
 

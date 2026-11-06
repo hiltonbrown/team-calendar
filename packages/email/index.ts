@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { resend } from "./client";
 import { keys } from "./keys";
 
+export { type SendAuthEmailInput, sendAuthEmail } from "./auth";
 export { resend } from "./client";
 
 export interface SendNotificationEmailInput {

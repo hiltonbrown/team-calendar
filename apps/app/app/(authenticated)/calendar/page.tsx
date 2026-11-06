@@ -1,5 +1,6 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type CalendarRange,
   type CalendarRole,
@@ -7,7 +8,7 @@ import {
   getCalendarRange,
 } from "@repo/availability";
 import {
-  type ClerkOrgId,
+  type AccountId,
   type OrganisationId,
   xeroRecoveryMessage,
 } from "@repo/core";
@@ -28,7 +29,7 @@ import { CalendarSyncStatus } from "@/components/calendar/calendar-sync-status";
 import { CalendarTimeline } from "@/components/calendar/calendar-timeline";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { withOrg } from "@/lib/navigation/org-url";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
@@ -48,7 +49,7 @@ const defaultCalendarFilters: CalendarFilterInput = {
   view: "week",
 };
 async function loadCalendarResources(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   userId: string,
   actingPersonId: string | null,
@@ -59,13 +60,13 @@ async function loadCalendarResources(
   explicitCompanyIds: string[] | undefined,
   db: TenantDb
 ) {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const [organisation, teams, locations, xeroConnection] = [
     await db.organisation.findFirst({
       select: { name: true, timezone: true },
       where: {
+        account_id: accountId,
         archived_at: null,
-        clerk_org_id: clerkOrgId,
         id: organisationId,
       },
     }),
@@ -73,7 +74,7 @@ async function loadCalendarResources(
       orderBy: { name: "asc" },
       select: { id: true, name: true },
       where: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         organisation_id: { in: companyIds },
       },
     }),
@@ -81,7 +82,7 @@ async function loadCalendarResources(
       orderBy: { name: "asc" },
       select: { id: true, name: true },
       where: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         organisation_id: { in: companyIds },
       },
     }),
@@ -94,7 +95,7 @@ async function loadCalendarResources(
         tenant_name: true,
       },
       where: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         organisation_id: organisationId,
         released_at: null,
       },
@@ -106,10 +107,10 @@ async function loadCalendarResources(
     : new Date();
   const dataResult = await getCalendarRange(
     {
+      accountId,
       actingPersonId,
       actingUserId: userId,
       anchorDate,
-      clerkOrgId,
       companyIds: explicitCompanyIds,
       filters: {
         approvalStatus: parsedFilters.approvalStatus,
@@ -137,11 +138,11 @@ async function loadCalendarResources(
 async function loadAccountCalendarContext(
   orgParam: string | undefined,
   filterParams: Record<string, string | string[] | undefined>,
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   db: TenantDb
 ) {
-  assertTenantDb(db, clerkOrgId);
-  const companies = await resolveAccountCompanies(clerkOrgId, db);
+  assertTenantDb(db, accountId);
+  const companies = await resolveAccountCompanies(accountId, db);
   if (companies.length === 0) {
     redirect("/onboarding");
   }
@@ -164,7 +165,7 @@ async function loadAccountCalendarContext(
     explicitCompanyIds ?? companies.map((company) => company.id);
   organisationId = (companyIds[0] ?? organisationId) as OrganisationId;
   return {
-    clerkOrgId,
+    accountId,
     companies,
     companyIds,
     explicitCompanyIds,
@@ -174,27 +175,35 @@ async function loadAccountCalendarContext(
   };
 }
 const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ calendar: ["read"] });
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = firstQueryValue(org);
-  const [{ orgRole }, user, account] = await Promise.all([
-    auth(),
-    currentUser(),
-    requireOrg(),
+  const [{ role: sessionRole }, user, account] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+    requireAccount(),
   ]);
   if (!user) {
     redirect("/");
   }
-  const clerkOrgId = account as ClerkOrgId;
-  const role = calendarRole(orgRole);
+  const accountId = account as AccountId;
+  const role = calendarRole(sessionRole);
   const prepared = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const context = await loadAccountCalendarContext(
         orgParam,
         filterParams,
-        clerkOrgId,
+        accountId,
         db
       );
       const {
@@ -209,10 +218,10 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: { id: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: user.id,
           organisation_id: { in: companies.map((company) => company.id) },
+          user_id: user.id,
         },
       });
       const defaultScopeType = defaultScopeForRole(role);
@@ -226,7 +235,7 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
         );
       }
       const resources = await loadCalendarResources(
-        clerkOrgId,
+        accountId,
         organisationId,
         user.id,
         currentPerson?.id ?? null,
@@ -318,7 +327,7 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
         {companyIds.length === 1 &&
         dataResult.value.xeroConnectionState !== "connected" ? (
           <DisconnectedXeroBanner
-            canConnect={role === "admin" || role === "owner"}
+            canConnect={can(role, { xero: ["connect"] })}
             orgQueryValue={orgQueryValue}
             xeroConnectionState={dataResult.value.xeroConnectionState}
           />
@@ -459,13 +468,13 @@ function renderCalendarView({
   );
 }
 function calendarRole(role: string | null | undefined): CalendarRole {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
-  if (role === "org:manager") {
+  if (role === "manager") {
     return "manager";
   }
   return "viewer";

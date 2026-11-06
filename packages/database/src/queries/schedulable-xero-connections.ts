@@ -2,7 +2,7 @@ import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { systemDatabase } from "../system-client";
 export interface SchedulableXeroConnection {
-  clerkOrgId: string;
+  accountId: string;
   connectionId: string;
   connectionStatus: string;
   disconnectedAt: Date | null;
@@ -35,7 +35,7 @@ export async function listSchedulableXeroConnections(
       ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
       orderBy: { id: "asc" },
       select: {
-        clerk_org_id: true,
+        account_id: true,
         disconnected_at: true,
         id: true,
         last_approval_state_reconciled_at: true,
@@ -69,7 +69,7 @@ export async function listSchedulableXeroConnections(
       value: {
         ...(more ? { nextCursor: rows.at(-1)?.id } : {}),
         connections: rows.map((row) => ({
-          clerkOrgId: row.clerk_org_id,
+          accountId: row.account_id,
           connectionId: row.id,
           connectionStatus: row.status,
           disconnectedAt: row.disconnected_at,

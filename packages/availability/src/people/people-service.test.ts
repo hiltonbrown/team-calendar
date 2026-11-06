@@ -16,8 +16,8 @@ const mocks = vi.hoisted(() => ({
   managerScopePersonIds: vi.fn(),
   personCount: vi.fn(),
   personFindMany: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, scopedOrganisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, scopedOrganisationId: string) => ({
+    account_id: accountId,
     organisation_id: scopedOrganisationId,
   })),
 }));
@@ -130,8 +130,8 @@ describe("people-service", () => {
       await expect(
         withTestTenantDb(
           tenantTestAccount({
+            accountId: "org_1",
             actingPersonId,
-            clerkOrgId: "org_1",
             organisationId,
             personId,
             role,
@@ -139,8 +139,8 @@ describe("people-service", () => {
           (db) =>
             canAccessPerson(
               {
+                accountId: "org_1",
                 actingPersonId,
-                clerkOrgId: "org_1",
                 organisationId,
                 personId,
                 role,
@@ -156,8 +156,8 @@ describe("people-service", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
+          accountId: "org_1",
           actingPersonId: managerId,
-          clerkOrgId: "org_1",
           organisationId,
           personId: directReportId,
           role: "manager",
@@ -165,8 +165,8 @@ describe("people-service", () => {
         (db) =>
           canAccessPerson(
             {
+              accountId: "org_1",
               actingPersonId: managerId,
-              clerkOrgId: "org_1",
               organisationId,
               personId: directReportId,
               role: "manager",
@@ -178,8 +178,8 @@ describe("people-service", () => {
     await expect(
       withTestTenantDb(
         tenantTestAccount({
+          accountId: "org_1",
           actingPersonId: managerId,
-          clerkOrgId: "org_1",
           organisationId,
           personId: "00000000-0000-4000-8000-000000000099",
           role: "manager",
@@ -187,8 +187,8 @@ describe("people-service", () => {
         (db) =>
           canAccessPerson(
             {
+              accountId: "org_1",
               actingPersonId: managerId,
-              clerkOrgId: "org_1",
               organisationId,
               personId: "00000000-0000-4000-8000-000000000099",
               role: "manager",
@@ -202,8 +202,8 @@ describe("people-service", () => {
   it("applies settings-aware manager visibility to the people directory", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         actingPersonId: managerId,
-        clerkOrgId: "org_1",
         filters: {
           includeArchived: false,
           personType: "all",
@@ -217,8 +217,8 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
+            accountId: "org_1",
             actingPersonId: managerId,
-            clerkOrgId: "org_1",
             filters: {
               includeArchived: false,
               personType: "all",
@@ -236,15 +236,15 @@ describe("people-service", () => {
     expect(result.ok).toBe(true);
     expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
       {
+        accountId: "org_1",
         actingPersonId: managerId,
-        clerkOrgId: "org_1",
       },
       expect.any(Object)
     );
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           id: { in: [managerId, directReportId] },
           organisation_id: { in: [organisationId] },
         }),
@@ -255,16 +255,16 @@ describe("people-service", () => {
   it("denies a manager without a linked acting person before querying people", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         actingPersonId: null,
-        clerkOrgId: "org_1",
         organisationId,
         role: "manager",
       }),
       (db) =>
         listPeople(
           {
+            accountId: "org_1",
             actingPersonId: null,
-            clerkOrgId: "org_1",
             organisationId,
             role: "manager",
           },
@@ -284,16 +284,16 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         actingPersonId: managerId,
-        clerkOrgId: "org_1",
         organisationId,
         role: "manager",
       }),
       (db) =>
         listPeople(
           {
+            accountId: "org_1",
             actingPersonId: managerId,
-            clerkOrgId: "org_1",
             organisationId,
             role: "manager",
           },
@@ -322,7 +322,7 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId,
         pagination: { pageSize: 50 },
         role: "admin",
@@ -330,7 +330,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             organisationId,
             pagination: { pageSize: 50 },
             role: "admin",
@@ -346,8 +346,8 @@ describe("people-service", () => {
       _count: { _all: true },
       by: ["person_id"],
       where: {
+        account_id: "org_1",
         approval_status: "xero_sync_failed",
-        clerk_org_id: "org_1",
         organisation_id: { in: [organisationId] },
         person_id: { in: people.map((person) => person.id) },
       },
@@ -368,7 +368,7 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId,
         pagination: { pageSize: 50 },
         role: "admin",
@@ -376,7 +376,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             organisationId,
             pagination: { pageSize: 50 },
             role: "admin",
@@ -389,8 +389,8 @@ describe("people-service", () => {
     expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledOnce();
     expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledWith(
       {
+        accountId: "org_1",
         at: expect.any(Date),
-        clerkOrgId: "org_1",
         organisationId,
         people: people.map((person) => ({
           locationId: person.location_id,
@@ -405,7 +405,7 @@ describe("people-service", () => {
   it("pushes xero sync failed only filtering into the person query", async () => {
     await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         filters: { xeroSyncFailedOnly: true },
         organisationId,
         pagination: { pageSize: 50 },
@@ -414,7 +414,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             filters: { xeroSyncFailedOnly: true },
             organisationId,
             pagination: { pageSize: 50 },
@@ -429,8 +429,8 @@ describe("people-service", () => {
         where: expect.objectContaining({
           availability_records: {
             some: {
+              account_id: "org_1",
               approval_status: "xero_sync_failed",
-              clerk_org_id: "org_1",
               organisation_id: { in: [organisationId] },
             },
           },
@@ -459,7 +459,7 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId,
         pagination: { pageSize: 2 },
         role: "admin",
@@ -467,7 +467,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             organisationId,
             pagination: { pageSize: 2 },
             role: "admin",
@@ -482,7 +482,7 @@ describe("people-service", () => {
     );
     expect(mocks.personCount).toHaveBeenCalledWith({
       where: expect.objectContaining({
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         organisation_id: { in: [organisationId] },
       }),
     });
@@ -500,7 +500,7 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId,
         pagination: { pageSize: 2 },
         role: "admin",
@@ -508,7 +508,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             organisationId,
             pagination: { pageSize: 2 },
             role: "admin",
@@ -533,7 +533,7 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         filters: { status: ["available"] },
         organisationId,
         pagination: { pageSize: 2 },
@@ -542,7 +542,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             filters: { status: ["available"] },
             organisationId,
             pagination: { pageSize: 2 },
@@ -568,7 +568,7 @@ describe("people-service", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         filters: { status: ["public_holiday"] },
         organisationId,
         pagination: { pageSize: 50 },
@@ -577,7 +577,7 @@ describe("people-service", () => {
       (db) =>
         listPeople(
           {
-            clerkOrgId: "org_1",
+            accountId: "org_1",
             filters: { status: ["public_holiday"] },
             organisationId,
             pagination: { pageSize: 50 },
@@ -590,7 +590,7 @@ describe("people-service", () => {
     expect(result.ok).toBe(true);
     const query = mocks.personFindMany.mock.calls[0]?.[0];
     expect(query.where.AND[0]).toMatchObject({
-      clerk_org_id: "org_1",
+      account_id: "org_1",
       organisation_id: { in: [organisationId] },
     });
     expect(query.where.AND[1]).toMatchObject({

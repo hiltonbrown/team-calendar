@@ -1,13 +1,13 @@
-import { requireOrg } from "@repo/auth/helpers";
+import { requireAccount } from "@repo/auth/helpers";
 import {
   loadHolidaySettings,
   type ResolvedPublicHoliday,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { toDateOnly } from "@repo/core";
 import { scopedQuery, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import {
   HolidaysClient,
@@ -29,17 +29,17 @@ const UPCOMING_LIMIT = 8;
 // Settings > Holidays summarises coverage and holds the per-location local day
 // switches. `/public-holidays` is the operational list for review and overrides.
 const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ settings: ["update"] });
   const { org } = await searchParams;
   // Trusted account is discovered before scoped company and settings preparation.
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const accountId = (await requireAccount()) as AccountId;
   const { settingsResult, locations, organisationId, range } =
-    await withTenantDb(clerkOrgId, async (db) => {
+    await withTenantDb(accountId, async (db) => {
       const { organisationId: scopedOrganisationId } =
-        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+        await resolveActiveOrgPageContext(accountId, org, db);
       const today = new Date();
       const preparedRange = {
-        clerkOrgId,
+        accountId,
         from: toDateOnly(today),
         organisationId: scopedOrganisationId,
         to: `${today.getUTCFullYear() + 2}-12-31`,
@@ -49,7 +49,7 @@ const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
         await db.location.findMany({
           orderBy: { name: "asc" },
           select: { id: true, name: true },
-          where: scopedQuery(clerkOrgId, scopedOrganisationId),
+          where: scopedQuery(accountId, scopedOrganisationId),
         }),
       ];
 

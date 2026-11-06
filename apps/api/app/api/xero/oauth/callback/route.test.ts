@@ -1,5 +1,11 @@
 vi.mock("@repo/auth/helpers", () => ({
-  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+  hasPermission: async (
+    request: import("@repo/auth/permissions").PermissionRequest
+  ) =>
+    (await import("@repo/auth/permissions")).hasPermission(
+      (await mocks.getSession())?.role,
+      request
+    ),
 }));
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,15 +14,15 @@ const CREDENTIAL_PATTERN =
   /access_token|refresh_token|client.secret|Authorization/;
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn().mockResolvedValue({
-    orgId: "org_1",
-    orgRole: "org:admin",
-    userId: "user_1",
-  }),
   cancelXeroOAuth: vi.fn(),
   captureXeroConnected: vi.fn(),
   completeXeroOAuth: vi.fn(),
   dispatchInitialXeroSync: vi.fn(),
+  getSession: vi.fn().mockResolvedValue({
+    accountId: "org_1",
+    role: "admin",
+    userId: "user_1",
+  }),
   isLocalApplicationPath: vi.fn(),
   isPreviewDeployment: vi.fn(),
   readOAuthStateReturnTo: vi.fn(),
@@ -26,7 +32,7 @@ vi.mock("@repo/jobs", () => ({
   dispatchInitialXeroSync: mocks.dispatchInitialXeroSync,
 }));
 
-vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
+vi.mock("@repo/auth/server", () => ({ getSession: mocks.getSession }));
 
 vi.mock("@repo/xero/activation", () => ({
   captureXeroConnected: mocks.captureXeroConnected,
@@ -48,9 +54,9 @@ describe("Xero OAuth callback route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "admin",
       userId: "user_1",
     });
     mocks.isPreviewDeployment.mockReturnValue(false);
@@ -86,7 +92,7 @@ describe("Xero OAuth callback route", () => {
     expect(response.status).toBe(307);
     expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
     expect(mocks.cancelXeroOAuth).toHaveBeenCalledWith({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       nonce: "nonce",
       state: "signed",
@@ -110,7 +116,7 @@ describe("Xero OAuth callback route", () => {
       )
     ).toBe("expired");
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "code",
       nonce: null,
@@ -130,7 +136,7 @@ describe("Xero OAuth callback route", () => {
       "https://api.example.com/settings/integrations/xero/connect?session=session_1"
     );
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith({
-      authenticatedClerkOrgId: "org_1",
+      authenticatedAccountId: "org_1",
       authenticatedUserId: "user_1",
       code: "code",
       nonce: "matching-nonce",
@@ -256,9 +262,9 @@ describe("Xero OAuth callback route", () => {
     expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
   });
   it("rejects current role loss before exchanging and clears the nonce", async () => {
-    mocks.auth.mockResolvedValueOnce({
-      orgId: "org_1",
-      orgRole: "org:viewer",
+    mocks.getSession.mockResolvedValueOnce({
+      accountId: "org_1",
+      role: "viewer",
       userId: "user_1",
     });
     const response = await GET(new Request(callbackUrl));
@@ -267,12 +273,12 @@ describe("Xero OAuth callback route", () => {
     expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
   });
 
-  it.each(["org:viewer", "org:manager", null])(
+  it.each(["viewer", "manager", null])(
     "rejects lost callback privilege %s before any provider work",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValueOnce({
-        orgId: "org_1",
-        orgRole,
+    async (role) => {
+      mocks.getSession.mockResolvedValueOnce({
+        accountId: "org_1",
+        role,
         userId: "user_1",
       });
       const response = await GET(
@@ -288,19 +294,19 @@ describe("Xero OAuth callback route", () => {
   );
 
   it.each([
-    { orgId: null, userId: "user_1" },
-    { orgId: "org_1", userId: null },
+    { accountId: null, userId: "user_1" },
+    { accountId: "org_1", userId: null },
   ])("rejects lost membership or authentication %j", async (identity) => {
-    mocks.auth.mockResolvedValueOnce({ ...identity, orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValueOnce({ ...identity, role: "admin" });
     const response = await GET(new Request(callbackUrl));
     expect(response.status).toBe(401);
     expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
   });
 
   it("accepts the owner role without returning credentials", async () => {
-    mocks.auth.mockResolvedValueOnce({
-      orgId: "org_1",
-      orgRole: "org:owner",
+    mocks.getSession.mockResolvedValueOnce({
+      accountId: "org_1",
+      role: "owner",
       userId: "user_1",
     });
     const response = await GET(
@@ -353,7 +359,7 @@ describe("Xero OAuth callback route", () => {
     expect(response.status).toBe(307);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledOnce();
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "conn_1",
       organisationId: "payroll_1",
       triggeredByUserId: "user_1",
@@ -361,7 +367,7 @@ describe("Xero OAuth callback route", () => {
     });
     expect(mocks.captureXeroConnected).toHaveBeenCalledOnce();
     expect(mocks.captureXeroConnected).toHaveBeenCalledWith({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "conn_1",
       organisationId: "payroll_1",
     });

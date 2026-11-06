@@ -29,10 +29,10 @@ describe("SupportSubmissionPayloadSchema", () => {
 
   it("parses a payload with optional fields and context", () => {
     const parsed = SupportSubmissionIssueInputSchema.safeParse({
+      account_id: "org_123",
       actual_outcome: "The page saves, but the data never appears.",
       app_version: "2026.04.22",
       category: "feedback",
-      clerk_org_id: "org_123",
       current_route: "/plans",
       email_override: "help@example.com",
       environment: "production",
@@ -51,10 +51,10 @@ describe("SupportSubmissionPayloadSchema", () => {
 
     expect(parsed.success).toBe(true);
     expect(parsed.data).toEqual({
+      account_id: "org_123",
       actual_outcome: "The page saves, but the data never appears.",
       app_version: "2026.04.22",
       category: "feedback",
-      clerk_org_id: "org_123",
       current_route: "/plans",
       email_override: "help@example.com",
       environment: "production",
@@ -74,10 +74,10 @@ describe("SupportSubmissionPayloadSchema", () => {
 
   it("normalises empty optional strings to undefined", () => {
     const parsed = SupportSubmissionIssueInputSchema.parse({
+      account_id: " ",
       actual_outcome: " ",
       app_version: " ",
       category: "support",
-      clerk_org_id: " ",
       current_route: " ",
       email_override: " ",
       environment: " ",
@@ -210,10 +210,10 @@ describe("buildSupportIssueMarkdownBody", () => {
   it("builds a deterministic markdown body with safe fences and untrusted markers", () => {
     const body = buildSupportIssueMarkdownBody(
       SupportSubmissionIssueInputSchema.parse({
+        account_id: "org_123",
         actual_outcome: "The saved plan does not refresh.",
         app_version: "2026.04.22",
         category: "support",
-        clerk_org_id: "org_123",
         current_route: "/plans",
         email_override: "help@example.com",
         environment: "production",
@@ -234,7 +234,7 @@ describe("buildSupportIssueMarkdownBody", () => {
     expect(body).toBe(`## Metadata
 - Category: Support
 - Priority: High
-- Clerk organisation ID: org_123
+- Account ID: org_123
 - Organisation ID: 00000000-0000-4000-8000-000000000001
 - User ID: user_123
 - Current route: /plans

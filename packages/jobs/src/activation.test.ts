@@ -60,7 +60,7 @@ const { captureInitialSyncCompleted, checkXeroImportReadiness } = await import(
   "./activation"
 );
 const scope = {
-  clerkOrgId: "org_a",
+  accountId: "org_a",
   connectionId: "22222222-2222-4222-8222-222222222222",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
@@ -104,7 +104,7 @@ describe("persisted complete initial import", () => {
     expect(mocks.connection).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: scope.clerkOrgId,
+          account_id: scope.accountId,
           id: scope.connectionId,
           organisation_id: scope.organisationId,
         }),

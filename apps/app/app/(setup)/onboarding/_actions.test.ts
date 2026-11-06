@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   advanceWizard: vi.fn(),
-  auth: vi.fn(),
   captureOnboardingEvent: vi.fn(),
   connectXeroAction: vi.fn(),
   createManualPerson: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     auditEvent: { create: vi.fn() },
     organisation: { findFirst: vi.fn() },
@@ -15,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   ensureCurrentUserPerson: vi.fn(),
   finishWizard: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   inviteMember: vi.fn(),
   lockPlanLimitMutations: vi.fn(() => Promise.resolve()),
   revalidatePath: vi.fn(),
@@ -24,15 +24,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   advanceWizard: mocks.advanceWizard,
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
   finishWizard: mocks.finishWizard,
   isOnboardingAdmin: (role: string | null) =>
-    role === "org:admin" || role === "org:owner",
+    role === "admin" || role === "owner",
 }));
 vi.mock("@repo/database/queries/onboarding", () => ({
   setXeroSetupSkipped: mocks.setXeroSetupSkipped,
@@ -93,8 +93,8 @@ const {
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const snapshot = { mode: "undecided", step: "xero" };
 const actor = {
-  actingRole: "org:admin",
-  clerkOrgId: "org_1",
+  accountId: "org_1",
+  actingRole: "admin",
   organisationId,
   userId: "user_admin",
 };
@@ -102,16 +102,16 @@ const actor = {
 describe("onboarding actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
     mocks.database.organisation.findFirst.mockResolvedValue({
       country_code: "AU",
       id: organisationId,
       name: "Company A",
     });
-    mocks.currentUser.mockResolvedValue({ id: "user_admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_admin" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: "org_1", organisationId },
+      value: { accountId: "org_1", organisationId },
     });
     mocks.updateOrganisationAction.mockResolvedValue({ ok: true, value: {} });
     mocks.advanceWizard.mockResolvedValue({ ok: true, value: snapshot });
@@ -131,20 +131,17 @@ describe("onboarding actions", () => {
     expect(mocks.updateOrganisationAction).not.toHaveBeenCalled();
   });
 
-  it.each(["org:viewer", "org:manager", null])(
-    "refuses %s",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgRole });
-      expect(
-        await saveDetailsAction({
-          name: "Acme",
-          organisationId,
-          timezone: "Australia/Brisbane",
-        })
-      ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
-      expect(mocks.updateOrganisationAction).not.toHaveBeenCalled();
-    }
-  );
+  it.each(["viewer", "manager", null])("refuses %s", async (role) => {
+    mocks.getSession.mockResolvedValue({ role });
+    expect(
+      await saveDetailsAction({
+        name: "Acme",
+        organisationId,
+        timezone: "Australia/Brisbane",
+      })
+    ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    expect(mocks.updateOrganisationAction).not.toHaveBeenCalled();
+  });
 
   it("saves details through General settings and advances", async () => {
     const result = await saveDetailsAction({
@@ -261,19 +258,19 @@ describe("onboarding actions", () => {
         value: { personId },
       });
       expect(mocks.database.person.updateMany).toHaveBeenCalledWith({
-        data: { clerk_user_id: "user_admin" },
+        data: { user_id: "user_admin" },
         where: {
+          account_id: "org_1",
           archived_at: null,
-          clerk_org_id: "org_1",
-          clerk_user_id: null,
           id: personId,
           organisation_id: organisationId,
+          user_id: null,
         },
       });
       expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
+          account_id: "org_1",
           action: "person.linked_to_user",
-          clerk_org_id: "org_1",
           organisation_id: organisationId,
           resource_id: personId,
         }),
@@ -299,12 +296,11 @@ describe("onboarding actions", () => {
     });
 
     it("creates or links the admin's own record from their account", async () => {
-      mocks.currentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: "ava@example.test" }],
-        firstName: "Ava",
+      mocks.getCurrentUser.mockResolvedValue({
+        email: "ava@example.test",
         id: "user_admin",
-        imageUrl: "https://img.test/a.png",
-        lastName: "Lee",
+        image: "https://img.test/a.png",
+        name: "Ava Lee",
       });
       mocks.ensureCurrentUserPerson.mockResolvedValue({
         ok: true,
@@ -315,11 +311,11 @@ describe("onboarding actions", () => {
         value: { personId },
       });
       expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledWith(
-        { clerkOrgId: "org_1", organisationId },
+        { accountId: "org_1", organisationId },
         expect.objectContaining({
-          clerkUserId: "user_admin",
           displayName: "Ava Lee",
           email: "ava@example.test",
+          userId: "user_admin",
         }),
         expect.any(Object)
       );
@@ -338,7 +334,7 @@ describe("onboarding actions", () => {
       });
       expect(mocks.createManualPerson).toHaveBeenCalledWith(
         {
-          clerkOrgId: "org_1",
+          accountId: "org_1",
           email: "ben@example.test",
           employmentType: "employee",
           firstName: "Ben",
@@ -364,13 +360,16 @@ describe("onboarding actions", () => {
           error: "That email address is already a member of this organisation",
           ok: false,
         })
-        .mockResolvedValueOnce({ error: "Clerk API 500 internal", ok: false });
+        .mockResolvedValueOnce({
+          error: "Account API 500 internal",
+          ok: false,
+        });
       const result = await sendInvitesAction({
         organisationId,
         rows: [
-          { email: "a@example.test", role: "org:manager" },
-          { email: "b@example.test", role: "org:viewer" },
-          { email: "c@example.test", role: "org:admin" },
+          { email: "a@example.test", role: "manager" },
+          { email: "b@example.test", role: "viewer" },
+          { email: "c@example.test", role: "admin" },
         ],
       });
       expect(result).toEqual({
@@ -393,7 +392,7 @@ describe("onboarding actions", () => {
       });
       expect(mocks.inviteMember).toHaveBeenNthCalledWith(1, {
         emailAddress: "a@example.test",
-        role: "org:manager",
+        role: "manager",
       });
     });
 
@@ -401,7 +400,7 @@ describe("onboarding actions", () => {
       expect(
         await sendInvitesAction({
           organisationId,
-          rows: [{ email: "a@example.test", role: "org:owner" as "org:admin" }],
+          rows: [{ email: "a@example.test", role: "owner" as "admin" }],
         })
       ).toMatchObject({ error: { code: "validation_error" }, ok: false });
       expect(mocks.inviteMember).not.toHaveBeenCalled();

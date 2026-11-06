@@ -46,7 +46,7 @@ import { recountUsage } from "./recount-usage";
 import { withXeroBinding } from "./xero-sync-access";
 
 const input = {
-  clerkOrgId: "account-A",
+  accountId: "account-A",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
 beforeEach(() => {
@@ -135,7 +135,7 @@ test("a third Xero persistence phase failing leaves the first two committed and 
         expect(isTenantScopeActive()).toBe(true);
         await db.person.create({
           data: {
-            clerk_org_id: input.clerkOrgId,
+            account_id: input.accountId,
             display_name: remoteId,
             email: `${remoteId}@example.com`,
             employment_type: "employee",

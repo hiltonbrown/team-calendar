@@ -2,7 +2,7 @@ import "server-only";
 import type { Organisation, Prisma } from "@repo/database/generated/client";
 
 export interface CreateCompanyInput {
-  clerkOrgId: string;
+  accountId: string;
   countryCode: string;
   fiscalYearStart?: number;
   locale?: string;
@@ -18,7 +18,7 @@ export function createCompany(
 ): Promise<Organisation> {
   return tx.organisation.create({
     data: {
-      clerk_org_id: input.clerkOrgId,
+      account_id: input.accountId,
       country_code: input.countryCode,
       fiscal_year_start: input.fiscalYearStart ?? 7,
       locale: input.locale ?? "en-AU",

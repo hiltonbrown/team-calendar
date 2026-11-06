@@ -51,7 +51,7 @@ import {
 function buildTenant(region: "AU" | "NZ" | "UK") {
   return {
     accessToken: "access-token",
-    clerk_org_id: "org_1",
+    account_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_1",
     organisation_id: "00000000-0000-4000-8000-000000000001",

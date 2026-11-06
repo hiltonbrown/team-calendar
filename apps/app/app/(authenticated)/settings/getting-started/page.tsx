@@ -1,9 +1,9 @@
-import { requireOrg } from "@repo/auth/helpers";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import type { AccountId } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { loadOnboardingState } from "@/lib/server/load-onboarding-state";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { SettingsSectionHeader } from "../components/settings-section-header";
@@ -20,17 +20,17 @@ interface GettingStartedSettingsPageProps {
 const GettingStartedSettingsPage = async ({
   searchParams,
 }: GettingStartedSettingsPageProps) => {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ settings: ["update"] });
 
   const { org } = await searchParams;
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const accountId = (await requireAccount()) as AccountId;
   const { onboarding, orgQueryValue } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const { organisationId, orgQueryValue: preparedOrgQueryValue } =
-        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+        await resolveActiveOrgPageContext(accountId, org, db);
       const preparedOnboarding = await loadOnboardingState(
-        { clerkOrgId, organisationId },
+        { accountId, organisationId },
         db
       );
       return {

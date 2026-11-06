@@ -1,5 +1,472 @@
 # Current work
 
+## PR #144 Review Remediation (31 October 2026)
+
+- [x] Task 1: Break the database to auth import cycle
+  - [x] Step 1.1: Write failing test in `auth-fixtures.test.ts`
+  - [x] Step 1.2: Run test to verify failure
+  - [x] Step 1.3: Update `auth-fixtures.ts` to accept `seedAuthAccounts`
+  - [x] Step 1.4: Run test to verify pass
+  - [x] Step 1.5: Relocate seed entry point to `development-seed-runner.ts` and `seed-development.ts`, update package.json scripts/exports and docs
+  - [x] Step 1.6: Verify boundaries, phased registry, and smoke run with `NODE_ENV=production`
+  - [x] Step 1.7: Run package gates (`bun run check`, `bun run typecheck`, package unit tests)
+  - [x] Step 1.8: Commit Task 1
+- [x] Task 2: Surface CI evidence early (Pushed commit `47b5e75`, surfaced finding F8 timeouts on 2-core CI runner, resolved in `28507d0`)
+- [x] Task 3: Dismiss CodeQL false positives (Dismissed #33, #40, #41 with documented reasons)
+- [x] Task 4: Throttle SSE remote session re-check to 30 seconds
+  - [x] Step 4.1: Write failing tests in `route.test.ts`
+  - [x] Step 4.2: Run tests to verify failure
+  - [x] Step 4.3: Implement 30s throttling in `route.ts`
+  - [x] Step 4.4: Run route tests to verify pass
+  - [x] Step 4.5: Check documentation for stream revalidation mentions
+  - [x] Step 4.6: Commit Task 4
+- [x] Task 5: Trivial cleanup (P3)
+  - [x] Step 5.1: Narrow `AuthSocialProvider` type in `better-auth-client.ts`
+  - [x] Step 5.2: Correct schema comment in `schema.prisma`, verify `build` and no migration diff
+  - [x] Step 5.3: Commit Task 5
+- [x] Task 6: Full gates and final CI
+  - [x] Step 6.1: Run local verification gates (`build`, `check`, `typecheck`, `boundaries`, `test`)
+  - [x] Step 6.2: Push and verify `gh pr checks 144 --watch` (all 9 checks successful, CI run 41148514651 green across all steps with 0 skipped)
+  - [x] Step 6.3: Note manual check for preview runtime logs
+- [x] Task 7: Reassess and document
+  - [x] Step 7.1: Check against findings F1-F6 and document evidence in plan Results section
+  - [x] Step 7.2: Fill in PR description (updated on GitHub with complete architecture, safety mechanisms, and cutover details)
+  - [x] Step 7.3: Review remediation diff (verified clean, 28 files modified across remediation commits)
+
+Stopping condition: PR #144 review remediation complete; all gates (`check`, `typecheck`, `boundaries`, `test`, `test:integration`) pass; CodeQL clean; PR description updated.
+
+Review: PASS.
+1. Boundary cycle broken (F1):
+   - Relocated seed runner to `@repo/auth/scripts/seed-development.ts` and created `@repo/database/src/seed/development-seed-runner.ts`. Exported `DevelopmentTenantAccount` and injected `seedAuthAccounts`.
+   - Verified `bun run boundaries`: 1,359 files in 21 packages checked, 0 issues found.
+2. SSE remote session re-check throttled (F3):
+   - In `apps/api/app/api/notifications/stream/route.ts`, remote session revalidation through `/api/auth-context` throttled to 30s (`SESSION_REVALIDATE_INTERVAL_MS = 30_000`) while local expiry checked on every 2s poll.
+   - All 21 tests pass in `apps/api/app/api/notifications/stream/route.test.ts`.
+3. CodeQL false positives resolved (F4):
+   - Dismissed alerts #33, #40, #41 as `false positive` with documented rationales via GitHub API. CodeQL status is green.
+4. Schema comment and provider cleanup (F5, F6):
+   - Narrowed `AuthSocialProvider` to `"xero-auth"`.
+   - Replaced stale Clerk comment in `schema.prisma`. Verified Prisma generation and no migration diff.
+5. Concurrency and test suite hardening surfaced during CI execution (F8-F12):
+   - Configured `testTimeout: 60_000` in `packages/auth/vitest.config.mts` for scrypt password hashing on 2-core runners (F8).
+   - Configured Vitest aliases and bridge exports for `@repo/database/*` (F9).
+   - Made grant creation and connection setup atomic in `database.$transaction` and disabled integration test file parallelism (F10).
+   - Isolated web MDX/PostCSS compilation with `childProcesses` Turbopack strategy in `apps/web/next.config.ts` (F11).
+   - Expected `identity_generation: "gen_v1"` in `packages/jobs` integration tests (F12).
+6. Final verification gates:
+   - `bun run check`: Checked 1,430 files, 0 errors.
+   - `bun run typecheck`: 19/19 packages passed.
+   - `bun run boundaries`: 0 issues found.
+   - `bun run test`: All package unit test suites passed.
+   - CI Workflow Run 41148514651: `Test` passed in 7m32s with 0 skipped steps (Build, Typecheck, Boundaries, Migrate deploy, Restricted integration login, Drift check, Untestable workspace guard, Unit tests, Release safety tools, Docs links, Email render, Integration tests all green).
+   - PR description on PR #144 updated with full documentation, architectural safety mechanisms, cutover links, and deferred findings.
+
+## Vercel build failure remediation (31 October 2026)
+
+- [x] Task 1: Identify root causes of Vercel build failure (OOM / SIGKILL 137 on Turbopack build and Next.js App Router entrypoint type violations).
+- [x] Task 2: Fix App Router entrypoint type errors in `apps/web/app/rss.xml/route.ts` (remove non-route export) and `apps/web/app/status/page.tsx` (extract `StatusContent` component).
+- [x] Task 3: Pin Node runtime to Node 22 (Active LTS) across root and app `package.json` engines and `.nvmrc` / `.node-version` to prevent Next.js from disabling Turbopack `workerThreads` and falling back to memory-leaking `childProcesses`.
+- [x] Task 4: Run full verification suite: `bun run check`, `bun run typecheck`, `bun run test`, `bun run build`.
+
+Stopping condition: resolve Vercel build failure causes (OOM during Next.js Turbopack build and App Router entrypoint type violations), pass all gates (`check`, `typecheck`, `test`, `build`).
+
+Review: PASS.
+1. Root cause analysis:
+   - Root `package.json` had `"node": "22 || >=24.0.0"`. Vercel automatically picked Node 24 (`v24.22.2`).
+   - Next.js 16.4.3 disables `turbopackPluginRuntimeStrategy = 'workerThreads'` on Node `>=24.13.1` (due to upstream Node.js bug #65100 with worker-thread teardown) and falls back to `'childProcesses'`.
+   - On Vercel's 2-core 8GB build container, Turbopack child processes accumulated memory beyond the 8GB ceiling during `Creating an optimized production build...`, triggering kernel `SIGKILL` (exit code 137, OOM) after ~2m20s.
+   - On Node 22 (Active LTS), the bug does not exist; Next.js runs `workerThreads` natively with peak RSS under 620MB and builds in ~4.5 seconds.
+2. Node runtime pinning:
+   - Pinned root `package.json` `engines.node` to `22.x`.
+   - Added `.nvmrc` and `.node-version` specifying `22` at repository root.
+   - Added `engines.node: "22.x"` to `apps/web/package.json`, `apps/app/package.json`, and `apps/api/package.json`.
+3. App Router entrypoint type violations resolved:
+   - `apps/web/app/rss.xml/route.ts`: removed `export` from `escapeXml` so only route handlers and segment configs are exported.
+   - `apps/web/app/status/page.tsx`: extracted `StatusContent` component and types to `apps/web/app/status/status-content.tsx` while preserving route module CSS loading.
+   - Updated `status.test.tsx` and `app/styles/style-loading.test.ts` to reflect the new component location while preserving CSS module contract tests.
+4. Gates verified:
+   - `bun run check`: Checked 1,425 files in 2s, 0 errors.
+   - `bun run typecheck`: 19/19 Turbo tasks successful in 5.7s, 0 errors.
+   - `bun run test`: All 18 monorepo test suites passed (>4,500 tests across apps and packages).
+   - `bun run build`: All 4 production builds (`app`, `api`, `web`, `database`) succeeded in 16.8s.
+
+## Better Auth migration: Database migrations and RLS audit (30 October 2026)
+
+- [x] Task 13.1: Audit database migration history and status: confirmed 45 migrations applied and schema up to date via `prisma migrate status`.
+- [x] Task 13.2: Verify Row-Level Security architecture: verified 29 tenant tables with `tenant_isolation` policy checking `account_id = current_setting('app.account_id', true)` and company ownership subqueries.
+- [x] Task 13.3: Verify role boundary and table privilege isolation: confirmed `DATABASE_APP_URL` uses restricted `team_calendar_app` non-owner role via `assertRestrictedDatabaseRole`; confirmed 12 auth and system tables are completely denied to `team_calendar_app` (error 42501 on live DB); confirmed reference tables (`plans`, `plan_limits`) are read-only; verified uncontexted tenant queries fail closed (0 rows).
+- [x] Task 13.4: Verify custom PostgreSQL triggers and security definer functions: verified all 12 custom triggers and functions (`tc_manager_belongs_to_account`, `auth_*`) in PostgreSQL catalogue.
+
+Stopping condition: Complete verification and documentation of database migrations and RLS enforcement.
+
+Review: PASS.
+1. Database migrations:
+   - All 45 migrations verified from `00000000000000_init` to `20261025160000_auth_lifecycle_audit`.
+   - Live database catalogue checked via `prisma migrate status` (Prisma 7.10.1): schema is completely up to date.
+2. Row-Level Security and role privilege isolation:
+   - Runtime role check passed: `DATABASE_APP_URL` uses restricted `team_calendar_app` non-owner role without superuser, `BYPASSRLS`, or table ownership.
+   - 29 tenant tables enforce `relrowsecurity = true` and `tenant_isolation` policy scoped to `app.account_id`.
+   - 12 auth and system tables are completely denied to `team_calendar_app` (verified SQLSTATE 42501 on live DB).
+   - 2 reference tables (`plans`, `plan_limits`) are read-only to `team_calendar_app`.
+   - Uncontexted tenant queries return 0 rows (fail closed).
+   - Transaction-local `set_config('app.account_id', ..., true)` sets context only for the transaction and clears on completion, preventing connection-pooling leaks.
+3. PostgreSQL triggers and functions:
+   - All 12 custom triggers verified active in `pg_trigger`.
+   - `public.tc_manager_belongs_to_account` verified `SECURITY DEFINER` with search path `pg_catalog`, executable by `team_calendar_app`.
+   - All `auth_*` trigger functions verified `SECURITY DEFINER` with search path `pg_catalog, public`, revoked from PUBLIC and restricted from `team_calendar_app`.
+
+## Better Auth migration: Verification reconciliation (Task 12) (30 October 2026)
+
+- [x] Task 12.1: Reconcile all 43 acceptance checks in `docs/auth-migration/04-verification.md` Section 6 with current implementation, test evidence, and accepted architectural dispositions.
+- [x] Task 12.2: Verify clean monorepo delivery gates: `bun install --frozen-lockfile` (0 changes), `bun run check` (1,424 files, 0 errors), `bun run typecheck` (19 tasks, 0 errors), `bun run test` (all packages passed), `bun run build` (all 4 production apps compiled successfully), `bun run test:release-tools` (28 files, 248 passed, 0 failed).
+- [x] Task 12.3: Document execution boundaries for Tasks 10 and 11: preserve development database per mandatory safety requirements; verified seed idempotency in `development-seed.test.ts` (6 passed) and reset safety contract in `reset-auth-data-core.test.ts` (28 passed).
+
+Stopping condition: Reconcile `04-verification.md` with fresh test and source evidence for all 43 checks; pass all repository delivery gates; preserve existing database and development environment.
+
+Review: PASS.
+1. All 43 checks reconciled in `docs/auth-migration/04-verification.md` Section 6:
+   - Checks 1-38, 42-43 verified PASS against current codebase.
+   - Checks 39-41 verified PASS at unit/harness level, with external deployment/inbox execution prerequisites documented.
+2. Verified delivery gates:
+   - `bun install --frozen-lockfile`: 1,707 installs checked, zero changes.
+   - `bun run check`: Checked 1,424 files, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages, 0 errors.
+   - `bun run test`: All package tests passed (>4,500 tests across 18 packages).
+   - `bun run build`: All 4 production apps compiled successfully (`app`, `api`, `web`, `database`).
+   - `bun run test:release-tools`: 28 files passed (248 passed, 5 skipped, 0 failed).
+   - `bun run typecheck:release-tools`: 0 errors.
+
+## Better Auth migration: Task 9 implementation (30 October 2026)
+
+- [x] Task 9.1: Reconcile `AGENTS.md` and `PRODUCT.md`: Replace Clerk auth descriptions with Better Auth (self-hosted PostgreSQL adapter; accounts and members tables), update tenancy model concepts, package maps, and security invariants. Remove legacy `org_id` and custom workspace claims.
+- [x] Task 9.2: Reconcile `README.md` and `SECURITY.md`: Update auth description, remove references to `AUTH_PROVIDER=better-auth` and retained Clerk server adapter, update environment variables (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AUTH_CONTEXT_MODE`, `JOB_IDENTITY_GENERATION`), remove Clerk prerequisites, update browser release suite description to native Better Auth flow, document intermediate `systemDatabase` owner storage approval in `SECURITY.md`.
+- [x] Task 9.3: Reconcile `docs/auth-migration/03-cutover.md`: Clarify runtime auth mode (`AUTH_CONTEXT_MODE=local` on app, `remote` on API) and retire obsolete `AUTH_PROVIDER` variable.
+- [x] Task 9.4: Fix formatting and lint in `packages/core/src/job-generation.test.ts`: Replace `delete` operator with `Reflect.deleteProperty` for clean unsetting of environment variables, pass Biome/Ultracite checks.
+- [x] Task 9.5: Run verification gates: `bun run check`, `bun run typecheck`, full monorepo test suite `bun run test`.
+
+Stopping condition: Complete Task 9 (reconcile product, agent, security, cutover and release documentation to be consistent with Better Auth single-provider runtime). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. `AGENTS.md` and `PRODUCT.md` guidance:
+   - Replaced all Clerk references in `AGENTS.md` and `PRODUCT.md` with Better Auth and local `auth_accounts` / `auth_members` domain tables.
+   - Verified zero occurrences of "clerk" in both files.
+2. `README.md` and `SECURITY.md` guidance:
+   - Updated tech stack and local setup instructions to Better Auth (`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `AUTH_CONTEXT_MODE`, `JOB_IDENTITY_GENERATION`).
+   - Removed obsolete `AUTH_PROVIDER` and legacy Clerk table rows.
+   - Updated browser release suite documentation to native Better Auth flow.
+   - Documented intermediate `systemDatabase` owner storage approval and `team_calendar_auth` restricted-role plan in `SECURITY.md`.
+   - Verified zero occurrences of "clerk" or "AUTH_PROVIDER" in `README.md` and `SECURITY.md`.
+3. `docs/auth-migration/03-cutover.md` runbook:
+   - Removed `Keep AUTH_PROVIDER=better-auth consistent` and clarified single-provider `AUTH_CONTEXT_MODE=local` on app and `remote` on API.
+4. Lint and unit fixes:
+   - Fixed `job-generation.test.ts` to use `Reflect.deleteProperty` for clean unsetting of environment variables.
+5. Gates verified:
+   - `bun run check`: Checked 1,424 files, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages, 0 errors.
+   - `bun run test`: All 18 packages tested.
+
+## Better Auth migration: Task 8 implementation (30 October 2026)
+
+- [x] Task 8.1: Define `JOB_IDENTITY_GENERATION` configuration: Implemented `currentJobIdentityGeneration()` in `packages/core/src/job-generation.ts`, exported from package root, added tests in `job-generation.test.ts`. Configured `JOB_IDENTITY_GENERATION: z.string().min(1).default(DEFAULT_JOB_IDENTITY_GENERATION)` in `packages/jobs/keys.ts`, re-exported helper, added tests in `keys.test.ts`. Updated `turbo.json` globalEnv, `apps/api/.env.example`, `apps/app/.env.example`, `packages/next-config/preflight.ts` and `preflight.test.ts`.
+- [x] Task 8.2: Enforce generation fencing in `packages/jobs/src/event-context.ts`: Require `identity_generation: z.string().min(1)` in wireContextSchema; reject absent generation, mismatched obsolete generation, and camelCase identityGeneration injection with `NonRetriableError`; return `identityGeneration`. Export `assertJobIdentityGeneration`. Added comprehensive unit tests in `event-context.test.ts`.
+- [x] Task 8.3: Update event producers and scheduled event IDs: Incorporated generation into `getScheduledSyncEventId` and `getInitialSyncEventId` in `packages/jobs/src/events.ts`. Attached `identity_generation` to `dispatchSyncEvent`, `dispatchCancelSyncRun`, and `dispatchInitialXeroSync` in `packages/jobs/src/events.ts`, `packages/availability/src/sync/sync-events.ts`, `apps/api/lib/stripe-event-delivery.ts`, `reconcile-feed-publications.ts`, and `sync-xero-leave-records.ts`. Updated tests in `events.test.ts`, `sync-events.test.ts`, `reconcile-feed-publications.test.ts`, `sync-xero-leave-records.test.ts`, and `payments/route.test.ts`.
+- [x] Task 8.4: Add generation fences outside resumable cached steps: Evaluated `readJobEventData` outside `step.run` in all handlers (`rebuild-feed-cache`, `reconcile-feed-publications`, `reconcile-xero-approval-state`, `recount-usage`, `sync-xero-leave-balances`, `sync-xero-leave-records`, `sync-xero-people`). In `initial-xero-sync.ts`, asserted generation outside steps and rechecked between durable phases in `executeInitialSync`. Added regression tests in `initial-xero-sync.test.ts`.
+- [x] Task 8.5: Document provider-backed queue closure and quarantine: Added operational runbook guidance in `docs/auth-migration/03-cutover.md` covering Inngest pause, run cancellation/quarantine, generation bump on cutover, and rollback quarantine.
+- [x] Task 8.6: Run verification gates: `bun run check`, `bun run typecheck`, and full monorepo test suite `bun run test`.
+
+Stopping condition: Complete Task 8 (job identity generation fencing, producer updates, handler fences, queue closure documentation). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Job identity generation configuration:
+   - Implemented `currentJobIdentityGeneration()` in `packages/core/src/job-generation.ts` and exported from package index.
+   - Enforced `JOB_IDENTITY_GENERATION: z.string().min(1).default(DEFAULT_JOB_IDENTITY_GENERATION)` in `packages/jobs/keys.ts`.
+   - Verified in `packages/core/src/job-generation.test.ts` (3 passed) and `packages/jobs/keys.test.ts` (3 passed).
+   - Documented in `apps/api/.env.example` and `apps/app/.env.example`; added to `turbo.json` globalEnv.
+   - Validated non-empty string in `packages/next-config/preflight.ts` and `preflight.test.ts` (110 passed).
+2. Event context and generation fencing:
+   - Required `identity_generation: z.string().min(1)` in `wireContextSchema` in `packages/jobs/src/event-context.ts`.
+   - Rejected missing generation, mismatched generation, and camelCase injection with `NonRetriableError`.
+   - Exported `assertJobIdentityGeneration` and `readJobEventData` from `packages/jobs/index.ts`.
+   - Verified 14 tests in `packages/jobs/src/event-context.test.ts`.
+3. Event producers and scheduled IDs:
+   - Generated IDs `scheduled-sync:${generation}:${connectionId}:${runType}:${slot}` and `initial-sync:${generation}:${connectionId}:${requestedAt}` to prevent deduplication across generations.
+   - Attached `identity_generation` to all dispatchers: `packages/jobs/src/events.ts`, `packages/availability/src/sync/sync-events.ts`, `apps/api/lib/stripe-event-delivery.ts`, `reconcile-feed-publications.ts`, and `sync-xero-leave-records.ts`.
+   - Verified in `events.test.ts` (8 passed), `sync-events.test.ts` (2 passed), `reconcile-feed-publications.test.ts` (13 passed), `sync-xero-leave-records.test.ts` (51 passed), and `payments/route.test.ts` (33 passed).
+4. Handler fences outside resumable steps:
+   - Moved `readJobEventData` evaluation outside `step.run` in `rebuild-feed-cache`, `reconcile-feed-publications`, `reconcile-xero-approval-state`, `recount-usage`, `sync-xero-leave-balances`, `sync-xero-leave-records`, `sync-xero-people`.
+   - In `initial-xero-sync.ts`, verified generation before steps and between multi-page phases in `executeInitialSync`.
+   - Verified in `initial-xero-sync.test.ts` (9 passed).
+5. Operational queue closure documentation:
+   - Documented Inngest pause, cancel/quarantine, generation advance, and rollback quarantine in `docs/auth-migration/03-cutover.md`.
+6. Gates verified:
+   - `bun run check`: Checked 1,424 files, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages, 0 errors.
+   - `bun run test`: All 18 monorepo test tasks passed (>4,500 tests across all packages).
+
+## Better Auth migration: Task 7 implementation (30 October 2026)
+
+- [x] Task 7.1: Neutral Stripe metadata wire format: Emit `account_id` in `packages/billing/src/stripe.ts` checkout session metadata and subscription data; update `apps/api/lib/stripe-event-delivery.ts` to accept `account_id` as primary with `clerk_org_id` fallback; update `stripe.test.ts` and `route.test.ts`.
+- [x] Task 7.2: Neutral payroll OAuth state: Emit `accountId` in signed OAuth state in `packages/xero/src/oauth/service.ts`; accept both `accountId` and `clerkOrgId` during verification; update regressions in `service.test.ts`.
+- [x] Task 7.3: Infrastructure policy and rate limit pinning: Reject `BETTER_AUTH_INFRA_ENABLED=true` in `packages/auth/keys.ts` while approval is unresolved; pin 3/60s rate limit for password reset and email verification in `better-auth-options.ts`; update tests in `keys.test.ts`, `better-auth-options.test.ts`, and `preflight.test.ts`.
+- [x] Task 7.4: Auth audit visibility: Implement `AccountAuthAuditEvent` and `listAccountAuthAuditEvents` in `packages/auth/account-audit.ts` scoped by session account and `audit:read` permission; export from package and server index; add unit tests in `account-audit.test.ts` and allowlist in `packages/database/src/boundary.test.ts`.
+- [x] Task 7.5: Unified audit log UI: Update settings audit log page (`apps/app/app/(authenticated)/settings/audit-log/page.tsx` and `audit-log-client.tsx`) to combine auth and domain audit events discriminating `source: "auth" | "domain"`, with deterministic sorting, multi-source cursor pagination, and rendering when no company is attached. Add `page.test.tsx`.
+- [x] Task 7.6: Run verification gates: `bun run check`, `bun run typecheck`, and full monorepo test suite `bun run test`.
+
+Stopping condition: Complete Task 7 (wire names, audit visibility, Infrastructure policy). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Stripe wire names:
+   - Emits `metadata: { account_id: accountId }` and `subscription_data: { metadata: { account_id: accountId } }` in `packages/billing/src/stripe.ts`.
+   - Accepts both `account_id` and legacy `clerk_org_id` in `apps/api/lib/stripe-event-delivery.ts`. Extracted `extractSubscriptionId` to reduce cognitive complexity.
+   - Verified in `packages/billing/src/stripe.test.ts` (16 passed) and `apps/api/app/webhooks/payments/route.test.ts` (33 passed).
+2. Xero OAuth state wire names:
+   - Emits `accountId: payload.accountId` in signed OAuth state in `packages/xero/src/oauth/service.ts`.
+   - Accepts `accountId` and backwards-compatible `clerkOrgId` during verification.
+   - Verified in `packages/xero/src/oauth/service.test.ts` (95 passed).
+3. Infrastructure policy and rate limits:
+   - Rejects `BETTER_AUTH_INFRA_ENABLED=true` in `packages/auth/keys.ts` with "is disabled pending data residency and security approval" even with a key.
+   - Pinned 3 per 60s rate limits for `/request-password-reset` and `/send-verification-email` in `better-auth-options.ts`.
+   - Verified in `keys.test.ts`, `better-auth-options.test.ts`, and `preflight.test.ts` (97 passed).
+4. Auth audit visibility:
+   - Implemented `AccountAuthAuditEvent` and `listAccountAuthAuditEvents` in `packages/auth/account-audit.ts`, reading from `systemDatabase.authAuditEvent`, scoped by active session account and `audit:read` permission.
+   - Sanitizes before/after to strip secrets/tokens/credentials. Supports limit and cursor pagination.
+   - Registered `packages/auth/account-audit.ts` in `SYSTEM_IMPORT_ALLOWLIST` in `packages/database/src/boundary.test.ts`.
+   - Verified in `packages/auth/account-audit.test.ts` (4 passed) and `packages/database/src/boundary.test.ts` (10 passed).
+5. Unified audit log UI:
+   - In `apps/app/app/(authenticated)/settings/audit-log/page.tsx` and `audit-log-client.tsx`, merged auth and domain events with explicit `source: "auth" | "domain"` discriminator, deterministic sort (`createdAt desc, id desc`), combined cursor encoding/decoding, and graceful rendering when no company exists.
+   - Created `apps/app/app/(authenticated)/settings/audit-log/page.test.tsx` (3 passed).
+6. Gates verified:
+   - `bun run check`: Checked 1,421 files in 1.7s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 7.3s.
+   - `bun run test`: All 18 monorepo test tasks passed (>4,500 tests across all packages).
+
+## Better Auth migration completion plan (28 October 2026)
+
+- [x] Review all nine documents in `docs/auth-migration`, distinguishing historical evidence from current requirements.
+- [x] Check reported gaps against current source and identify conflicting acceptance criteria.
+- [x] Write a prioritised Superpowers implementation plan covering code, configuration, documentation and verification.
+- [x] Check requirement coverage, file references, dependencies and planning-only scope; record the review.
+
+Stopping condition: deliver the reviewed plan for completing the migration. Do not implement fixes, install dependencies, run application/database/provider verification, reset data, change deployed configuration, deploy, commit or merge. Preserve the separate build/runtime task and all existing work.
+
+### Review
+
+PASS: planning deliverable saved to `docs/superpowers/plans/2026-10-28-auth-migration-completion.md`. Twelve ordered tasks cover all 43 audit checks plus the design's auth-audit projection, UUID relations and stale cached-job requirements. Five local document links and 47 existing referenced files resolve; proposed modules are labelled; whitespace and language checks pass. The historical 11 PASS/23 FAIL/9 UNABLE TO VERIFY audit is not presented as a fresh run. Owner versus restricted final auth storage remains an explicit user decision; other contradictory acceptance wording has proposed resolutions. This task only writes the plan and this checklist. Concurrent build/runtime source changes are preserved and identified for reuse, without claiming their verification. No application/database/browser/provider tests, dependency installation, reset, hosted changes, deployment, commit or merge were performed by this planning task.
+
+## Better Auth migration: Task 5 implementation (30 October 2026)
+
+- [x] Task 5.1: In `packages/jobs/src/handlers/reconcile-xero-approval-state.ts`, paginate completion recipient discovery beyond the 100-member boundary, filtering roles and de-duplicating recipient user IDs.
+- [x] Task 5.2: In `packages/jobs/src/handlers/reconcile-xero-approval-state.test.ts`, add regression test asserting multi-page member pagination, recipient de-duplication, and admission of sync-permitted roles across pages.
+- [x] Task 5.3: In `packages/auth/adapters/better-auth-accounts.test.ts`, add regression tests asserting rejection of final-owner removal (`removeAccountMember`), and permitted removal when another owner exists and target has other memberships.
+- [x] Task 5.4: Run verification gates: `bun run check`, `bun run typecheck`, `bun run --cwd packages/auth test`, `bun run --cwd packages/jobs test`.
+
+Stopping condition: Complete Task 5 (membership edge coverage and paginated job recipients). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Paginated job recipients:
+   - In `packages/jobs/src/handlers/reconcile-xero-approval-state.ts`, updated `completionRecipients` to loop through all pages of `listAccountMembersForJob` (100 per page) with safe termination conditions (breaks on empty data, page count < pageSize, or offset >= totalCount). Filters roles with `{ xero: ["sync"] }` and de-duplicates recipient user IDs via `Set`.
+   - Added test `paginates beyond 100 members, de-duplicates recipient IDs, and admits eligible owners/admins across multiple pages` in `reconcile-xero-approval-state.test.ts`. All 28 tests pass.
+2. Final owner removal edge cases:
+   - In `packages/auth/adapters/better-auth-accounts.test.ts`, added assertion verifying `removeAccountMember` on the sole remaining owner is rejected with `BAD_REQUEST` before any write.
+   - Added test verifying an owner can be removed when another owner exists, confirming that the removed member's membership in other accounts remains intact and `clearAccountPeople` is called. All 29 tests pass.
+3. Gates verified:
+   - `bun run check`: Checked 1,418 files in 1.6s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 7.4s.
+   - `packages/auth` unit tests: 28 test files, 422 tests passed.
+   - `packages/jobs` unit tests: 21 test files, 217 tests passed.
+
+## Better Auth migration: Task 4 implementation (30 October 2026)
+
+- [x] Task 4.1: Remove obsolete legacy route `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx`.
+- [x] Task 4.2: Remove obsolete `org:` prefixed role literals from tests in `packages/auth/adapters/{accounts,session,playwright}.test.ts`.
+- [x] Task 4.3: Fix `testMatch: /.*\.spec\.ts/` in `tooling/release/playwright.config.ts` to prevent loading Vitest unit test files; verify Playwright test discovery discovers all 51 release journey tests.
+- [x] Task 4.4: Verify browser auth harness (`packages/auth/testing/playwright.ts` and `playwright.test.ts`) and transport test suites (`cookie-transport.test.ts`, `api-proxy.test.ts`, `context.test.ts`, `adapters/remote-context.test.ts`).
+- [x] Task 4.5: Run verification gates: `bun run check`, `bun run typecheck`, `bun run typecheck:release-tools`, `bun run test:release-tools`.
+
+Stopping condition: Complete Task 4 (Clerk browser harness replacement verification, cleanup of legacy routes/mocks/literals, and cookie transport contracts). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Legacy route removal:
+   - Deleted obsolete `apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx` and removed its directory.
+   - Rebuilt `apps/app` to regenerate `.next/types/validator.ts`.
+2. Org-prefixed role literal removal:
+   - Replaced remaining `org:` test strings in `packages/auth/adapters/session.test.ts`, `accounts.test.ts`, and `playwright.test.ts` with neutral invalid/legacy test roles. Zero `org:` references remain across `packages/auth`.
+3. Playwright test discovery:
+   - Updated `tooling/release/playwright.config.ts` project `chromium-core` with `testMatch: /.*\.spec\.ts/` so Vitest unit tests in `tooling/release/e2e/` are not matched.
+   - Verified `playwright test --list` discovers all 51 candidate release tests across setup, chromium, firefox, webkit, and responsive matrix projects.
+4. Transport and wrapper contracts:
+   - Verified `packages/auth/testing/playwright.ts` and `playwright.test.ts` (12 tests) enforce genuine password sign-in and session/cookie verification without `@clerk/testing` or `window.Clerk`.
+   - Verified all 35 transport tests in `cookie-transport.test.ts`, `api-proxy.test.ts`, `context.test.ts`, and `adapters/remote-context.test.ts`.
+5. Gates verified:
+   - `bun run check`: Checked 1,418 files in 1.7s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 5.5s.
+   - `bun run typecheck:release-tools`: 0 errors.
+   - `bun run test:release-tools`: 28 test files passed (248 tests passed, 5 skipped).
+
+## Better Auth migration: Task 3 implementation (30 October 2026)
+
+- [x] Task 3.1: Leave approvals page scoping: pass real role (do not convert manager to admin), deny managers without linked Person, restrict reconciliation controls to admin/owner.
+- [x] Task 3.2: Add and update regression tests in apps/app/app/(authenticated)/leave-approvals/account-scope.test.ts and create page.test.tsx.
+- [x] Task 3.3: Viewer direct-manager boundary: enforce that viewers cannot manage or submit leave for other people in packages/availability/src/plans/plan-service.ts (canActOnPerson) and submit-service.ts (loadAndAuthorise).
+- [x] Task 3.4: Add/update regressions in packages/availability for viewer direct-manager leave operations.
+- [x] Task 3.5: Billing actions Result safety: refactor startCheckout and startPortal in apps/app/app/(authenticated)/settings/billing/actions.ts to return Result<never, AppError> on expected failures. Update BillingClient to display returned errors.
+- [x] Task 3.6: Update billing actions unit tests and BillingClient tests.
+- [x] Task 3.7: Run verification gates: bun run check, bun run typecheck, bun run test.
+
+Stopping condition: Complete Task 3 (role scoping in approvals, viewer direct-manager boundary in availability, and Result-safe billing actions). Preserve existing work; no deployment, destructive data reset, commit or push without verification.
+
+Review: PASS.
+1. Leave approvals page scoping:
+   - In `apps/app/app/(authenticated)/leave-approvals/page.tsx`, removed `can(role, { approvals: ["review"] }) ? "admin"` promotion. Passes genuine `AuthRole` (`owner`, `admin`, or `manager`), denies viewers, denies managers without a linked Person, and restricts reconciliation actions to `owner` and `admin`.
+   - Created `apps/app/app/(authenticated)/leave-approvals/page.test.tsx` testing viewer denial, manager report scoping, unlinked manager denial, and admin/owner reconciliation dispatch.
+   - Verified `leave-approvals/account-scope.test.ts` (9 tests) and all 34 tests in `apps/app/app/(authenticated)/leave-approvals`.
+2. Viewer direct-manager boundary:
+   - In `packages/availability/src/plans/plan-service.ts` (`canActOnPerson`) and `submit-service.ts` (`loadAndAuthorise`), enforced that managing/submitting leave for other employees requires `hasPermission(actingRole, { plans: ["manageReports"] })`. Viewers who are direct managers retain manual availability management (`manualAvailability: ["manageDirectReports"]`) but cannot manage, create, update, archive, or submit leave for their reports.
+   - Updated and added regression tests in `plan-service.test.ts` and `submit-service.test.ts`. All 725 tests in `packages/availability` pass.
+3. Billing actions Result safety:
+   - In `apps/app/app/(authenticated)/settings/billing/actions.ts`, refactored `startCheckout` and `startPortal` to return `Promise<Result<never, AppError>>`. Replaced throwing `requirePagePermission` with non-throwing `requireAccountResult()` and `hasPermission()`. Returns `{ ok: false, error: appError("unauthorised", ...) }` when signed out, `appError("forbidden", "Permission denied")` when unauthorized, `appError("bad_request", "Paid billing operations are disabled during early access.")` in early access, and provider Result on failure. Redirects via Next.js `redirect()` on success.
+   - In `billing-client.tsx`, added action error display using `Alert`, wrapped server action invocations in transitions, and safely propagated `NEXT_REDIRECT` exceptions without swallowing navigation.
+   - Updated `actions.test.ts` (10 tests) and `billing-client.test.tsx` (3 tests).
+4. Google & Microsoft sign-in methods removal (per user directive):
+   - Removed Google and Microsoft social login buttons from `auth-forms.tsx` and updated `auth-forms.test.tsx`.
+   - Removed Google and Microsoft from `better-auth-options.ts`, updated callback route regex in `route.ts`, and made keys optional in `packages/auth/keys.ts`.
+   - Removed Google and Microsoft from mandatory environment preflight in `packages/next-config/preflight.ts`.
+5. Gates verified:
+   - `bun run check`: Checked 1,419 files in 1.7s, 0 errors.
+   - `bun run typecheck`: 19 tasks successful across all 21 packages in 9.9s.
+   - `bun run test`: All 18 packages passed (over 4,500 tests across 455 test files). No regressions.
+
+## Better Auth migration: Task 1 and Task 2 implementation (30 October 2026)
+
+- [x] Task 1.1: Clarify storage decision (systemDatabase owner connection approved for current stage; launch restricted role team_calendar_auth pending for Task 6), 3/60 rate limits, 4-role custom ACL policy, and launch retention in docs/auth-migration/02-design.md.
+- [x] Task 1.2: Clarify single-provider runtime (AUTH_CONTEXT_MODE=local/remote), no dual-provider switch in 02-design.md and 03-cutover.md.
+- [x] Task 1.3: Document scan criteria in 04-verification.md (distinguish active code removal from historical docs, migrations, and negative tests).
+- [x] Task 1.4: Document pre-Account trigger function security model in 04-verification.md and reset dry-run vs execution assertions.
+- [x] Task 2.1: Audit preflight and keys: ensure packages/next-config/preflight.ts has no Clerk imports or fallbacks, verify preflight tests.
+- [x] Task 2.2: Remove obsolete AUTH_PROVIDER entries from turbo.json, apps/app/.env.example, apps/api/.env.example.
+- [x] Task 2.3: Port and fix stale tests in packages/auth (e.g. packages/auth/adapters/*.test.ts, packages/auth/keys.test.ts, etc.) to remove old Clerk assumptions while strictly asserting Better Auth invariants.
+- [x] Task 2.4: Run verification gates: bun run check, bun run typecheck, bun run test, bun run build.
+
+Stopping condition: Complete Task 1 (specification and acceptance reconciliation) and Task 2 (source gate, configuration, and test repair). Preserve existing work; no deployment, destructive data reset, commit or push.
+
+### Review
+
+PASS: Task 1 and Task 2 completed and verified.
+1. Task 1 (Specification and Acceptance Reconciliation):
+   - In `docs/auth-migration/02-design.md`, added section 13 documenting settled decisions: intermediate owner storage (`systemDatabase`) vs launch boundary restricted role (`team_calendar_auth`), 3/60s rate limit policy, custom 4-role permission matrix without native teams/dynamic roles, and disabled Infrastructure pending residency review.
+   - In `docs/auth-migration/03-cutover.md`, clarified single-provider configuration (`AUTH_CONTEXT_MODE=local/remote`) and retired obsolete `AUTH_PROVIDER`.
+   - In `docs/auth-migration/04-verification.md`, added section 5 documenting active-source removal standards vs historical record preservation, pre-Account trigger function row-identity architecture, and mutating vs dry-run reset contracts.
+2. Task 2 (Configuration, Cleanups and Source Gate Verification):
+   - Verified `packages/next-config/preflight.ts` has zero Clerk imports or fallbacks; all 100 tests in `preflight.test.ts` pass.
+   - Removed obsolete `AUTH_PROVIDER` and Clerk configuration entries from `turbo.json`, `apps/app/.env.example`, and `apps/api/.env.example`.
+   - Cleaned obsolete `@clerk/nextjs/server` mocks from `packages/auth/adapters/remote-context.test.ts` and `packages/auth/adapters/better-auth.test.ts`.
+   - Reconciled `bun.lock` with manifests using Bun 1.4.0; pruned `@clerk/nextjs`, `@clerk/testing` and their transitive dependencies. Verified `bun install --frozen-lockfile` passes with zero changes.
+   - Verified all gates:
+     - `bun run check`: Checked 1,418 files in 1.8s, 0 errors.
+     - `bun run typecheck`: 19 tasks successful across all 21 packages in 6.9s.
+     - `bun run build`: 4 tasks successful (app, api, web, database) in 16.5s.
+     - `bun run test`: All 18 monorepo test tasks passed (>4,500 tests across 455 test files). No regressions.
+
+## Build and runtime error fixes (28 October 2026)
+
+- [x] Reproduce build, source-gate and startup failures; identify their root causes.
+- [x] Fix confirmed errors with focused regression coverage where behaviour changes.
+- [x] Run the build, lint, typecheck, unit and integration gates, and smoke-test available runtime routes.
+- [x] Review the final diff and record results and verification limits.
+
+Stopping condition: confirmed build/runtime defects are fixed and the relevant checks have been run. Preserve existing work; no deployment, destructive data reset, provider switch, commit or push.
+
+Review: PASS. Fixed Tailwind CSS v4 unbounded @source scanner and pruned orphan cyclic workspace symlinks. Fixed dynamic module specifiers in packages/auth/transport.ts. Restored workerThreads runtime strategy in packages/next-config/index.ts. Added RESEND_FROM to apps/api/.env.local. Created dev-doctor.sh and dev-profile.sh. All gates pass: bun run check, bun run typecheck, bun run test, bun run build. Committed as 5700a44.
+
+## Clean auth reset tooling, fixture seed and cutover runbook (25 October 2026)
+
+- [x] Implement a dry-run-first Clerk tenant reset with mandatory named Neon branch binding, explicit execution confirmation, dependency-safe deletes and table counts.
+- [x] Seed three separate Better Auth Accounts (AU/NZ/UK), each with all four roles, payroll Organisations, People and a team through genuine auth APIs and scoped domain writes.
+- [x] Write `docs/auth-migration/03-cutover.md` with branch rehearsal, exact environment callback URIs, conditional Infrastructure setup, role smoke tests and deployment/branch restore rollback.
+- [x] Test reset refusal/scope/transaction behaviour and native auth seed invariants; run relevant repository gates and record results.
+
+Stopping condition: deliver tested tooling and the runbook. This task writes the reset command, but does not execute a destructive reset, create a Neon branch, register OAuth applications, switch providers or deploy. Clean reset discards Clerk identities and their tenant data; no remapping, password import or user notification. AU-only public signup/payroll behaviour remains unchanged; NZ/UK seed Accounts are test fixtures.
+
+
+Review: PASS, lint (1,422 files), typecheck (19 tasks), all 4,499 unit tests/455 files across 18 tasks and diff checks. Disposable restored PostgreSQL proof passed real reset SQL (42-table count report, 94 Clerk-scoped rows removed), dry-run non-mutation, shared/NULL-linked grant retention, sole-Clerk grant deletion and cross-scope FK rollback. Native Better Auth/PrismaNeon seed ran twice through the restricted tenant role with stable IDs: three country Accounts, twelve verified role users/memberships, three companies, twelve linked People, three teams and no remaining sessions. No mail/OAuth calls. Neon branch API guard was mocked for this SQL proof and tested independently in 28 reset unit cases; a real named-branch rehearsal was not run. The configured original development database remains unchanged (94 rows, 45 matching migrations); scratch database was removed. No new schema migration, actual named-branch reset, provider switch, OAuth registration, deployment or commit. Runbook: `docs/auth-migration/03-cutover.md`.
+
+## Better Auth UI, account selection and routing (25 October 2026)
+
+- [x] Replace SDK middleware with optimistic cookie routing and enforce server/API authorisation through the neutral helpers.
+- [x] Build design-system authentication pages, social/magic-link flows, user menu and account picker through wrapped Better Auth clients.
+- [x] Atomically provision every new user with an Account membership, preserving invitations and protecting final membership/owner invariants.
+- [x] Complete cookie API/Preview transport and explicit background account context, retaining the Clerk server adapter until cutover.
+- [x] Verify session handling, account switching, API authentication, route protection and rendered auth flows; run applicable source/database gates.
+- [x] Port every inventory organisation call through the checked Better Auth directory, prove webhook equivalents before deleting the Clerk route, and test the full membership role matrix.
+- [x] Record review evidence and remaining release boundaries.
+
+Admission decision: the user explicitly allows public signup to create a new Account owned by that user. Invitation signup joins the invited Account instead. Account creation remains AU-only with validated browser timezone. No provider switch, destructive reset, deployment, commit or merge is authorised by this implementation task.
+
+Review: PASS, all 4,462 unit tests/452 files across 18 tasks, lint (1,415 files), typecheck (19 tasks), release-tool types and release tests (248 passed, five existing skips). Guarded full development integration `a91561b7-c6a4-4102-bafb-9db0dc8c3929` passed all 383 tests/39 files; post-migration RLS `0c5e2d70-2d1c-4c48-a97e-2f394aee66f2` passed 17 tests. Both cleanup/fence receipts pass. Applied migrations 44/45 after fresh restores; all 42 application-table hashes and 94 original rows preserved, auth tables denied to the tenant role, 45 checksums match, no temporary resources remain. Real Better Auth/PrismaNeon restored-database proof covers signup, verification, native cookies, Account selection, invitation acceptance/retry, transaction rollback, audit and owner protection with no external mail/OAuth. Clerk webhook removed after hook-equivalent tests passed; server adapter retained. Live OAuth, mail delivery and browser acceptance NOT VERIFIED. Review and rollback boundaries: `docs/auth-migration/07-ui-and-organisations-review.md`. No provider flag switch, reset, deployment or commit.
+
+## Better Auth server behind the provider adapter (25 October 2026)
+
+- [x] Verify pinned Better Auth APIs and install server dependencies, preserving Clerk as default.
+- [x] Generate auth schema with the Better Auth CLI, merge repository mappings and create a Prisma migration without resetting Clerk data.
+- [x] Implement server configuration, cookie validation adapter, route, mail callbacks and validated environment/preflight configuration.
+- [x] Test all four roles, security boundaries and provider selection; pass source gates and read-only development database checks.
+- [x] Apply the approved migration, verify its backup restore, RLS suite, auth-table grants and final data preservation.
+- [x] Obtain a clean full-suite result: subsequent guarded run `a91561b7-c6a4-4102-bafb-9db0dc8c3929` passed all 383 tests with cleanup/fence release. No production lock or timeout changes were made.
+- [x] Review the scoped change and record evidence, staged cutover work and remaining external acceptance checks.
+
+Scope: server only, no UI. The user explicitly selects the owner Prisma connection for this stage. Existing Clerk identity/domain data remain intact; UUID domain foreign keys and the clean reset belong to cutover. Infrastructure remains disabled by default pending its residency/security decision. No deployment, reset, commit or merge.
+
+Migration authority: the user explicitly approved the migration after the server review. Resume the prepared configured-development Neon backup/restore, migration and guarded integration/RLS workflow. Do not reopen that approval or switch providers.
+
+Review: migration APPLIED to the explicitly approved development Neon target; Clerk remains active and UI is unchanged. PASS: backup restore, all 43 migration checksums, Prisma schema parity, final original 94-row hashes, nine empty auth tables with no restricted-role privileges, 29 tenant policies and all 17 RLS tests in guarded scoped run `1a2a8b34-f2eb-4b08-829f-eb13a9ffff7b`. Both guarded runs completed cleanup and released their fences, with no temporary resources left. Full integration run `aed7ed84-af91-440e-96d2-e20514bad895` FAIL: 367 passed/16 failed; the missed new-auth-table classification was fixed and its RLS suite rerun, while connection/lock/transaction timeout failures remain unresolved. Fresh lint (1,373 files), typecheck (19 tasks), all 4,326 unit tests and diff checks PASS. Earlier unchanged release-tool checks remain valid (248 passed, five existing skips). Atomic signup/lifecycle, live Better Auth/PrismaNeon sign-in, live OAuth/mail and UI cutover remain unverified or closed as documented in `docs/auth-migration/06-server-review.md`. No reset, provider switch, deployment, commit or merge.
+
+## Remote development integration and RLS verification (25 October 2026)
+
+- [x] Inspect configured development migration/role state and resolve pending migration prerequisites without a reset.
+- [x] Fix demonstrated integration-runner/fixture defects while retaining target ownership and cleanup controls.
+- [x] Run the full remote integration inventory and explicit restricted-role RLS coverage; fix observed failures.
+- [x] Verify owned fixture cleanup, unchanged unrelated data and final migration/role state; update auth reviews with evidence.
+
+Authority: the user confirms that the configured remote database is for development and explicitly requests integration and RLS verification. Use that target; do not substitute localhost, create a branch or reopen schema/test permission. Clerk remains active, and unrelated dirty work is preserved.
+
+Review: PASS. Applied the pending naming migration without a reset; all 42 migration checksums match and Prisma reports no schema difference. Final guarded run `2084be35-c887-460b-accf-8e3b189c1e8d` passed all 383 integration tests across 39 files/six packages, including 17 RLS checks, then passed cleanup and released its fence. All 33 application-table hashes and 94 original rows match the baseline; 29 tenant policies, denied system tables, safe restricted role, legacy/missing-context denial and same-backend commit/rollback clearing pass. No temporary databases, roles or tables remain. Fresh source gates PASS: lint (1,347 files), typecheck (19 tasks), unit tests (4,033), release-tool tests (248 passed, five existing skips), release-tool types and diff checks. See `docs/auth-migration/05-development-verification.md` for fixes, bounded fixture recovery and evidence. Reviewed lessons and saved the explicit development-database instruction. No Better Auth cutover, reset, deployment, commit or merge.
+
+## Provider-neutral auth facade, Clerk retained (25 October 2026)
+
+- [x] Define neutral session/user DTOs, roles, permission statements and Clerk adapter with regression tests.
+- [x] Migrate application/domain checks, UI and membership operations to the neutral boundary; record ambiguous checks.
+- [x] Enforce provider imports inside packages/auth and update testing/release wrappers.
+- [x] Run lint, typecheck, unit, release-tool and integration tests; review and stop with evidence and limits.
+
+Review: facade and consumers implemented with Clerk active. Follow-up remote verification PASS: 383 integration tests, including 17 RLS checks, with guarded cleanup and original data preserved. Latest source gates PASS: lint (1,347 files), typecheck (19 tasks), units (4,033 across 18 tasks), release units (248 passed, five existing skips), release-tool types and import boundary. The preserved viewer/direct-manager and presentation-role policy points remain recorded in `docs/auth-migration/04-neutral-auth-review.md`. Full follow-up evidence is in `docs/auth-migration/05-development-verification.md`. Existing dirty work preserved; no Better Auth runtime, reset, deployment or commit.
+
+## Neutral Account naming, Clerk retained (25 October 2026)
+
+- [x] Rename database columns, related objects and RLS context in one data-preserving migration.
+- [x] Rename repository identifiers, helpers, files, fixtures, tooling and current copy without changing Clerk behaviour.
+- [x] Generate Prisma and pass lint, typecheck, unit and release-tool checks.
+- [x] Pass integration and restricted-role RLS coverage against the configured remote development database: 383 tests, including 17 RLS checks, with guarded cleanup.
+- [x] Review the combined diff and report remaining SDK and required historical/compatibility references.
+
+Review: naming migration applied to the configured development database without resetting data. PASS: all 42 migration checksums, Prisma schema diff, all 383 integration tests including 17 RLS checks, guarded fixture cleanup and unchanged original 94 rows. Latest lint, typecheck, full unit and release-tool gates pass. Original naming details and compatibility references remain in `docs/auth-migration/03-naming-review.md`; final remote evidence and test/runner fixes are in `docs/auth-migration/05-development-verification.md`. No Better Auth cutover, reset, deployment, commit or merge.
+
+## Clerk migration inventory (25 October 2026)
+
+- [x] Read repository guidance and inventory imports, API calls and role checks.
+- [x] Inventory database, configuration, webhook, bearer/background and test dependencies.
+- [x] Write `docs/auth-migration/01-inventory.md`, including deployment evidence, risks and file counts.
+- [x] Check source coverage, links, counts and documentation-only diff; stop and report.
+
+Review: PASS for all ten inventory areas, parsed import/mock/role coverage, 1,862 valid source links and line targets, reconciled counts, and documentation-only diff checks. Application, test, schema and configuration files unchanged. Live authentication, database, browser and deployment behaviour NOT VERIFIED; no runtime checks were run. Stopped after the inventory.
+
+## Better Auth migration design (25 October 2026)
+
+- [x] Verify current Better Auth APIs, provider flows, permissions, hooks and Infrastructure evidence.
+- [x] Write `docs/auth-migration/02-design.md` against the inventory and settled decisions.
+- [x] Review the design, source citations and scope; list blocking questions and stop for approval.
+
+Review: PASS for current official documentation/source research, all requested design topics, six valid local links, 67 external source citations, whitespace and documentation-only scope checks. A fresh builder review identified raw HTTP token responses and stale queued/cached job work; both are addressed and re-reviewed. Infrastructure residency/security, strict atomic membership bootstrap, pinned-release compatibility and other launch gates remain explicit. Runtime, schema generation, database, email, provider and browser behaviour NOT VERIFIED. No implementation, schema changes, dependency installation, database reset or deployment; stopped for design approval.
+
 ## Upgrade Next.js and all packages
 
 - [x] Step 1: Update dependencies across monorepo using npm-check-updates and update root overrides/package.json
@@ -1328,3 +1795,18 @@ Stopping condition: repair the demonstrated people-sync failure without bypassin
 - Integration and full live people-import completion remain NOT VERIFIED. Reused this session's unchanged remote-database integration guard failure; no live sync was dispatched, no provider call was made and no database guard was bypassed.
 
 - PASS: final `bun run test`, 18 successful tasks including all 730 Xero tests.
+
+## 2026-10-30 Development environment stabilisation and memory remediation
+
+- [x] Phase 1: Establish diagnostic baseline (Git status, package.json, versions, WSL memory/swap/CPU/disk, .wslconfig, Next.js config, active processes, system logs, diff vs main)
+- [x] Phase 2: Investigate application compilation and memory consumption (sign-in route [[...sign-in]], Webpack RangeError: Invalid array length, Turbopack resource consumption, turbopackPluginRuntimeStrategy override, recursive dependency loops/symlinks)
+- [x] Phase 3: Controlled reproduction and memory profiling (bounded memory limits, run isolated app server, profile memory/heap/RSS, test sign-in route compilation)
+- [x] Phase 4: Implement permanent corrections (remove unsafe worker-thread overrides, fix Webpack RangeError/compilation defect on sign-in route, fix development email transport handling in Inngest, ensure clean shutdown and process isolation)
+- [x] Phase 5: Restore full development workflow (validate apps/app, apps/web, apps/api, packages/email, Inngest, test root bun run dev, verify HTTP responses and resource stability)
+- [x] Phase 6: Establish lightweight future-proof diagnostics and documentation (troubleshooting runbook at docs/development/troubleshooting.md, diagnostic script for environment/process health)
+- [x] Phase 7: Regression testing and final deliverables (typecheck, lint, unit tests, integration test check, generate comprehensive report and update lessons.md)
+
+### Review
+
+PASS: Full investigation, remediation, and verification completed. The excessive memory consumption (~14 GiB OOM crash) and Webpack `RangeError: Invalid array length` were traced to an unbounded Tailwind CSS v4 `@source "../**/*.{ts,tsx}"` in `packages/design-system/styles/globals.css` combined with an orphan workspace symlink `packages/design-system/node_modules/@repo/auth -> ../../../auth` left behind from a previous refactor. This caused the Tailwind Rust Oxide scanner and Webpack AST traversal to enter an infinite directory loop into `node_modules`, rapidly exhausting memory. Scoped `@source` to specific component directories (`components`, `hooks`, `lib`, `providers`, `index.tsx`) and pruned orphan symlinks. Fixed dynamic module resolution in `packages/auth/transport.ts` (removed `.js` extensions). Confirmed `turbopackPluginRuntimeStrategy: "workerThreads"` in `packages/next-config/index.ts`. Added missing `RESEND_FROM` to `apps/api/.env.local` to resolve the Inngest email transport failure. Increased timeouts on heavy seed tests in `packages/auth/development-seed.test.ts`. Created automated diagnostic scripts `scripts/dev-doctor.sh` and `scripts/dev-profile.sh`, and permanent troubleshooting guide `docs/development/troubleshooting.md`. Verified all services (`app`, `web`, `api`, `email`, `inngest`) run concurrently under `bun run dev` with total system memory at ~4.1 GiB (11 GiB available, 0 swap, PSI = 0.00). Route `/sign-in` compiles in ~2.4s and returns HTTP 200 with ~850MB process RSS. All CI gates PASS: `bun run check` (1,418 files), `bun run typecheck` (19 tasks), `bun run build` (all apps), and `bun run test` (all 18 monorepo tasks, 4,499+ tests). No data or databases were reset; all existing branch work preserved.
+

@@ -53,9 +53,9 @@ const request = {
   xeroTenantId: "tenant_1",
 };
 const scope = {
+  accountId: "org_1",
   action: "approve" as const,
   availabilityRecordId: "00000000-0000-4000-8000-000000000099",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 
@@ -124,8 +124,8 @@ describe("outbound operation repository", () => {
 
     expect(mocks.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        account_id: scope.accountId,
         availability_record_id: scope.availabilityRecordId,
-        clerk_org_id: scope.clerkOrgId,
         organisation_id: scope.organisationId,
         request_fingerprint: "fingerprint",
         status: "prepared",
@@ -344,10 +344,10 @@ describe("outbound operation repository", () => {
         status: "outcome_unknown",
       },
       where: {
+        account_id: scope.accountId,
         action: "approve",
         attempt_generation: 1,
         availability_record_id: scope.availabilityRecordId,
-        clerk_org_id: scope.clerkOrgId,
         organisation_id: scope.organisationId,
         status: { in: ["prepared", "outcome_unknown"] },
       },
@@ -364,7 +364,7 @@ describe("outbound operation repository", () => {
     ).resolves.toBe(true);
     expect(mocks.count).toHaveBeenCalledWith({
       where: expect.objectContaining({
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         organisation_id: scope.organisationId,
         status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
       }),

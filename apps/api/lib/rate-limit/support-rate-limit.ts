@@ -125,11 +125,11 @@ async function executeRateLimitIncrement(
 }
 
 export async function checkSupportRateLimit(input: {
-  clerkOrgId: string;
+  accountId: string;
   userId: string;
 }): Promise<SupportRateLimitResult> {
   const userKey = `ratelimit:support:user:${hashSupportRateLimitIdentifier(input.userId)}`;
-  const organisationKey = `ratelimit:support:organisation:${hashSupportRateLimitIdentifier(input.clerkOrgId)}`;
+  const organisationKey = `ratelimit:support:organisation:${hashSupportRateLimitIdentifier(input.accountId)}`;
 
   try {
     const incrementResult = await executeRateLimitIncrement(

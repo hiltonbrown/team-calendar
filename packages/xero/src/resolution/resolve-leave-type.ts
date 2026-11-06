@@ -11,12 +11,12 @@ export async function resolveXeroLeaveTypeId(
   },
   db: TenantDb
 ): Promise<Result<string, ResolutionError>> {
-  assertTenantDb(db, input.xeroConnection.clerk_org_id);
+  assertTenantDb(db, input.xeroConnection.account_id);
   const person = await db.person.findFirst({
     select: { id: true },
     where: {
+      account_id: input.xeroConnection.account_id,
       archived_at: null,
-      clerk_org_id: input.xeroConnection.clerk_org_id,
       id: input.personId,
       organisation_id: input.xeroConnection.organisation_id,
     },
@@ -36,7 +36,7 @@ export async function resolveXeroLeaveTypeId(
       leave_type_xero_id: true,
     },
     where: {
-      clerk_org_id: input.xeroConnection.clerk_org_id,
+      account_id: input.xeroConnection.account_id,
       organisation_id: input.xeroConnection.organisation_id,
       person_id: input.personId,
       record_type: input.recordType,

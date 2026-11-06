@@ -3,7 +3,7 @@ import { z } from "zod";
 const CSV_ESCAPE_PATTERN = /[",\r\n]/;
 
 export const OrganisationSettingsSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   createdAt: z.date(),
   defaultFeedPrivacyMode: z.enum(["named", "masked", "private"]),
   defaultLeaveRequestAdvanceDays: z.number().int().min(0),
@@ -40,7 +40,7 @@ export type OrganisationSettingsPatch = z.infer<
 >;
 
 export function mapOrganisationSettingsRow(input: {
-  clerk_org_id: string;
+  account_id: string;
   created_at: Date;
   default_feed_privacy_mode: "masked" | "named" | "private";
   default_leave_request_advance_days: number;
@@ -55,7 +55,7 @@ export function mapOrganisationSettingsRow(input: {
   updated_at: Date;
 }): OrganisationSettings {
   return {
-    clerkOrgId: input.clerk_org_id,
+    accountId: input.account_id,
     createdAt: input.created_at,
     defaultFeedPrivacyMode: input.default_feed_privacy_mode,
     defaultLeaveRequestAdvanceDays: input.default_leave_request_advance_days,

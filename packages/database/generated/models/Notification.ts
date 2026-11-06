@@ -26,7 +26,7 @@ export type AggregateNotification = {
 
 export type NotificationMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   recipient_user_id: string | null
   recipient_person_id: string | null
@@ -44,7 +44,7 @@ export type NotificationMinAggregateOutputType = {
 
 export type NotificationMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   recipient_user_id: string | null
   recipient_person_id: string | null
@@ -62,7 +62,7 @@ export type NotificationMaxAggregateOutputType = {
 
 export type NotificationCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   recipient_user_id: number
   recipient_person_id: number
@@ -83,7 +83,7 @@ export type NotificationCountAggregateOutputType = {
 
 export type NotificationMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   recipient_user_id?: true
   recipient_person_id?: true
@@ -101,7 +101,7 @@ export type NotificationMinAggregateInputType = {
 
 export type NotificationMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   recipient_user_id?: true
   recipient_person_id?: true
@@ -119,7 +119,7 @@ export type NotificationMaxAggregateInputType = {
 
 export type NotificationCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   recipient_user_id?: true
   recipient_person_id?: true
@@ -211,7 +211,7 @@ export type NotificationGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 
 export type NotificationGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   recipient_person_id: string | null
@@ -251,7 +251,7 @@ export type NotificationWhereInput = {
   OR?: Prisma.NotificationWhereInput[]
   NOT?: Prisma.NotificationWhereInput | Prisma.NotificationWhereInput[]
   id?: Prisma.UuidFilter<"Notification"> | string
-  clerk_org_id?: Prisma.StringFilter<"Notification"> | string
+  account_id?: Prisma.StringFilter<"Notification"> | string
   organisation_id?: Prisma.UuidFilter<"Notification"> | string
   recipient_user_id?: Prisma.StringFilter<"Notification"> | string
   recipient_person_id?: Prisma.UuidNullableFilter<"Notification"> | string | null
@@ -273,7 +273,7 @@ export type NotificationWhereInput = {
 
 export type NotificationOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
   recipient_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -298,7 +298,7 @@ export type NotificationWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.NotificationWhereInput | Prisma.NotificationWhereInput[]
   OR?: Prisma.NotificationWhereInput[]
   NOT?: Prisma.NotificationWhereInput | Prisma.NotificationWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"Notification"> | string
+  account_id?: Prisma.StringFilter<"Notification"> | string
   organisation_id?: Prisma.UuidFilter<"Notification"> | string
   recipient_user_id?: Prisma.StringFilter<"Notification"> | string
   recipient_person_id?: Prisma.UuidNullableFilter<"Notification"> | string | null
@@ -320,7 +320,7 @@ export type NotificationWhereUniqueInput = Prisma.AtLeast<{
 
 export type NotificationOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
   recipient_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -345,7 +345,7 @@ export type NotificationScalarWhereWithAggregatesInput = {
   OR?: Prisma.NotificationScalarWhereWithAggregatesInput[]
   NOT?: Prisma.NotificationScalarWhereWithAggregatesInput | Prisma.NotificationScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"Notification"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"Notification"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"Notification"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"Notification"> | string
   recipient_user_id?: Prisma.StringWithAggregatesFilter<"Notification"> | string
   recipient_person_id?: Prisma.UuidNullableWithAggregatesFilter<"Notification"> | string | null
@@ -364,7 +364,7 @@ export type NotificationScalarWhereWithAggregatesInput = {
 
 export type NotificationCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   type: $Enums.notification_type
   title: string
@@ -384,7 +384,7 @@ export type NotificationCreateInput = {
 
 export type NotificationUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   recipient_person_id?: string | null
@@ -404,7 +404,7 @@ export type NotificationUncheckedCreateInput = {
 
 export type NotificationUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -424,7 +424,7 @@ export type NotificationUpdateInput = {
 
 export type NotificationUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -444,7 +444,7 @@ export type NotificationUncheckedUpdateInput = {
 
 export type NotificationCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   recipient_person_id?: string | null
@@ -463,7 +463,7 @@ export type NotificationCreateManyInput = {
 
 export type NotificationUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -480,7 +480,7 @@ export type NotificationUpdateManyMutationInput = {
 
 export type NotificationUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -509,7 +509,7 @@ export type NotificationOrderByRelationAggregateInput = {
 
 export type NotificationCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
   recipient_person_id?: Prisma.SortOrder
@@ -528,7 +528,7 @@ export type NotificationCountOrderByAggregateInput = {
 
 export type NotificationMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
   recipient_person_id?: Prisma.SortOrder
@@ -546,7 +546,7 @@ export type NotificationMaxOrderByAggregateInput = {
 
 export type NotificationMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   recipient_user_id?: Prisma.SortOrder
   recipient_person_id?: Prisma.SortOrder
@@ -673,7 +673,7 @@ export type NotificationUpdateOneWithoutEmail_queueNestedInput = {
 
 export type NotificationCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   type: $Enums.notification_type
   title: string
@@ -692,7 +692,7 @@ export type NotificationCreateWithoutOrganisationInput = {
 
 export type NotificationUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   recipient_person_id?: string | null
   type: $Enums.notification_type
@@ -740,7 +740,7 @@ export type NotificationScalarWhereInput = {
   OR?: Prisma.NotificationScalarWhereInput[]
   NOT?: Prisma.NotificationScalarWhereInput | Prisma.NotificationScalarWhereInput[]
   id?: Prisma.UuidFilter<"Notification"> | string
-  clerk_org_id?: Prisma.StringFilter<"Notification"> | string
+  account_id?: Prisma.StringFilter<"Notification"> | string
   organisation_id?: Prisma.UuidFilter<"Notification"> | string
   recipient_user_id?: Prisma.StringFilter<"Notification"> | string
   recipient_person_id?: Prisma.UuidNullableFilter<"Notification"> | string | null
@@ -759,7 +759,7 @@ export type NotificationScalarWhereInput = {
 
 export type NotificationCreateWithoutRecipient_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   type: $Enums.notification_type
   title: string
@@ -778,7 +778,7 @@ export type NotificationCreateWithoutRecipient_personInput = {
 
 export type NotificationUncheckedCreateWithoutRecipient_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   type: $Enums.notification_type
@@ -823,7 +823,7 @@ export type NotificationUpdateManyWithWhereWithoutRecipient_personInput = {
 
 export type NotificationCreateWithoutEmail_queueInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   type: $Enums.notification_type
   title: string
@@ -842,7 +842,7 @@ export type NotificationCreateWithoutEmail_queueInput = {
 
 export type NotificationUncheckedCreateWithoutEmail_queueInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   recipient_person_id?: string | null
@@ -877,7 +877,7 @@ export type NotificationUpdateToOneWithWhereWithoutEmail_queueInput = {
 
 export type NotificationUpdateWithoutEmail_queueInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -896,7 +896,7 @@ export type NotificationUpdateWithoutEmail_queueInput = {
 
 export type NotificationUncheckedUpdateWithoutEmail_queueInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -915,7 +915,7 @@ export type NotificationUncheckedUpdateWithoutEmail_queueInput = {
 
 export type NotificationCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   recipient_user_id: string
   recipient_person_id?: string | null
   type: $Enums.notification_type
@@ -933,7 +933,7 @@ export type NotificationCreateManyOrganisationInput = {
 
 export type NotificationUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -952,7 +952,7 @@ export type NotificationUpdateWithoutOrganisationInput = {
 
 export type NotificationUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -971,7 +971,7 @@ export type NotificationUncheckedUpdateWithoutOrganisationInput = {
 
 export type NotificationUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -989,7 +989,7 @@ export type NotificationUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type NotificationCreateManyRecipient_personInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   recipient_user_id: string
   type: $Enums.notification_type
@@ -1007,7 +1007,7 @@ export type NotificationCreateManyRecipient_personInput = {
 
 export type NotificationUpdateWithoutRecipient_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   title?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1026,7 +1026,7 @@ export type NotificationUpdateWithoutRecipient_personInput = {
 
 export type NotificationUncheckedUpdateWithoutRecipient_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -1045,7 +1045,7 @@ export type NotificationUncheckedUpdateWithoutRecipient_personInput = {
 
 export type NotificationUncheckedUpdateManyWithoutRecipient_personInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   recipient_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
@@ -1094,7 +1094,7 @@ export type NotificationCountOutputTypeCountEmail_queueArgs<ExtArgs extends runt
 
 export type NotificationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   recipient_user_id?: boolean
   recipient_person_id?: boolean
@@ -1117,7 +1117,7 @@ export type NotificationSelect<ExtArgs extends runtime.Types.Extensions.Internal
 
 export type NotificationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   recipient_user_id?: boolean
   recipient_person_id?: boolean
@@ -1138,7 +1138,7 @@ export type NotificationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type NotificationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   recipient_user_id?: boolean
   recipient_person_id?: boolean
@@ -1159,7 +1159,7 @@ export type NotificationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type NotificationSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   recipient_user_id?: boolean
   recipient_person_id?: boolean
@@ -1176,7 +1176,7 @@ export type NotificationSelectScalar = {
   updated_at?: boolean
 }
 
-export type NotificationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "recipient_user_id" | "recipient_person_id" | "type" | "title" | "body" | "action_url" | "object_type" | "object_id" | "actor_user_id" | "payload" | "read_at" | "created_at" | "updated_at", ExtArgs["result"]["notification"]>
+export type NotificationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "recipient_user_id" | "recipient_person_id" | "type" | "title" | "body" | "action_url" | "object_type" | "object_id" | "actor_user_id" | "payload" | "read_at" | "created_at" | "updated_at", ExtArgs["result"]["notification"]>
 export type NotificationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   recipient_person?: boolean | Prisma.Notification$recipient_personArgs<ExtArgs>
@@ -1201,7 +1201,7 @@ export type $NotificationPayload<ExtArgs extends runtime.Types.Extensions.Intern
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     recipient_user_id: string
     recipient_person_id: string | null
@@ -1643,7 +1643,7 @@ export interface Prisma__NotificationClient<T, Null = never, ExtArgs extends run
  */
 export interface NotificationFieldRefs {
   readonly id: Prisma.FieldRef<"Notification", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"Notification", 'String'>
+  readonly account_id: Prisma.FieldRef<"Notification", 'String'>
   readonly organisation_id: Prisma.FieldRef<"Notification", 'String'>
   readonly recipient_user_id: Prisma.FieldRef<"Notification", 'String'>
   readonly recipient_person_id: Prisma.FieldRef<"Notification", 'String'>

@@ -39,8 +39,8 @@ const mocks = vi.hoisted(() => ({
   prepareAndClaimSubmitOperation: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   withdrawLeaveApplicationForRegion: vi.fn(),
@@ -189,21 +189,21 @@ const {
 } = await import("./approval-service");
 const { withdrawSubmission } = await import("../plans/submit-service");
 const input = {
+  accountId: "org_1",
   actingPersonId: "00000000-0000-4000-8000-000000000012",
   actingUserId: "manager_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   recordId: "00000000-0000-4000-8000-000000000099",
   role: "manager" as const,
 };
 const record = {
+  account_id: input.accountId,
   all_day: true,
   approval_note: null,
   approval_status: "submitted",
   approved_at: null,
   approved_by_person_id: null,
   archived_at: null,
-  clerk_org_id: input.clerkOrgId,
   contactability: "unavailable",
   created_at: new Date("2026-04-01T00:00:00.000Z"),
   created_by_user_id: "employee_1",
@@ -215,7 +215,6 @@ const record = {
   organisation: { id: input.organisationId, name: "Acme Org" },
   organisation_id: input.organisationId,
   person: {
-    clerk_user_id: "employee_1",
     email: "employee@example.com",
     first_name: "Ava",
     id: "00000000-0000-4000-8000-000000000011",
@@ -223,6 +222,7 @@ const record = {
     location_id: null,
     manager_person_id: input.actingPersonId,
     team: { name: "Operations" },
+    user_id: "employee_1",
   },
   person_id: "00000000-0000-4000-8000-000000000011",
   record_type: "annual_leave",
@@ -233,7 +233,7 @@ const record = {
   xero_write_error: null,
 };
 const xeroConnection = {
-  clerk_org_id: input.clerkOrgId,
+  account_id: input.accountId,
   id: "00000000-0000-4000-8000-000000000201",
   organisation_id: input.organisationId,
   payroll_region: "AU",
@@ -625,9 +625,9 @@ describe("approval-service", () => {
     );
     const withdrawing = withdrawSubmission(
       {
-        actingOrgRole: "org:viewer",
-        actingUserId: record.person.clerk_user_id,
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
+        actingRole: "viewer",
+        actingUserId: record.person.user_id,
         organisationId: input.organisationId,
         recordId: input.recordId,
       },
@@ -666,9 +666,9 @@ describe("approval-service", () => {
       .mockResolvedValueOnce(null);
     mocks.withdrawLeaveApplicationForRegion.mockReturnValue(withdrawal.promise);
     const withdrawInput = {
-      actingOrgRole: "org:viewer",
-      actingUserId: record.person.clerk_user_id,
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
+      actingRole: "viewer",
+      actingUserId: record.person.user_id,
       organisationId: input.organisationId,
       recordId: input.recordId,
     };
@@ -692,7 +692,7 @@ describe("approval-service", () => {
     });
     expect(result).toEqual({ ok: true, value: { queued: true } });
     expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       connectionId: xeroConnection.id,
       organisationId: input.organisationId,
       runType: "leave_records",
@@ -957,7 +957,7 @@ describe("approval-service", () => {
           failed_action: null,
         }),
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
         }),
       })
@@ -1470,7 +1470,7 @@ describe("approval-service", () => {
     expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
           person_id: { in: [record.person_id] },
         }),
@@ -1478,8 +1478,8 @@ describe("approval-service", () => {
     );
     expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
       expect.objectContaining({
+        accountId: input.accountId,
         actingPersonId: input.actingPersonId,
-        clerkOrgId: input.clerkOrgId,
       }),
       expect.any(Object)
     );
@@ -1796,7 +1796,7 @@ describe("approval-service", () => {
       expect(result.ok).toBe(true);
       expect(mocks.getSettings).toHaveBeenCalledWith(
         {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           organisationId: record.organisation_id,
         },
         expect.any(Object)
@@ -2135,7 +2135,7 @@ describe("approval-service", () => {
     });
     expect(where).not.toHaveProperty("OR");
   });
-  it("keeps clerk_org_id and organisation_id in the where clause", async () => {
+  it("keeps account_id and organisation_id in the where clause", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
     const result = await withTestTenantResult(
       tenantTestAccount({
@@ -2155,7 +2155,7 @@ describe("approval-service", () => {
     expect(companyApprovalQuery()).toMatchObject(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
         }),
       })
@@ -2228,7 +2228,7 @@ function companyApprovalQuery() {
   if (!query) {
     throw new Error("Expected approval query");
   }
-  expect(query.where.clerk_org_id).toBe(input.clerkOrgId);
+  expect(query.where.account_id).toBe(input.accountId);
   expect(query.where.organisation_id).toEqual({ in: [input.organisationId] });
   const { OR: branches, ...accountPredicate } = query.where;
   const branch = branches.find(

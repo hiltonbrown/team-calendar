@@ -1,7 +1,7 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { getPersonProfile, loadWelcomeEligibility } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { type TenantDb, withTenantDb } from "@repo/database";
 import { Button } from "@repo/design-system/components/ui/button";
 import { listFeeds, normaliseRole } from "@repo/feeds";
@@ -32,8 +32,8 @@ const STEPS = [
 
 type StepId = (typeof STEPS)[number]["id"];
 
-function peopleRole(orgRole: string): "manager" | "viewer" {
-  return orgRole === "org:manager" ? "manager" : "viewer";
+function peopleRole(role: string): "manager" | "viewer" {
+  return role === "manager" ? "manager" : "viewer";
 }
 
 interface WelcomePageProps {
@@ -46,26 +46,37 @@ function first(value: string | string[] | undefined): string | undefined {
 
 const WelcomePage = async ({ searchParams }: WelcomePageProps) => {
   const params = await searchParams;
-  const [{ orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(user && orgRole)) {
+  const [{ role: sessionRole }, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+  ]);
+  if (!(user && sessionRole)) {
     redirect("/");
   }
   const step: StepId =
     STEPS.find((item) => item.id === first(params.step))?.id ?? "identity";
   const index = STEPS.findIndex((item) => item.id === step);
   const next = STEPS[index + 1];
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const accountId = (await requireAccount()) as AccountId;
   const { organisationId, orgQueryValue, homeHref, profile, calendar } =
-    await withTenantDb(clerkOrgId, async (db) => {
+    await withTenantDb(accountId, async (db) => {
       const {
         organisationId: scopedOrganisationId,
         orgQueryValue: preparedOrgQueryValue,
-      } = await resolveActiveOrgPageContext(clerkOrgId, first(params.org), db);
+      } = await resolveActiveOrgPageContext(accountId, first(params.org), db);
       const preparedHomeHref = withOrg("/", preparedOrgQueryValue);
       const eligibility = await loadWelcomeEligibility(
         {
-          actingRole: orgRole,
-          clerkOrgId,
+          accountId,
+          actingRole: sessionRole,
           organisationId: scopedOrganisationId,
           userId: user.id,
         },
@@ -86,12 +97,12 @@ const WelcomePage = async ({ searchParams }: WelcomePageProps) => {
           ? null
           : await getPersonProfile(
               {
+                accountId,
                 actingPersonId: personId,
                 actingUserId: user.id,
-                clerkOrgId,
                 organisationId: scopedOrganisationId,
                 personId,
-                role: peopleRole(orgRole),
+                role: peopleRole(sessionRole),
               },
               db
             );
@@ -99,10 +110,10 @@ const WelcomePage = async ({ searchParams }: WelcomePageProps) => {
         step === "calendar"
           ? await calendarData(
               {
-                clerkOrgId,
+                accountId,
                 homeHref: preparedHomeHref,
                 organisationId: scopedOrganisationId,
-                orgRole,
+                role: sessionRole,
                 userId: user.id,
               },
               db
@@ -228,19 +239,19 @@ function BalancesContent({ profile }: { profile: Profile }) {
 
 async function calendarData(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     homeHref: string;
     organisationId: string;
-    orgRole: string;
+    role: string;
     userId: string;
   },
   db: TenantDb
 ) {
   const feeds = await listFeeds(
     {
-      actingRole: normaliseRole(input.orgRole),
+      accountId: input.accountId,
+      actingRole: normaliseRole(input.role),
       actingUserId: input.userId,
-      clerkOrgId: input.clerkOrgId,
       filters: { status: ["active"] },
       organisationId: input.organisationId,
     },

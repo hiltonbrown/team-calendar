@@ -87,8 +87,8 @@ function fixture(
     assertion,
     assertOwned,
     fixture: {
+      accountId: "org_owned",
       alias: "fixture-owned",
-      clerkOrgId: "org_owned",
       feedId: assertion.feedId,
       organisationId: "00000000-0000-4000-8000-000000000002",
     },

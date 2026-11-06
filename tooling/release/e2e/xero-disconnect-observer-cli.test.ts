@@ -4,7 +4,7 @@ const originalInfo = console.info;
 const originalDebug = console.debug;
 const state = vi.hoisted(() => {
   const fixture = {
-    clerkOrgId: "owned-account",
+    accountId: "owned-account",
     deleteAcknowledgement: "I_ACKNOWLEDGE_XERO_DEMO_CONNECTION_DELETE",
     organisationId: "33333333-3333-4333-8333-333333333333",
     organisationName: "Disposable demo",
@@ -39,7 +39,7 @@ vi.mock("./environment.js", () => ({
     },
     manifest: {
       owned: {
-        clerkOrgIds: [state.fixture.clerkOrgId],
+        accountIds: [state.fixture.accountId],
         organisationIds: [
           state.fixture.organisationId,
           state.fixture.siblingOrganisationId,
@@ -161,8 +161,8 @@ it("refuses a production company from the actual observer demo-check path", asyn
   await expect(import("./xero-disconnect-observer-cli.js")).rejects.toThrow();
   expect(state.access).toHaveBeenCalledWith(
     expect.objectContaining({
+      accountId: state.fixture.accountId,
       capability: "accounting.settings.read",
-      clerkOrgId: state.fixture.clerkOrgId,
       organisationId: state.fixture.organisationId,
     })
   );
@@ -170,8 +170,8 @@ it("refuses a production company from the actual observer demo-check path", asyn
   expect(state.fetch).toHaveBeenCalledWith(
     expect.objectContaining({
       accessContext: expect.objectContaining({
+        account_id: state.fixture.accountId,
         capability: "accounting.settings.read",
-        clerk_org_id: state.fixture.clerkOrgId,
         id: "target-connection",
         organisation_id: state.fixture.organisationId,
         payroll_region: "AU",
@@ -246,7 +246,7 @@ it("keeps sibling organisation authority on the provider inventory dispatch", as
   expect(state.fetch).toHaveBeenCalledWith(
     expect.objectContaining({
       accessContext: expect.objectContaining({
-        clerk_org_id: state.fixture.clerkOrgId,
+        account_id: state.fixture.accountId,
         id: "sibling-connection",
         organisation_id: state.fixture.siblingOrganisationId,
         payroll_region: "AU",

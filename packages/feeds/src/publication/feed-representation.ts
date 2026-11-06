@@ -20,7 +20,7 @@ export interface FeedRepresentation {
 }
 
 export interface RepresentationScope {
-  clerkOrgId: string;
+  accountId: string;
   feedId: string;
   organisationId: string | null;
 }
@@ -37,7 +37,7 @@ export async function establishFeedRepresentation(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       return await withTenantDb(
-        input.clerkOrgId,
+        input.accountId,
         async (tx) => reconcileRepresentation(tx, input),
         {
           isolationLevel: "Serializable",
@@ -71,7 +71,7 @@ async function reconcileRepresentation(
   input: RepresentationScope
 ): Promise<Result<FeedRepresentation, RepresentationError>> {
   const scope = {
-    clerk_org_id: input.clerkOrgId,
+    account_id: input.accountId,
     organisation_id: input.organisationId,
   };
   const feed = await tx.feed.findFirst({
@@ -224,7 +224,7 @@ async function markRemovedEvents(
           published_sequence: { increment: 1 },
         },
         where: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           feed_id: input.feedId,
           id: row.id,
           organisation_id: input.organisationId,

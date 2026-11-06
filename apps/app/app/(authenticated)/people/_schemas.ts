@@ -138,11 +138,11 @@ export const SetManualBalanceActionSchema = z.object({
     .optional(),
 });
 
-export const LoadClerkAccessCandidatesSchema = z.object({
+export const LoadAccountAccessCandidatesSchema = z.object({
   organisationId: z.string().uuid(),
 });
 
-export const InviteClerkAccessCandidatesSchema = z.object({
+export const InviteAccountAccessCandidatesSchema = z.object({
   candidatePersonIds: z.array(z.string().uuid()).optional(),
   organisationId: z.string().uuid(),
 });
@@ -165,9 +165,9 @@ export type RefreshBalancesActionInput = z.infer<
 export type SetManualBalanceActionInput = z.infer<
   typeof SetManualBalanceActionSchema
 >;
-export type LoadClerkAccessCandidatesInput = z.infer<
-  typeof LoadClerkAccessCandidatesSchema
+export type LoadAccountAccessCandidatesInput = z.infer<
+  typeof LoadAccountAccessCandidatesSchema
 >;
-export type InviteClerkAccessCandidatesInput = z.infer<
-  typeof InviteClerkAccessCandidatesSchema
+export type InviteAccountAccessCandidatesInput = z.infer<
+  typeof InviteAccountAccessCandidatesSchema
 >;

@@ -1,8 +1,13 @@
+export { currentJobIdentityGeneration } from "./keys";
 export {
   type CaptureInitialSyncCompletedInput,
   captureInitialSyncCompleted,
 } from "./src/activation";
 export { inngest } from "./src/client";
+export {
+  assertJobIdentityGeneration,
+  readJobEventData,
+} from "./src/event-context";
 export {
   dispatchCancelSyncRun,
   dispatchInitialXeroSync,

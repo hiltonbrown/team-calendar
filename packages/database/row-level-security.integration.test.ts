@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { afterAll, beforeAll, expect, test } from "vitest";
+import { afterAll, beforeAll, expect, test, vi } from "vitest";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { assertRestrictedDatabaseRole } from "./src/runtime-role";
 import { systemDatabase } from "./src/system-client";
 import { referenceDatabase } from "./src/tenant-client";
@@ -10,10 +11,49 @@ import {
   withTenantDb,
 } from "./src/tenant-db";
 
-const accountA = `rls-a-${randomUUID()}`;
-const accountB = `rls-b-${randomUUID()}`;
-let companyA: string;
-let companyB: string;
+vi.mock("./src/tenant-client", async () => {
+  const { assertTestDatabaseConnectionAllowed } = await import(
+    "./src/live-test-guard"
+  );
+  const { isLocalDatabase } = await import("./src/is-local-database");
+  const { PrismaClient } = await import("./generated/client");
+  const { PrismaPg } = await import("@prisma/adapter-pg");
+  const { PrismaNeon } = await import("@prisma/adapter-neon");
+  const { neonConfig } = await import("@neondatabase/serverless");
+  const { default: WebSocket } = await import("ws");
+  const configured = process.env.DATABASE_APP_URL;
+  if (!configured) {
+    throw new Error("RLS tests require the restricted connection");
+  }
+  assertTestDatabaseConnectionAllowed(configured);
+  const direct = new URL(configured);
+  if (direct.hostname.endsWith(".neon.tech")) {
+    direct.hostname = direct.hostname.replace("-pooler.", ".");
+  }
+  // A dedicated direct pool pins one real backend for the commit/rollback PID
+  // checks. PgBouncer may legitimately choose another backend between requests.
+  neonConfig.webSocketConstructor = WebSocket;
+  const config = { connectionString: direct.toString(), max: 1 };
+  return {
+    referenceDatabase: new PrismaClient({
+      adapter: isLocalDatabase(configured)
+        ? new PrismaPg(config)
+        : new PrismaNeon(config),
+    }),
+  };
+});
+
+const tenantFixture = allocateLiveTestFixture(
+  "packages/database/row-level-security.integration.test.ts"
+);
+const [tenantA, tenantB] = tenantFixture.tenants;
+if (!(tenantA && tenantB)) {
+  throw new Error("RLS integration tests require two owned account fixtures");
+}
+const accountA = tenantA.accountId;
+const accountB = tenantB.accountId;
+const companyA = tenantA.organisationId;
+const companyB = tenantB.organisationId;
 const appUrl = process.env.DATABASE_APP_URL;
 if (!appUrl) {
   throw new Error("RLS integration tests require DATABASE_APP_URL");
@@ -21,22 +61,25 @@ if (!appUrl) {
 const unscoped = referenceDatabase;
 
 beforeAll(async () => {
-  const [first, second] = await Promise.all(
-    [accountA, accountB].map((clerk_org_id) =>
+  await Promise.all(
+    [tenantA, tenantB].map(({ accountId, organisationId }) =>
       systemDatabase.organisation.create({
-        data: { clerk_org_id, country_code: "AU", name: clerk_org_id },
+        data: {
+          account_id: accountId,
+          country_code: "AU",
+          id: organisationId,
+          name: accountId,
+        },
       })
     )
   );
-  companyA = first.id;
-  companyB = second.id;
 });
 afterAll(async () => {
   await systemDatabase.accountSettings.deleteMany({
-    where: { clerk_org_id: { in: [accountA, accountB] } },
+    where: { account_id: { in: [accountA, accountB] } },
   });
   await systemDatabase.organisation.deleteMany({
-    where: { clerk_org_id: { in: [accountA, accountB] } },
+    where: { account_id: { in: [accountA, accountB] } },
   });
   await unscoped.$disconnect();
 });
@@ -53,6 +96,9 @@ test("preflight rejects inherited table ownership that bypasses RLS", async () =
   const ownerRole = `rls_owner_${suffix}`;
   const tableName = `rls_role_${suffix}`;
   const appRole = new URL(appUrl).username.replaceAll('"', '""');
+  const ownerRoleName = new URL(
+    process.env.DATABASE_URL ?? ""
+  ).username.replaceAll('"', '""');
   // Identifiers use generated hexadecimal names or a quoted URL role name.
   // Only this disposable table belongs to the temporary inherited role.
   try {
@@ -60,7 +106,13 @@ test("preflight rejects inherited table ownership that bypasses RLS", async () =
       `CREATE ROLE "${ownerRole}" NOLOGIN`
     );
     await systemDatabase.$executeRawUnsafe(
-      `CREATE TABLE "${tableName}" (clerk_org_id text NOT NULL)`
+      `GRANT "${ownerRole}" TO "${ownerRoleName}" WITH SET TRUE`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `GRANT USAGE, CREATE ON SCHEMA public TO "${ownerRole}"`
+    );
+    await systemDatabase.$executeRawUnsafe(
+      `CREATE TABLE "${tableName}" (account_id text NOT NULL)`
     );
     await systemDatabase.$executeRawUnsafe(
       `INSERT INTO "${tableName}" VALUES ('other-account')`
@@ -76,7 +128,7 @@ test("preflight rejects inherited table ownership that bypasses RLS", async () =
     );
     expect(
       await unscoped.$queryRawUnsafe(`SELECT * FROM "${tableName}"`)
-    ).toEqual([{ clerk_org_id: "other-account" }]);
+    ).toEqual([{ account_id: "other-account" }]);
     await expect(assertRestrictedDatabaseRole(appUrl)).rejects.toThrow(
       "non-owner"
     );
@@ -88,9 +140,25 @@ test("preflight rejects inherited table ownership that bypasses RLS", async () =
       `DROP TABLE IF EXISTS "${tableName}"`
     );
     await systemDatabase.$executeRawUnsafe(
+      `REVOKE USAGE, CREATE ON SCHEMA public FROM "${ownerRole}"`
+    );
+    await systemDatabase.$executeRawUnsafe(
       `DROP ROLE IF EXISTS "${ownerRole}"`
     );
   }
+});
+
+test("legacy context alone fails closed while account context permits its rows", async () => {
+  await unscoped.$transaction(async (db) => {
+    await db.$queryRaw`SELECT set_config('app.account_id', '', true)`;
+    // The legacy setting must no longer authorise tenant access after the rename.
+    await db.$queryRaw`SELECT set_config('app.clerk_org_id', ${accountA}, true)`;
+    expect(await db.organisation.findMany()).toEqual([]);
+    await db.$queryRaw`SELECT set_config('app.account_id', ${accountA}, true)`;
+    expect((await db.organisation.findMany()).map((row) => row.id)).toEqual([
+      companyA,
+    ]);
+  });
 });
 
 test("tenant reads omit another account even without application filters", async () => {
@@ -123,14 +191,14 @@ test("WITH CHECK rejects another account and mismatched company pairing", async 
   await expect(
     withTenantDb(accountA, (db) =>
       db.organisation.create({
-        data: { clerk_org_id: accountB, country_code: "AU", name: "forged" },
+        data: { account_id: accountB, country_code: "AU", name: "forged" },
       })
     )
   ).rejects.toThrow();
   await expect(
     withTenantDb(accountA, (db) =>
       db.organisationSettings.create({
-        data: { clerk_org_id: accountA, organisation_id: companyB },
+        data: { account_id: accountA, organisation_id: companyB },
       })
     )
   ).rejects.toThrow();
@@ -142,7 +210,7 @@ test("missing context fails closed and scoped context does not survive pooling",
   expect(await unscoped.organisation.findMany()).toEqual([]);
   const [context] = await unscoped.$queryRaw<
     Array<{ tenant: string | null }>
-  >`SELECT nullif(current_setting('app.clerk_org_id', true), '') AS tenant`;
+  >`SELECT nullif(current_setting('app.account_id', true), '') AS tenant`;
   expect(context.tenant).toBeNull();
 });
 
@@ -178,7 +246,7 @@ test.each(["commit", "rollback"])(
     const failure = new Error("injected rollback");
     const request = withTenantDb(accountA, async (db) => {
       const [row] = await db.$queryRaw<Array<{ pid: number; tenant: string }>>`
-      SELECT pg_backend_pid() AS pid, current_setting('app.clerk_org_id', true) AS tenant
+      SELECT pg_backend_pid() AS pid, current_setting('app.account_id', true) AS tenant
     `;
       transactionPid = row.pid;
       expect(row.tenant).toBe(accountA);
@@ -194,7 +262,7 @@ test.each(["commit", "rollback"])(
     const [row] = await unscoped.$queryRaw<
       Array<{ pid: number; tenant: string | null }>
     >`
-    SELECT pg_backend_pid() AS pid, current_setting('app.clerk_org_id', true) AS tenant
+    SELECT pg_backend_pid() AS pid, current_setting('app.account_id', true) AS tenant
   `;
     // Matching the PID prevents a fresh connection from masking a context leak.
     expect(row.pid).toBe(transactionPid);
@@ -222,8 +290,8 @@ test("every table is classified and tenant tables have enabled policies", async 
       any_privilege: boolean;
     }>
   >`
-    SELECT c.relname AS name,
-      EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'clerk_org_id' AND NOT a.attisdropped) AS tenant,
+    SELECT c.relname::text AS name,
+      EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'account_id' AND NOT a.attisdropped) AS tenant,
       c.relrowsecurity AS enabled,
       EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid AND p.polname = 'tenant_isolation') AS policy,
       has_table_privilege('team_calendar_app', c.oid, 'SELECT') AS granted,
@@ -234,6 +302,15 @@ test("every table is classified and tenant tables have enabled policies", async 
   `;
   const references = ["plans", "plan_limits"];
   const forbidden = [
+    "account_invitations",
+    "account_members",
+    "accounts",
+    "auth_audit_events",
+    "auth_identities",
+    "auth_rate_limits",
+    "auth_sessions",
+    "auth_users",
+    "auth_verifications",
     "xero_authorisations",
     "stripe_events",
     "_prisma_migrations",
@@ -253,6 +330,15 @@ test("every table is classified and tenant tables have enabled policies", async 
   }
   await expect(unscoped.xeroAuthorisation.findMany()).rejects.toThrow();
   await expect(unscoped.stripeEvent.findMany()).rejects.toThrow();
+  await expect(unscoped.authUser.findMany()).rejects.toThrow();
+  await expect(unscoped.authSession.findMany()).rejects.toThrow();
+  await expect(unscoped.authIdentity.findMany()).rejects.toThrow();
+  await expect(unscoped.authVerification.findMany()).rejects.toThrow();
+  await expect(unscoped.authOrganization.findMany()).rejects.toThrow();
+  await expect(unscoped.authMember.findMany()).rejects.toThrow();
+  await expect(unscoped.authInvitation.findMany()).rejects.toThrow();
+  await expect(unscoped.authRateLimit.findMany()).rejects.toThrow();
+  await expect(unscoped.authAuditEvent.findMany()).rejects.toThrow();
 });
 
 test("standalone tenant raw SQL receives transaction-local context", async () => {
@@ -266,28 +352,28 @@ test("standalone tenant raw SQL receives transaction-local context", async () =>
 
 test("account settings isolate accounts without requiring a selected company", async () => {
   await systemDatabase.accountSettings.createMany({
-    data: [{ clerk_org_id: accountA }, { clerk_org_id: accountB }],
+    data: [{ account_id: accountA }, { account_id: accountB }],
     skipDuplicates: true,
   });
   await withTenantDb(accountA, async (db) => {
     expect(
-      await db.accountSettings.findMany({ where: { clerk_org_id: accountB } })
+      await db.accountSettings.findMany({ where: { account_id: accountB } })
     ).toEqual([]);
     expect(
       await db.accountSettings.updateMany({
         data: { manager_visibility_scope: "all_team_leave" },
-        where: { clerk_org_id: accountB },
+        where: { account_id: accountB },
       })
     ).toEqual({ count: 0 });
     const own = await db.accountSettings.findFirst({
-      where: { clerk_org_id: accountA },
+      where: { account_id: accountA },
     });
-    expect(own?.clerk_org_id).toBe(accountA);
+    expect(own?.account_id).toBe(accountA);
   });
   await expect(
     withTenantDb(accountA, (db) =>
       db.accountSettings.create({
-        data: { clerk_org_id: `${accountB}-forged` },
+        data: { account_id: `${accountB}-forged` },
       })
     )
   ).rejects.toThrow();
@@ -340,7 +426,7 @@ test("manager RLS permits another owned company and rejects a foreign account", 
   const fixture = await systemDatabase.$transaction(async (db) => {
     const company = await db.organisation.create({
       data: {
-        clerk_org_id: accountA,
+        account_id: accountA,
         country_code: "AU",
         name: "Second manager company",
       },
@@ -353,13 +439,13 @@ test("manager RLS permits another owned company and rejects a foreign account", 
       source_system: "MANUAL" as const,
     };
     const employee = await db.person.create({
-      data: { ...base, clerk_org_id: accountA, organisation_id: companyA },
+      data: { ...base, account_id: accountA, organisation_id: companyA },
     });
     const manager = await db.person.create({
-      data: { ...base, clerk_org_id: accountA, organisation_id: company.id },
+      data: { ...base, account_id: accountA, organisation_id: company.id },
     });
     const foreign = await db.person.create({
-      data: { ...base, clerk_org_id: accountB, organisation_id: companyB },
+      data: { ...base, account_id: accountB, organisation_id: companyB },
     });
     return { company, employee, foreign, manager };
   });
@@ -368,7 +454,7 @@ test("manager RLS permits another owned company and rejects a foreign account", 
       db.person.update({
         data: { manager_person_id: fixture.manager.id },
         where: {
-          clerk_org_id: accountA,
+          account_id: accountA,
           id: fixture.employee.id,
           organisation_id: companyA,
         },
@@ -379,7 +465,7 @@ test("manager RLS permits another owned company and rejects a foreign account", 
         db.person.update({
           data: { manager_person_id: fixture.foreign.id },
           where: {
-            clerk_org_id: accountA,
+            account_id: accountA,
             id: fixture.employee.id,
             organisation_id: companyA,
           },

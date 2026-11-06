@@ -1,6 +1,6 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { currentUser } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import {
   listAllTypes,
@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
@@ -46,11 +46,11 @@ const FilterSchema = z.object({
 });
 
 const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ notifications: ["read"] });
   const params = await searchParams;
   const { org, ...filterParams } = params;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/");
   }
@@ -69,8 +69,8 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
     unreadOnly: filters.unreadOnly,
   };
 
-  // Clerk supplied the authenticated account identifier.
-  const accountId = (await requireOrg()) as ClerkOrgId;
+  // Authentication supplied the authenticated account identifier.
+  const accountId = (await requireAccount()) as AccountId;
   const {
     organisationId,
     orgQueryValue,
@@ -81,17 +81,16 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
     accountId,
     async (db) => {
       const {
-        clerkOrgId,
         organisationId: scopedOrganisationId,
         orgQueryValue: preparedOrgQueryValue,
       } = await resolveActiveOrgPageContext(accountId, orgParam, db);
       const company = await db.organisation.findFirst({
         select: { name: true },
-        where: { clerk_org_id: clerkOrgId, id: scopedOrganisationId },
+        where: { account_id: accountId, id: scopedOrganisationId },
       });
       const preparedNotificationsResult = await listForUser(
         {
-          clerkOrgId,
+          accountId,
           filters: notificationFilters,
           pagination: { cursor: filters.cursor, pageSize: 25 },
           userId: user.id,
@@ -99,7 +98,7 @@ const NotificationsPage = async ({ searchParams }: NotificationsPageProps) => {
         db
       );
       const preparedPreferencesResult = await listPreferences(
-        { clerkOrgId, organisationId: scopedOrganisationId, userId: user.id },
+        { accountId, organisationId: scopedOrganisationId, userId: user.id },
         db
       );
       return {

@@ -36,7 +36,7 @@ export type AlternativeContactSumAggregateOutputType = {
 
 export type AlternativeContactMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   person_id: string | null
   name: string | null
@@ -51,7 +51,7 @@ export type AlternativeContactMinAggregateOutputType = {
 
 export type AlternativeContactMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   person_id: string | null
   name: string | null
@@ -66,7 +66,7 @@ export type AlternativeContactMaxAggregateOutputType = {
 
 export type AlternativeContactCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   person_id: number
   name: number
@@ -91,7 +91,7 @@ export type AlternativeContactSumAggregateInputType = {
 
 export type AlternativeContactMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   person_id?: true
   name?: true
@@ -106,7 +106,7 @@ export type AlternativeContactMinAggregateInputType = {
 
 export type AlternativeContactMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   person_id?: true
   name?: true
@@ -121,7 +121,7 @@ export type AlternativeContactMaxAggregateInputType = {
 
 export type AlternativeContactCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   person_id?: true
   name?: true
@@ -223,7 +223,7 @@ export type AlternativeContactGroupByArgs<ExtArgs extends runtime.Types.Extensio
 
 export type AlternativeContactGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   person_id: string
   name: string
@@ -261,7 +261,7 @@ export type AlternativeContactWhereInput = {
   OR?: Prisma.AlternativeContactWhereInput[]
   NOT?: Prisma.AlternativeContactWhereInput | Prisma.AlternativeContactWhereInput[]
   id?: Prisma.UuidFilter<"AlternativeContact"> | string
-  clerk_org_id?: Prisma.StringFilter<"AlternativeContact"> | string
+  account_id?: Prisma.StringFilter<"AlternativeContact"> | string
   organisation_id?: Prisma.UuidFilter<"AlternativeContact"> | string
   person_id?: Prisma.UuidFilter<"AlternativeContact"> | string
   name?: Prisma.StringFilter<"AlternativeContact"> | string
@@ -278,7 +278,7 @@ export type AlternativeContactWhereInput = {
 
 export type AlternativeContactOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
@@ -298,7 +298,7 @@ export type AlternativeContactWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.AlternativeContactWhereInput | Prisma.AlternativeContactWhereInput[]
   OR?: Prisma.AlternativeContactWhereInput[]
   NOT?: Prisma.AlternativeContactWhereInput | Prisma.AlternativeContactWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"AlternativeContact"> | string
+  account_id?: Prisma.StringFilter<"AlternativeContact"> | string
   organisation_id?: Prisma.UuidFilter<"AlternativeContact"> | string
   person_id?: Prisma.UuidFilter<"AlternativeContact"> | string
   name?: Prisma.StringFilter<"AlternativeContact"> | string
@@ -315,7 +315,7 @@ export type AlternativeContactWhereUniqueInput = Prisma.AtLeast<{
 
 export type AlternativeContactOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
@@ -338,7 +338,7 @@ export type AlternativeContactScalarWhereWithAggregatesInput = {
   OR?: Prisma.AlternativeContactScalarWhereWithAggregatesInput[]
   NOT?: Prisma.AlternativeContactScalarWhereWithAggregatesInput | Prisma.AlternativeContactScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"AlternativeContact"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"AlternativeContact"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"AlternativeContact"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"AlternativeContact"> | string
   person_id?: Prisma.UuidWithAggregatesFilter<"AlternativeContact"> | string
   name?: Prisma.StringWithAggregatesFilter<"AlternativeContact"> | string
@@ -353,7 +353,7 @@ export type AlternativeContactScalarWhereWithAggregatesInput = {
 
 export type AlternativeContactCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   role?: string | null
   email?: string | null
@@ -368,7 +368,7 @@ export type AlternativeContactCreateInput = {
 
 export type AlternativeContactUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   person_id: string
   name: string
@@ -383,7 +383,7 @@ export type AlternativeContactUncheckedCreateInput = {
 
 export type AlternativeContactUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -398,7 +398,7 @@ export type AlternativeContactUpdateInput = {
 
 export type AlternativeContactUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
@@ -413,7 +413,7 @@ export type AlternativeContactUncheckedUpdateInput = {
 
 export type AlternativeContactCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   person_id: string
   name: string
@@ -428,7 +428,7 @@ export type AlternativeContactCreateManyInput = {
 
 export type AlternativeContactUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -441,7 +441,7 @@ export type AlternativeContactUpdateManyMutationInput = {
 
 export type AlternativeContactUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
@@ -466,7 +466,7 @@ export type AlternativeContactOrderByRelationAggregateInput = {
 
 export type AlternativeContactCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
@@ -485,7 +485,7 @@ export type AlternativeContactAvgOrderByAggregateInput = {
 
 export type AlternativeContactMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
@@ -500,7 +500,7 @@ export type AlternativeContactMaxOrderByAggregateInput = {
 
 export type AlternativeContactMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
@@ -603,7 +603,7 @@ export type AlternativeContactUncheckedUpdateManyWithoutPersonNestedInput = {
 
 export type AlternativeContactCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   role?: string | null
   email?: string | null
@@ -617,7 +617,7 @@ export type AlternativeContactCreateWithoutOrganisationInput = {
 
 export type AlternativeContactUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   person_id: string
   name: string
   role?: string | null
@@ -660,7 +660,7 @@ export type AlternativeContactScalarWhereInput = {
   OR?: Prisma.AlternativeContactScalarWhereInput[]
   NOT?: Prisma.AlternativeContactScalarWhereInput | Prisma.AlternativeContactScalarWhereInput[]
   id?: Prisma.UuidFilter<"AlternativeContact"> | string
-  clerk_org_id?: Prisma.StringFilter<"AlternativeContact"> | string
+  account_id?: Prisma.StringFilter<"AlternativeContact"> | string
   organisation_id?: Prisma.UuidFilter<"AlternativeContact"> | string
   person_id?: Prisma.UuidFilter<"AlternativeContact"> | string
   name?: Prisma.StringFilter<"AlternativeContact"> | string
@@ -675,7 +675,7 @@ export type AlternativeContactScalarWhereInput = {
 
 export type AlternativeContactCreateWithoutPersonInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   role?: string | null
   email?: string | null
@@ -689,7 +689,7 @@ export type AlternativeContactCreateWithoutPersonInput = {
 
 export type AlternativeContactUncheckedCreateWithoutPersonInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   role?: string | null
@@ -729,7 +729,7 @@ export type AlternativeContactUpdateManyWithWhereWithoutPersonInput = {
 
 export type AlternativeContactCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   person_id: string
   name: string
   role?: string | null
@@ -743,7 +743,7 @@ export type AlternativeContactCreateManyOrganisationInput = {
 
 export type AlternativeContactUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -757,7 +757,7 @@ export type AlternativeContactUpdateWithoutOrganisationInput = {
 
 export type AlternativeContactUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -771,7 +771,7 @@ export type AlternativeContactUncheckedUpdateWithoutOrganisationInput = {
 
 export type AlternativeContactUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -785,7 +785,7 @@ export type AlternativeContactUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type AlternativeContactCreateManyPersonInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   role?: string | null
@@ -799,7 +799,7 @@ export type AlternativeContactCreateManyPersonInput = {
 
 export type AlternativeContactUpdateWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -813,7 +813,7 @@ export type AlternativeContactUpdateWithoutPersonInput = {
 
 export type AlternativeContactUncheckedUpdateWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -827,7 +827,7 @@ export type AlternativeContactUncheckedUpdateWithoutPersonInput = {
 
 export type AlternativeContactUncheckedUpdateManyWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -843,7 +843,7 @@ export type AlternativeContactUncheckedUpdateManyWithoutPersonInput = {
 
 export type AlternativeContactSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   name?: boolean
@@ -860,7 +860,7 @@ export type AlternativeContactSelect<ExtArgs extends runtime.Types.Extensions.In
 
 export type AlternativeContactSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   name?: boolean
@@ -877,7 +877,7 @@ export type AlternativeContactSelectCreateManyAndReturn<ExtArgs extends runtime.
 
 export type AlternativeContactSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   name?: boolean
@@ -894,7 +894,7 @@ export type AlternativeContactSelectUpdateManyAndReturn<ExtArgs extends runtime.
 
 export type AlternativeContactSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   person_id?: boolean
   name?: boolean
@@ -907,7 +907,7 @@ export type AlternativeContactSelectScalar = {
   updated_at?: boolean
 }
 
-export type AlternativeContactOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "person_id" | "name" | "role" | "email" | "phone" | "notes" | "display_order" | "created_at" | "updated_at", ExtArgs["result"]["alternativeContact"]>
+export type AlternativeContactOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "person_id" | "name" | "role" | "email" | "phone" | "notes" | "display_order" | "created_at" | "updated_at", ExtArgs["result"]["alternativeContact"]>
 export type AlternativeContactInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
@@ -929,7 +929,7 @@ export type $AlternativeContactPayload<ExtArgs extends runtime.Types.Extensions.
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     person_id: string
     name: string
@@ -1366,7 +1366,7 @@ export interface Prisma__AlternativeContactClient<T, Null = never, ExtArgs exten
  */
 export interface AlternativeContactFieldRefs {
   readonly id: Prisma.FieldRef<"AlternativeContact", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"AlternativeContact", 'String'>
+  readonly account_id: Prisma.FieldRef<"AlternativeContact", 'String'>
   readonly organisation_id: Prisma.FieldRef<"AlternativeContact", 'String'>
   readonly person_id: Prisma.FieldRef<"AlternativeContact", 'String'>
   readonly name: Prisma.FieldRef<"AlternativeContact", 'String'>

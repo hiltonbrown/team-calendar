@@ -30,7 +30,7 @@ type PublicationClient = Pick<
 export async function materialiseAvailabilityPublication(
   input: {
     availabilityRecordId: string;
-    clerkOrgId: string;
+    accountId: string;
     // Invalidate the caches of feeds whose scope includes this record's person. Defaults to
     // true so single-record callers (manual edits, approval transitions) reflect changes
     // immediately. Bulk callers (inbound sync, reconcile) pass false and batch their own
@@ -40,15 +40,15 @@ export async function materialiseAvailabilityPublication(
   },
   db: TenantDb
 ): Promise<Result<MaterialisedPublication>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const result: Result<MaterialisedPublication> = await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const tx = db;
 
     const record = await tx.availabilityRecord.findFirst({
       select: recordPublicationSelect,
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         id: input.availabilityRecordId,
         organisation_id: input.organisationId,
       },
@@ -65,7 +65,7 @@ export async function materialiseAvailabilityPublication(
     if (input.invalidateCache !== false) {
       await invalidateFeedCachesForPerson(
         {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           organisationId: input.organisationId,
           personId: record.person_id,
         },
@@ -96,8 +96,8 @@ async function upsertPublication(
     // concurrent losing insert is skipped, reloaded and takes the update path.
     const inserted = await client.availabilityPublication.createMany({
       data: {
+        account_id: record.account_id,
         availability_record_id: record.id,
-        clerk_org_id: record.clerk_org_id,
         organisation_id: record.organisation_id,
         privacy_mode: published.privacyMode,
         published_all_day: published.allDay,
@@ -114,8 +114,8 @@ async function upsertPublication(
     existing = await client.availabilityPublication.findFirst({
       select: existingPublicationSelect,
       where: {
+        account_id: record.account_id,
         availability_record_id: record.id,
-        clerk_org_id: record.clerk_org_id,
         organisation_id: record.organisation_id,
       },
     });
@@ -166,7 +166,7 @@ async function upsertPublication(
     },
     select: publicationSelect,
     where: {
-      clerk_org_id: record.clerk_org_id,
+      account_id: record.account_id,
       id: existing.id,
       organisation_id: record.organisation_id,
     },
@@ -245,8 +245,8 @@ const existingPublicationSelect = {
 } satisfies Prisma.AvailabilityPublicationSelect;
 
 const recordPublicationSelect = {
+  account_id: true,
   all_day: true,
-  clerk_org_id: true,
   derived_uid_key: true,
   ends_at: true,
   id: true,

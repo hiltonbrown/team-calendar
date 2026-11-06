@@ -12,8 +12,8 @@ vi.mock("server-only", () => ({}));
 const sentEvents: Array<{
   name: string;
   data: {
-    clerkOrgId: string;
-    organisationId: string;
+    account_id: string;
+    organisation_id: string;
     connectionId: string;
     mode?: "full" | "incremental";
     triggerType: string;
@@ -40,20 +40,20 @@ describe("local persistence integration", async () => {
   const { systemDatabase: database } = await import("@repo/database");
   const { scheduleXeroSyncsPage } = await import("./schedule-xero-syncs");
   const tenantA = {
-    authorisationId: fixture.id("authorisation", 0),
-    clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+    accountId: fixture.tenants[0]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 0),
     connectionId: fixture.id("connection", 0),
     organisationId: fixture.tenants[0]?.organisationId as string,
     providerTenantId: fixture.id("provider-tenant", 0),
   } as const;
   const tenantB = {
-    authorisationId: fixture.id("authorisation", 1),
-    clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+    accountId: fixture.tenants[1]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 1),
     connectionId: fixture.id("connection", 1),
     organisationId: fixture.tenants[1]?.organisationId as string,
     providerTenantId: fixture.id("provider-tenant", 1),
   } as const;
-  const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
+  const testAccountIds = [tenantA.accountId, tenantB.accountId] as const;
   const testAuthorisationIds = [
     tenantA.authorisationId,
     tenantB.authorisationId,
@@ -64,11 +64,11 @@ describe("local persistence integration", async () => {
     }
     await database.organisation.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         country_code: "AU",
         id: tenant.organisationId,
         is_active: true,
-        name: `Schedule Test Org ${tenant.clerkOrgId}`,
+        name: `Schedule Test Org ${tenant.accountId}`,
         timezone,
       },
     });
@@ -102,7 +102,7 @@ describe("local persistence integration", async () => {
       where: { id: tenant.authorisationId },
     });
     const connection = {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       initial_sync_completed_at: now,
       organisation_id: tenant.organisationId,
       payroll_region: "AU" as const,
@@ -123,13 +123,13 @@ describe("local persistence integration", async () => {
       return;
     }
     await database.xeroConnection.deleteMany({
-      where: { clerk_org_id: { in: testClerkOrgIds as unknown as string[] } },
+      where: { account_id: { in: testAccountIds as unknown as string[] } },
     });
     await database.xeroAuthorisation.deleteMany({
       where: { xero_user_id: { in: testAuthorisationIds } },
     });
     await database.organisation.deleteMany({
-      where: { clerk_org_id: { in: testClerkOrgIds as unknown as string[] } },
+      where: { account_id: { in: testAccountIds as unknown as string[] } },
     });
   }
   describe("scheduleXeroSyncs Integration", () => {
@@ -149,7 +149,7 @@ describe("local persistence integration", async () => {
       await database.xeroConnection.updateMany({
         data: { initial_sync_completed_at: null },
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -169,7 +169,7 @@ describe("local persistence integration", async () => {
         )
       ).toHaveLength(4);
     });
-    it("scans database tenants and emits tenant-scoped events carrying matching Clerk Org and Organisation IDs", async () => {
+    it("scans database tenants and emits tenant-scoped events carrying matching Account and Organisation IDs", async () => {
       await setupTenant(tenantA, "Australia/Sydney");
       await setupTenant(tenantB, "Australia/Melbourne");
       const now = new Date("2026-08-11T15:30:00.000Z"); // Wed 01:30 AM local
@@ -185,10 +185,10 @@ describe("local persistence integration", async () => {
       expect(result.value.dispatched).toBeGreaterThanOrEqual(8); // 4 per tenant
       // Filter sent events for our test tenants
       const tenantAEvents = sentEvents.filter(
-        (e) => e.data.clerkOrgId === tenantA.clerkOrgId
+        (e) => e.data.account_id === tenantA.accountId
       );
       const tenantBEvents = sentEvents.filter(
-        (e) => e.data.clerkOrgId === tenantB.clerkOrgId
+        (e) => e.data.account_id === tenantB.accountId
       );
       const expectedRunTypes = [
         "people",
@@ -206,8 +206,8 @@ describe("local persistence integration", async () => {
         expectedEventNames
       );
       for (const evt of tenantAEvents) {
-        expect(evt.data.clerkOrgId).toBe(tenantA.clerkOrgId);
-        expect(evt.data.organisationId).toBe(tenantA.organisationId);
+        expect(evt.data.account_id).toBe(tenantA.accountId);
+        expect(evt.data.organisation_id).toBe(tenantA.organisationId);
         expect(evt.data.connectionId).toBe(tenantA.connectionId);
         expect(evt.data.connectionId).not.toBe(tenantA.providerTenantId);
         expect(evt.data.triggerType).toBe("scheduled");
@@ -222,8 +222,8 @@ describe("local persistence integration", async () => {
         );
       }
       for (const evt of tenantBEvents) {
-        expect(evt.data.clerkOrgId).toBe(tenantB.clerkOrgId);
-        expect(evt.data.organisationId).toBe(tenantB.organisationId);
+        expect(evt.data.account_id).toBe(tenantB.accountId);
+        expect(evt.data.organisation_id).toBe(tenantB.organisationId);
         expect(evt.data.connectionId).toBe(tenantB.connectionId);
         expect(evt.data.connectionId).not.toBe(tenantB.providerTenantId);
         expect(evt.data.triggerType).toBe("scheduled");

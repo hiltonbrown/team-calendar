@@ -5,9 +5,9 @@
     "analyze": "ANALYZE=true npm run build",
     "build": "next build",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
-    "dev": "bun --bun next dev -p 3002",
-    "next-dev": "bun --bun next dev -p 3002",
-    "start": "bun --bun next start",
+    "dev": "next dev -p 3002",
+    "next-dev": "next dev -p 3002",
+    "start": "next start",
     "test": "NODE_ENV=test vitest run",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
@@ -34,7 +34,6 @@
     "react-dom": "19.3.1",
     "require-in-the-middle": "8.0.1",
     "server-only": "^0.0.1",
-    "svix": "^2.9.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -45,5 +44,8 @@
     "@vitejs/plugin-react": "^6.1.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

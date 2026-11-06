@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   locationFindMany: vi.fn(),
   organisationFindFirst: vi.fn(),
   resolvePublicHolidays: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
 }));
@@ -81,8 +81,8 @@ const {
 } = await import("./current-status");
 
 const baseInput = {
+  accountId: "org_1",
   at: new Date("2026-04-25T02:00:00.000Z"),
-  clerkOrgId: "org_1",
   locationId: "00000000-0000-4000-8000-000000000101",
   organisationId: "00000000-0000-4000-8000-000000000001",
   personId: "00000000-0000-4000-8000-000000000011",
@@ -161,16 +161,16 @@ describe("current-status", () => {
 
     const result = await withTestTenantDb(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         at: baseInput.at,
-        clerkOrgId: baseInput.clerkOrgId,
         locationIds: [locationId],
         organisationId: baseInput.organisationId,
       }),
       (db) =>
         computePublicHolidayApplicability(
           {
+            accountId: baseInput.accountId,
             at: baseInput.at,
-            clerkOrgId: baseInput.clerkOrgId,
             locationIds: [locationId],
             organisationId: baseInput.organisationId,
           },
@@ -236,7 +236,7 @@ describe("current-status", () => {
     expect(status.statusKey).toBe("public_holiday");
     expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
       {
-        clerkOrgId: baseInput.clerkOrgId,
+        accountId: baseInput.accountId,
         from: "2026-04-25",
         organisationId: baseInput.organisationId,
         to: "2026-04-25",
@@ -314,16 +314,16 @@ describe("current-status", () => {
 
     const statuses = await withTestTenantDb(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         at: baseInput.at,
-        clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         people,
       }),
       (db) =>
         computeCurrentStatusForPeople(
           {
+            accountId: baseInput.accountId,
             at: baseInput.at,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             people,
           },
@@ -429,8 +429,8 @@ describe("current-status", () => {
 
         const batchMap = await withTestTenantDb(
           tenantTestAccount({
+            accountId: baseInput.accountId,
             at: baseInput.at,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             people: [
               {
@@ -442,8 +442,8 @@ describe("current-status", () => {
           (db) =>
             computeCurrentStatusForPeople(
               {
+                accountId: baseInput.accountId,
                 at: baseInput.at,
-                clerkOrgId: baseInput.clerkOrgId,
                 organisationId: baseInput.organisationId,
                 people: [
                   {

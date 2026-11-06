@@ -8,7 +8,7 @@ vi.mock("@repo/database", async () => ({
   loadHolidayResolutionData: vi.fn(),
 }));
 
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { loadHolidayResolutionData } from "@repo/database";
 import { describe, expect, it } from "vitest";
 import {
@@ -16,10 +16,10 @@ import {
   resolvePublicHolidays,
 } from "./resolve-public-holidays";
 
-const clerkOrgId = "org_a" as ClerkOrgId;
+const accountId = "org_a" as AccountId;
 const organisationId = "11111111-1111-4111-8111-111111111111" as OrganisationId;
 const range = {
-  clerkOrgId,
+  accountId,
   from: "2026-01-01",
   organisationId,
   to: "2026-12-31",

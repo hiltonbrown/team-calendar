@@ -126,7 +126,13 @@ async function runLiveIntegration(): Promise<number> {
     protectedManifestPath
   );
   runner.phase = "consumer_isolation";
+  let ownershipVerifiedForRunId: string | undefined;
+  if (action === "cleanup") {
+    await assertActiveRunOwner(manifest, registryInput);
+    ownershipVerifiedForRunId = manifest.runId;
+  }
   await assertConsumerIsolationReadBack(manifest, {
+    ownershipVerifiedForRunId,
     signingKey: process.env.INNGEST_SIGNING_KEY,
   });
   if (manifest.consumerIsolation) {
@@ -194,11 +200,24 @@ async function runLiveIntegration(): Promise<number> {
         signingKey: process.env.INNGEST_SIGNING_KEY,
       });
       runner.phase = "tests";
-      const result = spawnSync("bun", ["run", "test:integration"], {
-        cwd: root,
-        env: buildLiveIntegrationTestEnvironment(childEnvironment),
-        stdio: "inherit",
-      });
+      // RLS tests temporarily change shared role membership. Complete each file
+      // and every package before cleanup, including when another package fails.
+      const result = spawnSync(
+        "bun",
+        [
+          "run",
+          "test:integration",
+          "--continue=always",
+          "--concurrency=1",
+          "--",
+          "--no-file-parallelism",
+        ],
+        {
+          cwd: root,
+          env: buildLiveIntegrationTestEnvironment(childEnvironment),
+          stdio: "inherit",
+        }
+      );
       status = result.status ?? 1;
       runner.inventoryStatus = status === 0 ? "PASS" : "FAIL";
       if (status !== 0) {

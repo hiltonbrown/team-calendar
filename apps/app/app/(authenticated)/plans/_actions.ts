@@ -1,7 +1,9 @@
 "use server";
+
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
-import { auth, currentUser } from "@repo/auth/server";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   archiveRecord,
   attachSubmitRecoveryCandidate,
@@ -19,7 +21,7 @@ import {
   updateRecord,
   withdrawSubmission,
 } from "@repo/availability";
-import type { ClerkOrgId, Result } from "@repo/core";
+import type { AccountId, Result } from "@repo/core";
 import {
   afterTenantCommit,
   assertTenantDb,
@@ -161,7 +163,7 @@ export async function createRecordAction(input: PlanRecordFormInput): Promise<
   }
   try {
     return await withTenantResult(
-      actor.value.clerkOrgId,
+      actor.value.accountId,
       async (db): ReturnType<typeof createRecordAction> => {
         const context = await loadPlanActionContext(
           actor.value,
@@ -183,9 +185,9 @@ export async function createRecordAction(input: PlanRecordFormInput): Promise<
         return await (async () => {
           const result = await createRecord(
             {
-              actingOrgRole: context.value.orgRole,
+              accountId: context.value.accountId,
+              actingRole: context.value.role,
               allDay: parsed.data.allDay,
-              clerkOrgId: context.value.clerkOrgId,
               contactabilityStatus: parsed.data.contactabilityStatus,
               createdByUserId: context.value.userId,
               endsAt: dates.value.endsAt,
@@ -245,7 +247,7 @@ export async function updateRecordAction(
   }
   try {
     return await withTenantResult(
-      actor.value.clerkOrgId,
+      actor.value.accountId,
       async (db): ReturnType<typeof updateRecordAction> => {
         const context = await loadPlanActionContext(
           actor.value,
@@ -267,9 +269,9 @@ export async function updateRecordAction(
         return await (async () => {
           const result = await updateRecord(
             {
-              actingOrgRole: context.value.orgRole,
+              accountId: context.value.accountId,
+              actingRole: context.value.role,
               actingUserId: context.value.userId,
-              clerkOrgId: context.value.clerkOrgId,
               organisationId: context.value.organisationId,
               patch: {
                 allDay: parsed.data.allDay,
@@ -309,19 +311,19 @@ export async function updateRecordAction(
   }
 }
 async function captureSubmissionActivation(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   submittedAt: Date | null;
 }): Promise<void> {
   if (!input.submittedAt) {
     return;
   }
-  const first = await withTenantDb(input.clerkOrgId, (db) =>
+  const first = await withTenantDb(input.accountId, (db) =>
     db.availabilityRecord.findFirst({
       orderBy: { submitted_at: "asc" },
       select: { submitted_at: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         organisation_id: input.organisationId,
         submitted_at: { not: null },
       },
@@ -331,10 +333,10 @@ async function captureSubmissionActivation(input: {
     return;
   }
   const event = createActivationEvent({
-    deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,
+    deduplicationKey: `${input.accountId}:${input.organisationId}`,
     name: "First Leave Submitted",
     occurredAt: first.submitted_at,
-    subjectId: input.clerkOrgId,
+    subjectId: input.accountId,
   });
   analytics?.capture({
     distinctId: event.distinctId,
@@ -359,7 +361,7 @@ export async function deleteDraftAction(
   }
   try {
     return await withTenantResult(
-      actor.value.clerkOrgId,
+      actor.value.accountId,
       async (db): ReturnType<typeof deleteDraftAction> => {
         const context = await loadPlanActionContext(
           actor.value,
@@ -372,9 +374,9 @@ export async function deleteDraftAction(
         return await (async () => {
           const result = await deleteDraftRecord(
             {
-              actingOrgRole: context.value.orgRole,
+              accountId: context.value.accountId,
+              actingRole: context.value.role,
               actingUserId: context.value.userId,
-              clerkOrgId: context.value.clerkOrgId,
               organisationId: context.value.organisationId,
               recordId: parsed.data.recordId,
             },
@@ -413,7 +415,7 @@ export async function archiveRecordAction(
   }
   try {
     return await withTenantResult(
-      actor.value.clerkOrgId,
+      actor.value.accountId,
       async (db): ReturnType<typeof archiveRecordAction> => {
         const context = await loadPlanActionContext(
           actor.value,
@@ -426,9 +428,9 @@ export async function archiveRecordAction(
         return await (async () => {
           const result = await archiveRecord(
             {
-              actingOrgRole: context.value.orgRole,
+              accountId: context.value.accountId,
+              actingRole: context.value.role,
               actingUserId: context.value.userId,
-              clerkOrgId: context.value.clerkOrgId,
               organisationId: context.value.organisationId,
               recordId: parsed.data.recordId,
             },
@@ -472,7 +474,7 @@ export async function restoreRecordAction(
   }
   try {
     return await withTenantResult(
-      actor.value.clerkOrgId,
+      actor.value.accountId,
       async (db): ReturnType<typeof restoreRecordAction> => {
         const context = await loadPlanActionContext(
           actor.value,
@@ -485,9 +487,9 @@ export async function restoreRecordAction(
         return await (async () => {
           const result = await restoreRecord(
             {
-              actingOrgRole: context.value.orgRole,
+              accountId: context.value.accountId,
+              actingRole: context.value.role,
               actingUserId: context.value.userId,
-              clerkOrgId: context.value.clerkOrgId,
               organisationId: context.value.organisationId,
               recordId: parsed.data.recordId,
             },
@@ -532,7 +534,7 @@ export async function submitForApprovalAction(
     }
     try {
       await captureSubmissionActivation({
-        clerkOrgId: context.value.clerkOrgId,
+        accountId: context.value.accountId,
         organisationId: context.value.organisationId,
         submittedAt: result.value.submitted_at,
       });
@@ -590,7 +592,7 @@ export async function retrySubmissionAction(
     }
     try {
       await captureSubmissionActivation({
-        clerkOrgId: context.value.clerkOrgId,
+        accountId: context.value.accountId,
         organisationId: context.value.organisationId,
         submittedAt: result.value.submitted_at,
       });
@@ -625,13 +627,25 @@ interface SubmissionActionValue {
   xeroWriteError: string | null;
 }
 interface PlanActor {
-  clerkOrgId: ClerkOrgId;
-  orgRole: string | null;
+  accountId: AccountId;
+  role: string | null;
   userId: string;
 }
 async function authenticatedPlanActor(): Promise<PlanActionResult<PlanActor>> {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(orgId && user && canUsePlans(orgRole))) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user && canUsePlans(sessionRole))) {
     return {
       error: {
         code: "not_authorised",
@@ -640,12 +654,12 @@ async function authenticatedPlanActor(): Promise<PlanActionResult<PlanActor>> {
       ok: false,
     };
   }
-  // Clerk account is authenticated before SQL preparation.
+  // Account is authenticated before SQL preparation.
   return {
     ok: true,
     value: {
-      clerkOrgId: orgId as ClerkOrgId,
-      orgRole: orgRole ?? null,
+      accountId: sessionAccountId as AccountId,
+      role: sessionRole ?? null,
       userId: user.id,
     },
   };
@@ -655,11 +669,11 @@ async function loadPlanActionContext(
   input: { organisationId: string; personId?: string; recordId?: string },
   db: TenantDb
 ): Promise<PlanActionResult<PlanActor & { organisationId: string }>> {
-  assertTenantDb(db, actor.clerkOrgId);
-  const companies = await resolveAccountCompanies(actor.clerkOrgId, db);
+  assertTenantDb(db, actor.accountId);
+  const companies = await resolveAccountCompanies(actor.accountId, db);
   const companyIds = companies.map((company) => company.id);
   const scope = {
-    clerk_org_id: actor.clerkOrgId,
+    account_id: actor.accountId,
     organisation_id: { in: companyIds },
   };
   let target: { organisation_id: string } | null = null;
@@ -693,9 +707,9 @@ async function resolveActionContext(
   recordId?: string
 ): Promise<
   PlanActionResult<{
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
-    orgRole: string | null;
+    role: string | null;
     userId: string;
   }>
 > {
@@ -703,26 +717,22 @@ async function resolveActionContext(
   if (!actor.ok) {
     return actor;
   }
-  return withTenantDb(actor.value.clerkOrgId, (db) =>
+  return withTenantDb(actor.value.accountId, (db) =>
     loadPlanActionContext(actor.value, { organisationId, recordId }, db)
   );
 }
 function canUsePlans(role: string | null | undefined): boolean {
-  return (
-    role === "org:viewer" ||
-    role === "org:manager" ||
-    role === "org:admin" ||
-    role === "org:owner"
-  );
+  return can(role, { plans: ["readOwn"] });
 }
+
 async function resolveRecoveryContext(
   organisationId: string,
   recordId?: string
 ): Promise<
   PlanActionResult<{
-    actingOrgRole: "org:admin" | "org:owner";
+    actingRole: "admin" | "owner";
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   }>
 > {
@@ -730,10 +740,7 @@ async function resolveRecoveryContext(
   if (!context.ok) {
     return context;
   }
-  if (
-    context.value.orgRole !== "org:admin" &&
-    context.value.orgRole !== "org:owner"
-  ) {
+  if (!can(context.value.role, { plans: ["manageAll"] })) {
     return {
       error: {
         code: "not_authorised",
@@ -746,9 +753,9 @@ async function resolveRecoveryContext(
   return {
     ok: true,
     value: {
-      actingOrgRole: context.value.orgRole,
+      accountId: context.value.accountId,
+      actingRole: context.value.role === "owner" ? "owner" : "admin",
       actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
     },
   };
@@ -757,9 +764,9 @@ async function resolveRecordActionContext(
   input: PlanRecordActionInput
 ): Promise<
   PlanActionResult<{
-    actingOrgRole: string | null;
+    actingRole: string | null;
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recordId: string;
   }>
@@ -778,9 +785,9 @@ async function resolveRecordActionContext(
   return {
     ok: true,
     value: {
-      actingOrgRole: context.value.orgRole,
+      accountId: context.value.accountId,
+      actingRole: context.value.role,
       actingUserId: context.value.userId,
-      clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
       recordId: parsed.data.recordId,
     },
@@ -819,7 +826,7 @@ function validationError(message?: string): PlanActionResult<never> {
 async function resolveFormDates(
   input: PlanRecordFormInput,
   context: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   },
   recordId: string | undefined,
@@ -830,12 +837,12 @@ async function resolveFormDates(
     endsAt: Date;
   }>
 > {
-  assertTenantDb(db, context.clerkOrgId);
+  assertTenantDb(db, context.accountId);
   const organisation = await db.organisation.findFirst({
     select: { timezone: true },
     where: {
+      account_id: context.accountId,
       archived_at: null,
-      clerk_org_id: context.clerkOrgId,
       id: context.organisationId,
     },
   });
@@ -861,8 +868,8 @@ async function resolveFormDates(
     ? await db.availabilityRecord.findFirst({
         select: { all_day: true, ends_at: true, starts_at: true },
         where: {
+          account_id: context.accountId,
           archived_at: null,
-          clerk_org_id: context.clerkOrgId,
           id: recordId,
           organisation_id: context.organisationId,
         },

@@ -1,6 +1,30 @@
 // Register functions individually. Other exports in the same module can use TenantDb.
 export const PHASED_TENANT_EXPORTS = [
   {
+    exports: ["seedAuthDevelopmentFixtures"],
+    path: "packages/database/src/seed/auth-fixtures.ts",
+    reason:
+      "Development-only native auth commits precede restricted tenant fixture creation and owner readiness updates",
+  },
+  {
+    exports: ["completeAuthUserLifecycle"],
+    path: "packages/auth/user-lifecycle.ts",
+    reason:
+      "Committed auth identity and durable audit discovery surround tenant-scoped provisioning and verified Person reconciliation; analytics follows closed database scopes",
+  },
+  {
+    exports: ["ensureUserAccountsReady"],
+    path: "packages/auth/adapters/better-auth-server.ts",
+    reason:
+      "Auth Account discovery precedes scoped default-company provisioning and readiness follows durable commit",
+  },
+  {
+    exports: ["reconcileAccountPeople", "clearAccountPeople"],
+    path: "packages/auth/membership-reconciliation.ts",
+    reason:
+      "Verified membership identity precedes scoped existing-Person reconciliation; auth tables never use the tenant client",
+  },
+  {
     exports: ["resolveWriteEmployeeId", "resolveWriteLeaveTypeId"],
     path: "packages/xero/src/adapter/xero-write-adapter.ts",
     reason:
@@ -34,19 +58,19 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/notifications/_actions.ts",
     reason:
-      "C6: Clerk identity and role precede one account Result scope; preference ownership and writes share a company-scoped request",
+      "C6: Account identity and role precede one account Result scope; preference ownership and writes share a company-scoped request",
   },
   {
     exports: ["POST"],
     path: "apps/api/app/api/notifications/[notificationId]/mark-read/route.ts",
     reason:
-      "C6: Clerk authentication and notification id validation precede one account Result write scope",
+      "C6: Account authenticationentication and notification id validation precede one account Result write scope",
   },
   {
     exports: ["Header"],
     path: "apps/app/app/(authenticated)/components/header.tsx",
     reason:
-      "C7: independent header scope groups company selector data and account-wide notification snapshots after Clerk authentication",
+      "C7: independent header scope groups company selector data and account-wide notification snapshots after Account authenticationentication",
   },
   {
     exports: ["drainNotificationEmailQueue"],
@@ -90,16 +114,6 @@ export const PHASED_TENANT_EXPORTS = [
     reason: "C6: activation snapshot closes before analytics capture and flush",
   },
   {
-    exports: [
-      "POST",
-      "handleOrganizationMembershipCreated",
-      "handleOrganizationMembershipDeleted",
-    ],
-    path: "apps/api/app/webhooks/auth/route.ts",
-    reason:
-      "C6: webhook/auth/provider work remains outside tenant persistence phases",
-  },
-  {
     exports: ["POST"],
     path: "apps/api/app/api/support/github-issue/route.ts",
     reason:
@@ -121,13 +135,13 @@ export const PHASED_TENANT_EXPORTS = [
     exports: ["GET"],
     path: "apps/api/app/api/xero/oauth/start/route.ts",
     reason:
-      "C6: Clerk authentication and OAuth provider work run outside SQL persistence phases",
+      "C6: Account authenticationentication and OAuth provider work run outside SQL persistence phases",
   },
   {
     exports: ["GET"],
     path: "apps/api/app/api/xero/oauth/callback/route.ts",
     reason:
-      "C6: Clerk authentication and OAuth provider work run outside SQL persistence phases",
+      "C6: Account authenticationentication and OAuth provider work run outside SQL persistence phases",
   },
   {
     exports: [
@@ -139,7 +153,7 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/settings/integrations/xero/_actions.ts",
     reason:
-      "C6: Clerk authentication and headers precede SQL preparation; disconnect and removal providers run outside SQL",
+      "C6: Account authenticationentication and headers precede SQL preparation; disconnect and removal providers run outside SQL",
   },
   {
     exports: [
@@ -152,7 +166,7 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/sync/_actions.ts",
     reason:
-      "C6: Clerk identity precedes owned-company scopes; cancellation and HTTP dispatch sends run between SQL phases",
+      "C6: Account identity precedes owned-company scopes; cancellation and HTTP dispatch sends run between SQL phases",
   },
   {
     exports: ["captureXeroConnected"],
@@ -163,40 +177,44 @@ export const PHASED_TENANT_EXPORTS = [
   {
     exports: ["inviteMember"],
     path: "apps/app/app/actions/settings/invite-member.ts",
-    reason: "C6: Clerk authentication and SDK calls remain outside tenant SQL",
+    reason:
+      "C6: Account authenticationentication and SDK calls remain outside tenant SQL",
   },
   {
     exports: ["removeMember"],
     path: "apps/app/app/actions/settings/remove-member.ts",
-    reason: "C6: Clerk authentication and SDK calls remain outside tenant SQL",
+    reason:
+      "C6: Account authenticationentication and SDK calls remain outside tenant SQL",
   },
   {
     exports: ["updateMemberRole"],
     path: "apps/app/app/actions/settings/update-member-role.ts",
-    reason: "C6: Clerk authentication and SDK calls remain outside tenant SQL",
+    reason:
+      "C6: Account authenticationentication and SDK calls remain outside tenant SQL",
   },
   {
     exports: ["revokeAllTokens"],
     path: "apps/app/app/actions/settings/revoke-tokens.ts",
-    reason: "C6: Clerk authentication and SDK calls remain outside tenant SQL",
+    reason:
+      "C6: Account authenticationentication and SDK calls remain outside tenant SQL",
   },
   {
     exports: ["updateOrganisationAction"],
     path: "apps/app/app/(authenticated)/settings/general/_actions.ts",
     reason:
-      "C6: Clerk identity and request headers precede one company/settings/audit Result scope",
+      "C6: Account identity and request headers precede one company/settings/audit Result scope",
   },
   {
     exports: ["startCheckout", "startPortal"],
     path: "apps/app/app/(authenticated)/settings/billing/actions.ts",
     reason:
-      "C6: Clerk authentication and company preparation precede Stripe calls outside SQL",
+      "C6: Account authenticationentication and company preparation precede Stripe calls outside SQL",
   },
   {
     exports: ["updateFeedDefaultsAction"],
     path: "apps/app/app/(authenticated)/settings/feeds/_actions.ts",
     reason:
-      "C6: Clerk identity precedes one owned-company Result write scope and post-commit invalidation",
+      "C6: Account identity precedes one owned-company Result write scope and post-commit invalidation",
   },
   {
     exports: [
@@ -212,31 +230,31 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(setup)/onboarding/_actions.ts",
     reason:
-      "C6: Clerk auth/providers and analytics remain outside Result write scopes; per-invite outcomes stay independent",
+      "C6: Account authentication/providers and analytics remain outside Result write scopes; per-invite outcomes stay independent",
   },
   {
     exports: ["completeWelcomeAction"],
     path: "apps/app/app/(setup)/welcome/_actions.ts",
     reason:
-      "C6: Clerk auth precedes one Result welcome write; analytics follows commit",
+      "C6: Account authentication precedes one Result welcome write; analytics follows commit",
   },
   {
     exports: ["createOrganisationAction"],
     path: "apps/app/app/(authenticated)/setup/_actions.ts",
     reason:
-      "C6: Clerk auth precedes atomic company/default feed/person setup; redirect follows commit",
+      "C6: Account authentication precedes atomic company/default feed/person setup; redirect follows commit",
   },
   {
     exports: ["POST"],
     path: "apps/api/app/api/availability/route.ts",
     reason:
-      "C6: Clerk auth and body validation precede one Result scope; HTTP response follows rollback/commit",
+      "C6: Account authentication and body validation precede one Result scope; HTTP response follows rollback/commit",
   },
   {
     exports: ["PATCH", "DELETE"],
     path: "apps/api/app/api/availability/[recordId]/route.ts",
     reason:
-      "C6: Clerk auth and body validation precede one Result scope; HTTP response follows rollback/commit",
+      "C6: Account authentication and body validation precede one Result scope; HTTP response follows rollback/commit",
   },
   {
     exports: [
@@ -246,25 +264,25 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/actions/availability/manual.ts",
     reason:
-      "C6: Clerk auth precedes one Result mutation scope and deferred revalidation",
+      "C6: Account authentication precedes one Result mutation scope and deferred revalidation",
   },
   {
     exports: ["exportLeaveReportsCsvAction"],
     path: "apps/app/app/(authenticated)/analytics/leave-reports/_actions.ts",
     reason:
-      "C6: Clerk auth precedes one scope for owned company and paginated export",
+      "C6: Account authentication precedes one scope for owned company and paginated export",
   },
   {
     exports: ["getActiveOrgContext"],
     path: "apps/app/lib/server/get-active-org-context.ts",
     reason:
-      "C6: Clerk account discovery precedes one owned-company scope; scoped callers use pure resolvers",
+      "C6: Account discovery precedes one owned-company scope; scoped callers use pure resolvers",
   },
   {
     exports: ["ensureDefaultOrganisation"],
     path: "apps/app/lib/server/ensure-default-organisation.ts",
     reason:
-      "C6: Clerk company-name lookup precedes one default-company and feed scope",
+      "C6: Account name lookup precedes one default-company and feed scope",
   },
   {
     exports: ["materialisePublication"],
@@ -276,7 +294,7 @@ export const PHASED_TENANT_EXPORTS = [
     exports: ["loadNewHolidayFormData"],
     path: "apps/app/app/(authenticated)/public-holidays/holidays/new/form-data.ts",
     reason:
-      "C6: Clerk role/account discovery precedes one form-data read scope",
+      "C6: Account identity and role discovery precedes one form-data read scope",
   },
   {
     exports: [
@@ -289,25 +307,25 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/public-holidays/_actions.ts",
     reason:
-      "C6: Clerk role/account discovery precedes one Result scope for holiday ownership and mutation",
+      "C6: Account identity and role discovery precedes one Result scope for holiday ownership and mutation",
   },
   {
     exports: ["updateTeamCoverageMinimumAction"],
     path: "apps/app/app/(authenticated)/settings/coverage/_actions.ts",
     reason:
-      "C6: Clerk authentication precedes one Result scope for coverage ownership and mutation",
+      "C6: Account authenticationentication precedes one Result scope for coverage ownership and mutation",
   },
   {
     exports: ["exportAuditLogCsvAction"],
     path: "apps/app/app/(authenticated)/settings/audit-log/_actions.ts",
     reason:
-      "C6: Clerk authentication precedes one Result scope for audit export and audit write",
+      "C6: Account authenticationentication precedes one Result scope for audit export and audit write",
   },
   {
     exports: ["loadPlanFormData"],
     path: "apps/app/app/(authenticated)/plans/record-form-data.ts",
     reason:
-      "C6: Clerk authentication precedes one owned person/record-derived form read scope",
+      "C6: Account authenticationentication precedes one owned person/record-derived form read scope",
   },
   {
     exports: [
@@ -326,7 +344,7 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/plans/_actions.ts",
     reason:
-      "Clerk auth precedes Result mutations or short record-derived preparation before durable provider phases",
+      "Account authentication precedes Result mutations or short record-derived preparation before durable provider phases",
   },
   {
     exports: ["materialisePlanPublication"],
@@ -347,13 +365,13 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/leave-approvals/_actions.ts",
     reason:
-      "Clerk auth and record-derived company preparation precede phased provider writes or one Result scope",
+      "Account authentication and record-derived company preparation precede phased provider writes or one Result scope",
   },
   {
     exports: ["createManualPersonAction"],
     path: "apps/app/app/(authenticated)/people/new/_actions.ts",
     reason:
-      "C6: Clerk authentication precedes one Result write scope; redirect follows commit",
+      "C6: Account authenticationentication precedes one Result write scope; redirect follows commit",
   },
   {
     exports: [
@@ -383,13 +401,13 @@ export const PHASED_TENANT_EXPORTS = [
     ],
     path: "apps/app/app/(authenticated)/feeds/_actions.ts",
     reason:
-      "Clerk authentication precedes feed database preparation; analytics and notification publication follow commit",
+      "Account authenticationentication precedes feed database preparation; analytics and notification publication follow commit",
   },
   {
     exports: ["requireActiveOrgPageContext"],
     path: "apps/app/lib/server/require-active-org-page-context.ts",
     reason:
-      "Clerk account discovery and a separately scoped company lookup; scoped callers use resolveActiveOrgPageContext",
+      "Account discovery and a separately scoped company lookup; scoped callers use resolveActiveOrgPageContext",
   },
 
   {
@@ -505,38 +523,40 @@ export const PHASED_TENANT_EXPORTS = [
   {
     exports: ["updateAccountNameAction"],
     path: "apps/app/app/(authenticated)/settings/general/_actions.ts",
-    reason: "C6: Clerk account update precedes local audit persistence",
+    reason: "C6: Account update precedes local audit persistence",
   },
   {
     exports: ["updateOrg"],
     path: "apps/app/app/actions/settings/update-org.ts",
     reason:
-      "C6: local company Result persistence closes before the Clerk organisation update",
+      "C6: local company Result persistence closes before the Account update",
   },
   {
     exports: [
-      "loadClerkAccessCandidates",
-      "inviteClerkAccessCandidates",
+      "loadAccountAccessCandidates",
+      "inviteAccountAccessCandidates",
       "refreshBalancesAction",
     ],
     path: "apps/app/app/(authenticated)/people/_actions.ts",
-    reason: "C6: Clerk membership and invitation calls surround tenant queries",
+    reason:
+      "C6: Account membership and invitation calls surround tenant queries",
   },
   {
     exports: ["resolveXeroPersonMatchAction"],
     path: "apps/app/app/(authenticated)/settings/integrations/xero/matches/_actions.ts",
-    reason: "C6: Clerk access discovery and person matching run in phases",
+    reason: "C6: Account access discovery and person matching run in phases",
   },
   {
     exports: [
-      "fetchAllClerkMemberships",
-      "fetchAllClerkPendingInvitations",
-      "loadClerkAccessReview",
-      "reconcileClerkAccessLinks",
-      "inviteClerkAccessCandidates",
+      "fetchAllAccountMembers",
+      "fetchAllPendingAccountInvitations",
+      "loadAccountAccessReview",
+      "reconcileAccountAccessLinks",
+      "inviteAccountAccessCandidates",
     ],
-    path: "packages/availability/src/people/clerk-access-service.ts",
-    reason: "C6: Clerk API calls cannot run inside a tenant transaction",
+    path: "packages/availability/src/people/account-access-service.ts",
+    reason:
+      "C6: Account directory calls cannot run inside a tenant transaction",
   },
 
   {

@@ -37,19 +37,35 @@ export const assertTestDatabaseConnectionAllowed = (
   if (process.env.ALLOW_LIVE_DATABASE_TESTS === "I_ACKNOWLEDGE_LIVE_MUTATION") {
     const manifestPath = process.env.TC_RELEASE_MANIFEST;
     const runId = process.env.TC_RELEASE_RUN_ID;
-    if (!(manifestPath && runId && databaseUrl)) {
+    const ownerUrl = process.env.DATABASE_URL;
+    if (!(manifestPath && runId && databaseUrl && ownerUrl)) {
       throw new Error("Protected live integration inputs are incomplete");
     }
     const value: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
     const manifest = manifestSchema.parse(value);
+    const ownerIdentity = new URL(ownerUrl);
     const identity = new URL(databaseUrl);
+    const isOwnerConnection = databaseUrl === ownerUrl;
+    // Runtime-role checks establish privileges; the guard admits only the
+    // configured app connection on this same protected database and endpoint.
+    const isAppConnection =
+      databaseUrl === process.env.DATABASE_APP_URL &&
+      identity.protocol === ownerIdentity.protocol &&
+      identity.hostname === ownerIdentity.hostname &&
+      (identity.port || "5432") === (ownerIdentity.port || "5432") &&
+      decodeURIComponent(identity.pathname.slice(1)) ===
+        decodeURIComponent(ownerIdentity.pathname.slice(1)) &&
+      Boolean(identity.username) &&
+      decodeURIComponent(identity.username) !==
+        decodeURIComponent(ownerIdentity.username);
     if (
       manifest.runId !== runId ||
       manifest.namespace !== `release:run:${runId}` ||
-      decodeURIComponent(identity.pathname.slice(1)) !==
+      decodeURIComponent(ownerIdentity.pathname.slice(1)) !==
         manifest.target.database ||
-      decodeURIComponent(identity.username) !== manifest.target.role ||
-      identity.hostname !== manifest.target.hostname ||
+      decodeURIComponent(ownerIdentity.username) !== manifest.target.role ||
+      ownerIdentity.hostname !== manifest.target.hostname ||
+      !(isOwnerConnection || isAppConnection) ||
       process.env.TC_RELEASE_DURABLE_VERIFIED !== runId ||
       process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED !== runId
     ) {

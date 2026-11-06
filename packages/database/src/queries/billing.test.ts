@@ -40,12 +40,12 @@ vi.mock("../system-client", () => ({
 }));
 const {
   getAuthoritativeUsageCount,
-  getSubscriptionForOrg,
-  getFirstActiveOrganisationIdForClerkOrg,
+  getSubscriptionForAccount,
+  getFirstActiveOrganisationIdForAccount,
   getUsageCounter,
   getFailedStripeEventsForOperators,
-  getUnresolvedStripeEventsForOrg,
-  hasUnresolvedStripeEventForOrg,
+  getUnresolvedStripeEventsForAccount,
+  hasUnresolvedStripeEventForAccount,
   isStripeEventProcessed,
   lockPlanLimitMutations,
   recordStripeEventFailure,
@@ -82,8 +82,8 @@ describe("authoritative billing usage", () => {
     );
     expect(mocks.personCount).toHaveBeenCalledWith({
       where: {
+        account_id: "org_123",
         archived_at: null,
-        clerk_org_id: "org_123",
         is_active: true,
       },
     });
@@ -95,8 +95,8 @@ describe("authoritative billing usage", () => {
     );
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: {
+        account_id: "org_123",
         archived_at: null,
-        clerk_org_id: "org_123",
         status: "active",
       },
     });
@@ -108,8 +108,8 @@ describe("authoritative billing usage", () => {
     );
     expect(mocks.organisationCount).toHaveBeenCalledWith({
       where: {
+        account_id: "org_123",
         archived_at: null,
-        clerk_org_id: "org_123",
         is_active: true,
       },
     });
@@ -121,13 +121,13 @@ describe("authoritative billing usage", () => {
     );
     expect(mocks.xeroConnectionCount).toHaveBeenCalledWith({
       where: {
-        clerk_org_id: "org_123",
+        account_id: "org_123",
         disconnected_at: null,
         status: "active",
       },
     });
   });
-  it("takes a transaction-scoped advisory lock using the Clerk Organisation", async () => {
+  it("takes a transaction-scoped advisory lock using the Account", async () => {
     mocks.queryRaw.mockResolvedValue([{ acquired: "" }]);
     await withTenantDb("org_123", (db) =>
       lockPlanLimitMutations("org_123", db)
@@ -149,7 +149,7 @@ describe("Stripe event receipt health", () => {
   it("reports a newer unresolved event for a known organisation", async () => {
     mocks.queryRaw.mockResolvedValue([{ exists: true }]);
     await expect(
-      hasUnresolvedStripeEventForOrg(
+      hasUnresolvedStripeEventForAccount(
         "org_123",
         new Date("2026-09-18T00:00:00Z")
       )
@@ -164,7 +164,9 @@ describe("Stripe event receipt health", () => {
         stripe_event_id: "evt_operator",
       },
     ]);
-    await expect(getUnresolvedStripeEventsForOrg("org_123")).resolves.toEqual([
+    await expect(
+      getUnresolvedStripeEventsForAccount("org_123")
+    ).resolves.toEqual([
       {
         errorCategory: "provider_fetch",
         eventId: "evt_operator",
@@ -183,7 +185,7 @@ describe("Stripe event receipt health", () => {
       mocks.queryRaw.mockResolvedValue([{ attempt_count: attemptCount }]);
       await expect(
         recordStripeEventFailure({
-          clerkOrgId: "org_123",
+          accountId: "org_123",
           errorCategory: "provider_fetch",
           eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
           eventId: "evt_operator",
@@ -197,7 +199,7 @@ describe("Stripe event receipt health", () => {
     const attemptedAt = new Date("2026-09-19T00:00:00.000Z");
     mocks.queryRaw.mockResolvedValue([
       {
-        clerk_org_id: null,
+        account_id: null,
         error_category: "invalid_payload",
         last_attempted_at: attemptedAt,
         stripe_event_id: "evt_unmatched",
@@ -205,7 +207,7 @@ describe("Stripe event receipt health", () => {
     ]);
     await expect(getFailedStripeEventsForOperators()).resolves.toEqual([
       {
-        clerkOrgId: null,
+        accountId: null,
         errorCategory: "invalid_payload",
         eventId: "evt_unmatched",
         lastAttemptedAt: attemptedAt,
@@ -218,9 +220,9 @@ describe("subscription mirror ordering", () => {
     mocks.executeRaw.mockResolvedValue(1);
     await withTestTenantDb(
       tenantTestAccount({
+        accountId: "org_123",
         authoritativeTie: true,
         cancelAtPeriodEnd: true,
-        clerkOrgId: "org_123",
         currentPeriodEnd: null,
         endedAt: new Date("2026-09-19T00:00:00.000Z"),
         planKey: "basic",
@@ -232,9 +234,9 @@ describe("subscription mirror ordering", () => {
       (db) =>
         upsertSubscriptionFromWebhook(
           {
+            accountId: "org_123",
             authoritativeTie: true,
             cancelAtPeriodEnd: true,
-            clerkOrgId: "org_123",
             currentPeriodEnd: null,
             endedAt: new Date("2026-09-19T00:00:00.000Z"),
             planKey: "basic",
@@ -256,10 +258,13 @@ const scopeCases: {
   name: string;
   run: (db: import("../tenant-db").TenantDb) => Promise<unknown>;
 }[] = [
-  { name: "subscription", run: (db) => getSubscriptionForOrg("account-A", db) },
+  {
+    name: "subscription",
+    run: (db) => getSubscriptionForAccount("account-A", db),
+  },
   {
     name: "active organisation",
-    run: (db) => getFirstActiveOrganisationIdForClerkOrg("account-A", db),
+    run: (db) => getFirstActiveOrganisationIdForAccount("account-A", db),
   },
   {
     name: "usage counter",
@@ -274,8 +279,8 @@ const scopeCases: {
     run: (db) =>
       upsertSubscriptionFromWebhook(
         {
+          accountId: "account-A",
           cancelAtPeriodEnd: false,
-          clerkOrgId: "account-A",
           currentPeriodEnd: null,
           endedAt: null,
           planKey: "basic",

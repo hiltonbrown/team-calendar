@@ -4,9 +4,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { isLocalDatabase } from "./src/is-local-database";
 import { assertTestDatabaseConnectionAllowed } from "./src/live-test-guard";
 
+// Legacy column names below intentionally seed the historical schema unchanged.
 // Runs the bundled-holiday data migration against a throwaway database so the
 // pre-migration shape (jurisdictions, assignments, Nager rows) can be seeded.
 const DATA_MIGRATION = "20261009025909_replace_imported_public_holidays";
@@ -19,14 +19,19 @@ const migrationsBeforeData = migrations.filter((name) => name < DATA_MIGRATION);
 
 assertTestDatabaseConnectionAllowed();
 const baseUrl = process.env.DATABASE_URL ?? "";
-if (!isLocalDatabase(baseUrl)) {
-  throw new Error("This migration test only runs against a local database");
+const adminUrl = new URL(baseUrl);
+if (adminUrl.hostname.endsWith(".neon.tech")) {
+  adminUrl.hostname = adminUrl.hostname.replace("-pooler.", ".");
 }
 const scratchName = `tc_holiday_migration_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-const scratchUrl = new URL(baseUrl);
+const scratchUrl = new URL(adminUrl);
 scratchUrl.pathname = `/${scratchName}`;
-const admin = new Client({ connectionString: baseUrl });
+const admin = new Client({ connectionString: adminUrl.toString() });
 const scratch = new Client({ connectionString: scratchUrl.toString() });
+let adminConnectionStarted = false;
+let adminConnected = false;
+let scratchConnectionStarted = false;
+let scratchCreated = false;
 
 const ids = {
   customAll: randomUUID(),
@@ -172,8 +177,12 @@ async function seed() {
 }
 
 beforeAll(async () => {
+  adminConnectionStarted = true;
   await admin.connect();
+  adminConnected = true;
   await admin.query(`CREATE DATABASE "${scratchName}"`);
+  scratchCreated = true;
+  scratchConnectionStarted = true;
   await scratch.connect();
   for (const name of migrationsBeforeData) {
     await scratch.query(
@@ -187,10 +196,24 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
-  await scratch.end();
-  await admin.query(`DROP DATABASE IF EXISTS "${scratchName}"`);
-  await admin.end();
-});
+  try {
+    if (scratchConnectionStarted) {
+      await scratch.end();
+    }
+  } finally {
+    try {
+      if (adminConnected && scratchCreated) {
+        await admin.query(
+          `DROP DATABASE IF EXISTS "${scratchName}" WITH (FORCE)`
+        );
+      }
+    } finally {
+      if (adminConnectionStarted) {
+        await admin.end();
+      }
+    }
+  }
+}, 120_000);
 
 describe("replace imported public holidays migration", () => {
   test("removes imported holidays, their assignments and every jurisdiction", async () => {

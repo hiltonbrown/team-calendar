@@ -32,9 +32,9 @@ import { completeSubmitSideEffects } from "./submit-side-effects";
 import { mutationRequestFingerprint } from "./write-operation";
 
 const RecoveryScopeSchema = z.object({
-  actingOrgRole: z.enum(["org:owner", "org:admin"]),
+  accountId: z.string().min(1),
+  actingRole: z.enum(["owner", "admin"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
 });
@@ -82,14 +82,14 @@ export async function listSubmitRecoveryCandidates(
   >
 > {
   assertNoTenantTransaction("listSubmitRecoveryCandidates");
-  const context = await withTenantDb(input.clerkOrgId, (db) =>
+  const context = await withTenantDb(input.accountId, (db) =>
     loadRecoveryContext(input, db)
   );
   if (!context.ok) {
     return context;
   }
   const candidates = await externalWritePort.findLeaveApplicationCandidates?.({
-    clerkOrgId: context.value.input.clerkOrgId,
+    accountId: context.value.input.accountId,
     employeeId: context.value.employeeId,
     expectedXeroTenantId:
       context.value.operation.request_xero_tenant_id ?? undefined,
@@ -119,14 +119,14 @@ export async function attachSubmitRecoveryCandidate(
   if (!parsed.success) {
     return recoveryError("invalid_input", "Invalid recovery request.");
   }
-  const context = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+  const context = await withTenantDb(parsed.data.accountId, (db) =>
     loadRecoveryContext(parsed.data, db)
   );
   if (!context.ok) {
     return context;
   }
   const candidates = await externalWritePort.findLeaveApplicationCandidates?.({
-    clerkOrgId: parsed.data.clerkOrgId,
+    accountId: parsed.data.accountId,
     employeeId: context.value.employeeId,
     expectedXeroTenantId:
       context.value.operation.request_xero_tenant_id ?? undefined,
@@ -161,7 +161,7 @@ export async function attachSubmitRecoveryCandidate(
       parsed.data,
       context.value.operation.attempt_generation,
       context.value.operation.action
-    ).clerkOrgId,
+    ).accountId,
     (db) =>
       markSubmitProviderAccepted(
         operationAttempt(
@@ -191,20 +191,20 @@ export async function attachSubmitRecoveryCandidate(
     context.value.record.approval_status === targetStatus;
   const originalApprover =
     context.value.operation.action === "approve"
-      ? await withTenantDb(parsed.data.clerkOrgId, (db) =>
+      ? await withTenantDb(parsed.data.accountId, (db) =>
           db.person.findFirst({
             select: { id: true },
             where: {
               ...scopedTo(parsed.data),
               archived_at: null,
-              clerk_user_id: context.value.operation.actor_user_id,
+              user_id: context.value.operation.actor_user_id,
             },
           })
         )
       : null;
   if (!alreadyAttached) {
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep verified recovery state, original actor and reason, merge fencing and audit in one transaction.
-    await withTenantDb(parsed.data.clerkOrgId, async (tx) => {
+    await withTenantDb(parsed.data.accountId, async (tx) => {
       const duplicate = await tx.availabilityRecord.findFirst({
         where: {
           ...scopedTo(parsed.data),
@@ -270,12 +270,12 @@ export async function attachSubmitRecoveryCandidate(
       }
       await tx.auditEvent.create({
         data: {
+          account_id: parsed.data.accountId,
           action:
             context.value.operation.action === "approve"
               ? "availability_records.approval_recovery_attached"
               : `availability_records.${context.value.operation.action}_recovery_attached`,
           actor_user_id: parsed.data.actingUserId,
-          clerk_org_id: parsed.data.clerkOrgId,
           organisation_id: parsed.data.organisationId,
           payload: {
             mergedRecordId,
@@ -295,7 +295,7 @@ export async function attachSubmitRecoveryCandidate(
     context.value.operation.attempt_generation,
     context.value.operation.action
   );
-  const sideEffectClaimedAt = await withTenantDb(attempt.clerkOrgId, (db) =>
+  const sideEffectClaimedAt = await withTenantDb(attempt.accountId, (db) =>
     acquireSubmitRecoverySideEffects(
       attempt,
       new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
@@ -317,14 +317,14 @@ export async function attachSubmitRecoveryCandidate(
     mergedRecordId,
   });
   if (!sideEffects.ok) {
-    await withTenantDb(attempt.clerkOrgId, (db) =>
+    await withTenantDb(attempt.accountId, (db) =>
       releaseSubmitRecoverySideEffects(attempt, sideEffectClaimedAt, db)
     );
     return sideEffects;
   }
 
   if (
-    !(await withTenantDb(attempt.clerkOrgId, (db) =>
+    !(await withTenantDb(attempt.accountId, (db) =>
       markSubmitCompleted(attempt, db)
     ))
   ) {
@@ -351,21 +351,21 @@ async function completeRecoverySideEffects(input: {
 }): Promise<Result<void, SubmitRecoveryError>> {
   const { manager } = input.context.record.person;
   const primary = await completeSubmitSideEffects({
+    accountId: input.input.accountId,
     actorUserId: input.context.operation.actor_user_id,
     approvalRecipient:
       input.context.operation.action !== "withdraw" &&
-      input.context.record.person.clerk_user_id
+      input.context.record.person.user_id
         ? {
-            clerkUserId: input.context.record.person.clerk_user_id,
             personId: input.context.record.person.id,
+            userId: input.context.record.person.user_id,
           }
         : null,
     attempt: input.attempt,
     claimedAt: input.claimedAt,
-    clerkOrgId: input.input.clerkOrgId,
     declineReason: input.context.operation.request_reason,
-    manager: manager?.clerk_user_id
-      ? { clerkUserId: manager.clerk_user_id, personId: manager.id }
+    manager: manager?.user_id
+      ? { personId: manager.id, userId: manager.user_id }
       : null,
     notifyManager: input.context.operation.action === "withdraw",
     organisationId: input.input.organisationId,
@@ -376,12 +376,12 @@ async function completeRecoverySideEffects(input: {
   }
   if (input.mergedRecordId) {
     const phaseInput1 = {
+      accountId: input.input.accountId,
       availabilityRecordId: input.mergedRecordId,
-      clerkOrgId: input.input.clerkOrgId,
       organisationId: input.input.organisationId,
     } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
     const duplicatePublication = await withTenantResult(
-      phaseInput1.clerkOrgId,
+      phaseInput1.accountId,
       (db) => materialiseAvailabilityPublication(phaseInput1, db),
       TENANT_READ_TRANSACTION_OPTIONS
     );
@@ -404,7 +404,7 @@ export async function resolveSubmitAsNotCreated(
   if (!parsed.success) {
     return recoveryError("invalid_input", "Invalid recovery request.");
   }
-  const operation = await withTenantDb(parsed.data.clerkOrgId, (db) =>
+  const operation = await withTenantDb(parsed.data.accountId, (db) =>
     getRecoveryOperation(parsed.data, db)
   );
   if (operation?.status !== "outcome_unknown") {
@@ -413,7 +413,7 @@ export async function resolveSubmitAsNotCreated(
       "No uncertain leave action is awaiting resolution."
     );
   }
-  const resolved = await withTenantDb(input.clerkOrgId, async (tx) => {
+  const resolved = await withTenantDb(input.accountId, async (tx) => {
     const marked = await markSubmitDefinitiveFailure(
       operationAttempt(
         parsed.data,
@@ -428,12 +428,12 @@ export async function resolveSubmitAsNotCreated(
     }
     await tx.auditEvent.create({
       data: {
+        account_id: parsed.data.accountId,
         action:
           operation.action === "approve"
             ? "availability_records.approval_recovery_not_created"
             : `availability_records.${operation.action}_recovery_not_processed`,
         actor_user_id: parsed.data.actingUserId,
-        clerk_org_id: parsed.data.clerkOrgId,
         organisation_id: parsed.data.organisationId,
         payload: {
           evidenceReference: parsed.data.evidenceReference,
@@ -459,9 +459,9 @@ async function loadRecoveryContext(
   input: z.input<typeof RecoveryScopeSchema>,
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = RecoveryScopeSchema.safeParse(input);
@@ -476,10 +476,10 @@ async function loadRecoveryContext(
         include: {
           person: {
             select: {
-              clerk_user_id: true,
               id: true,
               location_id: true,
-              manager: { select: { clerk_user_id: true, id: true } },
+              manager: { select: { id: true, user_id: true } },
+              user_id: true,
             },
           },
         },
@@ -604,17 +604,17 @@ const candidateMatches = (
       }) === context.operation.request_fingerprint;
 
 const operationScope = (input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   recordId: string;
 }) => ({
+  accountId: input.accountId,
   availabilityRecordId: input.recordId,
-  clerkOrgId: input.clerkOrgId,
   organisationId: input.organisationId,
 });
 
 const operationAttempt = (
-  input: { clerkOrgId: string; organisationId: string; recordId: string },
+  input: { accountId: string; organisationId: string; recordId: string },
   attemptGeneration: number,
   action: "approve" | "decline" | "withdraw" = "approve"
 ) => ({ ...operationScope(input), action, attemptGeneration });
@@ -629,15 +629,15 @@ const recoveryError = (
 
 async function getRecoveryOperation(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recordId: string;
   },
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const operations = [

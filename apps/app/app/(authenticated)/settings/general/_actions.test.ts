@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  clerkClient: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     auditEvent: { create: vi.fn() },
     organisation: {
@@ -11,15 +8,18 @@ const mocks = vi.hoisted(() => ({
       update: vi.fn(),
     },
   },
+  getAccount: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   headers: vi.fn(),
   revalidatePath: vi.fn(),
+  updateAccount: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  clerkClient: mocks.clerkClient,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -54,16 +54,15 @@ describe("general settings organisation actions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "admin@example.com" }],
-      firstName: "Admin",
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "admin@example.com",
       id: "user_1",
-      lastName: "User",
+      name: "Admin",
     });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: "org_1", organisationId },
+      value: { accountId: "org_1", organisationId },
     });
     mocks.headers.mockResolvedValue(new Headers());
     mocks.database.auditEvent.create.mockResolvedValue({});
@@ -196,3 +195,13 @@ describe("general settings organisation actions", () => {
     expect(mocks.database.organisation.update).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("@repo/auth/accounts", () => ({
+  accountDirectory: {
+    inviteMembers: vi.fn(),
+    listInvitations: vi.fn(),
+    listMembers: vi.fn(),
+  },
+  getAccount: mocks.getAccount,
+  updateAccount: mocks.updateAccount,
+}));

@@ -53,7 +53,7 @@ const {
   XeroBindingChangedError,
 } = await import("./xero-sync-access");
 const scope = {
-  clerkOrgId: "org_a",
+  accountId: "org_a",
   connectionId: "00000000-0000-4000-8000-000000000002",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
@@ -71,13 +71,13 @@ describe("Xero sync connection lock", () => {
       expect(mocks.query).toHaveBeenCalledWith(
         expect.anything(),
         scope.connectionId,
-        scope.clerkOrgId,
+        scope.accountId,
         scope.organisationId
       );
       expect(mocks.find).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            clerk_org_id: scope.clerkOrgId,
+            account_id: scope.accountId,
             id: scope.connectionId,
             organisation_id: scope.organisationId,
           }),
@@ -86,7 +86,7 @@ describe("Xero sync connection lock", () => {
       await tx.person.updateMany({
         data: { is_active: false },
         where: {
-          clerk_org_id: scope.clerkOrgId,
+          account_id: scope.accountId,
           organisation_id: scope.organisationId,
         },
       });
@@ -171,8 +171,8 @@ describe("Xero sync connection lock", () => {
       await resolveSyncTenant(scope, capability);
       expect(mocks.resolve).toHaveBeenCalledWith(
         expect.objectContaining({
+          accountId: scope.accountId,
           capability,
-          clerkOrgId: scope.clerkOrgId,
           connectionId: scope.connectionId,
           deadline: { expiresAtMs: expect.any(Number) },
           organisationId: scope.organisationId,

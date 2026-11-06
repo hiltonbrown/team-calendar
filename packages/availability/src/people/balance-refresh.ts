@@ -1,6 +1,7 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { log } from "@repo/observability/log";
 import "server-only";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { xeroRecoveryMessage } from "@repo/core";
 import {
   assertTenantDb,
@@ -35,7 +36,7 @@ export type BalanceRefreshReason =
   | "not_xero_linked"
   | "xero_not_connected";
 export type BalanceRefreshDispatcher = (payload: {
-  clerkOrgId: string;
+  accountId: string;
   dispatchedBy: string;
   organisationId: string;
   personId: string;
@@ -55,9 +56,9 @@ export function setBalanceRefreshDispatcher(
   balanceRefreshDispatcher = dispatcher;
 }
 const DispatchBalanceRefreshSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.enum(["admin", "manager", "owner", "viewer"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
 });
@@ -79,7 +80,7 @@ export async function dispatchBalanceRefresh(
 ): Promise<Result<BalanceRefreshOutcome, BalanceRefreshError>> {
   assertNoTenantTransaction("dispatchBalanceRefresh");
   try {
-    const prepared = await withTenantDb(input.clerkOrgId, (db) =>
+    const prepared = await withTenantDb(input.accountId, (db) =>
       prepareBalanceRefresh(input, db)
     );
     if (!prepared.ok) {
@@ -90,7 +91,7 @@ export async function dispatchBalanceRefresh(
       return sent;
     }
     const outcome = sent.value;
-    const audited = await withTenantDb(input.clerkOrgId, (db) =>
+    const audited = await withTenantDb(input.accountId, (db) =>
       recordBalanceRefreshDispatch(input, outcome, db)
     );
     return audited.ok ? sent : audited;
@@ -103,19 +104,17 @@ export async function prepareBalanceRefresh(
   input: BalanceRefreshInput,
   db: TenantDb
 ): Promise<Result<PreparedBalanceRefresh, BalanceRefreshError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = DispatchBalanceRefreshSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  if (
-    !(parsed.data.actingRole === "admin" || parsed.data.actingRole === "owner")
-  ) {
+  if (!hasPermission(parsed.data.actingRole, { balances: ["manage"] })) {
     return notAuthorised();
   }
   try {
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const person = await db.person.findFirst({
@@ -140,7 +139,7 @@ export async function prepareBalanceRefresh(
     }
     const xeroStateResult = await getXeroConnectionStateForScope(
       {
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         organisationId: parsed.data.organisationId,
       },
       db
@@ -203,7 +202,7 @@ export async function prepareBalanceRefresh(
         input: parsed.data,
         kind: "send",
         payload: {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           connectionId: xeroConnection.id,
           dispatchedBy: parsed.data.actingUserId,
           organisationId: parsed.data.organisationId,
@@ -257,13 +256,13 @@ export async function recordBalanceRefreshDispatch(
   },
   db: TenantDb
 ): Promise<Result<void, BalanceRefreshError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   try {
     await db.auditEvent.create({
       data: {
+        account_id: input.accountId,
         action: "availability_records.balance_refresh_dispatched",
         actor_user_id: input.actingUserId,
-        clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
         payload: {
           actingUserId: input.actingUserId,
@@ -282,23 +281,23 @@ export async function recordBalanceRefreshDispatch(
 }
 async function personNotFound(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<Result<never, BalanceRefreshError>> {
   const exists = await db.person.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
+    select: { account_id: true, organisation_id: true },
     where: { id: input.personId },
   });
   if (
     exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
+    (exists.account_id !== input.accountId ||
       exists.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.personId,
       resourceType: "person",
@@ -331,7 +330,7 @@ function notAuthorised(): Result<never, BalanceRefreshError> {
 }
 setBalanceRefreshDispatcher(async (payload) => {
   const result = await dispatchSyncEvent({
-    clerkOrgId: payload.clerkOrgId,
+    accountId: payload.accountId,
     connectionId: payload.connectionId,
     organisationId: payload.organisationId,
     personId: payload.personId,

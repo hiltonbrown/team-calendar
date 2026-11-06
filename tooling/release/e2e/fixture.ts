@@ -6,6 +6,7 @@ import {
   type Page,
   expect as playwrightExpect,
 } from "@playwright/test";
+import { readBrowserAuthIdentity } from "@repo/auth/testing/playwright";
 import { validateReleaseFixtureOwnership } from "./created-record.js";
 import {
   type ReleaseRole,
@@ -47,24 +48,13 @@ export async function useRole(browser: Browser, role: ReleaseRole) {
   context.on("page", (rolePage) => attachErrorCapture(rolePage, errors));
   const page = await context.newPage();
   await page.goto("/");
-  await page.waitForFunction(() => Boolean(window.Clerk?.user));
-  const identity = await page.evaluate(() => ({
-    email: window.Clerk?.user?.primaryEmailAddress?.emailAddress,
-    organisationId: window.Clerk?.organization?.id,
-    role: window.Clerk?.user?.organizationMemberships.find(
-      (membership) =>
-        membership.organization.id === window.Clerk?.organization?.id
-    )?.role,
-    userId: window.Clerk?.user?.id,
-  }));
+  const identity = await readBrowserAuthIdentity(page);
   const fixtureIdentity = await validateReleaseFixtureOwnership();
   playwrightExpect(identity.email).toBe(roleEmail(role));
-  playwrightExpect(identity.organisationId).toBe(
-    fixtureIdentity.primaryClerkOrgId
-  );
-  playwrightExpect(identity.role).toBe(`org:${role}`);
+  playwrightExpect(identity.accountId).toBe(fixtureIdentity.primaryAccountId);
+  playwrightExpect(identity.role).toBe(role);
   if (role === "viewer") {
-    playwrightExpect(identity.userId).toBe(fixtureIdentity.viewerClerkUserId);
+    playwrightExpect(identity.userId).toBe(fixtureIdentity.viewerUserId);
   }
   return { context, page };
 }

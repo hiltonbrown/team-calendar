@@ -26,8 +26,8 @@ test("account companies retain manual companies and exclude released or archived
   expect(mocks.findMany).toHaveBeenCalledWith(
     expect.objectContaining({
       where: {
+        account_id: "account",
         archived_at: null,
-        clerk_org_id: "account",
         is_active: true,
         OR: [
           { xero_connection: null },

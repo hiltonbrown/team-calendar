@@ -1,6 +1,6 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { currentUser } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -55,7 +55,7 @@ export const Header = async ({
           <NotificationsBell
             initialRecent={bell.recent}
             initialUnreadCount={bell.unreadCount}
-            key={bell.clerkOrgId}
+            key={bell.accountId}
           />
         ) : null}
         <ModeToggle />
@@ -73,17 +73,17 @@ export const Header = async ({
 
 async function loadHeaderData(showCompanySelector: boolean) {
   try {
-    const [user, rawClerkOrgId] = await Promise.all([
-      currentUser(),
-      requireOrg(),
+    const [user, rawAccountId] = await Promise.all([
+      getCurrentUser(),
+      requireAccount(),
     ]);
-    // requireOrg supplies the authenticated Clerk account identifier.
-    const clerkOrgId = rawClerkOrgId as ClerkOrgId;
+    // requireAccount supplies the authenticated Account identifier.
+    const accountId = rawAccountId as AccountId;
     return await withTenantDb(
-      clerkOrgId,
+      accountId,
       async (db) => {
         const companies = showCompanySelector
-          ? (await resolveAccountCompanies(clerkOrgId, db)).map(
+          ? (await resolveAccountCompanies(accountId, db)).map(
               ({ id, name }) => ({ id, name })
             )
           : [];
@@ -91,16 +91,16 @@ async function loadHeaderData(showCompanySelector: boolean) {
           return { bell: null, companies };
         }
         const countResult = await getUnreadCount(
-          { clerkOrgId, userId: user.id },
+          { accountId, userId: user.id },
           db
         );
         const recentResult = await listRecentUnread(
-          { clerkOrgId, limit: 3, userId: user.id },
+          { accountId, limit: 3, userId: user.id },
           db
         );
         return {
           bell: {
-            clerkOrgId,
+            accountId,
             recent: recentResult.ok
               ? recentResult.value.map((item) => ({
                   actionUrl: item.actionUrl,

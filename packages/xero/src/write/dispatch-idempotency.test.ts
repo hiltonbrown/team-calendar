@@ -56,7 +56,7 @@ function input() {
     mutation,
     xeroConnection: {
       accessToken: "old-access",
-      clerk_org_id: "org_1",
+      account_id: "org_1",
       deadline: { expiresAtMs: now + 120_000 },
       id: "connection-1",
       organisation_id: "organisation-1",

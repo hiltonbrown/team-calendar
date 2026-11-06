@@ -60,7 +60,7 @@ const { renderFeedBody, renderFeedForToken, cachedEtagForToken } = await import(
 );
 const { createSignedFeedToken } = await import("../tokens/token-service");
 const input = {
-  clerkOrgId: "org_render",
+  accountId: "org_render",
   feedId: "10000000-0000-4000-8000-000000000002",
   feedName: "Old name",
   organisationId: "10000000-0000-4000-8000-000000000001",
@@ -100,7 +100,7 @@ function snapshot(overrides: Record<string, unknown> = {}) {
 }
 function token(overrides: Record<string, unknown> = {}) {
   return {
-    clerk_org_id: input.clerkOrgId,
+    account_id: input.accountId,
     expires_at: null,
     feed: {
       id: input.feedId,
@@ -255,7 +255,7 @@ describe("current token and cache visibility", () => {
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
           representation_generation: 2,
         }),
@@ -289,7 +289,7 @@ describe("current token and cache visibility", () => {
       expect.objectContaining({
         data: { status: "expired" },
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           expires_at: expect.anything(),
           organisation_id: input.organisationId,
           status: "active",

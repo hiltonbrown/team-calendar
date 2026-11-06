@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const disconnectFixtureSchema = z.strictObject({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   deleteAcknowledgement: z.literal("I_ACKNOWLEDGE_XERO_DEMO_CONNECTION_DELETE"),
   organisationId: z.uuid(),
   organisationName: z.string().trim().min(1),
@@ -43,7 +43,7 @@ export function parseDisconnectFixture(
   scope: {
     runId: string;
     providerAppId: string;
-    ownedClerkOrgIds: readonly string[];
+    ownedAccountIds: readonly string[];
     ownedOrganisationIds: readonly string[];
     primaryOrganisationId: string;
     foreignOrganisationId: string;
@@ -66,7 +66,7 @@ export function parseDisconnectFixture(
   }
   if (
     !(
-      scope.ownedClerkOrgIds.includes(fixture.clerkOrgId) &&
+      scope.ownedAccountIds.includes(fixture.accountId) &&
       scope.ownedOrganisationIds.includes(fixture.organisationId) &&
       scope.ownedOrganisationIds.includes(fixture.siblingOrganisationId)
     ) ||

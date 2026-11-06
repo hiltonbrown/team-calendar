@@ -1,6 +1,6 @@
 import {
+  type AccountId,
   appError,
-  type ClerkOrgId,
   type ListReferenceHolidays,
   type LocalHolidayOption,
   listReferenceHolidays,
@@ -31,7 +31,7 @@ export {
 } from "@repo/core";
 
 export interface ResolvePublicHolidaysInput {
-  clerkOrgId: ClerkOrgId;
+  accountId: AccountId;
   /** Inclusive YYYY-MM-DD. */
   from: string;
   includeHidden?: boolean;
@@ -46,7 +46,7 @@ export async function resolvePublicHolidays(
   listReference: ListReferenceHolidays | undefined,
   db: TenantDb
 ): Promise<Result<ResolvedPublicHoliday[]>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const referenceLookup = listReference ?? listReferenceHolidays;
   const data = await loadHolidayResolutionData(input, db);
   if (!data) {
@@ -77,7 +77,7 @@ export async function loadHolidaySettings(
     localOptions: Array<{ holidays: LocalHolidayOption[]; locationId: string }>;
   }>
 > {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const referenceLookup = listReference ?? listReferenceHolidays;
   const data = await loadHolidayResolutionData(input, db);
   if (!data) {

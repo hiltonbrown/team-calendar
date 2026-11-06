@@ -36,7 +36,7 @@ describe("jobs events", () => {
   });
   it("dispatches approval reconciliation with full tenant payload", async () => {
     const result = await dispatchSyncEvent({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000010",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runType: "approval_state_reconciliation",
@@ -54,6 +54,7 @@ describe("jobs events", () => {
     expect(mocks.send).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          identity_generation: "gen_v1",
           runId: expect.any(String),
         }),
       })
@@ -63,7 +64,7 @@ describe("jobs events", () => {
     mocks.send.mockClear();
     const explicitRunId = "11111111-1111-4111-8111-111111111111";
     await dispatchSyncEvent({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000010",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runId: explicitRunId,
@@ -83,7 +84,7 @@ describe("jobs events", () => {
     const eventId = "scheduled-sync:tenant_1:people:2026-08-10T19:45Z";
     await dispatchSyncEvent(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         connectionId: "00000000-0000-4000-8000-000000000010",
         organisationId: "00000000-0000-4000-8000-000000000001",
         runType: "people",
@@ -117,22 +118,33 @@ describe("jobs events", () => {
     const idTenantA = getScheduledSyncEventId("tenant_a", "people", d1);
     const idTenantB = getScheduledSyncEventId("tenant_b", "people", d1);
     const idRunTypeB = getScheduledSyncEventId("tenant_a", "leave_records", d1);
-    expect(idTenantA).toBe("scheduled-sync:tenant_a:people:2026-08-10T10:00Z");
+    expect(idTenantA).toBe(
+      "scheduled-sync:gen_v1:tenant_a:people:2026-08-10T10:00Z"
+    );
     expect(idTenantA).not.toBe(idTenantB);
     expect(idTenantA).not.toBe(idRunTypeB);
   });
   it("dispatches sync cancellation events", async () => {
     const result = await dispatchCancelSyncRun({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runId: "00000000-0000-4000-8000-000000000020",
     });
     expect(result).toEqual({ ok: true, value: { queued: true } });
+    expect(mocks.send).toHaveBeenCalledWith({
+      data: {
+        account_id: "org_1",
+        identity_generation: "gen_v1",
+        organisation_id: "00000000-0000-4000-8000-000000000001",
+        runId: "00000000-0000-4000-8000-000000000020",
+      },
+      name: "cancel-sync-run",
+    });
   });
   it("dispatches initial Xero sync with deterministic event ID and scoped connection payload", async () => {
     mocks.send.mockClear();
     const result = await dispatchInitialXeroSync({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       connectionId: "00000000-0000-4000-8000-000000000010",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggeredByUserId: "user_1",
@@ -152,19 +164,20 @@ describe("jobs events", () => {
         "2026-10-07T12:00:00.000Z"
       )
     ).toBe(
-      "initial-sync:00000000-0000-4000-8000-000000000010:2026-10-07T12:00:00.000Z"
+      "initial-sync:gen_v1:00000000-0000-4000-8000-000000000010:2026-10-07T12:00:00.000Z"
     );
     expect(mocks.send).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          clerkOrgId: "org_1",
+          account_id: "org_1",
           connectionId: "00000000-0000-4000-8000-000000000010",
-          organisationId: "00000000-0000-4000-8000-000000000001",
+          identity_generation: "gen_v1",
+          organisation_id: "00000000-0000-4000-8000-000000000001",
           runId: expect.any(String),
           triggeredByUserId: "user_1",
           triggerType: "manual",
         }),
-        id: "initial-sync:00000000-0000-4000-8000-000000000010:2026-10-07T12:00:00.000Z",
+        id: "initial-sync:gen_v1:00000000-0000-4000-8000-000000000010:2026-10-07T12:00:00.000Z",
         name: "initial-xero-sync",
       })
     );
@@ -173,7 +186,7 @@ describe("jobs events", () => {
 it("rejects a sync event missing its local connection ID before queueing", async () => {
   mocks.send.mockClear();
   const missingConnection: unknown = {
-    clerkOrgId: "org_1",
+    accountId: "org_1",
     organisationId: "00000000-0000-4000-8000-000000000001",
     runType: "people",
   };

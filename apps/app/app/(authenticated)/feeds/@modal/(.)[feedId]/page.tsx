@@ -1,6 +1,7 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { getFeedDetail, normaliseRole, previewFeed } from "@repo/feeds";
 import { notFound } from "next/navigation";
@@ -19,29 +20,30 @@ const FeedDetailModalPage = async ({
 }: FeedDetailModalPageProps) => {
   const { feedId } = await params;
   const { org } = await searchParams;
-  const { orgRole } = await auth();
-  const user = await currentUser();
+  const { role: sessionRole } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  const user = await getCurrentUser();
   if (!user) {
     notFound();
   }
-  const role = normaliseRole(orgRole);
-  const isAdmin =
-    role === "org:admin" ||
-    role === "org:owner" ||
-    role === "admin" ||
-    role === "owner";
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const role = normaliseRole(sessionRole);
+  const isAdmin = can(role, { feeds: ["manageAll"] });
+  const accountId = (await requireAccount()) as AccountId;
   const { organisationId, detail, canManage, previews, previewErrors } =
     await withTenantDb(
-      clerkOrgId,
+      accountId,
       async (db) => {
         const { organisationId: scopedOrganisationId } =
-          await resolveActiveOrgPageContext(clerkOrgId, org, db);
+          await resolveActiveOrgPageContext(accountId, org, db);
         const preparedDetail = await getFeedDetail(
           {
+            accountId,
             actingRole: role,
             actingUserId: user.id,
-            clerkOrgId,
             feedId,
             organisationId: scopedOrganisationId,
           },
@@ -65,9 +67,9 @@ const FeedDetailModalPage = async ({
         for (const mode of modes) {
           const result = await previewFeed(
             {
+              accountId,
               actingRole: role,
               actingUserId: user.id,
-              clerkOrgId,
               feedId,
               horizonDays: 30,
               organisationId: scopedOrganisationId,

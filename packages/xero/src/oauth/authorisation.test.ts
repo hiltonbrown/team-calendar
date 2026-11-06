@@ -113,8 +113,8 @@ function grant(expiry = Date.now() + 3_600_000) {
 }
 let current: ReturnType<typeof grant>;
 const input = () => ({
+  accountId: "account",
   capability: "payroll.employees.read",
-  clerkOrgId: "account",
   connectionId: "connection",
   deadline: { expiresAtMs: Date.now() + 120_000 },
   organisationId: "payroll",

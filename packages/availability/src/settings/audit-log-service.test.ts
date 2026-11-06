@@ -44,19 +44,19 @@ const { exportCsv, getEventDetail, listEvents } = await import(
 );
 
 const baseInput = {
+  accountId: "org_1",
   actingRole: "admin" as const,
   actingUserId: "user_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 
 const eventRow = {
+  account_id: "org_1",
   action: "organisation_settings.updated",
   actor_display: "Ava Admin",
   actor_user_id: "user_1",
   after_value: { safe: true, xero_write_error_raw: { remove: true } },
   before_value: { previous: true, xero_write_error_raw: { remove: true } },
-  clerk_org_id: "org_1",
   created_at: new Date("2026-04-19T10:00:00.000Z"),
   entity_id: "00000000-0000-4000-8000-000000000001",
   entity_type: "organisation_settings",

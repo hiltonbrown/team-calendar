@@ -15,7 +15,7 @@ import {
   type XeroWriteError,
 } from "@repo/xero";
 export interface XeroSyncScope {
-  clerkOrgId: string;
+  accountId: string;
   connectionId: string;
   expectedXeroTenantId?: string;
   organisationId: string;
@@ -41,7 +41,7 @@ const bindingTransactions = new AsyncLocalStorage<{
 }>();
 function sameBinding(a: XeroSyncScope, b: XeroSyncScope) {
   return (
-    a.clerkOrgId === b.clerkOrgId &&
+    a.accountId === b.accountId &&
     a.organisationId === b.organisationId &&
     a.connectionId === b.connectionId
   );
@@ -61,14 +61,14 @@ export async function withXeroBinding<T>(
   const afterCommit: Array<(db: TenantDb) => Promise<void>> = [];
   const afterSends: Array<() => Promise<void>> = [];
   const result = await withTenantDb(
-    scope.clerkOrgId,
+    scope.accountId,
     async (tx) => {
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
-      await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${scope.connectionId}::uuid AND clerk_org_id = ${scope.clerkOrgId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${scope.connectionId}::uuid AND account_id = ${scope.accountId} AND organisation_id = ${scope.organisationId}::uuid FOR UPDATE`;
       const connection = await tx.xeroConnection.findFirst({
         select: { id: true, xero_authorisation_id: true },
         where: {
-          clerk_org_id: scope.clerkOrgId,
+          account_id: scope.accountId,
           id: scope.connectionId,
           organisation_id: scope.organisationId,
           released_at: null,
@@ -114,7 +114,7 @@ export async function resolveSyncTenant(
   capability: string | readonly string[]
 ) {
   assertNoTenantTransaction("resolveSyncTenant");
-  const loaded = await withTenantDb(scope.clerkOrgId, (db) =>
+  const loaded = await withTenantDb(scope.accountId, (db) =>
     db.xeroConnection.findFirst({
       select: {
         approval_state_stale_since: true,
@@ -126,7 +126,7 @@ export async function resolveSyncTenant(
         sync_paused_at: true,
       },
       where: {
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         id: scope.connectionId,
         organisation_id: scope.organisationId,
         released_at: null,
@@ -137,8 +137,8 @@ export async function resolveSyncTenant(
     throw new XeroBindingChangedError();
   }
   const resolved = await resolveXeroAccess({
+    accountId: scope.accountId,
     capability,
-    clerkOrgId: scope.clerkOrgId,
     connectionId: scope.connectionId,
     deadline: { expiresAtMs: Date.now() + 120_000 },
     organisationId: scope.organisationId,
@@ -172,8 +172,8 @@ export async function resolveSyncTenant(
       ...loaded,
       ...toResolvedXeroConnection(
         {
+          accountId: scope.accountId,
           capability,
-          clerkOrgId: scope.clerkOrgId,
           organisationId: scope.organisationId,
         },
         resolved.value
@@ -186,15 +186,15 @@ export async function isCurrentXeroSyncBinding(
   scope: XeroSyncScope,
   db: TenantDb
 ) {
-  assertTenantDb(db, scope.clerkOrgId);
+  assertTenantDb(db, scope.accountId);
   {
-    assertTenantDb(db, scope.clerkOrgId);
+    assertTenantDb(db, scope.accountId);
     const client = db;
 
     const connection = await client.xeroConnection.findFirst({
       select: { id: true },
       where: {
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         id: scope.connectionId,
         organisation_id: scope.organisationId,
         released_at: null,

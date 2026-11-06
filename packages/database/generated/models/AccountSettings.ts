@@ -26,7 +26,7 @@ export type AggregateAccountSettings = {
 
 export type AccountSettingsMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   manager_visibility_scope: string | null
   created_at: Date | null
   updated_at: Date | null
@@ -34,7 +34,7 @@ export type AccountSettingsMinAggregateOutputType = {
 
 export type AccountSettingsMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   manager_visibility_scope: string | null
   created_at: Date | null
   updated_at: Date | null
@@ -42,7 +42,7 @@ export type AccountSettingsMaxAggregateOutputType = {
 
 export type AccountSettingsCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   manager_visibility_scope: number
   created_at: number
   updated_at: number
@@ -52,7 +52,7 @@ export type AccountSettingsCountAggregateOutputType = {
 
 export type AccountSettingsMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   manager_visibility_scope?: true
   created_at?: true
   updated_at?: true
@@ -60,7 +60,7 @@ export type AccountSettingsMinAggregateInputType = {
 
 export type AccountSettingsMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   manager_visibility_scope?: true
   created_at?: true
   updated_at?: true
@@ -68,7 +68,7 @@ export type AccountSettingsMaxAggregateInputType = {
 
 export type AccountSettingsCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   manager_visibility_scope?: true
   created_at?: true
   updated_at?: true
@@ -149,7 +149,7 @@ export type AccountSettingsGroupByArgs<ExtArgs extends runtime.Types.Extensions.
 
 export type AccountSettingsGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   manager_visibility_scope: string
   created_at: Date
   updated_at: Date
@@ -178,7 +178,7 @@ export type AccountSettingsWhereInput = {
   OR?: Prisma.AccountSettingsWhereInput[]
   NOT?: Prisma.AccountSettingsWhereInput | Prisma.AccountSettingsWhereInput[]
   id?: Prisma.UuidFilter<"AccountSettings"> | string
-  clerk_org_id?: Prisma.StringFilter<"AccountSettings"> | string
+  account_id?: Prisma.StringFilter<"AccountSettings"> | string
   manager_visibility_scope?: Prisma.StringFilter<"AccountSettings"> | string
   created_at?: Prisma.DateTimeFilter<"AccountSettings"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"AccountSettings"> | Date | string
@@ -186,7 +186,7 @@ export type AccountSettingsWhereInput = {
 
 export type AccountSettingsOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   manager_visibility_scope?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -194,18 +194,18 @@ export type AccountSettingsOrderByWithRelationInput = {
 
 export type AccountSettingsWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  clerk_org_id?: string
+  account_id?: string
   AND?: Prisma.AccountSettingsWhereInput | Prisma.AccountSettingsWhereInput[]
   OR?: Prisma.AccountSettingsWhereInput[]
   NOT?: Prisma.AccountSettingsWhereInput | Prisma.AccountSettingsWhereInput[]
   manager_visibility_scope?: Prisma.StringFilter<"AccountSettings"> | string
   created_at?: Prisma.DateTimeFilter<"AccountSettings"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"AccountSettings"> | Date | string
-}, "id" | "clerk_org_id">
+}, "id" | "account_id">
 
 export type AccountSettingsOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   manager_visibility_scope?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -219,7 +219,7 @@ export type AccountSettingsScalarWhereWithAggregatesInput = {
   OR?: Prisma.AccountSettingsScalarWhereWithAggregatesInput[]
   NOT?: Prisma.AccountSettingsScalarWhereWithAggregatesInput | Prisma.AccountSettingsScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"AccountSettings"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"AccountSettings"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"AccountSettings"> | string
   manager_visibility_scope?: Prisma.StringWithAggregatesFilter<"AccountSettings"> | string
   created_at?: Prisma.DateTimeWithAggregatesFilter<"AccountSettings"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"AccountSettings"> | Date | string
@@ -227,7 +227,7 @@ export type AccountSettingsScalarWhereWithAggregatesInput = {
 
 export type AccountSettingsCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   manager_visibility_scope?: string
   created_at?: Date | string
   updated_at?: Date | string
@@ -235,7 +235,7 @@ export type AccountSettingsCreateInput = {
 
 export type AccountSettingsUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   manager_visibility_scope?: string
   created_at?: Date | string
   updated_at?: Date | string
@@ -243,7 +243,7 @@ export type AccountSettingsUncheckedCreateInput = {
 
 export type AccountSettingsUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -251,7 +251,7 @@ export type AccountSettingsUpdateInput = {
 
 export type AccountSettingsUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -259,7 +259,7 @@ export type AccountSettingsUncheckedUpdateInput = {
 
 export type AccountSettingsCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   manager_visibility_scope?: string
   created_at?: Date | string
   updated_at?: Date | string
@@ -267,7 +267,7 @@ export type AccountSettingsCreateManyInput = {
 
 export type AccountSettingsUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -275,7 +275,7 @@ export type AccountSettingsUpdateManyMutationInput = {
 
 export type AccountSettingsUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   manager_visibility_scope?: Prisma.StringFieldUpdateOperationsInput | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -283,7 +283,7 @@ export type AccountSettingsUncheckedUpdateManyInput = {
 
 export type AccountSettingsCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   manager_visibility_scope?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -291,7 +291,7 @@ export type AccountSettingsCountOrderByAggregateInput = {
 
 export type AccountSettingsMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   manager_visibility_scope?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -299,7 +299,7 @@ export type AccountSettingsMaxOrderByAggregateInput = {
 
 export type AccountSettingsMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   manager_visibility_scope?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -309,7 +309,7 @@ export type AccountSettingsMinOrderByAggregateInput = {
 
 export type AccountSettingsSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   manager_visibility_scope?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -317,7 +317,7 @@ export type AccountSettingsSelect<ExtArgs extends runtime.Types.Extensions.Inter
 
 export type AccountSettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   manager_visibility_scope?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -325,7 +325,7 @@ export type AccountSettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
 
 export type AccountSettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   manager_visibility_scope?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -333,20 +333,20 @@ export type AccountSettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
 
 export type AccountSettingsSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   manager_visibility_scope?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type AccountSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "manager_visibility_scope" | "created_at" | "updated_at", ExtArgs["result"]["accountSettings"]>
+export type AccountSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "manager_visibility_scope" | "created_at" | "updated_at", ExtArgs["result"]["accountSettings"]>
 
 export type $AccountSettingsPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "AccountSettings"
   objects: {}
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     manager_visibility_scope: string
     created_at: Date
     updated_at: Date
@@ -774,7 +774,7 @@ export interface Prisma__AccountSettingsClient<T, Null = never, ExtArgs extends 
  */
 export interface AccountSettingsFieldRefs {
   readonly id: Prisma.FieldRef<"AccountSettings", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"AccountSettings", 'String'>
+  readonly account_id: Prisma.FieldRef<"AccountSettings", 'String'>
   readonly manager_visibility_scope: Prisma.FieldRef<"AccountSettings", 'String'>
   readonly created_at: Prisma.FieldRef<"AccountSettings", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"AccountSettings", 'DateTime'>

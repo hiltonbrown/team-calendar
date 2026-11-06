@@ -1,8 +1,8 @@
-import { requireOrg } from "@repo/auth/helpers";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { SettingsSectionHeader } from "../../../components/settings-section-header";
 import { toXeroPersonMatchView, xeroPersonMatchSelect } from "./_match-view";
@@ -21,22 +21,22 @@ interface XeroMatchesPageProps {
 export default async function XeroMatchesPage({
   searchParams,
 }: XeroMatchesPageProps) {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ xero: ["manage"] });
 
   const { org: orgParam } = await searchParams;
-  // Clerk supplied the authenticated account identifier.
-  const accountId = (await requireOrg()) as ClerkOrgId;
+  // Authentication supplied the authenticated account identifier.
+  const accountId = (await requireAccount()) as AccountId;
   const { organisationId, matches } = await withTenantDb(
     accountId,
     async (db) => {
-      const { clerkOrgId, organisationId: scopedOrganisationId } =
+      const { organisationId: scopedOrganisationId } =
         await resolveActiveOrgPageContext(accountId, orgParam, db);
 
       const rawMatches = await db.xeroPersonMatch.findMany({
         orderBy: [{ created_at: "asc" }, { id: "asc" }],
         select: xeroPersonMatchSelect,
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: scopedOrganisationId,
           status: "pending",
         },

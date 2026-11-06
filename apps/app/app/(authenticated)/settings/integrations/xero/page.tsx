@@ -1,8 +1,8 @@
-import { auth, withinLimit } from "@repo/auth/server";
+import { getSession, withinLimit } from "@repo/auth/server";
 import { getXeroConnectionStateForScope } from "@repo/availability";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { organisationWithConnectionSelect } from "../_connection-view";
 import { XeroClient } from "./xero-client";
 export const metadata: Metadata = {
@@ -10,20 +10,26 @@ export const metadata: Metadata = {
   title: "Xero - Settings - Team Calendar",
 };
 export default async function XeroPage() {
-  await requirePageRole("org:admin");
-  const { orgId, orgRole } = await auth();
-  if (!orgId) {
+  await requirePagePermission({ xero: ["manage"] });
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
+  if (!sessionAccountId) {
     throw new Error("Organisation context is required.");
   }
   const { withState, payrollEntityAllowance } = await withTenantDb(
-    orgId,
+    sessionAccountId,
     async (db) => {
       const organisations = await db.organisation.findMany({
         orderBy: [{ created_at: "asc" }, { name: "asc" }],
         select: organisationWithConnectionSelect,
         where: {
+          account_id: sessionAccountId,
           archived_at: null,
-          clerk_org_id: orgId,
         },
       });
       const preparedWithState: Array<
@@ -33,7 +39,7 @@ export default async function XeroPage() {
       > = [];
       for (const organisation of organisations) {
         const result = await getXeroConnectionStateForScope(
-          { clerkOrgId: orgId, organisationId: organisation.id },
+          { accountId: sessionAccountId, organisationId: organisation.id },
           db
         );
         const xeroConnectionState: import("@repo/core").XeroConnectionDisplayState =
@@ -41,7 +47,7 @@ export default async function XeroPage() {
         preparedWithState.push({ ...organisation, xeroConnectionState });
       }
       const allowance = await withinLimit(
-        orgId,
+        sessionAccountId,
         organisations[0]?.id ?? "",
         "payroll_entities",
         db
@@ -66,7 +72,7 @@ export default async function XeroPage() {
   );
   return (
     <XeroClient
-      actingRole={orgRole === "org:owner" ? "owner" : "admin"}
+      actingRole={sessionRole === "owner" ? "owner" : "admin"}
       organisations={withState}
       payrollEntityAllowance={payrollEntityAllowance}
     />

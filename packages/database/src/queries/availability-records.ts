@@ -1,6 +1,6 @@
 import type {
+  AccountId,
   AvailabilityRecordId,
-  ClerkOrgId,
   OrganisationId,
   PersonId,
   Result,
@@ -11,8 +11,8 @@ import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 export interface AvailabilityRecordData {
+  accountId: string;
   approvalStatus: string;
-  clerkOrgId: string;
   contactability: string;
   createdAt: Date;
   derivedUidKey: string;
@@ -54,19 +54,19 @@ interface DateRange {
 }
 
 export async function listAvailabilityForCalendar(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   dateRange: DateRange,
   filters: CalendarFilters | undefined,
   db: TenantDb
 ): Promise<Result<AvailabilityRecordData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
       const whereConditions: Record<string, unknown> = {
-        ...scopedQuery(clerkOrgId, organisationId),
+        ...scopedQuery(accountId, organisationId),
         ends_at: {
           gte: dateRange.startDate,
         },
@@ -94,8 +94,8 @@ export async function listAvailabilityForCalendar(
       const records = await tenantDb.availabilityRecord.findMany({
         orderBy: [{ starts_at: "asc" }, { person_id: "asc" }],
         select: {
+          account_id: true,
           approval_status: true,
-          clerk_org_id: true,
           contactability: true,
           created_at: true,
           derived_uid_key: true,
@@ -132,22 +132,22 @@ export async function listAvailabilityForCalendar(
 }
 
 export async function listAvailabilityForPerson(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   personId: PersonId,
   dateRange: DateRange,
   db: TenantDb
 ): Promise<Result<AvailabilityRecordData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
       const records = await tenantDb2.availabilityRecord.findMany({
         orderBy: { starts_at: "asc" },
         select: {
+          account_id: true,
           approval_status: true,
-          clerk_org_id: true,
           contactability: true,
           created_at: true,
           derived_uid_key: true,
@@ -165,7 +165,7 @@ export async function listAvailabilityForPerson(
           updated_at: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           ends_at: {
             gte: dateRange.startDate,
           },
@@ -193,7 +193,7 @@ export async function listAvailabilityForPerson(
 }
 
 export async function listPendingApprovalRecords(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   filters:
     | {
@@ -204,12 +204,12 @@ export async function listPendingApprovalRecords(
   db: TenantDb
 ): Promise<Result<AvailabilityRecordData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb3 = db;
 
     try {
       const whereConditions: Record<string, unknown> = {
-        ...scopedQuery(clerkOrgId, organisationId),
+        ...scopedQuery(accountId, organisationId),
         approval_status: "submitted",
       };
 
@@ -223,8 +223,8 @@ export async function listPendingApprovalRecords(
       const records = await tenantDb3.availabilityRecord.findMany({
         orderBy: { created_at: "asc" },
         select: {
+          account_id: true,
           approval_status: true,
-          clerk_org_id: true,
           contactability: true,
           created_at: true,
           derived_uid_key: true,
@@ -262,7 +262,7 @@ export async function listPendingApprovalRecords(
 
 function toAvailabilityRecord(r: {
   id: string;
-  clerk_org_id: string;
+  account_id: string;
   organisation_id: string;
   person_id: string;
   record_type: string;
@@ -280,8 +280,8 @@ function toAvailabilityRecord(r: {
   updated_at: Date;
 }): AvailabilityRecordData {
   return {
+    accountId: r.account_id,
     approvalStatus: r.approval_status,
-    clerkOrgId: r.clerk_org_id,
     contactability: r.contactability,
     createdAt: r.created_at,
     derivedUidKey: r.derived_uid_key,
@@ -301,7 +301,7 @@ function toAvailabilityRecord(r: {
 }
 
 export async function listManualAvailability(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   filters:
     | {
@@ -314,12 +314,12 @@ export async function listManualAvailability(
   db: TenantDb
 ): Promise<Result<ManualAvailabilityListData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb4 = db;
 
     try {
       const whereConditions: Record<string, unknown> = {
-        ...scopedQuery(clerkOrgId, organisationId),
+        ...scopedQuery(accountId, organisationId),
         source_type: "manual",
       };
 
@@ -340,10 +340,10 @@ export async function listManualAvailability(
       const records = await tenantDb4.availabilityRecord.findMany({
         orderBy: { starts_at: "asc" },
         select: {
+          account_id: true,
           all_day: true,
           approval_status: true,
           archived_at: true,
-          clerk_org_id: true,
           contactability: true,
           created_at: true,
           derived_uid_key: true,
@@ -370,10 +370,10 @@ export async function listManualAvailability(
       return {
         ok: true,
         value: records.map((r) => ({
+          accountId: r.account_id,
           allDay: r.all_day,
           approvalStatus: r.approval_status,
           archivedAt: r.archived_at,
-          clerkOrgId: r.clerk_org_id,
           contactability: r.contactability,
           createdAt: r.created_at,
           derivedUidKey: r.derived_uid_key,
@@ -409,22 +409,22 @@ export async function listManualAvailability(
 }
 
 export async function getAvailabilityRecordById(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   recordId: AvailabilityRecordId,
   db: TenantDb
 ): Promise<Result<ManualAvailabilityListData>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb5 = db;
 
     try {
       const record = await tenantDb5.availabilityRecord.findFirst({
         select: {
+          account_id: true,
           all_day: true,
           approval_status: true,
           archived_at: true,
-          clerk_org_id: true,
           contactability: true,
           created_at: true,
           derived_uid_key: true,
@@ -446,7 +446,7 @@ export async function getAvailabilityRecordById(
           working_location: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           id: recordId,
         },
       });
@@ -461,10 +461,10 @@ export async function getAvailabilityRecordById(
       return {
         ok: true,
         value: {
+          accountId: record.account_id,
           allDay: record.all_day,
           approvalStatus: record.approval_status,
           archivedAt: record.archived_at,
-          clerkOrgId: record.clerk_org_id,
           contactability: record.contactability,
           createdAt: record.created_at,
           derivedUidKey: record.derived_uid_key,

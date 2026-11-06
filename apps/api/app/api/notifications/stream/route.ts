@@ -1,4 +1,5 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
+import type { AuthRole } from "@repo/auth/permissions";
+import { getRequestAuthContext } from "@repo/auth/transport";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { pollNotificationStream } from "@repo/notifications";
 import { log } from "@repo/observability/log";
@@ -10,6 +11,7 @@ const IDLE_POLL_DELAY_MS = 10_000;
 const IDLE_THRESHOLD_MS = 60_000;
 const KEEP_ALIVE_INTERVAL_MS = 25_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
+const SESSION_REVALIDATE_INTERVAL_MS = 30_000;
 
 const REDIS_STREAM_ID_PATTERN = /^\d+-\d+$/;
 
@@ -60,8 +62,11 @@ function resolveInitialLastId(lastEventIdHeader: string | null): string {
 }
 
 interface StreamContext {
-  clerkOrgId: string;
+  accountId: string;
+  expiresAt: number | null;
   initialLastId: string;
+  revalidate: () => Promise<boolean>;
+  role: AuthRole;
   userId: string;
 }
 
@@ -73,6 +78,7 @@ class NotificationStreamSession {
   private keepAliveTimer: ReturnType<typeof setInterval> | null;
   private lastEventAt: number;
   private lastId: string;
+  private lastRevalidatedAt: number;
   private pollTimer: ReturnType<typeof setTimeout> | null;
   private polling: boolean;
 
@@ -87,6 +93,7 @@ class NotificationStreamSession {
     this.keepAliveTimer = null;
     this.lastEventAt = Date.now();
     this.lastId = context.initialLastId;
+    this.lastRevalidatedAt = Date.now();
     this.pollTimer = null;
     this.polling = false;
   }
@@ -160,9 +167,28 @@ class NotificationStreamSession {
   }
 
   private async performPoll(): Promise<void> {
+    if (
+      this.context.expiresAt !== null &&
+      Date.now() >= this.context.expiresAt
+    ) {
+      this.cleanup();
+      this.controller.close();
+      return;
+    }
+
+    if (Date.now() - this.lastRevalidatedAt >= SESSION_REVALIDATE_INTERVAL_MS) {
+      const valid = await this.context.revalidate();
+      if (!valid) {
+        this.cleanup();
+        this.controller.close();
+        return;
+      }
+      this.lastRevalidatedAt = Date.now();
+    }
+
     const events = await pollNotificationStream(
       {
-        clerkOrgId: this.context.clerkOrgId,
+        accountId: this.context.accountId,
         userId: this.context.userId,
       },
       this.lastId
@@ -190,7 +216,7 @@ class NotificationStreamSession {
     }
     this.consecutiveFailures += 1;
     log.warn("Notification stream poll failed", {
-      clerkOrgId: this.context.clerkOrgId,
+      accountId: this.context.accountId,
       consecutiveFailures: this.consecutiveFailures,
       error: error instanceof Error ? error.message : String(error),
       userId: this.context.userId,
@@ -198,7 +224,7 @@ class NotificationStreamSession {
 
     if (this.consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) {
       log.error("Notification stream closing after consecutive poll failures", {
-        clerkOrgId: this.context.clerkOrgId,
+        accountId: this.context.accountId,
         consecutiveFailures: this.consecutiveFailures,
         userId: this.context.userId,
       });
@@ -221,10 +247,15 @@ class NotificationStreamSession {
 
 export async function GET(request: Request): Promise<Response> {
   assertNoTenantTransaction("GET");
-  let clerkOrgId: string;
-  try {
-    clerkOrgId = await requireOrg();
-  } catch {
+  const identity = await getRequestAuthContext(request.headers);
+  const current = identity.context;
+  if (
+    !(
+      current?.session.accountId &&
+      current.session.role &&
+      current.user.emailVerified
+    )
+  ) {
     return Response.json(
       {
         error: { code: "unauthorised", message: "Not authenticated" },
@@ -233,14 +264,29 @@ export async function GET(request: Request): Promise<Response> {
       { status: 401 }
     );
   }
-
-  const user = await currentUser();
-  if (!user) {
+  const { accountId, role } = current.session;
+  const { id: userId } = current.user;
+  const expiresAt =
+    current.expiresAt === null ? null : Date.parse(current.expiresAt);
+  if (expiresAt !== null && expiresAt <= Date.now()) {
     return Response.json(
-      { error: { code: "unauthorised", message: "User not found" }, ok: false },
+      {
+        error: { code: "unauthorised", message: "Session expired" },
+        ok: false,
+      },
       { status: 401 }
     );
   }
+  const revalidate = async () => {
+    const fresh = (await getRequestAuthContext(request.headers)).context;
+    return Boolean(
+      fresh?.user.emailVerified &&
+        fresh.user.id === userId &&
+        fresh.session.accountId === accountId &&
+        fresh.session.role === role &&
+        (fresh.expiresAt === null || Date.parse(fresh.expiresAt) > Date.now())
+    );
+  };
 
   let session: NotificationStreamSession | null = null;
   const stream = new ReadableStream<Uint8Array>({
@@ -250,11 +296,14 @@ export async function GET(request: Request): Promise<Response> {
     start(controller) {
       session = new NotificationStreamSession(
         {
-          clerkOrgId,
+          accountId,
+          expiresAt,
           initialLastId: resolveInitialLastId(
             request.headers.get("last-event-id")
           ),
-          userId: user.id,
+          revalidate,
+          role,
+          userId,
         },
         controller
       );
@@ -275,5 +324,9 @@ export async function GET(request: Request): Promise<Response> {
     headers.Vary = "Origin";
   }
 
-  return new Response(stream, { headers });
+  const responseHeaders = new Headers(headers);
+  for (const value of identity.responseHeaders.getSetCookie()) {
+    responseHeaders.append("set-cookie", value);
+  }
+  return new Response(stream, { headers: responseHeaders });
 }

@@ -17,8 +17,8 @@ const mocks = vi.hoisted(() => {
     published_uid: "stable@ical.teamcalendar.online",
   };
   const record = {
+    account_id: "org_publication",
     all_day: true,
-    clerk_org_id: "org_publication",
     derived_uid_key: "stable@ical.teamcalendar.online",
     ends_at: new Date("2026-05-01T17:00:00.000Z"),
     id: "10000000-0000-4000-8000-000000000001",
@@ -181,8 +181,8 @@ const { materialiseAvailabilityPublication } = await import(
 );
 
 const input = {
+  accountId: "org_publication",
   availabilityRecordId: "10000000-0000-4000-8000-000000000001",
-  clerkOrgId: "org_publication",
   organisationId: "30000000-0000-4000-8000-000000000001",
 };
 

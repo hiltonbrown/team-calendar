@@ -9,17 +9,21 @@ import {
   xeroSimplificationFixture,
 } from "./src/test-fixtures/xero-simplification-fixture";
 
-const { database } = xeroSimplificationFixture();
+const { database, fixture: ownedFixture } = xeroSimplificationFixture(
+  "packages/database/xero-sync-cursors.integration.test.ts"
+);
 afterAll(() => database.$disconnect());
 test("provider cursor commits are scoped, conditional and monotonic; old reconnect requests cannot complete", async () => {
-  const owned = await database.$transaction(createXeroConnectionFixture);
+  const owned = await database.$transaction((tx) =>
+    createXeroConnectionFixture(tx, ownedFixture)
+  );
   const { connection } = owned;
   const scope = {
-    clerkOrgId: connection.clerk_org_id,
+    accountId: connection.account_id,
     organisationId: connection.organisation_id,
   };
   try {
-    await withTenantDb(scope.clerkOrgId, async (tx) => {
+    await withTenantDb(scope.accountId, async (tx) => {
       const first = new Date("2026-10-07T12:00:00Z");
       const next = new Date("2026-10-07T12:01:00Z");
       const cursor = {
@@ -31,7 +35,7 @@ test("provider cursor commits are scoped, conditional and monotonic; old reconne
       };
       await expect(
         advanceXeroSyncCursor(
-          { ...cursor, scope: { ...scope, clerkOrgId: "foreign" } },
+          { ...cursor, scope: { ...scope, accountId: "foreign" } },
           tx
         )
       ).rejects.toBeInstanceOf(TenantMismatchError);
@@ -53,7 +57,7 @@ test("provider cursor commits are scoped, conditional and monotonic; old reconne
       ).toBe(false);
       const current = await tx.xeroSyncCursor.findFirst({
         where: {
-          clerk_org_id: scope.clerkOrgId,
+          account_id: scope.accountId,
           organisation_id: scope.organisationId,
           xero_connection_id: connection.id,
         },

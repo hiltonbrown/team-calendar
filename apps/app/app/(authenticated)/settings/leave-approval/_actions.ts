@@ -1,6 +1,8 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   defaultOrganisationSettingsPatch,
   type OrganisationSettingsPatch,
@@ -56,12 +58,12 @@ export async function updateLeaveApprovalSettingsAction(input: {
   }
 
   try {
-    const result = await withTenantResult(context.value.clerkOrgId, (db) =>
+    const result = await withTenantResult(context.value.accountId, (db) =>
       updateSettings(
         {
+          accountId: context.value.accountId,
           actingRole: context.value.role,
           actingUserId: context.value.actingUserId,
-          clerkOrgId: context.value.clerkOrgId,
           organisationId: context.value.organisationId,
           patch: parsed.data.patch,
         },
@@ -107,21 +109,29 @@ export async function restoreLeaveApprovalDefaultsAction(input: {
 async function resolveAdminContext(organisationId: string): Promise<
   ActionResult<{
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     role: "admin" | "owner";
   }>
 > {
-  const [{ orgRole }, user, context] = await Promise.all([
-    auth(),
-    currentUser(),
+  const [{ role: sessionRole }, user, context] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
     getActiveOrgContext(organisationId),
   ]);
 
   let role: "admin" | "owner" | null = null;
-  if (orgRole === "org:owner") {
+  if (sessionRole === "owner") {
     role = "owner";
-  } else if (orgRole === "org:admin") {
+  } else if (sessionRole === "admin") {
     role = "admin";
   }
   if (!(user && role && context.ok)) {
@@ -131,8 +141,8 @@ async function resolveAdminContext(organisationId: string): Promise<
   return {
     ok: true,
     value: {
+      accountId: context.value.accountId,
       actingUserId: user.id,
-      clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
       role,
     },
@@ -179,20 +189,28 @@ export async function updateAccountManagerVisibilityAction(input: {
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-  const { orgId, userId, orgRole } = await auth();
+  const {
+    accountId: sessionAccountId,
+    userId,
+    role: sessionRole,
+  } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
   if (
-    !(orgId && userId) ||
-    (orgRole !== "org:owner" && orgRole !== "org:admin")
+    !(sessionAccountId && userId && can(sessionRole, { settings: ["update"] }))
   ) {
     return notAuthorised();
   }
   try {
-    const result = await withTenantResult(orgId, (db) =>
+    const result = await withTenantResult(sessionAccountId, (db) =>
       updateAccountApprovalSettings(
         {
-          actingRole: orgRole === "org:owner" ? "owner" : "admin",
+          accountId: sessionAccountId,
+          actingRole: sessionRole === "owner" ? "owner" : "admin",
           actingUserId: userId,
-          clerkOrgId: orgId,
           managerVisibilityScope: parsed.data.managerVisibilityScope,
         },
         db

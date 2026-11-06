@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getSession: vi.fn(),
   revalidatePath: vi.fn(),
   revokeAllFeedTokens: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/feeds", () => ({
   revokeAllFeedTokens: mocks.revokeAllFeedTokens,
@@ -27,14 +27,14 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 describe("revokeAllTokens", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:viewer",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "viewer",
     });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
       value: {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId,
       },
     });
@@ -53,9 +53,9 @@ describe("revokeAllTokens", () => {
   });
 
   it("allows admins to revoke feed tokens", async () => {
-    mocks.auth.mockResolvedValue({
-      orgId: "org_1",
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "admin",
     });
 
     const result = await revokeAllTokens({ organisationId });
@@ -66,7 +66,7 @@ describe("revokeAllTokens", () => {
     });
     expect(mocks.revokeAllFeedTokens).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId,
       },
       expect.any(Object)

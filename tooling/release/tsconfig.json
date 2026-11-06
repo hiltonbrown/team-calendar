@@ -4,6 +4,9 @@
     "noEmit": true,
     "paths": {
       "@/*": ["../../apps/api/*"],
+      "@repo/auth/testing/playwright": [
+        "../../packages/auth/testing/playwright.ts"
+      ],
       "@repo/jobs/src/*": ["../../packages/jobs/src/*"],
       "@repo/*": ["../../packages/*/index.ts"]
     },

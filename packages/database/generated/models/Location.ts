@@ -26,7 +26,7 @@ export type AggregateLocation = {
 
 export type LocationMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   name: string | null
   country_code: string | null
@@ -38,7 +38,7 @@ export type LocationMinAggregateOutputType = {
 
 export type LocationMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   name: string | null
   country_code: string | null
@@ -50,7 +50,7 @@ export type LocationMaxAggregateOutputType = {
 
 export type LocationCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   name: number
   country_code: number
@@ -64,7 +64,7 @@ export type LocationCountAggregateOutputType = {
 
 export type LocationMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   name?: true
   country_code?: true
@@ -76,7 +76,7 @@ export type LocationMinAggregateInputType = {
 
 export type LocationMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   name?: true
   country_code?: true
@@ -88,7 +88,7 @@ export type LocationMaxAggregateInputType = {
 
 export type LocationCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   name?: true
   country_code?: true
@@ -173,7 +173,7 @@ export type LocationGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
 
 export type LocationGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   country_code: string | null
@@ -206,7 +206,7 @@ export type LocationWhereInput = {
   OR?: Prisma.LocationWhereInput[]
   NOT?: Prisma.LocationWhereInput | Prisma.LocationWhereInput[]
   id?: Prisma.UuidFilter<"Location"> | string
-  clerk_org_id?: Prisma.StringFilter<"Location"> | string
+  account_id?: Prisma.StringFilter<"Location"> | string
   organisation_id?: Prisma.UuidFilter<"Location"> | string
   name?: Prisma.StringFilter<"Location"> | string
   country_code?: Prisma.StringNullableFilter<"Location"> | string | null
@@ -221,7 +221,7 @@ export type LocationWhereInput = {
 
 export type LocationOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   country_code?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -239,7 +239,7 @@ export type LocationWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.LocationWhereInput | Prisma.LocationWhereInput[]
   OR?: Prisma.LocationWhereInput[]
   NOT?: Prisma.LocationWhereInput | Prisma.LocationWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"Location"> | string
+  account_id?: Prisma.StringFilter<"Location"> | string
   organisation_id?: Prisma.UuidFilter<"Location"> | string
   name?: Prisma.StringFilter<"Location"> | string
   country_code?: Prisma.StringNullableFilter<"Location"> | string | null
@@ -254,7 +254,7 @@ export type LocationWhereUniqueInput = Prisma.AtLeast<{
 
 export type LocationOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   country_code?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -272,7 +272,7 @@ export type LocationScalarWhereWithAggregatesInput = {
   OR?: Prisma.LocationScalarWhereWithAggregatesInput[]
   NOT?: Prisma.LocationScalarWhereWithAggregatesInput | Prisma.LocationScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"Location"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"Location"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"Location"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"Location"> | string
   name?: Prisma.StringWithAggregatesFilter<"Location"> | string
   country_code?: Prisma.StringNullableWithAggregatesFilter<"Location"> | string | null
@@ -284,7 +284,7 @@ export type LocationScalarWhereWithAggregatesInput = {
 
 export type LocationCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   country_code?: string | null
   region_code?: string | null
@@ -298,7 +298,7 @@ export type LocationCreateInput = {
 
 export type LocationUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   country_code?: string | null
@@ -312,7 +312,7 @@ export type LocationUncheckedCreateInput = {
 
 export type LocationUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -326,7 +326,7 @@ export type LocationUpdateInput = {
 
 export type LocationUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -340,7 +340,7 @@ export type LocationUncheckedUpdateInput = {
 
 export type LocationCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   country_code?: string | null
@@ -352,7 +352,7 @@ export type LocationCreateManyInput = {
 
 export type LocationUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -363,7 +363,7 @@ export type LocationUpdateManyMutationInput = {
 
 export type LocationUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -385,7 +385,7 @@ export type LocationOrderByRelationAggregateInput = {
 
 export type LocationCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -397,7 +397,7 @@ export type LocationCountOrderByAggregateInput = {
 
 export type LocationMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -409,7 +409,7 @@ export type LocationMaxOrderByAggregateInput = {
 
 export type LocationMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   country_code?: Prisma.SortOrder
@@ -500,7 +500,7 @@ export type LocationUpdateOneWithoutPublic_holiday_preferencesNestedInput = {
 
 export type LocationCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   country_code?: string | null
   region_code?: string | null
@@ -513,7 +513,7 @@ export type LocationCreateWithoutOrganisationInput = {
 
 export type LocationUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   country_code?: string | null
   region_code?: string | null
@@ -555,7 +555,7 @@ export type LocationScalarWhereInput = {
   OR?: Prisma.LocationScalarWhereInput[]
   NOT?: Prisma.LocationScalarWhereInput | Prisma.LocationScalarWhereInput[]
   id?: Prisma.UuidFilter<"Location"> | string
-  clerk_org_id?: Prisma.StringFilter<"Location"> | string
+  account_id?: Prisma.StringFilter<"Location"> | string
   organisation_id?: Prisma.UuidFilter<"Location"> | string
   name?: Prisma.StringFilter<"Location"> | string
   country_code?: Prisma.StringNullableFilter<"Location"> | string | null
@@ -567,7 +567,7 @@ export type LocationScalarWhereInput = {
 
 export type LocationCreateWithoutPeopleInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   country_code?: string | null
   region_code?: string | null
@@ -580,7 +580,7 @@ export type LocationCreateWithoutPeopleInput = {
 
 export type LocationUncheckedCreateWithoutPeopleInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   country_code?: string | null
@@ -609,7 +609,7 @@ export type LocationUpdateToOneWithWhereWithoutPeopleInput = {
 
 export type LocationUpdateWithoutPeopleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -622,7 +622,7 @@ export type LocationUpdateWithoutPeopleInput = {
 
 export type LocationUncheckedUpdateWithoutPeopleInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -635,7 +635,7 @@ export type LocationUncheckedUpdateWithoutPeopleInput = {
 
 export type LocationCreateWithoutPublic_holiday_preferencesInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   country_code?: string | null
   region_code?: string | null
@@ -648,7 +648,7 @@ export type LocationCreateWithoutPublic_holiday_preferencesInput = {
 
 export type LocationUncheckedCreateWithoutPublic_holiday_preferencesInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   name: string
   country_code?: string | null
@@ -677,7 +677,7 @@ export type LocationUpdateToOneWithWhereWithoutPublic_holiday_preferencesInput =
 
 export type LocationUpdateWithoutPublic_holiday_preferencesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -690,7 +690,7 @@ export type LocationUpdateWithoutPublic_holiday_preferencesInput = {
 
 export type LocationUncheckedUpdateWithoutPublic_holiday_preferencesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -703,7 +703,7 @@ export type LocationUncheckedUpdateWithoutPublic_holiday_preferencesInput = {
 
 export type LocationCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   name: string
   country_code?: string | null
   region_code?: string | null
@@ -714,7 +714,7 @@ export type LocationCreateManyOrganisationInput = {
 
 export type LocationUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -727,7 +727,7 @@ export type LocationUpdateWithoutOrganisationInput = {
 
 export type LocationUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -740,7 +740,7 @@ export type LocationUncheckedUpdateWithoutOrganisationInput = {
 
 export type LocationUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   country_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -791,7 +791,7 @@ export type LocationCountOutputTypeCountPublic_holiday_preferencesArgs<ExtArgs e
 
 export type LocationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   country_code?: boolean
@@ -807,7 +807,7 @@ export type LocationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
 
 export type LocationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   country_code?: boolean
@@ -820,7 +820,7 @@ export type LocationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
 
 export type LocationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   country_code?: boolean
@@ -833,7 +833,7 @@ export type LocationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
 
 export type LocationSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   name?: boolean
   country_code?: boolean
@@ -843,7 +843,7 @@ export type LocationSelectScalar = {
   updated_at?: boolean
 }
 
-export type LocationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "name" | "country_code" | "region_code" | "timezone" | "created_at" | "updated_at", ExtArgs["result"]["location"]>
+export type LocationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "name" | "country_code" | "region_code" | "timezone" | "created_at" | "updated_at", ExtArgs["result"]["location"]>
 export type LocationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   people?: boolean | Prisma.Location$peopleArgs<ExtArgs>
@@ -866,7 +866,7 @@ export type $LocationPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     name: string
     country_code: string | null
@@ -1301,7 +1301,7 @@ export interface Prisma__LocationClient<T, Null = never, ExtArgs extends runtime
  */
 export interface LocationFieldRefs {
   readonly id: Prisma.FieldRef<"Location", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"Location", 'String'>
+  readonly account_id: Prisma.FieldRef<"Location", 'String'>
   readonly organisation_id: Prisma.FieldRef<"Location", 'String'>
   readonly name: Prisma.FieldRef<"Location", 'String'>
   readonly country_code: Prisma.FieldRef<"Location", 'String'>

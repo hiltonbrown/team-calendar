@@ -81,9 +81,18 @@ export const ModelName = {
   AuditEvent: 'AuditEvent',
   Plan: 'Plan',
   PlanLimit: 'PlanLimit',
-  ClerkOrgSubscription: 'ClerkOrgSubscription',
+  AccountSubscription: 'AccountSubscription',
   UsageCounter: 'UsageCounter',
-  StripeEvent: 'StripeEvent'
+  StripeEvent: 'StripeEvent',
+  AuthUser: 'AuthUser',
+  AuthSession: 'AuthSession',
+  AuthIdentity: 'AuthIdentity',
+  AuthVerification: 'AuthVerification',
+  AuthOrganization: 'AuthOrganization',
+  AuthMember: 'AuthMember',
+  AuthInvitation: 'AuthInvitation',
+  AuthRateLimit: 'AuthRateLimit',
+  AuthAuditEvent: 'AuthAuditEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -104,7 +113,7 @@ export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof
 
 export const OrganisationScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   name: 'name',
   country_code: 'country_code',
   region_code: 'region_code',
@@ -127,7 +136,7 @@ export type OrganisationScalarFieldEnum = (typeof OrganisationScalarFieldEnum)[k
 
 export const AccountSettingsScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   manager_visibility_scope: 'manager_visibility_scope',
   created_at: 'created_at',
   updated_at: 'updated_at'
@@ -138,7 +147,7 @@ export type AccountSettingsScalarFieldEnum = (typeof AccountSettingsScalarFieldE
 
 export const OrganisationSettingsScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   show_pending_on_calendar: 'show_pending_on_calendar',
   show_declined_on_approvals: 'show_declined_on_approvals',
@@ -157,7 +166,7 @@ export type OrganisationSettingsScalarFieldEnum = (typeof OrganisationSettingsSc
 
 export const TeamScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   name: 'name',
   minimum_available_people: 'minimum_available_people',
@@ -170,7 +179,7 @@ export type TeamScalarFieldEnum = (typeof TeamScalarFieldEnum)[keyof typeof Team
 
 export const LocationScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   name: 'name',
   country_code: 'country_code',
@@ -185,7 +194,7 @@ export type LocationScalarFieldEnum = (typeof LocationScalarFieldEnum)[keyof typ
 
 export const PersonScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   team_id: 'team_id',
   manager_person_id: 'manager_person_id',
@@ -200,7 +209,7 @@ export const PersonScalarFieldEnum = {
   employment_type: 'employment_type',
   is_active: 'is_active',
   display_name: 'display_name',
-  clerk_user_id: 'clerk_user_id',
+  user_id: 'user_id',
   job_title: 'job_title',
   start_date: 'start_date',
   avatar_url: 'avatar_url',
@@ -219,7 +228,7 @@ export type PersonScalarFieldEnum = (typeof PersonScalarFieldEnum)[keyof typeof 
 
 export const AlternativeContactScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   person_id: 'person_id',
   name: 'name',
@@ -262,7 +271,7 @@ export type XeroAuthorisationScalarFieldEnum = (typeof XeroAuthorisationScalarFi
 
 export const XeroConnectionScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   xero_authorisation_id: 'xero_authorisation_id',
   xero_tenant_id: 'xero_tenant_id',
@@ -307,7 +316,7 @@ export type XeroConnectionScalarFieldEnum = (typeof XeroConnectionScalarFieldEnu
 
 export const XeroOAuthSessionScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   created_by_user_id: 'created_by_user_id',
   status: 'status',
@@ -331,7 +340,7 @@ export type XeroOAuthSessionScalarFieldEnum = (typeof XeroOAuthSessionScalarFiel
 
 export const XeroSyncCursorScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   xero_connection_id: 'xero_connection_id',
   entity_type: 'entity_type',
@@ -345,7 +354,7 @@ export type XeroSyncCursorScalarFieldEnum = (typeof XeroSyncCursorScalarFieldEnu
 
 export const AvailabilityRecordScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   person_id: 'person_id',
   record_type: 'record_type',
@@ -391,7 +400,7 @@ export type AvailabilityRecordScalarFieldEnum = (typeof AvailabilityRecordScalar
 
 export const OutboundOperationScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   availability_record_id: 'availability_record_id',
   action: 'action',
@@ -430,7 +439,7 @@ export type OutboundOperationScalarFieldEnum = (typeof OutboundOperationScalarFi
 
 export const AvailabilityPublicationScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   availability_record_id: 'availability_record_id',
   published_uid: 'published_uid',
@@ -451,7 +460,7 @@ export type AvailabilityPublicationScalarFieldEnum = (typeof AvailabilityPublica
 
 export const LeaveBalanceScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   person_id: 'person_id',
   xero_connection_id: 'xero_connection_id',
@@ -473,7 +482,7 @@ export type LeaveBalanceScalarFieldEnum = (typeof LeaveBalanceScalarFieldEnum)[k
 
 export const XeroPersonMatchScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   xero_person_id: 'xero_person_id',
   candidate_person_id: 'candidate_person_id',
@@ -481,7 +490,7 @@ export const XeroPersonMatchScalarFieldEnum = {
   status: 'status',
   resolution_note: 'resolution_note',
   resolved_person_id: 'resolved_person_id',
-  resolved_clerk_user_id: 'resolved_clerk_user_id',
+  resolved_user_id: 'resolved_user_id',
   resolved_by_user_id: 'resolved_by_user_id',
   resolved_at: 'resolved_at',
   created_at: 'created_at',
@@ -493,7 +502,7 @@ export type XeroPersonMatchScalarFieldEnum = (typeof XeroPersonMatchScalarFieldE
 
 export const PublicHolidayScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   source: 'source',
   source_remote_id: 'source_remote_id',
@@ -517,7 +526,7 @@ export type PublicHolidayScalarFieldEnum = (typeof PublicHolidayScalarFieldEnum)
 
 export const PublicHolidayPreferenceScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   holiday_key: 'holiday_key',
   location_id: 'location_id',
@@ -533,7 +542,7 @@ export type PublicHolidayPreferenceScalarFieldEnum = (typeof PublicHolidayPrefer
 
 export const FeedScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   name: 'name',
   slug: 'slug',
@@ -556,7 +565,7 @@ export type FeedScalarFieldEnum = (typeof FeedScalarFieldEnum)[keyof typeof Feed
 
 export const FeedEventPublicationScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   feed_id: 'feed_id',
   source_key: 'source_key',
@@ -574,7 +583,7 @@ export type FeedEventPublicationScalarFieldEnum = (typeof FeedEventPublicationSc
 
 export const FeedScopeScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   feed_id: 'feed_id',
   scope_type: 'scope_type',
@@ -587,7 +596,7 @@ export type FeedScopeScalarFieldEnum = (typeof FeedScopeScalarFieldEnum)[keyof t
 
 export const FeedTokenScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   feed_id: 'feed_id',
   token_hash: 'token_hash',
@@ -606,7 +615,7 @@ export type FeedTokenScalarFieldEnum = (typeof FeedTokenScalarFieldEnum)[keyof t
 
 export const NotificationScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   recipient_user_id: 'recipient_user_id',
   recipient_person_id: 'recipient_person_id',
@@ -629,7 +638,7 @@ export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[k
 export const NotificationPreferenceScalarFieldEnum = {
   id: 'id',
   user_id: 'user_id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   notification_type: 'notification_type',
   in_app_enabled: 'in_app_enabled',
@@ -643,7 +652,7 @@ export type NotificationPreferenceScalarFieldEnum = (typeof NotificationPreferen
 
 export const NotificationEmailQueueScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   notification_id: 'notification_id',
   recipient_user_id: 'recipient_user_id',
@@ -669,7 +678,7 @@ export type NotificationEmailQueueScalarFieldEnum = (typeof NotificationEmailQue
 
 export const SyncRunScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   xero_connection_id: 'xero_connection_id',
   status: 'status',
@@ -696,7 +705,7 @@ export type SyncRunScalarFieldEnum = (typeof SyncRunScalarFieldEnum)[keyof typeo
 
 export const FailedRecordScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   sync_run_id: 'sync_run_id',
   entity_type: 'entity_type',
@@ -715,7 +724,7 @@ export type FailedRecordScalarFieldEnum = (typeof FailedRecordScalarFieldEnum)[k
 
 export const AuditEventScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   organisation_id: 'organisation_id',
   actor_user_id: 'actor_user_id',
   actor_display: 'actor_display',
@@ -763,9 +772,9 @@ export const PlanLimitScalarFieldEnum = {
 export type PlanLimitScalarFieldEnum = (typeof PlanLimitScalarFieldEnum)[keyof typeof PlanLimitScalarFieldEnum]
 
 
-export const ClerkOrgSubscriptionScalarFieldEnum = {
+export const AccountSubscriptionScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   plan_key: 'plan_key',
   status: 'status',
   current_period_end: 'current_period_end',
@@ -779,12 +788,12 @@ export const ClerkOrgSubscriptionScalarFieldEnum = {
   updated_at: 'updated_at'
 } as const
 
-export type ClerkOrgSubscriptionScalarFieldEnum = (typeof ClerkOrgSubscriptionScalarFieldEnum)[keyof typeof ClerkOrgSubscriptionScalarFieldEnum]
+export type AccountSubscriptionScalarFieldEnum = (typeof AccountSubscriptionScalarFieldEnum)[keyof typeof AccountSubscriptionScalarFieldEnum]
 
 
 export const UsageCounterScalarFieldEnum = {
   id: 'id',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   metric_key: 'metric_key',
   counter_type: 'counter_type',
   current_value: 'current_value',
@@ -803,7 +812,7 @@ export const StripeEventScalarFieldEnum = {
   type: 'type',
   delivery_state: 'delivery_state',
   attempt_count: 'attempt_count',
-  clerk_org_id: 'clerk_org_id',
+  account_id: 'account_id',
   stripe_customer_id: 'stripe_customer_id',
   event_created_at: 'event_created_at',
   error_category: 'error_category',
@@ -814,6 +823,137 @@ export const StripeEventScalarFieldEnum = {
 } as const
 
 export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[keyof typeof StripeEventScalarFieldEnum]
+
+
+export const AuthUserScalarFieldEnum = {
+  membership_revision: 'membership_revision',
+  id: 'id',
+  name: 'name',
+  email: 'email',
+  email_verified: 'email_verified',
+  image: 'image',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthUserScalarFieldEnum = (typeof AuthUserScalarFieldEnum)[keyof typeof AuthUserScalarFieldEnum]
+
+
+export const AuthSessionScalarFieldEnum = {
+  id: 'id',
+  expires_at: 'expires_at',
+  token: 'token',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  ip_address: 'ip_address',
+  user_agent: 'user_agent',
+  user_id: 'user_id',
+  active_account_id: 'active_account_id'
+} as const
+
+export type AuthSessionScalarFieldEnum = (typeof AuthSessionScalarFieldEnum)[keyof typeof AuthSessionScalarFieldEnum]
+
+
+export const AuthIdentityScalarFieldEnum = {
+  id: 'id',
+  provider_subject: 'provider_subject',
+  provider_id: 'provider_id',
+  user_id: 'user_id',
+  access_token: 'access_token',
+  refresh_token: 'refresh_token',
+  id_token: 'id_token',
+  access_token_expires_at: 'access_token_expires_at',
+  refresh_token_expires_at: 'refresh_token_expires_at',
+  scope: 'scope',
+  password: 'password',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthIdentityScalarFieldEnum = (typeof AuthIdentityScalarFieldEnum)[keyof typeof AuthIdentityScalarFieldEnum]
+
+
+export const AuthVerificationScalarFieldEnum = {
+  id: 'id',
+  identifier: 'identifier',
+  value: 'value',
+  expires_at: 'expires_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthVerificationScalarFieldEnum = (typeof AuthVerificationScalarFieldEnum)[keyof typeof AuthVerificationScalarFieldEnum]
+
+
+export const AuthOrganizationScalarFieldEnum = {
+  membership_revision: 'membership_revision',
+  id: 'id',
+  name: 'name',
+  slug: 'slug',
+  logo: 'logo',
+  metadata: 'metadata',
+  country_code: 'country_code',
+  provisioning_status: 'provisioning_status',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthOrganizationScalarFieldEnum = (typeof AuthOrganizationScalarFieldEnum)[keyof typeof AuthOrganizationScalarFieldEnum]
+
+
+export const AuthMemberScalarFieldEnum = {
+  id: 'id',
+  account_id: 'account_id',
+  user_id: 'user_id',
+  role: 'role',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthMemberScalarFieldEnum = (typeof AuthMemberScalarFieldEnum)[keyof typeof AuthMemberScalarFieldEnum]
+
+
+export const AuthInvitationScalarFieldEnum = {
+  id: 'id',
+  account_id: 'account_id',
+  email: 'email',
+  role: 'role',
+  status: 'status',
+  expires_at: 'expires_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  inviter_id: 'inviter_id'
+} as const
+
+export type AuthInvitationScalarFieldEnum = (typeof AuthInvitationScalarFieldEnum)[keyof typeof AuthInvitationScalarFieldEnum]
+
+
+export const AuthRateLimitScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  count: 'count',
+  last_request: 'last_request',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthRateLimitScalarFieldEnum = (typeof AuthRateLimitScalarFieldEnum)[keyof typeof AuthRateLimitScalarFieldEnum]
+
+
+export const AuthAuditEventScalarFieldEnum = {
+  id: 'id',
+  account_id: 'account_id',
+  actor_user_id: 'actor_user_id',
+  target_user_id: 'target_user_id',
+  event_type: 'event_type',
+  before_value: 'before_value',
+  after_value: 'after_value',
+  request_id: 'request_id',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type AuthAuditEventScalarFieldEnum = (typeof AuthAuditEventScalarFieldEnum)[keyof typeof AuthAuditEventScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -1,4 +1,8 @@
-import { auth, clerkClient } from "@repo/auth/server";
+import {
+  listAccountInvitations,
+  listAccountMembers,
+} from "@repo/auth/accounts";
+import { getSession } from "@repo/auth/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { MembersClient } from "./members-client";
@@ -9,46 +13,52 @@ export const metadata: Metadata = {
 };
 
 const MembersPage = async () => {
-  const { orgId, orgRole, userId } = await auth();
+  const {
+    accountId: sessionAccountId,
+    role: sessionRole,
+    userId,
+  } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
 
-  if (!(orgId && userId)) {
+  if (!(sessionAccountId && userId)) {
     redirect("/");
   }
 
-  const clerk = await clerkClient();
-
   const [membershipsResult, invitationsResult] = await Promise.all([
-    clerk.organizations.getOrganizationMembershipList({
+    listAccountMembers({
+      accountId: sessionAccountId,
       limit: 100,
-      organizationId: orgId,
     }),
-    clerk.organizations.getOrganizationInvitationList({
-      organizationId: orgId,
+    listAccountInvitations({
+      accountId: sessionAccountId,
       status: ["pending"],
     }),
   ]);
 
   const members = membershipsResult.data.map((m) => ({
-    emailAddress: m.publicUserData?.identifier ?? "",
-    firstName: m.publicUserData?.firstName ?? null,
-    imageUrl: m.publicUserData?.imageUrl ?? "",
-    lastName: m.publicUserData?.lastName ?? null,
+    email: m.email ?? "",
+    image: m.image,
     membershipId: m.id,
-    role: m.role,
-    userId: m.publicUserData?.userId ?? "",
+    name: m.name,
+    role: m.role ?? "unknown",
+    userId: m.userId ?? "",
   }));
 
   const pendingInvitations = invitationsResult.data.map((inv) => ({
     createdAt: inv.createdAt,
-    emailAddress: inv.emailAddress,
+    emailAddress: inv.email,
     id: inv.id,
-    role: inv.role,
+    role: inv.role ?? "viewer",
   }));
 
   return (
     <MembersClient
-      currentUserId={userId}
-      currentUserRole={orgRole ?? "org:viewer"}
+      getCurrentUserId={userId}
+      getCurrentUserRole={sessionRole ?? "viewer"}
       members={members}
       pendingInvitations={pendingInvitations}
     />

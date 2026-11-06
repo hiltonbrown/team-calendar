@@ -1,5 +1,6 @@
+import { hasPermission } from "@repo/auth/permissions";
 import {
-  type ClerkOrgId,
+  type AccountId,
   CUSTOM_HOLIDAY_KEY_PREFIX,
   findReferenceHoliday,
   type HolidayClassification,
@@ -21,9 +22,9 @@ export interface HolidayPreferenceReceipt {
 }
 
 const BaseSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.string(),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   holidayKey: z.string().min(1).max(200),
   organisationId: z.string().uuid(),
 });
@@ -42,7 +43,7 @@ type Base = z.infer<typeof BaseSchema>;
 // Both ids were validated by BaseSchema; branding them scopes every query.
 const scopeOf = (input: Base) =>
   scopedQuery(
-    input.clerkOrgId as ClerkOrgId,
+    input.accountId as AccountId,
     input.organisationId as OrganisationId
   );
 type Transaction = TenantDb;
@@ -134,11 +135,11 @@ async function writeAudit(
 ) {
   await tx.auditEvent.create({
     data: {
+      account_id: input.accountId,
       action,
       actor_user_id: input.actingUserId,
       after_value: { locationId: details.locationId, setting: details.after },
       before_value: { locationId: details.locationId, setting: details.before },
-      clerk_org_id: input.clerkOrgId,
       entity_id: input.holidayKey,
       entity_type: "public_holiday",
       metadata: {
@@ -167,8 +168,8 @@ async function applyPreference(
   check: ((holiday: PreferenceTarget) => string | null | undefined) | undefined,
   db: TenantDb
 ): Promise<Result<HolidayPreferenceReceipt, HolidayPreferenceError>> {
-  assertTenantDb(db, input.clerkOrgId);
-  if (!(input.actingRole === "owner" || input.actingRole === "admin")) {
+  assertTenantDb(db, input.accountId);
+  if (!hasPermission(input.actingRole, { settings: ["update"] })) {
     return failure(
       "not_authorised",
       "Only owners and admins can change public holidays."
@@ -212,7 +213,7 @@ async function applyPreference(
     } else {
       const inserted = await client.publicHolidayPreference.createMany({
         data: {
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           created_by_user_id: input.actingUserId,
           holiday_key: input.holidayKey,
           location_id: input.locationId,
@@ -249,7 +250,7 @@ async function applyPreference(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -274,7 +275,7 @@ export function hidePublicHoliday(
   input: z.input<typeof ScopeSchema>,
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const value = parsed(ScopeSchema, input);
   return value.ok
     ? applyPreference(
@@ -292,7 +293,7 @@ export function restorePublicHoliday(
   input: z.input<typeof ScopeSchema>,
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const value = parsed(ScopeSchema, input);
   return value.ok
     ? applyPreference(
@@ -309,7 +310,7 @@ export function setPublicHolidayClassification(
   input: z.input<typeof ClassificationSchema>,
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const value = parsed(ClassificationSchema, input);
   return value.ok
     ? applyPreference(
@@ -331,7 +332,7 @@ export function setLocalHolidayEnabled(
   input: z.input<typeof LocalDaySchema>,
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const value = parsed(LocalDaySchema, input);
   if (!value.ok) {
     return Promise.resolve(value);
