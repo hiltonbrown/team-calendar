@@ -1,5 +1,39 @@
 # Current work
 
+## PR #144 Second Review Remediation (12 November 2026)
+
+- [x] Task 1: Remove `requireActiveOrgPageContext()` from billing Server Actions
+  - [x] Step 1.1: Update unit test in `apps/app/app/(authenticated)/settings/billing/actions.test.ts` (TDD red)
+  - [x] Step 1.2: Implement fix in `apps/app/app/(authenticated)/settings/billing/actions.ts` and update `packages/database/src/tenant-phased-modules.ts`
+  - [x] Step 1.3: Run targeted tests and boundary checks
+- [x] Task 2: Remove shared egress IP rate-limit bucket for session-bearing `/api/auth-context` calls
+  - [x] Step 2.1: Update unit test in `packages/auth/context-rate-limit.test.ts` (TDD red)
+  - [x] Step 2.2: Verify test fails before implementation
+  - [x] Step 2.3: Implement fix in `packages/auth/context-rate-limit.ts` and update comment in `packages/auth/adapters/better-auth-server.ts`
+  - [x] Step 2.4: Run `@repo/auth` unit test suite
+- [x] Task 3: Run full monorepo validation suite (`build`, `check`, `typecheck`, `typecheck:release-tools`, `boundaries`, `test`, `test:release-tools`)
+- [x] Task 4: Final PR review & readiness check
+
+Stopping condition: Tasks 1-4 completed in order; all local verification gates pass with 0 errors.
+
+Review: PASS.
+1. Task 1 (P2 — Billing Server Actions):
+   - Removed `requireActiveOrgPageContext()` from `apps/app/app/(authenticated)/settings/billing/actions.ts` and passed `accountResult.value` directly to `createCheckoutSession` and `createPortalSession`.
+   - Updated `apps/app/app/(authenticated)/settings/billing/actions.test.ts` and `packages/database/src/tenant-phased-modules.ts`.
+   - Verified with `bun run --cwd apps/app test "app/(authenticated)/settings/billing/actions.test.ts" "app/(authenticated)/settings/billing/billing-client.test.tsx" "app/(authenticated)/settings/billing/page.test.tsx"` (18/18 passed) and `packages/database/src/boundary.test.ts` (10/10 passed).
+2. Task 2 (P2 — Shared Egress IP Rate-Limit Bucket in `/api/auth-context`):
+   - Updated `authContextBuckets` in `packages/auth/context-rate-limit.ts` to key session-bearing requests solely by `auth-context:session:${digest(cookie)}` (limit 100/60s) and unauthenticated requests by `auth-context:anonymous:${digest(address)}` (limit 100/60s).
+   - Updated `packages/auth/context-rate-limit.test.ts` and comment in `packages/auth/adapters/better-auth-server.ts`.
+   - Verified with `bunx vitest run packages/auth/context-rate-limit.test.ts packages/auth/context.test.ts packages/auth/invitation-route.test.ts packages/auth/adapters/remote-context.test.ts` (23/23 passed).
+3. Task 3 & Task 4 (Validation Gates & Final Diff Check):
+   - `bun run build`: 4/4 build targets succeeded in 25.6s.
+   - `bun run check`: Checked 1,430 files in 3s, 0 errors.
+   - `bun run typecheck`: 19/19 packages passed.
+   - `bun run typecheck:release-tools`: 0 errors.
+   - `bun run boundaries`: Checked 1,359 files across 21 packages, 0 issues found.
+   - `bun run test:release-tools`: 28 test files (248 passed, 5 skipped, 0 failed).
+   - `bun run test`: 18/18 package test suites passed.
+
 ## PR #144 Review Remediation (31 October 2026)
 
 - [x] Task 1: Break the database to auth import cycle
