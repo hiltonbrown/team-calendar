@@ -14,12 +14,15 @@ const request = (token?: string) =>
     },
   });
 describe("online auth resolver admission", () => {
-  it("isolates sessions sharing an API egress address while bounding that address", () => {
+  it("isolates sessions sharing an API egress address without a shared address bucket", () => {
     const first = authContextBuckets(request("first"), origin, true);
     const second = authContextBuckets(request("second"), origin, true);
-    expect(first[0]).toEqual(second[0]);
-    expect(first[1].key).not.toBe(second[1].key);
-    expect(first[1].limit).toBe(100);
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(1);
+    expect(first[0].key).toContain(":session:");
+    expect(second[0].key).toContain(":session:");
+    expect(first[0].key).not.toBe(second[0].key);
+    expect(first[0].limit).toBe(100);
     expect(JSON.stringify(first)).not.toContain("first");
     expect(JSON.stringify(first)).not.toContain("secret");
   });

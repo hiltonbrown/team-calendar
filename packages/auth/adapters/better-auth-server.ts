@@ -49,8 +49,8 @@ export async function consumeAuthContextRateLimit(
     Boolean(process.env.VERCEL)
   );
   const now = BigInt(Date.now());
-  // Each bucket uses one atomic upsert. Address admission runs first, bounding
-  // attempts to manufacture new session keys without affecting other users.
+  // Each bucket uses one atomic upsert keyed by session token digest (or
+  // client address for unauthenticated admission requests).
   for (const { key, limit } of buckets) {
     const rows = await systemDatabase.$queryRaw<{ count: number }[]>`
       INSERT INTO auth_rate_limits (id, key, count, last_request, created_at, updated_at)
