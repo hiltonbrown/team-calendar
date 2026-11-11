@@ -208,7 +208,7 @@ export const PHASED_TENANT_EXPORTS = [
     exports: ["startCheckout", "startPortal"],
     path: "apps/app/app/(authenticated)/settings/billing/actions.ts",
     reason:
-      "C6: Account authenticationentication and company preparation precede Stripe calls outside SQL",
+      "C6: Account authentication precedes subscription lookup and Stripe calls outside SQL",
   },
   {
     exports: ["updateFeedDefaultsAction"],

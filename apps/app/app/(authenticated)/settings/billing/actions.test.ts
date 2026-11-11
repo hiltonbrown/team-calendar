@@ -6,16 +6,11 @@ const mocks = vi.hoisted(() => ({
   hasPermission: vi.fn(),
   redirect: vi.fn(),
   requireAccountResult: vi.fn(),
-  requireActiveOrgPageContext: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
   hasPermission: mocks.hasPermission,
   requireAccountResult: mocks.requireAccountResult,
-}));
-vi.mock("@/lib/server/require-active-org-page-context", () => ({
-  requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
-  resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
 vi.mock("@repo/billing", () => ({
   createCheckoutSession: mocks.createCheckoutSession,
@@ -39,7 +34,6 @@ describe("billing actions", () => {
       value: accountId,
     });
     mocks.hasPermission.mockResolvedValue(true);
-    mocks.requireActiveOrgPageContext.mockResolvedValue({ accountId });
     mocks.createCheckoutSession.mockResolvedValue({
       ok: true,
       value: redirectUrl,
@@ -65,7 +59,6 @@ describe("billing actions", () => {
         ok: false,
       });
       expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
-      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
     });
 
     it("rejects portal in early access mode", async () => {
@@ -79,7 +72,6 @@ describe("billing actions", () => {
         ok: false,
       });
       expect(mocks.createPortalSession).not.toHaveBeenCalled();
-      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
     });
   });
 
@@ -103,7 +95,6 @@ describe("billing actions", () => {
       });
 
       expect(mocks.hasPermission).not.toHaveBeenCalled();
-      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
       expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     });
@@ -123,7 +114,6 @@ describe("billing actions", () => {
       expect(mocks.hasPermission).toHaveBeenCalledWith({
         billing: ["checkout"],
       });
-      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
       expect(mocks.createCheckoutSession).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     });
@@ -177,7 +167,6 @@ describe("billing actions", () => {
       });
 
       expect(mocks.hasPermission).not.toHaveBeenCalled();
-      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
       expect(mocks.createPortalSession).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     });
@@ -197,7 +186,6 @@ describe("billing actions", () => {
       expect(mocks.hasPermission).toHaveBeenCalledWith({
         billing: ["portal"],
       });
-      expect(mocks.requireActiveOrgPageContext).not.toHaveBeenCalled();
       expect(mocks.createPortalSession).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     });

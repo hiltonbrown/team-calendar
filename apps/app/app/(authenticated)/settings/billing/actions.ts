@@ -6,7 +6,6 @@ import { type AppError, appError, type Result } from "@repo/core";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { isEarlyAccess } from "@repo/next-config/launch-mode";
 import { redirect } from "next/navigation";
-import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 
 export async function startCheckout(
   planKey: "basic" | "premium"
@@ -36,8 +35,7 @@ export async function startCheckout(
     };
   }
 
-  const { accountId } = await requireActiveOrgPageContext();
-  const result = await createCheckoutSession(accountId, planKey);
+  const result = await createCheckoutSession(accountResult.value, planKey);
   if (result.ok) {
     redirect(result.value);
   }
@@ -70,8 +68,7 @@ export async function startPortal(): Promise<Result<never, AppError>> {
     };
   }
 
-  const { accountId } = await requireActiveOrgPageContext();
-  const result = await createPortalSession(accountId);
+  const result = await createPortalSession(accountResult.value);
   if (result.ok) {
     redirect(result.value);
   }
