@@ -2,8 +2,6 @@
 
 ## Database RLS Hardening (12 November 2026)
 
-Plan: `docs/superpowers/plans/2026-11-12-database-rls-hardening.md`
-
 - [x] Task 1: Author migration `20261025170000_rls_child_reference_integrity`
   - [x] Step 1.1: Revoke default privileges in schema `public` on `TABLES`, `SEQUENCES`, and `FUNCTIONS` from `PUBLIC` and `team_calendar_app`
   - [x] Step 1.2: Remove redundant `organisation_id IS NULL` branch from `WITH CHECK` policies on the 18 non-nullable company-scoped tables
