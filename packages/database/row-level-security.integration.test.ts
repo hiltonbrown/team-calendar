@@ -493,5 +493,295 @@ test("manager RLS permits another owned company and rejects a foreign account", 
   }
 });
 
+test("child RLS policies enforce same-company and same-account parent ownership", async () => {
+  const fixture = await systemDatabase.$transaction(async (db) => {
+    const secondCompany = await db.organisation.create({
+      data: {
+        account_id: accountA,
+        country_code: "AU",
+        name: "Second child-RLS company",
+      },
+    });
+    const basePerson = {
+      email: "rls-child@example.test",
+      employment_type: "employee" as const,
+      first_name: "RLS",
+      last_name: "Child",
+      source_system: "MANUAL" as const,
+    };
+    const employeeA = await db.person.create({
+      data: { ...basePerson, account_id: accountA, organisation_id: companyA },
+    });
+    const managerA2 = await db.person.create({
+      data: {
+        ...basePerson,
+        account_id: accountA,
+        organisation_id: secondCompany.id,
+      },
+    });
+    const foreignPerson = await db.person.create({
+      data: { ...basePerson, account_id: accountB, organisation_id: companyB },
+    });
+    const teamA = await db.team.create({
+      data: { account_id: accountA, name: "Team A", organisation_id: companyA },
+    });
+    const teamA2 = await db.team.create({
+      data: {
+        account_id: accountA,
+        name: "Team A2",
+        organisation_id: secondCompany.id,
+      },
+    });
+    const teamB = await db.team.create({
+      data: { account_id: accountB, name: "Team B", organisation_id: companyB },
+    });
+    const locationA = await db.location.create({
+      data: {
+        account_id: accountA,
+        name: "Location A",
+        organisation_id: companyA,
+      },
+    });
+    const locationA2 = await db.location.create({
+      data: {
+        account_id: accountA,
+        name: "Location A2",
+        organisation_id: secondCompany.id,
+      },
+    });
+    const locationB = await db.location.create({
+      data: {
+        account_id: accountB,
+        name: "Location B",
+        organisation_id: companyB,
+      },
+    });
+    const feedA = await db.feed.create({
+      data: {
+        account_id: accountA,
+        name: "Feed A",
+        organisation_id: companyA,
+        slug: `feed-a-${randomUUID()}`,
+      },
+    });
+    const feedA2 = await db.feed.create({
+      data: {
+        account_id: accountA,
+        name: "Feed A2",
+        organisation_id: secondCompany.id,
+        slug: `feed-a2-${randomUUID()}`,
+      },
+    });
+    const tokenA2 = await db.feedToken.create({
+      data: {
+        account_id: accountA,
+        feed_id: feedA2.id,
+        organisation_id: secondCompany.id,
+        status: "revoked",
+        token_hash: `hash-${randomUUID()}`,
+        token_hint: "a200",
+      },
+    });
+    return {
+      employeeA,
+      feedA,
+      feedA2,
+      foreignPerson,
+      locationA,
+      locationA2,
+      locationB,
+      managerA2,
+      secondCompany,
+      teamA,
+      teamA2,
+      teamB,
+      tokenA2,
+    };
+  });
+
+  try {
+    // 1. people.team_id and people.location_id must belong to the same company and account.
+    await withTenantDb(accountA, (db) =>
+      db.person.update({
+        data: {
+          location_id: fixture.locationA.id,
+          team_id: fixture.teamA.id,
+        },
+        where: {
+          account_id: accountA,
+          id: fixture.employeeA.id,
+          organisation_id: companyA,
+        },
+      })
+    );
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.person.update({
+          data: { team_id: fixture.teamA2.id },
+          where: {
+            account_id: accountA,
+            id: fixture.employeeA.id,
+            organisation_id: companyA,
+          },
+        })
+      )
+    ).rejects.toThrow();
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.person.update({
+          data: { team_id: fixture.teamB.id },
+          where: {
+            account_id: accountA,
+            id: fixture.employeeA.id,
+            organisation_id: companyA,
+          },
+        })
+      )
+    ).rejects.toThrow();
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.person.update({
+          data: { location_id: fixture.locationA2.id },
+          where: {
+            account_id: accountA,
+            id: fixture.employeeA.id,
+            organisation_id: companyA,
+          },
+        })
+      )
+    ).rejects.toThrow();
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.person.update({
+          data: { location_id: fixture.locationB.id },
+          where: {
+            account_id: accountA,
+            id: fixture.employeeA.id,
+            organisation_id: companyA,
+          },
+        })
+      )
+    ).rejects.toThrow();
+
+    // 2. availability_records.person_id must match companyA, while approved_by_person_id
+    // permits another company in accountA and rejects accountB.
+    const recordBase = {
+      account_id: accountA,
+      approval_status: "approved" as const,
+      contactability: "unavailable" as const,
+      derived_uid_key: `uid-${randomUUID()}`,
+      ends_at: new Date("2026-11-15T00:00:00.000Z"),
+      organisation_id: companyA,
+      privacy_mode: "named" as const,
+      record_type: "annual_leave" as const,
+      source_type: "manual" as const,
+      starts_at: new Date("2026-11-14T00:00:00.000Z"),
+    };
+    const validRecord = await withTenantDb(accountA, (db) =>
+      db.availabilityRecord.create({
+        data: {
+          ...recordBase,
+          approved_by_person_id: fixture.managerA2.id,
+          person_id: fixture.employeeA.id,
+        },
+      })
+    );
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.availabilityRecord.create({
+          data: {
+            ...recordBase,
+            derived_uid_key: `uid-${randomUUID()}`,
+            person_id: fixture.managerA2.id,
+          },
+        })
+      )
+    ).rejects.toThrow();
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.availabilityRecord.update({
+          data: { approved_by_person_id: fixture.foreignPerson.id },
+          where: {
+            account_id: accountA,
+            id: validRecord.id,
+            organisation_id: companyA,
+          },
+        })
+      )
+    ).rejects.toThrow();
+
+    // 3. feed_tokens must match parent feed's (account_id, organisation_id) and rotated_from_token_id feed.
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.feedToken.create({
+          data: {
+            account_id: accountA,
+            feed_id: fixture.feedA2.id,
+            organisation_id: companyA,
+            status: "revoked",
+            token_hash: `hash-${randomUUID()}`,
+            token_hint: "bad1",
+          },
+        })
+      )
+    ).rejects.toThrow();
+    await expect(
+      withTenantDb(accountA, (db) =>
+        db.feedToken.create({
+          data: {
+            account_id: accountA,
+            feed_id: fixture.feedA.id,
+            organisation_id: companyA,
+            rotated_from_token_id: fixture.tokenA2.id,
+            status: "revoked",
+            token_hash: `hash-${randomUUID()}`,
+            token_hint: "bad2",
+          },
+        })
+      )
+    ).rejects.toThrow();
+  } finally {
+    await systemDatabase.availabilityRecord.deleteMany({
+      where: { account_id: accountA, person_id: fixture.employeeA.id },
+    });
+    await systemDatabase.feedToken.deleteMany({
+      where: { feed_id: { in: [fixture.feedA.id, fixture.feedA2.id] } },
+    });
+    await systemDatabase.feed.deleteMany({
+      where: { id: { in: [fixture.feedA.id, fixture.feedA2.id] } },
+    });
+    await systemDatabase.person.deleteMany({
+      where: {
+        id: {
+          in: [
+            fixture.employeeA.id,
+            fixture.managerA2.id,
+            fixture.foreignPerson.id,
+          ],
+        },
+      },
+    });
+    await systemDatabase.team.deleteMany({
+      where: {
+        id: { in: [fixture.teamA.id, fixture.teamA2.id, fixture.teamB.id] },
+      },
+    });
+    await systemDatabase.location.deleteMany({
+      where: {
+        id: {
+          in: [
+            fixture.locationA.id,
+            fixture.locationA2.id,
+            fixture.locationB.id,
+          ],
+        },
+      },
+    });
+    await systemDatabase.organisation.delete({
+      where: { id: fixture.secondCompany.id },
+    });
+  }
+});
+
 const ACCOUNT_SETTINGS_INSERT_PATTERN =
   /INSERT INTO "account_settings"[\s\S]+?ON CONFLICT \("clerk_org_id"\) DO NOTHING;/;

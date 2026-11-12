@@ -1,5 +1,36 @@
 # Current work
 
+## Database RLS Hardening (12 November 2026)
+
+Plan: `docs/superpowers/plans/2026-11-12-database-rls-hardening.md`
+
+- [x] Task 1: Author migration `20261025170000_rls_child_reference_integrity`
+  - [x] Step 1.1: Revoke default privileges in schema `public` on `TABLES`, `SEQUENCES`, and `FUNCTIONS` from `PUBLIC` and `team_calendar_app`
+  - [x] Step 1.2: Remove redundant `organisation_id IS NULL` branch from `WITH CHECK` policies on the 18 non-nullable company-scoped tables
+  - [x] Step 1.3: Add intra-tenant parent ownership predicates to `WITH CHECK` policies on the 14 child tables with single-column FKs (`people`, `alternative_contacts`, `availability_records`, `outbound_operations`, `availability_publications`, `leave_balances`, `xero_person_matches`, `public_holiday_preferences`, `feed_tokens`, `feed_scopes`, `feed_event_publications`, `notifications`, `notification_email_queue`, `failed_records`) and `tc_feed_token_belongs_to_feed` self-reference helper
+- [x] Task 2: Expand `packages/database/row-level-security.integration.test.ts`
+  - [x] Step 2.1: Add integration tests verifying cross-company and cross-account child FK writes are rejected by RLS while valid same-account cross-company manager/reviewer references succeed
+- [x] Task 3: Run verification gates and document results
+
+Stopping condition: Migration and integration test updates completed, deployed, and verified against repository gates.
+
+Review: PASS.
+1. Task 1 (Migration `20261025170000_rls_child_reference_integrity`):
+   - Created `packages/database/prisma/migrations/20261025170000_rls_child_reference_integrity/migration.sql` and applied it via `bun run migrate:deploy` (46/46 migrations applied; `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` reports `No difference detected`).
+   - Revoked default privileges in `public` on `TABLES`, `SEQUENCES`, and `FUNCTIONS` from `PUBLIC` and `team_calendar_app`.
+   - Tightened `WITH CHECK` policies across all 18 non-nullable company-scoped tables so `organisation_id IS NULL` only remains on the 5 nullable tables (`feed_event_publications`, `feed_scopes`, `feed_tokens`, `feeds`, `xero_oauth_sessions`).
+   - Added parent `(account_id, organisation_id)` / `(account_id)` ownership checks in `WITH CHECK` policies across all child tables with single-column FKs, plus `public.tc_feed_token_belongs_to_feed` (`SECURITY DEFINER`, `search_path=pg_catalog`) for `feed_tokens.rotated_from_token_id`.
+2. Task 2 (Integration Test Coverage & Live Database Verification):
+   - Added `"child RLS policies enforce same-company and same-account parent ownership"` to `packages/database/row-level-security.integration.test.ts`.
+   - Verified against the live database under `team_calendar_app` (`DATABASE_APP_URL`) in rolled-back transactions: cross-company `people.team_id`, cross-account `people.team_id`, cross-company `availability_records.person_id`, and cross-account `availability_records.approved_by_person_id` all fail with PostgreSQL SQLSTATE `42501`, while same-company `person_id` + same-account cross-company `approved_by_person_id` succeeds.
+3. Task 3 (Repository Verification Gates):
+   - `bun run check`: Checked 1,430 files, 0 errors.
+   - `bun run typecheck`: 19/19 packages passed.
+   - `bun run typecheck:release-tools`: 0 errors.
+   - `bun run boundaries`: 0 issues found.
+   - `bun run test:release-tools`: 28/28 test files passed (248 passed, 5 skipped).
+   - `migration-check.ts`: Verified 41 immutable base migrations and 5 ordered candidate migrations including `20261025170000_rls_child_reference_integrity`.
+
 ## PR #144 Second Review Remediation (12 November 2026)
 
 - [x] Task 1: Remove `requireActiveOrgPageContext()` from billing Server Actions
