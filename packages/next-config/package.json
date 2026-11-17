@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "next": "16.4.3",
+    "next": "16.4.5",
     "vitest": "^5.0.5"
   }
 }
