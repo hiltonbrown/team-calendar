@@ -83,8 +83,8 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@better-auth/core": "1.7.12",
-    "@better-auth/infra": "0.4.22",
+    "@better-auth/core": "1.7.25",
+    "@better-auth/infra": "0.4.30",
     "@repo/analytics": "*",
     "@repo/core": "*",
     "@repo/database": "*",
@@ -92,19 +92,19 @@
     "@repo/email": "*",
     "@repo/observability": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "better-auth": "1.7.12",
+    "better-auth": "1.7.25",
     "react": "19.3.1",
     "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.1",
     "@repo/typescript-config": "*",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "peerDependencies": {
     "next": "16.4.3"

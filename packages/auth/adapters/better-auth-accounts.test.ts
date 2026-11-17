@@ -751,9 +751,15 @@ describe("native organisation API behind guarded Account facade", () => {
       });
       expect(page.totalCount).toBe(1);
       expect(page.data[0]).toMatchObject({ role: actorRole, userId: actorId });
-      expect(
-        await listAccountInvitations({ accountId, status: ["pending"] })
-      ).toEqual({ data: [], totalCount: 0 });
+      if (actorRole === "owner" || actorRole === "admin") {
+        expect(
+          await listAccountInvitations({ accountId, status: ["pending"] })
+        ).toEqual({ data: [], totalCount: 0 });
+      } else {
+        await expect(
+          listAccountInvitations({ accountId, status: ["pending"] })
+        ).rejects.toMatchObject({ status: "FORBIDDEN", statusCode: 403 });
+      }
     }
   );
   it("denies invitation email mismatch before changing any membership", async () => {

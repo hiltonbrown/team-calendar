@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@next/bundle-analyzer": "16.4.3",
+    "@next/bundle-analyzer": "16.4.6",
     "@repo/auth": "*",
     "@repo/database": "*",
     "@t3-oss/env-core": "^0.13.11",
@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "next": "16.4.3",
-    "vitest": "^5.0.5"
+    "next": "16.4.6",
+    "vitest": "^5.1.0"
   }
 }

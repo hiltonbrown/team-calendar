@@ -2,6 +2,7 @@ import {
   listAccountInvitations,
   listAccountMembers,
 } from "@repo/auth/accounts";
+import { hasPermission } from "@repo/auth/permissions";
 import { getSession } from "@repo/auth/server";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -28,15 +29,21 @@ const MembersPage = async () => {
     redirect("/");
   }
 
+  const canViewInvitations = hasPermission(sessionRole, {
+    invitation: ["create"],
+  });
+
   const [membershipsResult, invitationsResult] = await Promise.all([
     listAccountMembers({
       accountId: sessionAccountId,
       limit: 100,
     }),
-    listAccountInvitations({
-      accountId: sessionAccountId,
-      status: ["pending"],
-    }),
+    canViewInvitations
+      ? listAccountInvitations({
+          accountId: sessionAccountId,
+          status: ["pending"],
+        })
+      : Promise.resolve({ data: [], totalCount: 0 }),
   ]);
 
   const members = membershipsResult.data.map((m) => ({
