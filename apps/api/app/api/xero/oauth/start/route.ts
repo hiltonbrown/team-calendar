@@ -1,18 +1,22 @@
-import { currentUser, requireOrg, requireRole } from "@repo/auth/helpers";
+import {
+  getCurrentUser,
+  hasPermission,
+  requireAccount,
+} from "@repo/auth/helpers";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { buildXeroOAuthStartUrl } from "@repo/xero";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   assertNoTenantTransaction("GET");
-  let authenticatedClerkOrgId: string;
+  let authenticatedAccountId: string;
   try {
-    authenticatedClerkOrgId = await requireOrg();
+    authenticatedAccountId = await requireAccount();
   } catch {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
 
-  const user = await currentUser();
+  const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
@@ -21,8 +25,8 @@ export async function GET(request: Request) {
   let isOwner = false;
   try {
     [isAdmin, isOwner] = await Promise.all([
-      requireRole("org:admin"),
-      requireRole("org:owner"),
+      hasPermission({ xero: ["connect"] }),
+      hasPermission({ ownership: ["manage"] }),
     ]);
   } catch {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
@@ -35,18 +39,15 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const clerkOrgId = url.searchParams.get("clerkOrgId");
+  const accountId = url.searchParams.get("accountId");
   const organisationId = url.searchParams.get("organisationId");
   const returnTo = url.searchParams.get("returnTo") ?? undefined;
 
-  if (!clerkOrgId) {
-    return NextResponse.json(
-      { error: "Missing Clerk organisation ID." },
-      { status: 400 }
-    );
+  if (!accountId) {
+    return NextResponse.json({ error: "Missing Account ID." }, { status: 400 });
   }
 
-  if (clerkOrgId !== authenticatedClerkOrgId) {
+  if (accountId !== authenticatedAccountId) {
     return NextResponse.json(
       { error: "Organisation mismatch." },
       { status: 403 }
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
   }
 
   const result = await buildXeroOAuthStartUrl({
-    clerkOrgId: authenticatedClerkOrgId,
+    accountId: authenticatedAccountId,
     organisationId,
     returnTo,
     userId: user.id,

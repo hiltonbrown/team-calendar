@@ -1,3 +1,7 @@
+import {
+  betterAuthServerEnvironmentSchema,
+  validateBetterAuthPreviewOrigins,
+} from "@repo/auth/keys";
 import { z } from "zod";
 import { type LaunchMode, launchModeSchema } from "./launch-mode";
 
@@ -136,7 +140,6 @@ export const runProductionPreflight = (
   const { appName, envVars = process.env, launchMode: explicitMode } = options;
   const errors: string[] = [];
   const checkedVars: string[] = [];
-
   const rawMode = envVars.NEXT_PUBLIC_LAUNCH_MODE?.trim();
   const parsedMode = launchModeSchema.safeParse(rawMode);
 
@@ -253,8 +256,48 @@ export const runProductionPreflight = (
     ) {
       errors.push("XERO_REDIRECT_URI must be a valid HTTPS URL");
     }
-    checkPresent("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
-    checkPresent("CLERK_SECRET_KEY");
+    if (appName === "app") {
+      checkedVars.push(
+        "AUTH_CONTEXT_MODE",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "BETTER_AUTH_INFRA_ENABLED",
+        "BETTER_AUTH_API_KEY",
+        "BETTER_AUTH_TELEMETRY",
+        "XERO_AUTH_CLIENT_ID",
+        "XERO_AUTH_CLIENT_SECRET"
+      );
+      const authConfig = betterAuthServerEnvironmentSchema.safeParse(envVars);
+      if (!authConfig.success) {
+        errors.push(
+          ...authConfig.error.issues.map(
+            (issue) => `${issue.path.join(".")} ${issue.message}`
+          )
+        );
+      }
+      if (!envVars.BETTER_AUTH_URL?.startsWith("https://")) {
+        errors.push("BETTER_AUTH_URL must use HTTPS in production");
+      }
+    } else {
+      checkedVars.push("AUTH_CONTEXT_MODE");
+      if (envVars.AUTH_CONTEXT_MODE !== "remote") {
+        errors.push("AUTH_CONTEXT_MODE must be remote for the Better Auth API");
+      }
+    }
+    if (envVars.VERCEL_ENV === "preview") {
+      checkedVars.push(
+        "VERCEL_ENV",
+        "TC_APP_CANDIDATE_URL",
+        "TC_API_CANDIDATE_URL"
+      );
+      try {
+        validateBetterAuthPreviewOrigins(envVars);
+      } catch {
+        errors.push(
+          "Preview auth requires an exact app/API candidate pair matching NEXT_PUBLIC_APP_URL and NEXT_PUBLIC_API_URL"
+        );
+      }
+    }
 
     if (
       checkPresent("XERO_APP_TIER") &&
@@ -269,9 +312,18 @@ export const runProductionPreflight = (
   }
 
   if (appName === "api") {
-    checkPresent("CLERK_WEBHOOK_SECRET");
     checkPair("INNGEST_EVENT_KEY", "INNGEST_SIGNING_KEY");
+  }
 
+  if (
+    (appName === "app" || appName === "api") &&
+    envVars.JOB_IDENTITY_GENERATION !== undefined &&
+    envVars.JOB_IDENTITY_GENERATION.trim().length === 0
+  ) {
+    errors.push("JOB_IDENTITY_GENERATION must not be empty");
+  }
+
+  if (appName === "app" || appName === "api") {
     if (checkPresent("RESEND_TOKEN")) {
       const resendToken = envVars.RESEND_TOKEN?.trim();
       if (!resendToken?.startsWith("re_")) {
@@ -279,6 +331,9 @@ export const runProductionPreflight = (
       }
     }
     checkEmail("RESEND_FROM");
+  }
+
+  if (appName === "api") {
     checkEmail("EARLY_ACCESS_APPLICATION_RECIPIENT");
     if (
       checkPresent("EARLY_ACCESS_APPLICATION_HMAC_SECRET") &&

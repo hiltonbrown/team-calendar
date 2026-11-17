@@ -1,10 +1,10 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getSession } from "@repo/auth/server";
 import { listTeamCoverageMinimums } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { CoverageSettingsClient } from "./coverage-settings-client";
 
@@ -18,19 +18,22 @@ interface CoveragePageProps {
 }
 
 const CoveragePage = async ({ searchParams }: CoveragePageProps) => {
-  await requirePageRole("org:admin");
-  const [{ org }, { orgRole }] = await Promise.all([searchParams, auth()]);
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  await requirePagePermission({ settings: ["update"] });
+  const [{ org }, { role: sessionRole }] = await Promise.all([
+    searchParams,
+    getSession().then((currentSession) => currentSession ?? { role: null }),
+  ]);
+  const accountId = (await requireAccount()) as AccountId;
   const { teamsResult, organisationId } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const { organisationId: scopedOrganisationId } =
-        await resolveActiveOrgPageContext(clerkOrgId, org, db);
+        await resolveActiveOrgPageContext(accountId, org, db);
       const preparedTeamsResult = await listTeamCoverageMinimums(
         {
-          // requirePageRole above admits only admins and owners.
-          actingRole: orgRole === "org:owner" ? "owner" : "admin",
-          clerkOrgId,
+          accountId,
+          // requirePagePermission above admits only admins and owners.
+          actingRole: sessionRole === "owner" ? "owner" : "admin",
           organisationId: scopedOrganisationId,
         },
         db

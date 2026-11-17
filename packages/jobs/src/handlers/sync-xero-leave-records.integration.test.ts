@@ -85,22 +85,22 @@ describe("local persistence integration", async () => {
   const { systemDatabase: database } = await import("@repo/database");
   const { syncXeroLeaveRecords } = await import("./sync-xero-leave-records");
   const tenantA = {
-    authorisationId: fixture.id("authorisation", 0),
-    clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+    accountId: fixture.tenants[0]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 0),
     connectionId: fixture.id("connection", 0),
     organisationId: fixture.tenants[0]?.organisationId as string,
     personId: fixture.id("person", 0),
     xeroEmployeeId: fixture.id("employee", 0),
   } as const;
   const tenantB = {
-    authorisationId: fixture.id("authorisation", 1),
-    clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+    accountId: fixture.tenants[1]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 1),
     connectionId: fixture.id("connection", 1),
     organisationId: fixture.tenants[1]?.organisationId as string,
     personId: fixture.id("person", 1),
     xeroEmployeeId: tenantA.xeroEmployeeId,
   } as const;
-  const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
+  const testAccountIds = [tenantA.accountId, tenantB.accountId] as const;
   const testAuthorisationIds = [
     tenantA.authorisationId,
     tenantB.authorisationId,
@@ -137,7 +137,7 @@ describe("local persistence integration", async () => {
         const record = await database.availabilityRecord.findFirst({
           select: { archived_at: true },
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             source_remote_id: staleLeaveId(),
           },
@@ -156,9 +156,10 @@ describe("local persistence integration", async () => {
       expect(mockInngestSend).toHaveBeenCalledWith([
         {
           data: {
-            clerkOrgId: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             feedId: "50000000-0000-4000-8000-000000000010",
-            organisationId: tenantA.organisationId,
+            identity_generation: "gen_v1",
+            organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
           name: "rebuild-feed-cache",
@@ -179,7 +180,7 @@ describe("local persistence integration", async () => {
           return;
         }
         const scope = {
-          clerk_org_id: context.clerkOrgId,
+          account_id: context.accountId,
           organisation_id: context.organisationId,
         };
         const archived = await tx.availabilityRecord.count({
@@ -203,7 +204,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.availabilityRecord.findFirst({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             source_remote_id: staleLeaveId(),
           },
@@ -212,7 +213,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.xeroSyncCursor.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             xero_connection_id: tenantA.connectionId,
           },
@@ -224,7 +225,7 @@ describe("local persistence integration", async () => {
       await setupTenant(tenantA);
       await setupPerson(tenantA);
       const scope = {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         organisation_id: tenantA.organisationId,
         xero_connection_id: tenantA.connectionId,
       };
@@ -256,7 +257,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.availabilityRecord.findFirst({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             source_remote_id: staleLeaveId(),
           },
@@ -279,7 +280,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.xeroConnection.findFirst({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             id: tenantA.connectionId,
             organisation_id: tenantA.organisationId,
           },
@@ -288,7 +289,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.availabilityRecord.findFirst({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             source_remote_id: staleLeaveId(),
           },
@@ -300,7 +301,7 @@ describe("local persistence integration", async () => {
       await setupPerson(tenantA);
       await createStaleRecord(tenantA);
       const scope = {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         organisation_id: tenantA.organisationId,
         xero_connection_id: tenantA.connectionId,
       };
@@ -328,7 +329,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.availabilityRecord.findFirst({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             source_remote_id: staleLeaveId(),
           },
@@ -343,7 +344,7 @@ describe("local persistence integration", async () => {
         await setupFeed(tenantA);
         await createStaleRecord(tenantA);
         const scope = {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           xero_connection_id: tenantA.connectionId,
         };
@@ -393,7 +394,7 @@ describe("local persistence integration", async () => {
         expect(
           await database.availabilityRecord.findFirst({
             where: {
-              clerk_org_id: tenantA.clerkOrgId,
+              account_id: tenantA.accountId,
               organisation_id: tenantA.organisationId,
               source_remote_id: staleLeaveId(),
             },
@@ -444,7 +445,7 @@ describe("local persistence integration", async () => {
       const records = await database.availabilityRecord.findMany({
         orderBy: { source_remote_id: "asc" },
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_type: "xero_leave",
         },
@@ -470,7 +471,7 @@ describe("local persistence integration", async () => {
       ).toBe("archived");
       const publications = await database.availabilityPublication.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -483,9 +484,10 @@ describe("local persistence integration", async () => {
       expect(mockInngestSend).toHaveBeenCalledWith([
         {
           data: {
-            clerkOrgId: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             feedId: expect.any(String),
-            organisationId: tenantA.organisationId,
+            identity_generation: "gen_v1",
+            organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
           name: "rebuild-feed-cache",
@@ -522,7 +524,7 @@ describe("local persistence integration", async () => {
       }
       const failedRecords = await database.failedRecord.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -533,7 +535,7 @@ describe("local persistence integration", async () => {
         record_type: "leave_records",
       });
     });
-    it("requires both Clerk org and Organisation scope for people and records", async () => {
+    it("requires both Account and Organisation scope for people and records", async () => {
       await setupTenant(tenantA);
       await setupTenant(tenantB);
       await setupPerson(tenantB);
@@ -556,7 +558,7 @@ describe("local persistence integration", async () => {
       }
       const tenantBRecords = await database.availabilityRecord.findMany({
         where: {
-          clerk_org_id: tenantB.clerkOrgId,
+          account_id: tenantB.accountId,
           organisation_id: tenantB.organisationId,
         },
       });
@@ -582,7 +584,7 @@ describe("local persistence integration", async () => {
       expect(result.ok).toBe(true);
       const records = await database.availabilityRecord.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: leaveId(),
         },
@@ -640,7 +642,7 @@ describe("local persistence integration", async () => {
       await setupTenant(tenantA);
       await setupPerson(tenantA);
       const cursorScope = {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         entity_type: "leave_records" as const,
         organisation_id: tenantA.organisationId,
         xero_connection_id: tenantA.connectionId,
@@ -670,7 +672,7 @@ describe("local persistence integration", async () => {
             updated_at: new Date(),
           },
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             id: existing.id,
             organisation_id: tenantA.organisationId,
           },
@@ -757,7 +759,7 @@ describe("local persistence integration", async () => {
       await database.availabilityRecord.updateMany({
         data: { updated_at: futureDate },
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: staleLeaveId(),
         },
@@ -782,7 +784,7 @@ describe("local persistence integration", async () => {
       }
       const record = await database.availabilityRecord.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: staleLeaveId(),
         },
@@ -811,7 +813,7 @@ describe("local persistence integration", async () => {
       }
       let record = await database.availabilityRecord.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: staleLeaveId(),
         },
@@ -833,7 +835,7 @@ describe("local persistence integration", async () => {
       }
       record = await database.availabilityRecord.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: staleLeaveId(),
         },
@@ -854,9 +856,9 @@ describe("local persistence integration", async () => {
       for (const id of staleIds) {
         await database.availabilityRecord.create({
           data: {
+            account_id: tenantA.accountId,
             all_day: true,
             approval_status: "approved",
-            clerk_org_id: tenantA.clerkOrgId,
             contactability: "unavailable",
             derived_uid_key: `stale-${id}`,
             ends_at: new Date("2026-05-05T00:00:00.000Z"),
@@ -891,7 +893,7 @@ describe("local persistence integration", async () => {
       }
       const archivedRecords = await database.availabilityRecord.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
           source_remote_id: { in: staleIds },
         },
@@ -906,9 +908,10 @@ describe("local persistence integration", async () => {
       expect(mockInngestSend).toHaveBeenCalledWith([
         {
           data: {
-            clerkOrgId: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             feedId: "50000000-0000-4000-8000-000000000010",
-            organisationId: tenantA.organisationId,
+            identity_generation: "gen_v1",
+            organisation_id: tenantA.organisationId,
             reason: "xero_leave_records_synced",
           },
           name: "rebuild-feed-cache",
@@ -919,7 +922,7 @@ describe("local persistence integration", async () => {
       await setupTenant(tenantA, "NZ");
       // Create 21 people in one batch
       const peopleData = Array.from({ length: 21 }, (_, i) => ({
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: `person${i + 1}@example.com`,
         employment_type: "employee" as const,
         first_name: "Person",
@@ -958,7 +961,7 @@ describe("local persistence integration", async () => {
       );
       const cursor1 = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -993,7 +996,7 @@ describe("local persistence integration", async () => {
       ).toBe(true);
       const cursor2 = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -1006,7 +1009,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.xeroSyncCursor.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             xero_connection_id: tenantA.connectionId,
           },
@@ -1020,7 +1023,7 @@ describe("local persistence integration", async () => {
       const employeeBId = "60000000-0000-4000-8000-000000000088";
       await database.person.create({
         data: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           email: "personb@example.com",
           employment_type: "employee",
           first_name: "Person",
@@ -1036,9 +1039,9 @@ describe("local persistence integration", async () => {
       const staleAId = "50000000-0000-4000-8000-000000000091";
       await database.availabilityRecord.create({
         data: {
+          account_id: tenantA.accountId,
           all_day: true,
           approval_status: "approved",
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "unavailable",
           derived_uid_key: `stale-${staleAId}`,
           ends_at: new Date("2026-05-05T00:00:00.000Z"),
@@ -1056,9 +1059,9 @@ describe("local persistence integration", async () => {
       const staleBId = "50000000-0000-4000-8000-000000000092";
       await database.availabilityRecord.create({
         data: {
+          account_id: tenantA.accountId,
           all_day: true,
           approval_status: "approved",
-          clerk_org_id: tenantA.clerkOrgId,
           contactability: "unavailable",
           derived_uid_key: `stale-${staleBId}`,
           ends_at: new Date("2026-05-05T00:00:00.000Z"),
@@ -1139,7 +1142,7 @@ describe("local persistence integration", async () => {
       await database.xeroConnection.updateMany({
         data: { leave_next_person_id: initialCursor },
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -1149,7 +1152,7 @@ describe("local persistence integration", async () => {
         await database.xeroConnection.updateMany({
           data: { leave_next_person_id: modifiedCursor },
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             id: tenantA.connectionId,
             organisation_id: tenantA.organisationId,
           },
@@ -1172,7 +1175,7 @@ describe("local persistence integration", async () => {
       // Ensure cursor value was NOT overwritten with next value
       const cursor = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -1193,7 +1196,7 @@ describe("local persistence integration", async () => {
       }
       const cursor = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -1207,10 +1210,10 @@ describe("local persistence integration", async () => {
   ) {
     await database.organisation.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         country_code: payrollRegion === "UK" ? "GB" : payrollRegion,
         id: tenant.organisationId,
-        name: `Test Org ${tenant.clerkOrgId}`,
+        name: `Test Org ${tenant.accountId}`,
       },
     });
     const access = encryptXeroToken("synthetic-access");
@@ -1243,7 +1246,7 @@ describe("local persistence integration", async () => {
       where: { id: tenant.authorisationId },
     });
     const connection = {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: tenant.organisationId,
       payroll_region: payrollRegion,
       remote_connection_id: `remote-${tenant.connectionId}`,
@@ -1261,7 +1264,7 @@ describe("local persistence integration", async () => {
   async function setupPerson(tenant: typeof tenantA | typeof tenantB) {
     await database.person.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         email: `${tenant.personId}@example.com`,
         employment_type: "employee",
         first_name: "Pat",
@@ -1277,7 +1280,7 @@ describe("local persistence integration", async () => {
   async function setupFeed(tenant: typeof tenantA) {
     const feed = await database.feed.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         id: "50000000-0000-4000-8000-000000000010",
         name: "Team feed",
         organisation_id: tenant.organisationId,
@@ -1288,7 +1291,7 @@ describe("local persistence integration", async () => {
     });
     await database.feedScope.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         feed_id: feed.id,
         organisation_id: tenant.organisationId,
         scope_type: "person",
@@ -1299,9 +1302,9 @@ describe("local persistence integration", async () => {
   async function createStaleRecord(tenant: typeof tenantA) {
     await database.availabilityRecord.create({
       data: {
+        account_id: tenant.accountId,
         all_day: true,
         approval_status: "approved",
-        clerk_org_id: tenant.clerkOrgId,
         contactability: "unavailable",
         derived_uid_key: "stale",
         ends_at: new Date("2026-05-05T00:00:00.000Z"),
@@ -1330,10 +1333,10 @@ describe("local persistence integration", async () => {
   ) {
     return await database.availabilityRecord.create({
       data: {
+        account_id: tenant.accountId,
         all_day: true,
         approval_note: input.approvalNote ?? null,
         approval_status: input.approvalStatus,
-        clerk_org_id: tenant.clerkOrgId,
         contactability: "unavailable",
         derived_uid_key: `existing-${input.sourceRemoteId}`,
         ends_at: new Date("2026-05-08T00:00:00.000Z"),
@@ -1353,7 +1356,7 @@ describe("local persistence integration", async () => {
     });
   }
   async function cleanTestData() {
-    const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
+    const scope = { account_id: { in: [...testAccountIds] } };
     await database.failedRecord.deleteMany({ where: scope });
     await database.xeroSyncCursor.deleteMany({ where: scope });
     await database.syncRun.deleteMany({ where: scope });
@@ -1370,7 +1373,7 @@ describe("local persistence integration", async () => {
   }
   function syncInput(tenant: typeof tenantA) {
     return {
-      clerkOrgId: tenant.clerkOrgId,
+      accountId: tenant.accountId,
       connectionId: tenant.connectionId,
       organisationId: tenant.organisationId,
       triggerType: "manual" as const,

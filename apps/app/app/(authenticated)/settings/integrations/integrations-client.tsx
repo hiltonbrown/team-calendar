@@ -47,7 +47,7 @@ export const IntegrationsClient = ({
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Xero is shared at the Clerk Organisation level and attached per payroll organisation."
+        description="Xero is shared at the Account level and attached per payroll organisation."
         title="Integrations"
       />
 
@@ -58,7 +58,7 @@ export const IntegrationsClient = ({
               <CardTitle>Xero Payroll</CardTitle>
               <CardDescription>
                 One shared integration overview for every payroll organisation
-                in this Clerk Organisation.
+                in this Account.
               </CardDescription>
             </div>
             <ProviderStatusBadge status={rolledUpStatus} />

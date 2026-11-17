@@ -13,8 +13,8 @@ export type InboundLeaveApprovalStatus =
   | "withdrawn";
 
 export interface InboundLeaveRecordInput {
+  accountId: string;
   approvalStatus: InboundLeaveApprovalStatus;
-  clerkOrgId: string;
   endsAt: Date;
   organisationId: string;
   personId: string;
@@ -58,7 +58,7 @@ export function normaliseInboundLeaveRecord(
     approvalStatus,
     contactability: "unavailable",
     derivedUidKey: deriveAvailabilityUidKey({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       endsAt: input.endsAt,
       organisationId: input.organisationId,
       personId: input.personId,

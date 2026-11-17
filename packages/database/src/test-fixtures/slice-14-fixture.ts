@@ -9,14 +9,14 @@ export type Slice14ApprovalStatus =
 export type Slice14SourceType = "team_calendar_leave" | "manual" | "xero_leave";
 
 export interface Slice14OrganisationFixture {
-  clerkOrgId: string;
+  accountId: string;
   countryCode: "AU" | "NZ";
   id: string;
   name: string;
 }
 
 export interface Slice14PersonFixture {
-  clerkOrgId: string;
+  accountId: string;
   email: string;
   firstName: string;
   id: string;
@@ -28,8 +28,8 @@ export interface Slice14PersonFixture {
 }
 
 export interface Slice14AvailabilityRecordFixture {
+  accountId: string;
   approvalStatus: Slice14ApprovalStatus;
-  clerkOrgId: string;
   failedAction: "approve" | "decline" | "submit" | "withdraw" | null;
   id: string;
   organisationId: string;
@@ -41,7 +41,7 @@ export interface Slice14AvailabilityRecordFixture {
 export interface Slice14Fixture {
   auditEvents: Array<{
     action: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   }>;
   availabilityRecords: Slice14AvailabilityRecordFixture[];
@@ -78,8 +78,8 @@ export interface Slice14Fixture {
   }>;
 }
 
-const CLERK_ORG_A = "org_a";
-const CLERK_ORG_B = "org_b";
+const ACCOUNT_A = "org_a";
+const ACCOUNT_B = "org_b";
 const ORG_A = "00000000-0000-4000-8000-0000000000a1";
 const ORG_B = "00000000-0000-4000-8000-0000000000b1";
 
@@ -108,13 +108,13 @@ const RECORD_TYPE_CYCLE = [
 export function createSlice14Fixture(): Slice14Fixture {
   const organisations: Slice14OrganisationFixture[] = [
     {
-      clerkOrgId: CLERK_ORG_A,
+      accountId: ACCOUNT_A,
       countryCode: "AU",
       id: ORG_A,
       name: "Team Calendar Fixture A",
     },
     {
-      clerkOrgId: CLERK_ORG_B,
+      accountId: ACCOUNT_B,
       countryCode: "NZ",
       id: ORG_B,
       name: "Team Calendar Fixture B",
@@ -140,7 +140,7 @@ export function createSlice14Fixture(): Slice14Fixture {
       (row) => row.organisationId === organisation.id
     )[index % 2];
     return {
-      clerkOrgId: organisation.clerkOrgId,
+      accountId: organisation.accountId,
       email: `person${index + 1}@teamcalendar.test`,
       firstName: `Person${index + 1}`,
       id: fixtureId("300", index),
@@ -217,8 +217,8 @@ function createAvailabilityRecords(
     const person = people[index % people.length];
     const approvalStatus = STATUS_CYCLE[index % STATUS_CYCLE.length];
     return {
+      accountId: person?.accountId ?? ACCOUNT_A,
       approvalStatus,
-      clerkOrgId: person?.clerkOrgId ?? CLERK_ORG_A,
       failedAction:
         approvalStatus === "xero_sync_failed" ? failedActionFor(index) : null,
       id: fixtureId("400", index),
@@ -247,8 +247,8 @@ function createAuditEvents(organisations: Slice14OrganisationFixture[]) {
   return actions.map((action, index) => {
     const organisation = organisations[index % organisations.length];
     return {
+      accountId: organisation?.accountId ?? ACCOUNT_A,
       action,
-      clerkOrgId: organisation?.clerkOrgId ?? CLERK_ORG_A,
       organisationId: organisation?.id ?? ORG_A,
     };
   });

@@ -15,7 +15,7 @@ import type {
 export const XERO_WRITE_CLAIM_LEASE_MS = 5 * 60 * 1000;
 
 interface ClaimScope {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   recordId: string;
 }
@@ -33,9 +33,9 @@ export async function acquireXeroWriteClaim(
   input: AcquireXeroWriteClaimInput,
   db: TenantDb
 ): Promise<Date | null> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const now = input.now ?? new Date();
@@ -76,9 +76,9 @@ export async function releaseXeroWriteClaim(
   input: ClaimScope & { claimedAt: Date },
   db: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const result = await client.availabilityRecord.updateMany({

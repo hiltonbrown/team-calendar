@@ -58,7 +58,7 @@ import {
 } from "./scope/feed-scope";
 
 const scope = {
-  clerkOrgId: "account-A",
+  accountId: "account-A",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
 const personId = "22222222-2222-4222-8222-222222222222";
@@ -177,12 +177,12 @@ beforeEach(() => {
 test.each(cases)(
   "$name runs within an explicit owned scope",
   async ({ run }) => {
-    await withTenantDb(scope.clerkOrgId, (db) => run(db));
+    await withTenantDb(scope.accountId, (db) => run(db));
     expect(state.transaction).toHaveBeenCalledTimes(1);
   }
 );
 test.each(cases)("$name reuses its caller's scope", async ({ run }) => {
-  await withTenantDb(scope.clerkOrgId, async (db) => {
+  await withTenantDb(scope.accountId, async (db) => {
     await run(db);
   });
   expect(state.transaction).toHaveBeenCalledTimes(1);
@@ -209,7 +209,7 @@ test("cache invalidation waits for the parent commit", async () => {
       scopes: [],
     },
   ];
-  await withTenantDb(scope.clerkOrgId, async (db) => {
+  await withTenantDb(scope.accountId, async (db) => {
     await invalidateAccountFeedCaches(scope, db);
     expect(state.invalidate).not.toHaveBeenCalled();
   });
@@ -225,7 +225,7 @@ test("a failed parent result discards cache invalidation", async () => {
       scopes: [],
     },
   ];
-  await withTenantResult(scope.clerkOrgId, async (db) => {
+  await withTenantResult(scope.accountId, async (db) => {
     await invalidateAccountFeedCaches(scope, db);
     return { error: "denied", ok: false };
   });

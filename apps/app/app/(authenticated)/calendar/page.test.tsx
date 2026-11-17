@@ -2,17 +2,17 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   getCalendarRange: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   locationFindMany: vi.fn(),
   organisationFindFirst: vi.fn(),
   personFindFirst: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
   resolveAccountCompanies: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
   teamFindMany: vi.fn(),
@@ -23,11 +23,11 @@ const LEAVE_SYNCED_REGEX = /Leave synced/;
 const UNLINKED_PERSON_COPY =
   /Your account is not linked to a person in this organisation/;
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: vi.fn(async () => "org_1"),
+  requireAccount: vi.fn(async () => "org_1"),
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   getCalendarRange: mocks.getCalendarRange,
@@ -60,8 +60,8 @@ function buildTenantTestDatabase() {
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   };
 }
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -111,10 +111,10 @@ describe("CalendarPage", () => {
         timezone: "Australia/Brisbane",
       },
     ]);
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
+    mocks.getSession.mockResolvedValue({ role: "viewer" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       orgQueryValue: null,
     });
@@ -136,8 +136,8 @@ describe("CalendarPage", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
     expect(mocks.getCalendarRange).toHaveBeenCalledWith(
       expect.objectContaining({
+        accountId: "org_1",
         actingUserId: "user_1",
-        clerkOrgId: "org_1",
         companyIds: undefined,
       }),
       expect.any(Object)
@@ -168,7 +168,7 @@ describe("CalendarPage", () => {
     expect(screen.queryByText("Today in view")).toBeNull();
   });
   it("uses admin default scope all_teams", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     render(await Page({ searchParams: Promise.resolve({}) }));
     expect(mocks.getCalendarRange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -189,7 +189,7 @@ describe("CalendarPage", () => {
         tenant_name: true,
       },
       where: {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         organisation_id: "00000000-0000-4000-8000-000000000001",
         released_at: null,
       },

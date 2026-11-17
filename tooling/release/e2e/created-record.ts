@@ -9,8 +9,8 @@ import { releaseEnvironment } from "./environment.js";
 const recordId = z.string().uuid();
 
 export interface ReleaseFixtureIdentity {
-  primaryClerkOrgId: string;
-  viewerClerkUserId: string;
+  primaryAccountId: string;
+  viewerUserId: string;
 }
 
 export async function validateReleaseFixtureOwnership(): Promise<ReleaseFixtureIdentity> {
@@ -18,10 +18,10 @@ export async function validateReleaseFixtureOwnership(): Promise<ReleaseFixtureI
   const pool = guardedPool();
   try {
     const organisations = await pool.query<{
-      clerk_org_id: string;
+      account_id: string;
       id: string;
     }>(
-      `SELECT id, clerk_org_id
+      `SELECT id, account_id
        FROM organisations
        WHERE id = ANY($1::uuid[])`,
       [[fixtures.organisations.primary, fixtures.organisations.foreign]]
@@ -29,11 +29,11 @@ export async function validateReleaseFixtureOwnership(): Promise<ReleaseFixtureI
     if (organisations.rows.length !== 2) {
       throw new Error("Release fixture organisations are incomplete");
     }
-    const clerkOrgByOrganisation = new Map(
-      organisations.rows.map((row) => [row.id, row.clerk_org_id])
+    const accountByOrganisation = new Map(
+      organisations.rows.map((row) => [row.id, row.account_id])
     );
-    for (const clerkOrgId of clerkOrgByOrganisation.values()) {
-      if (!manifest.owned.clerkOrgIds.includes(clerkOrgId)) {
+    for (const accountId of accountByOrganisation.values()) {
+      if (!manifest.owned.accountIds.includes(accountId)) {
         throw new Error("Release fixture organisation is not manifest-owned");
       }
     }
@@ -46,11 +46,11 @@ export async function validateReleaseFixtureOwnership(): Promise<ReleaseFixtureI
       [fixtures.people.viewer, fixtures.organisations.primary],
     ]);
     const people = await pool.query<{
-      clerk_user_id: string | null;
+      user_id: string | null;
       id: string;
       organisation_id: string;
     }>(
-      `SELECT id, organisation_id, clerk_user_id
+      `SELECT id, organisation_id, user_id
        FROM people
        WHERE id = ANY($1::uuid[])`,
       [[...expectedPeople.keys()]]
@@ -68,8 +68,8 @@ export async function validateReleaseFixtureOwnership(): Promise<ReleaseFixtureI
     const viewer = people.rows.find(
       (person) => person.id === fixtures.people.viewer
     );
-    if (!viewer?.clerk_user_id) {
-      throw new Error("Controlled viewer is not mapped to a Clerk user");
+    if (!viewer?.user_id) {
+      throw new Error("Controlled viewer is not mapped to a user");
     }
     const expectedRecords = new Map([
       [fixtures.records.approve, fixtures.people.approve],
@@ -108,13 +108,13 @@ export async function validateReleaseFixtureOwnership(): Promise<ReleaseFixtureI
     ) {
       throw new Error("Release fixture feed has unexpected ownership");
     }
-    const primaryClerkOrgId = clerkOrgByOrganisation.get(
+    const primaryAccountId = accountByOrganisation.get(
       fixtures.organisations.primary
     );
-    if (!primaryClerkOrgId) {
+    if (!primaryAccountId) {
       throw new Error("Primary release organisation is unavailable");
     }
-    return { primaryClerkOrgId, viewerClerkUserId: viewer.clerk_user_id };
+    return { primaryAccountId, viewerUserId: viewer.user_id };
   } finally {
     await pool.end();
   }
@@ -138,7 +138,7 @@ export async function findCreatedRecordId(input: {
          AND ar.person_id = $2::uuid
          AND ar.notes_internal = $3
          AND ar.archived_at IS NULL
-         AND ar.clerk_org_id = o.clerk_org_id
+         AND ar.account_id = o.account_id
        LIMIT 2`,
       [fixtures.organisations.primary, input.personId, input.notes]
     );

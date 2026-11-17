@@ -7,7 +7,7 @@ import {
 } from "./xero-fixture-cleanup.js";
 
 const owned = {
-  clerkOrgIds: ["clerk-owned"],
+  accountIds: ["account-owned"],
   globalKeys: ["authorisation:grant", "provider_app:app", "plan_id:plan"],
   organisationIds: ["org-owned"],
 };
@@ -48,7 +48,7 @@ describe("owned canonical Xero authorisation cleanup", () => {
     expect(database.query.mock.calls[1]?.slice(1)).toEqual([
       ["grant"],
       ["app"],
-      ["clerk-owned"],
+      ["account-owned"],
       ["org-owned"],
     ]);
     expect(database.query.mock.calls[1]?.[0]).toContain("xero_oauth_sessions");

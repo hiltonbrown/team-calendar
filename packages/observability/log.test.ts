@@ -21,11 +21,11 @@ describe("log", () => {
     vi.stubEnv("NODE_ENV", "production");
     const { log } = await import("./log");
     log.error("Fixed message", {
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       nested: { token: "secret" },
     });
     expect(transports.error).toHaveBeenCalledWith("Fixed message", {
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       nested: { token: "[SCRUBBED]" },
     });
   });

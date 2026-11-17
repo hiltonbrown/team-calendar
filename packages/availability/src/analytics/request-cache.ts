@@ -32,14 +32,14 @@ export function createAggregationCache(): AggregationCache {
 }
 
 export function aggregationFingerprint(input: {
-  clerkOrgId: string;
+  accountId: string;
   dateRangeKey: string;
   filterKey: unknown;
   organisationId: string;
   serviceMethod: string;
 }): string {
   return stableStringify({
-    clerkOrgId: input.clerkOrgId,
+    accountId: input.accountId,
     dateRangeKey: input.dateRangeKey,
     filterKey: input.filterKey,
     organisationId: input.organisationId,

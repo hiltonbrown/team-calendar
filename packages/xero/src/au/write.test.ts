@@ -71,7 +71,7 @@ function restoreEncryptionKey() {
 function buildXeroTenant() {
   return {
     accessToken: "access-token",
-    clerk_org_id: "org_1",
+    account_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_1",
     organisation_id: "00000000-0000-4000-8000-000000000001",
@@ -891,8 +891,8 @@ function withAuMutation<
   const { xeroConnection } = input;
   const prepared = prepareAuLeaveMutation(
     {
+      accountId: input.xeroConnection.account_id,
       action,
-      clerkOrgId: input.xeroConnection.clerk_org_id,
       employeeId: input.xeroEmployeeId,
       endsAt: input.endsAt,
       leaveTypeId: input.xeroLeaveTypeId,

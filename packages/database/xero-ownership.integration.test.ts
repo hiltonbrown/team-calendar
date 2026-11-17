@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, expect, test } from "vitest";
-import { isLocalDatabase } from "./src/is-local-database";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { resolveAccountCompanies } from "./src/queries/account-companies";
 import {
   claimXeroTenant,
@@ -14,46 +14,56 @@ import {
 import { tenantTestAccount } from "./src/test-fixtures/tenant-scope";
 import { lockActiveScopedXeroConnection } from "./src/xero-locks";
 
-const ownerUrl = process.env.DATABASE_URL;
-if (!(ownerUrl && isLocalDatabase(ownerUrl))) {
-  throw new Error(
-    "Multi-company database fixtures require disposable local PostgreSQL"
-  );
-}
-
+const fixture = allocateLiveTestFixture(
+  "packages/database/xero-ownership.integration.test.ts"
+);
 const accounts: string[] = [];
+let companyIndex = 0;
 const createCompany = async (account?: string) => {
-  const clerkOrgId = account ?? `ownership-${randomUUID()}`;
-  if (!accounts.includes(clerkOrgId)) {
-    accounts.push(clerkOrgId);
+  const tenant = fixture.tenants[companyIndex];
+  companyIndex += 1;
+  if (!tenant) {
+    throw new Error("Fixture tenant slot is not allocated");
+  }
+  const accountId = account ?? tenant.accountId;
+  if (!fixture.tenants.some((owned) => owned.accountId === accountId)) {
+    throw new Error("Fixture account is not allocated");
+  }
+  if (!accounts.includes(accountId)) {
+    accounts.push(accountId);
   }
   const company = await systemDatabase.organisation.create({
-    data: { clerk_org_id: clerkOrgId, country_code: "AU", name: "Payroll" },
+    data: {
+      account_id: accountId,
+      country_code: "AU",
+      id: tenant.organisationId,
+      name: "Payroll",
+    },
   });
-  return { clerkOrgId, organisationId: company.id };
+  return { accountId, organisationId: company.id };
 };
 afterAll(async () => {
   await systemDatabase.xeroConnection.deleteMany({
-    where: { clerk_org_id: { in: accounts } },
+    where: { account_id: { in: accounts } },
   });
   await systemDatabase.organisation.deleteMany({
-    where: { clerk_org_id: { in: accounts } },
+    where: { account_id: { in: accounts } },
   });
 });
 
 const claimAndInsert = (
-  scope: { clerkOrgId: string; organisationId: string },
+  scope: { accountId: string; organisationId: string },
   tenantId: string,
   remoteId?: string
 ) =>
   withTenantDb(
-    scope.clerkOrgId,
+    scope.accountId,
     async (tx) => {
       const ownership = await claimXeroTenant(tx, scope, tenantId);
       if (ownership.status === "unowned") {
         await tx.xeroConnection.create({
           data: {
-            clerk_org_id: scope.clerkOrgId,
+            account_id: scope.accountId,
             organisation_id: scope.organisationId,
             payroll_region: "AU",
             remote_connection_id: remoteId ?? randomUUID(),
@@ -65,6 +75,34 @@ const claimAndInsert = (
     },
     { maxWait: 15_000, timeout: 15_000 }
   );
+
+const errorField = (value: unknown, key: string): unknown =>
+  typeof value === "object" && value !== null
+    ? Reflect.get(value, key)
+    : undefined;
+
+const bindingFailureDiagnostic = (failure: unknown): string => {
+  const meta = errorField(failure, "meta");
+  const adapter = errorField(meta, "driverAdapterError");
+  const cause = errorField(adapter, "cause");
+  const originalMessage = errorField(cause, "originalMessage");
+  const ownershipIndexes = [
+    "xero_connections_owned_tenant_key",
+    "xero_connections_owned_remote_connection_key",
+  ].filter(
+    (index) =>
+      typeof originalMessage === "string" && originalMessage.includes(index)
+  );
+  return JSON.stringify({
+    code: errorField(failure, "code"),
+    constraint: errorField(cause, "constraint"),
+    kind: errorField(cause, "kind"),
+    modelName: errorField(meta, "modelName"),
+    originalCode: errorField(cause, "originalCode"),
+    ownershipIndexes,
+    target: errorField(meta, "target"),
+  });
+};
 
 test("another account cannot claim an owned tenant and conflict reveals no metadata", async () => {
   const first = await createCompany();
@@ -117,9 +155,9 @@ test("released tenant and remote connection identities can be claimed elsewhere"
 
 test("account resolver keeps manual companies and excludes inactive, archived, released and foreign ones", async () => {
   const manual = await createCompany();
-  const released = await createCompany(manual.clerkOrgId);
-  const archived = await createCompany(manual.clerkOrgId);
-  const inactive = await createCompany(manual.clerkOrgId);
+  const released = await createCompany(manual.accountId);
+  const archived = await createCompany(manual.accountId);
+  const inactive = await createCompany(manual.accountId);
   await createCompany();
   await claimAndInsert(released, randomUUID());
   await systemDatabase.xeroConnection.updateMany({
@@ -136,8 +174,8 @@ test("account resolver keeps manual companies and excludes inactive, archived, r
   });
   expect(
     (
-      await withTestTenantDb(tenantTestAccount(manual.clerkOrgId), (db) =>
-        resolveAccountCompanies(manual.clerkOrgId, db)
+      await withTestTenantDb(tenantTestAccount(manual.accountId), (db) =>
+        resolveAccountCompanies(manual.accountId, db)
       )
     ).map((company) => company.id)
   ).toEqual([manual.organisationId]);
@@ -148,10 +186,10 @@ test("partial unique-index violations map to the neutral tenant binding conflict
   const second = await createCompany();
   const tenantId = randomUUID();
   await claimAndInsert(first, tenantId);
-  const failure = await withTenantDb(second.clerkOrgId, (tx) =>
+  const failure = await withTenantDb(second.accountId, (tx) =>
     tx.xeroConnection.create({
       data: {
-        clerk_org_id: second.clerkOrgId,
+        account_id: second.accountId,
         organisation_id: second.organisationId,
         payroll_region: "AU",
         remote_connection_id: randomUUID(),
@@ -162,7 +200,10 @@ test("partial unique-index violations map to the neutral tenant binding conflict
     () => null,
     (error: unknown) => error
   );
-  expect(isXeroTenantBindingConflict(failure)).toBe(true);
+  expect(
+    isXeroTenantBindingConflict(failure),
+    bindingFailureDiagnostic(failure)
+  ).toBe(true);
 });
 
 test("released bindings cannot acquire the active outbound connection fence", async () => {
@@ -175,14 +216,15 @@ test("released bindings cannot acquire the active outbound connection fence", as
       access_token_expires_at: new Date(),
       access_token_iv: "fixture",
       granted_scopes: [],
+      id: fixture.id("ownership-authorisation"),
       last_refreshed_at: new Date(),
-      provider_app_id: randomUUID(),
+      provider_app_id: fixture.globalKey("provider_app"),
       refresh_token_auth_tag: "fixture",
       refresh_token_encrypted: "fixture",
       refresh_token_iv: "fixture",
       token_encrypted_at: new Date(),
       token_key_version: 1,
-      xero_user_id: randomUUID(),
+      xero_user_id: fixture.id("ownership-user"),
     },
   });
   try {
@@ -191,7 +233,7 @@ test("released bindings cannot acquire the active outbound connection fence", as
       where: { organisation_id: scope.organisationId },
     });
     expect(
-      await withTenantDb(scope.clerkOrgId, (tx) =>
+      await withTenantDb(scope.accountId, (tx) =>
         lockActiveScopedXeroConnection(scope, tx)
       )
     ).toBe(true);
@@ -200,7 +242,7 @@ test("released bindings cannot acquire the active outbound connection fence", as
       where: { organisation_id: scope.organisationId },
     });
     expect(
-      await withTenantDb(scope.clerkOrgId, (tx) =>
+      await withTenantDb(scope.accountId, (tx) =>
         lockActiveScopedXeroConnection(scope, tx)
       )
     ).toBe(false);

@@ -1,10 +1,10 @@
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type ApprovalRole,
   getApprovalSummaryCounts,
   listForApprover,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import {
   resolveAccountCompanies,
   TENANT_READ_TRANSACTION_OPTIONS,
@@ -15,8 +15,8 @@ import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
 import {
   PermissionDeniedError,
-  requirePageRole,
-} from "@/lib/auth/require-page-role";
+  requirePagePermission,
+} from "@/lib/auth/require-page-permission";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { resolveApprovalActingPerson } from "./acting-person";
@@ -70,7 +70,7 @@ const LeaveApprovalsPage = async ({
   searchParams,
 }: LeaveApprovalsPageProps) => {
   try {
-    await requirePageRole("org:manager");
+    await requirePagePermission({ approvals: ["review"] });
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return <PermissionDeniedState />;
@@ -79,13 +79,25 @@ const LeaveApprovalsPage = async ({
   }
 
   const params = await searchParams;
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  const role = effectiveApprovalRole(orgRole);
-  if (!(orgId && user && role)) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  const role = effectiveApprovalRole(sessionRole);
+  if (!(sessionAccountId && user && role)) {
     return <PermissionDeniedState />;
   }
-  // Authenticated Clerk account, resolved before the read scope.
-  const clerkOrgId = orgId as ClerkOrgId;
+  // Authenticated Account, resolved before the read scope.
+  const accountId = sessionAccountId as AccountId;
   const parsedFilters = parseFilterParams(params, FilterSchema);
   const status: ApprovalStatusFilter[] | undefined = parsedFilters?.status;
   const statusWithFailed: ApprovalStatusFilter[] | undefined =
@@ -103,11 +115,11 @@ const LeaveApprovalsPage = async ({
   };
 
   const prepared = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
-      const companies = await resolveAccountCompanies(clerkOrgId, db);
+      const companies = await resolveAccountCompanies(accountId, db);
       const actingPerson = await resolveApprovalActingPerson(
-        clerkOrgId,
+        accountId,
         user.id,
         companies.map((company) => company.id),
         db
@@ -116,9 +128,9 @@ const LeaveApprovalsPage = async ({
         return null;
       }
       const serviceInput = {
+        accountId,
         actingPersonId: actingPerson?.id ?? null,
         actingUserId: user.id,
-        clerkOrgId,
         role,
       };
       const approvalsResult = await listForApprover(
@@ -150,7 +162,7 @@ const LeaveApprovalsPage = async ({
       <Header page="Leave Approvals" showCompanySelector={false} />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <LeaveApprovalsClient
-          canDispatchReconciliation={role === "admin"}
+          canDispatchReconciliation={role === "admin" || role === "owner"}
           filters={{
             includeFailed: parsedFilters?.includeFailed ?? false,
             status: parsedFilters?.status,
@@ -169,11 +181,8 @@ export default LeaveApprovalsPage;
 function effectiveApprovalRole(
   role: string | null | undefined
 ): ApprovalRole | null {
-  if (role === "org:owner" || role === "org:admin") {
-    return "admin";
-  }
-  if (role === "org:manager") {
-    return "manager";
+  if (role === "owner" || role === "admin" || role === "manager") {
+    return role;
   }
   return null;
 }

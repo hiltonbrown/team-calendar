@@ -21,7 +21,7 @@ interface MatchesClientProps {
 
 export function MatchesClient({ matches, organisationId }: MatchesClientProps) {
   const [isPending, startTransition] = useTransition();
-  const [clerkUserIds, setClerkUserIds] = useState<Record<string, string>>({});
+  const [userIds, setUserIds] = useState<Record<string, string>>({});
 
   if (matches.length === 0) {
     return (
@@ -61,16 +61,15 @@ export function MatchesClient({ matches, organisationId }: MatchesClientProps) {
 
             <Input
               onChange={(event) =>
-                setClerkUserIds((current) => ({
+                setUserIds((current) => ({
                   ...current,
                   [match.id]: event.target.value,
                 }))
               }
               placeholder={
-                match.candidate_person?.clerk_user_id ??
-                "Enter Clerk user ID to link"
+                match.candidate_person?.user_id ?? "Enter user ID to link"
               }
-              value={clerkUserIds[match.id] ?? ""}
+              value={userIds[match.id] ?? ""}
             />
 
             <div className="flex flex-wrap gap-3">
@@ -79,13 +78,13 @@ export function MatchesClient({ matches, organisationId }: MatchesClientProps) {
                 onClick={() =>
                   startTransition(async () => {
                     const result = await resolveXeroPersonMatchAction({
-                      clerkUserId:
-                        clerkUserIds[match.id] ??
-                        match.candidate_person?.clerk_user_id ??
-                        undefined,
                       matchId: match.id,
                       organisationId,
                       resolution: "match",
+                      userId:
+                        userIds[match.id] ??
+                        match.candidate_person?.user_id ??
+                        undefined,
                     });
                     toast[result.ok ? "success" : "error"](
                       result.ok ? "Xero person linked." : result.error.message
@@ -93,7 +92,7 @@ export function MatchesClient({ matches, organisationId }: MatchesClientProps) {
                   })
                 }
               >
-                Link to Clerk user
+                Link to user
               </Button>
               <Button
                 disabled={isPending}

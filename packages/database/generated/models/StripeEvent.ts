@@ -40,7 +40,7 @@ export type StripeEventMinAggregateOutputType = {
   type: string | null
   delivery_state: $Enums.stripe_event_delivery_state | null
   attempt_count: number | null
-  clerk_org_id: string | null
+  account_id: string | null
   stripe_customer_id: string | null
   event_created_at: Date | null
   error_category: string | null
@@ -56,7 +56,7 @@ export type StripeEventMaxAggregateOutputType = {
   type: string | null
   delivery_state: $Enums.stripe_event_delivery_state | null
   attempt_count: number | null
-  clerk_org_id: string | null
+  account_id: string | null
   stripe_customer_id: string | null
   event_created_at: Date | null
   error_category: string | null
@@ -72,7 +72,7 @@ export type StripeEventCountAggregateOutputType = {
   type: number
   delivery_state: number
   attempt_count: number
-  clerk_org_id: number
+  account_id: number
   stripe_customer_id: number
   event_created_at: number
   error_category: number
@@ -98,7 +98,7 @@ export type StripeEventMinAggregateInputType = {
   type?: true
   delivery_state?: true
   attempt_count?: true
-  clerk_org_id?: true
+  account_id?: true
   stripe_customer_id?: true
   event_created_at?: true
   error_category?: true
@@ -114,7 +114,7 @@ export type StripeEventMaxAggregateInputType = {
   type?: true
   delivery_state?: true
   attempt_count?: true
-  clerk_org_id?: true
+  account_id?: true
   stripe_customer_id?: true
   event_created_at?: true
   error_category?: true
@@ -130,7 +130,7 @@ export type StripeEventCountAggregateInputType = {
   type?: true
   delivery_state?: true
   attempt_count?: true
-  clerk_org_id?: true
+  account_id?: true
   stripe_customer_id?: true
   event_created_at?: true
   error_category?: true
@@ -233,7 +233,7 @@ export type StripeEventGroupByOutputType = {
   type: string
   delivery_state: $Enums.stripe_event_delivery_state
   attempt_count: number
-  clerk_org_id: string | null
+  account_id: string | null
   stripe_customer_id: string | null
   event_created_at: Date | null
   error_category: string | null
@@ -272,7 +272,7 @@ export type StripeEventWhereInput = {
   type?: Prisma.StringFilter<"StripeEvent"> | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateFilter<"StripeEvent"> | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntFilter<"StripeEvent"> | number
-  clerk_org_id?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
+  account_id?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
   stripe_customer_id?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
   event_created_at?: Prisma.DateTimeNullableFilter<"StripeEvent"> | Date | string | null
   error_category?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
@@ -288,7 +288,7 @@ export type StripeEventOrderByWithRelationInput = {
   type?: Prisma.SortOrder
   delivery_state?: Prisma.SortOrder
   attempt_count?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  account_id?: Prisma.SortOrderInput | Prisma.SortOrder
   stripe_customer_id?: Prisma.SortOrderInput | Prisma.SortOrder
   event_created_at?: Prisma.SortOrderInput | Prisma.SortOrder
   error_category?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -307,7 +307,7 @@ export type StripeEventWhereUniqueInput = Prisma.AtLeast<{
   type?: Prisma.StringFilter<"StripeEvent"> | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateFilter<"StripeEvent"> | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntFilter<"StripeEvent"> | number
-  clerk_org_id?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
+  account_id?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
   stripe_customer_id?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
   event_created_at?: Prisma.DateTimeNullableFilter<"StripeEvent"> | Date | string | null
   error_category?: Prisma.StringNullableFilter<"StripeEvent"> | string | null
@@ -323,7 +323,7 @@ export type StripeEventOrderByWithAggregationInput = {
   type?: Prisma.SortOrder
   delivery_state?: Prisma.SortOrder
   attempt_count?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  account_id?: Prisma.SortOrderInput | Prisma.SortOrder
   stripe_customer_id?: Prisma.SortOrderInput | Prisma.SortOrder
   event_created_at?: Prisma.SortOrderInput | Prisma.SortOrder
   error_category?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -347,7 +347,7 @@ export type StripeEventScalarWhereWithAggregatesInput = {
   type?: Prisma.StringWithAggregatesFilter<"StripeEvent"> | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateWithAggregatesFilter<"StripeEvent"> | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntWithAggregatesFilter<"StripeEvent"> | number
-  clerk_org_id?: Prisma.StringNullableWithAggregatesFilter<"StripeEvent"> | string | null
+  account_id?: Prisma.StringNullableWithAggregatesFilter<"StripeEvent"> | string | null
   stripe_customer_id?: Prisma.StringNullableWithAggregatesFilter<"StripeEvent"> | string | null
   event_created_at?: Prisma.DateTimeNullableWithAggregatesFilter<"StripeEvent"> | Date | string | null
   error_category?: Prisma.StringNullableWithAggregatesFilter<"StripeEvent"> | string | null
@@ -363,7 +363,7 @@ export type StripeEventCreateInput = {
   type: string
   delivery_state?: $Enums.stripe_event_delivery_state
   attempt_count?: number
-  clerk_org_id?: string | null
+  account_id?: string | null
   stripe_customer_id?: string | null
   event_created_at?: Date | string | null
   error_category?: string | null
@@ -379,7 +379,7 @@ export type StripeEventUncheckedCreateInput = {
   type: string
   delivery_state?: $Enums.stripe_event_delivery_state
   attempt_count?: number
-  clerk_org_id?: string | null
+  account_id?: string | null
   stripe_customer_id?: string | null
   event_created_at?: Date | string | null
   error_category?: string | null
@@ -395,7 +395,7 @@ export type StripeEventUpdateInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateFieldUpdateOperationsInput | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntFieldUpdateOperationsInput | number
-  clerk_org_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  account_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   event_created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error_category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -411,7 +411,7 @@ export type StripeEventUncheckedUpdateInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateFieldUpdateOperationsInput | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntFieldUpdateOperationsInput | number
-  clerk_org_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  account_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   event_created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error_category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -427,7 +427,7 @@ export type StripeEventCreateManyInput = {
   type: string
   delivery_state?: $Enums.stripe_event_delivery_state
   attempt_count?: number
-  clerk_org_id?: string | null
+  account_id?: string | null
   stripe_customer_id?: string | null
   event_created_at?: Date | string | null
   error_category?: string | null
@@ -443,7 +443,7 @@ export type StripeEventUpdateManyMutationInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateFieldUpdateOperationsInput | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntFieldUpdateOperationsInput | number
-  clerk_org_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  account_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   event_created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error_category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -459,7 +459,7 @@ export type StripeEventUncheckedUpdateManyInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   delivery_state?: Prisma.Enumstripe_event_delivery_stateFieldUpdateOperationsInput | $Enums.stripe_event_delivery_state
   attempt_count?: Prisma.IntFieldUpdateOperationsInput | number
-  clerk_org_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  account_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   event_created_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   error_category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -475,7 +475,7 @@ export type StripeEventCountOrderByAggregateInput = {
   type?: Prisma.SortOrder
   delivery_state?: Prisma.SortOrder
   attempt_count?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   stripe_customer_id?: Prisma.SortOrder
   event_created_at?: Prisma.SortOrder
   error_category?: Prisma.SortOrder
@@ -495,7 +495,7 @@ export type StripeEventMaxOrderByAggregateInput = {
   type?: Prisma.SortOrder
   delivery_state?: Prisma.SortOrder
   attempt_count?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   stripe_customer_id?: Prisma.SortOrder
   event_created_at?: Prisma.SortOrder
   error_category?: Prisma.SortOrder
@@ -511,7 +511,7 @@ export type StripeEventMinOrderByAggregateInput = {
   type?: Prisma.SortOrder
   delivery_state?: Prisma.SortOrder
   attempt_count?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   stripe_customer_id?: Prisma.SortOrder
   event_created_at?: Prisma.SortOrder
   error_category?: Prisma.SortOrder
@@ -537,7 +537,7 @@ export type StripeEventSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   type?: boolean
   delivery_state?: boolean
   attempt_count?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   stripe_customer_id?: boolean
   event_created_at?: boolean
   error_category?: boolean
@@ -553,7 +553,7 @@ export type StripeEventSelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   type?: boolean
   delivery_state?: boolean
   attempt_count?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   stripe_customer_id?: boolean
   event_created_at?: boolean
   error_category?: boolean
@@ -569,7 +569,7 @@ export type StripeEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   type?: boolean
   delivery_state?: boolean
   attempt_count?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   stripe_customer_id?: boolean
   event_created_at?: boolean
   error_category?: boolean
@@ -585,7 +585,7 @@ export type StripeEventSelectScalar = {
   type?: boolean
   delivery_state?: boolean
   attempt_count?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   stripe_customer_id?: boolean
   event_created_at?: boolean
   error_category?: boolean
@@ -595,7 +595,7 @@ export type StripeEventSelectScalar = {
   updated_at?: boolean
 }
 
-export type StripeEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stripe_event_id" | "type" | "delivery_state" | "attempt_count" | "clerk_org_id" | "stripe_customer_id" | "event_created_at" | "error_category" | "last_attempted_at" | "processed_at" | "created_at" | "updated_at", ExtArgs["result"]["stripeEvent"]>
+export type StripeEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "stripe_event_id" | "type" | "delivery_state" | "attempt_count" | "account_id" | "stripe_customer_id" | "event_created_at" | "error_category" | "last_attempted_at" | "processed_at" | "created_at" | "updated_at", ExtArgs["result"]["stripeEvent"]>
 
 export type $StripeEventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "StripeEvent"
@@ -606,7 +606,7 @@ export type $StripeEventPayload<ExtArgs extends runtime.Types.Extensions.Interna
     type: string
     delivery_state: $Enums.stripe_event_delivery_state
     attempt_count: number
-    clerk_org_id: string | null
+    account_id: string | null
     stripe_customer_id: string | null
     event_created_at: Date | null
     error_category: string | null
@@ -1042,7 +1042,7 @@ export interface StripeEventFieldRefs {
   readonly type: Prisma.FieldRef<"StripeEvent", 'String'>
   readonly delivery_state: Prisma.FieldRef<"StripeEvent", 'stripe_event_delivery_state'>
   readonly attempt_count: Prisma.FieldRef<"StripeEvent", 'Int'>
-  readonly clerk_org_id: Prisma.FieldRef<"StripeEvent", 'String'>
+  readonly account_id: Prisma.FieldRef<"StripeEvent", 'String'>
   readonly stripe_customer_id: Prisma.FieldRef<"StripeEvent", 'String'>
   readonly event_created_at: Prisma.FieldRef<"StripeEvent", 'DateTime'>
   readonly error_category: Prisma.FieldRef<"StripeEvent", 'String'>

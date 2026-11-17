@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withTenantDb as withTestTenantDb } from "../tenant-db";
 import { tenantTestAccount } from "../test-fixtures/tenant-scope";
@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   createMany: vi.fn(),
   findFirst: vi.fn(),
   findFirstOrThrow: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
   updateMany: vi.fn(),
@@ -37,13 +37,13 @@ const { getOrCreateForOrganisation, updateForOrganisation } = await import(
   "./repository"
 );
 
-const tenant: { clerkOrgId: ClerkOrgId; organisationId: OrganisationId } = {
-  clerkOrgId: "org_test_settings_repo" as ClerkOrgId,
+const tenant: { accountId: AccountId; organisationId: OrganisationId } = {
+  accountId: "org_test_settings_repo" as AccountId,
   organisationId: "65000000-0000-4000-8000-000000000001" as OrganisationId,
 };
 
 const row = {
-  clerk_org_id: tenant.clerkOrgId,
+  account_id: tenant.accountId,
   created_at: new Date("2026-04-19T00:00:00.000Z"),
   default_feed_privacy_mode: "named" as const,
   default_leave_request_advance_days: 0,
@@ -86,7 +86,7 @@ describe("organisation-settings repository", () => {
     expect(result).toEqual(row);
     expect(mocks.createMany).toHaveBeenCalledWith({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         organisation_id: tenant.organisationId,
       },
       skipDuplicates: true,
@@ -140,7 +140,7 @@ describe("organisation-settings repository", () => {
     expect(mocks.updateMany).toHaveBeenCalledWith({
       data: { require_decline_reason: false },
       where: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         organisation_id: tenant.organisationId,
       },
     });

@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   availabilityUpdate: vi.fn(),
   materialiseAvailabilityPublication: vi.fn(),
   personFindFirst: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
 }));
@@ -61,14 +61,14 @@ const {
 } = await import("./manual-records-service");
 
 const tenant = {
-  clerkOrgId: "org_clerk_123",
+  accountId: "org_account_123",
   organisationId: "22222222-2222-4222-a222-222222222222",
 };
 
 const targetPerson = {
-  clerk_user_id: "user_target",
   id: "11111111-1111-4111-a111-111111111111",
   manager_person_id: "33333333-3333-4333-a333-333333333333",
+  user_id: "user_target",
 };
 
 const recordView = {
@@ -127,7 +127,7 @@ describe("manual-records-service authorisation", () => {
         tenant,
         validInput,
         {
-          orgRole: "org:viewer",
+          role: "viewer",
           userId: "user_peer",
         },
         db
@@ -151,7 +151,7 @@ describe("manual-records-service authorisation", () => {
         tenant,
         validInput,
         {
-          orgRole: "org:viewer",
+          role: "viewer",
           userId: "user_target",
         },
         db
@@ -176,7 +176,7 @@ describe("manual-records-service authorisation", () => {
         tenant,
         validInput,
         {
-          orgRole: "org:admin",
+          role: "admin",
           userId: "user_admin",
         },
         db
@@ -208,7 +208,7 @@ describe("manual-records-service authorisation", () => {
           recordType: "training",
           startsAt: new Date("2026-07-02T09:00:00.000Z"),
         },
-        { orgRole: "org:admin", userId: "user_admin" },
+        { role: "admin", userId: "user_admin" },
         db
       )
     );
@@ -219,7 +219,7 @@ describe("manual-records-service authorisation", () => {
           derived_uid_key: expect.anything(),
         }),
         where: expect.objectContaining({
-          clerk_org_id: tenant.clerkOrgId,
+          account_id: tenant.accountId,
           organisation_id: tenant.organisationId,
         }),
       })
@@ -242,7 +242,7 @@ describe("manual-records-service authorisation", () => {
         tenant,
         recordView.id,
         validInput,
-        { orgRole: "org:viewer", userId: "user_peer" },
+        { role: "viewer", userId: "user_peer" },
         db
       )
     );
@@ -265,7 +265,7 @@ describe("manual-records-service authorisation", () => {
         tenant,
         recordView.id,
         {
-          orgRole: "org:viewer",
+          role: "viewer",
           userId: "user_peer",
         },
         db
@@ -291,7 +291,7 @@ describe("manual-records-service authorisation", () => {
           tenant,
           validInput,
           {
-            orgRole: "org:viewer",
+            role: "viewer",
             userId: "user_manager",
           },
           db
@@ -311,7 +311,7 @@ describe("manual-records-service authorisation", () => {
           tenant,
           validInput,
           {
-            orgRole: "org:viewer",
+            role: "viewer",
             userId: "user_indirect_manager",
           },
           db

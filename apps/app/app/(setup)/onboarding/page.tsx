@@ -1,6 +1,6 @@
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { isOnboardingAdmin, loadWizardSnapshot } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { type TenantDb, withTenantDb } from "@repo/database";
 import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { getOrganisationById } from "@repo/database/queries/organisations";
@@ -50,30 +50,42 @@ function first(value: string | string[] | undefined): string | null {
 
 const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
   const params = await searchParams;
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (!(orgId && user && isOnboardingAdmin(orgRole))) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user && isOnboardingAdmin(sessionRole))) {
     redirect("/");
   }
-  const clerkOrgId = orgId as ClerkOrgId;
+  const accountId = sessionAccountId as AccountId;
   const requestedOrganisationId = first(params.org) ?? undefined;
-  let prepared = await withTenantDb(clerkOrgId, (db) =>
+  let prepared = await withTenantDb(accountId, (db) =>
     prepareOnboardingPage(
-      clerkOrgId,
+      accountId,
       user.id,
-      orgRole,
+      sessionRole,
       requestedOrganisationId,
       params,
       db
     )
   );
   if (prepared.kind === "provision") {
-    // First-run company provisioning has Clerk and database phases, outside the page read scope.
-    const initial = await ensureDefaultOrganisation(clerkOrgId);
-    prepared = await withTenantDb(clerkOrgId, (db) =>
+    // First-run company provisioning has auth and database phases, outside the page read scope.
+    const initial = await ensureDefaultOrganisation(accountId);
+    prepared = await withTenantDb(accountId, (db) =>
       prepareOnboardingPage(
-        clerkOrgId,
+        accountId,
         user.id,
-        orgRole,
+        sessionRole,
         initial.organisationId,
         params,
         db
@@ -102,7 +114,7 @@ const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
   const doneHref = withOrg("/onboarding", orgQueryValue);
   const previous = STEPS[stepIndex(viewStep) - 1];
   const content = stepContent({
-    clerkOrgId,
+    accountId,
     doneHref,
     organisation,
     organisationId,
@@ -139,28 +151,28 @@ const OnboardingPage = async ({ searchParams }: OnboardingPageProps) => {
 };
 
 async function prepareOnboardingPage(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   userId: string,
-  orgRole: string | null | undefined,
+  role: string | null | undefined,
   requestedOrganisationId: string | undefined,
   params: Record<string, string | string[] | undefined>,
   db: TenantDb
 ) {
   let selectedOrganisationId = requestedOrganisationId;
   if (!selectedOrganisationId) {
-    const companies = await resolveAccountCompanies(clerkOrgId, db);
+    const companies = await resolveAccountCompanies(accountId, db);
     if (!companies.length) {
       return { kind: "provision" as const };
     }
     selectedOrganisationId = companies[0]?.id;
   }
   const { organisationId, orgQueryValue } = await resolveActiveOrgPageContext(
-    clerkOrgId,
+    accountId,
     selectedOrganisationId,
     db
   );
   const result = await loadWizardSnapshot(
-    { actingRole: orgRole, clerkOrgId, organisationId, userId },
+    { accountId, actingRole: role, organisationId, userId },
     db
   );
   if (!result.ok) {
@@ -178,11 +190,11 @@ async function prepareOnboardingPage(
       : storedStep;
   const organisation =
     viewStep === "details"
-      ? await getOrganisationById(clerkOrgId, organisationId, db)
+      ? await getOrganisationById(accountId, organisationId, db)
       : null;
   const people =
     viewStep === "people" || viewStep === "invites"
-      ? await loadOnboardingPeople({ clerkOrgId, organisationId, userId }, db)
+      ? await loadOnboardingPeople({ accountId, organisationId, userId }, db)
       : null;
   return {
     kind: "ready" as const,
@@ -197,7 +209,7 @@ async function prepareOnboardingPage(
 }
 
 function stepContent(props: {
-  clerkOrgId: ClerkOrgId;
+  accountId: AccountId;
   doneHref: string;
   orgQueryValue: string | null;
   organisationId: OrganisationId;

@@ -2,17 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   archiveManualAvailability: vi.fn(),
-  auth: vi.fn(),
   createManualAvailability: vi.fn(),
-  currentUser: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   revalidatePath: vi.fn(),
   updateManualAvailability: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   archiveManualAvailability: mocks.archiveManualAvailability,
@@ -31,15 +31,15 @@ const { createManualAvailabilityAction } = await import("./manual");
 describe("manual availability actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      orgId: "org_clerk_123",
-      orgRole: "org:manager",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_account_123",
+      role: "manager",
     });
-    mocks.currentUser.mockResolvedValue({ id: "user_123" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_123" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
       value: {
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         organisationId: "22222222-2222-4222-a222-222222222222",
       },
     });
@@ -49,7 +49,7 @@ describe("manual availability actions", () => {
     });
   });
 
-  it("passes orgRole through to the availability service", async () => {
+  it("passes role through to the availability service", async () => {
     const result = await createManualAvailabilityAction({
       allDay: false,
       contactability: "contactable",
@@ -72,7 +72,7 @@ describe("manual availability actions", () => {
     });
     expect(mocks.createManualAvailability).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_clerk_123",
+        accountId: "org_account_123",
         organisationId: "22222222-2222-4222-a222-222222222222",
       },
       expect.objectContaining({
@@ -80,7 +80,7 @@ describe("manual availability actions", () => {
         title: "WFH",
       }),
       {
-        orgRole: "org:manager",
+        role: "manager",
         userId: "user_123",
       },
       expect.any(Object)

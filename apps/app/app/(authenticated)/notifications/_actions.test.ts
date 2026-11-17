@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   companyLookup: vi.fn(),
-  currentUser: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   getUnreadCount: vi.fn(),
-  hasPageRole: vi.fn(),
+  hasPagePermission: vi.fn(),
   listRecentUnread: vi.fn(),
   markAllAsRead: vi.fn(),
   markAsRead: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
   revalidatePath: vi.fn(),
   upsertPreference: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/database", () => ({
   afterTenantCommit: (_db: unknown, effect: () => Promise<void>) => effect(),
@@ -37,9 +37,9 @@ vi.mock("@repo/notifications", () => ({
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));
-vi.mock("@/lib/auth/require-page-role", () => ({
-  hasPageRole: mocks.hasPageRole,
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  hasPagePermission: mocks.hasPagePermission,
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
@@ -53,16 +53,17 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 describe("notification actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      has: async () => true,
-      isAuthenticated: true,
-      orgId: "org_1",
+    mocks.getSession.mockResolvedValue({
+      accountId: "org_1",
+      role: "viewer",
+      sessionId: "session_1",
+      userId: "user_1",
     });
     mocks.companyLookup.mockResolvedValue({ id: organisationId });
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: "org_1", organisationId },
+      value: { accountId: "org_1", organisationId },
     });
     mocks.markAsRead.mockResolvedValue({
       ok: true,
@@ -72,7 +73,7 @@ describe("notification actions", () => {
       ok: true,
       value: { markedCount: 2, unreadCount: 0 },
     });
-    mocks.hasPageRole.mockResolvedValue(true);
+    mocks.hasPagePermission.mockResolvedValue(true);
     mocks.upsertPreference.mockResolvedValue({
       ok: true,
       value: { type: "leave_submitted" },
@@ -94,7 +95,7 @@ describe("notification actions", () => {
 
     expect(result.ok).toBe(true);
     expect(mocks.markAsRead).toHaveBeenCalledWith(
-      expect.objectContaining({ clerkOrgId: "org_1", userId: "user_1" }),
+      expect.objectContaining({ accountId: "org_1", userId: "user_1" }),
       expect.any(Object)
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/notifications");

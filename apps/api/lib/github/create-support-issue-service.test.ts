@@ -68,7 +68,7 @@ describe("createSupportGitHubIssue", () => {
     };
 
     const result = await createSupportGitHubIssue({
-      clerk_org_id: "org_123",
+      account_id: "org_123",
       organisation_id: "00000000-0000-4000-8000-000000000001",
       organisation_name: "Team Calendar Dev Organisation",
       payload,
@@ -90,7 +90,7 @@ describe("createSupportGitHubIssue", () => {
 
     const createdBody = buildSupportIssueMarkdownBody({
       ...payload,
-      clerk_org_id: "org_123",
+      account_id: "org_123",
       organisation_id: "00000000-0000-4000-8000-000000000001",
       user_id: "user_123",
     });

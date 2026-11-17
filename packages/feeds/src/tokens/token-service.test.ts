@@ -13,8 +13,8 @@ const mocks = vi.hoisted(() => ({
   invalidateFeedCache: vi.fn(),
   logError: vi.fn(),
   queryRaw: vi.fn(),
-  scopedTo: vi.fn((input: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: input.clerkOrgId,
+  scopedTo: vi.fn((input: { accountId: string; organisationId: string }) => ({
+    account_id: input.accountId,
     organisation_id: input.organisationId,
   })),
   transaction: vi.fn(),
@@ -108,9 +108,9 @@ const {
 } = await import("./token-service");
 
 const baseInput = {
-  actingRole: "org:admin",
+  accountId: "org_token_service_a",
+  actingRole: "admin",
   actingUserId: "user_admin",
-  clerkOrgId: "org_token_service_a",
   feedId: "71000000-0000-4000-8000-000000000001",
   organisationId: "71000000-0000-4000-8000-000000000002",
 };
@@ -186,6 +186,23 @@ describe("feed token pure functions", () => {
   });
 });
 
+describe("neutral feed token role validation", () => {
+  it.each([null, "unexpected"])(
+    "rejects unrecognised role %s before querying feeds",
+    async (actingRole) => {
+      const result = await withTestTenantResult(
+        tenantTestAccount(baseInput),
+        (db) => issueToken({ ...baseInput, actingRole }, db)
+      );
+      expect(result).toMatchObject({
+        error: { code: "validation_error" },
+        ok: false,
+      });
+      expect(mocks.feedFindFirst).not.toHaveBeenCalled();
+    }
+  );
+});
+
 describe("existing feed token issuance", () => {
   it("issues a replacement without an active predecessor and audits its scope", async () => {
     mocks.feedFindFirst.mockResolvedValue({
@@ -204,7 +221,7 @@ describe("existing feed token issuance", () => {
     expect(mocks.auditEventCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          clerk_org_id: baseInput.clerkOrgId,
+          account_id: baseInput.accountId,
           organisation_id: baseInput.organisationId,
         }),
       })
@@ -240,7 +257,7 @@ describe("existing feed token issuance", () => {
 describe("feed token lifecycle with a mocked database", () => {
   it("creates the initial token with a stored secret hash and signed disclosure", async () => {
     const { withTenantResult } = await import("@repo/database");
-    const result = await withTenantResult(baseInput.clerkOrgId, (tx) =>
+    const result = await withTenantResult(baseInput.accountId, (tx) =>
       createInitialTokenWithClient(tx, baseInput)
     );
 
@@ -257,7 +274,7 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(mocks.feedTokenFindFirst).toHaveBeenCalledWith({
       select: { id: true },
       where: {
-        clerk_org_id: baseInput.clerkOrgId,
+        account_id: baseInput.accountId,
         feed_id: baseInput.feedId,
         organisation_id: baseInput.organisationId,
       },
@@ -267,7 +284,7 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(insertCall).toEqual(
       expect.arrayContaining([
         result.value.tokenId,
-        baseInput.clerkOrgId,
+        baseInput.accountId,
         baseInput.organisationId,
         baseInput.feedId,
         expect.stringMatching(TOKEN_HASH_PATTERN),
@@ -324,7 +341,7 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(mocks.queryRaw.mock.calls[1]).toEqual(
       expect.arrayContaining([
         result.value.tokenId,
-        baseInput.clerkOrgId,
+        baseInput.accountId,
         baseInput.organisationId,
         baseInput.feedId,
         expect.stringMatching(TOKEN_HASH_PATTERN),
@@ -352,14 +369,14 @@ describe("feed token lifecycle with a mocked database", () => {
       withTestTenantResult(
         tenantTestAccount({
           ...baseInput,
-          actingRole: "org:viewer",
+          actingRole: "viewer",
           actingUserId: "user_owner",
         }),
         (db) =>
           rotateToken(
             {
               ...baseInput,
-              actingRole: "org:viewer",
+              actingRole: "viewer",
               actingUserId: "user_owner",
             },
             db
@@ -371,14 +388,14 @@ describe("feed token lifecycle with a mocked database", () => {
       withTestTenantResult(
         tenantTestAccount({
           ...baseInput,
-          actingRole: "org:viewer",
+          actingRole: "viewer",
           actingUserId: "user_other",
         }),
         (db) =>
           rotateToken(
             {
               ...baseInput,
-              actingRole: "org:viewer",
+              actingRole: "viewer",
               actingUserId: "user_other",
             },
             db
@@ -392,7 +409,7 @@ describe("feed token lifecycle with a mocked database", () => {
     mocks.queryRaw.mockResolvedValue([]);
     const { withTenantResult } = await import("@repo/database");
     await expect(
-      withTenantResult(baseInput.clerkOrgId, (tx) =>
+      withTenantResult(baseInput.accountId, (tx) =>
         createInitialTokenWithClient(tx, baseInput)
       )
     ).resolves.toEqual({
@@ -453,18 +470,18 @@ describe("feed token lifecycle with a mocked database", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         actingRole: baseInput.actingRole,
         actingUserId: baseInput.actingUserId,
-        clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         tokenId: "71000000-0000-4000-8000-000000000020",
       }),
       (db) =>
         revokeToken(
           {
+            accountId: baseInput.accountId,
             actingRole: baseInput.actingRole,
             actingUserId: baseInput.actingUserId,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             tokenId: "71000000-0000-4000-8000-000000000020",
           },
@@ -482,7 +499,7 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(mocks.feedTokenFindFirst).toHaveBeenCalledWith({
       select: { feed_id: true, id: true, status: true, token_hint: true },
       where: {
-        clerk_org_id: baseInput.clerkOrgId,
+        account_id: baseInput.accountId,
         id: "71000000-0000-4000-8000-000000000020",
         OR: [
           { organisation_id: baseInput.organisationId },
@@ -501,18 +518,18 @@ describe("feed token lifecycle with a mocked database", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         actingRole: baseInput.actingRole,
         actingUserId: baseInput.actingUserId,
-        clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         tokenId: "71000000-0000-4000-8000-000000000020",
       }),
       (db) =>
         revokeToken(
           {
+            accountId: baseInput.accountId,
             actingRole: baseInput.actingRole,
             actingUserId: baseInput.actingUserId,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             tokenId: "71000000-0000-4000-8000-000000000020",
           },
@@ -533,18 +550,18 @@ describe("feed token lifecycle with a mocked database", () => {
 
     const otherTenant = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         actingRole: baseInput.actingRole,
         actingUserId: baseInput.actingUserId,
-        clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         tokenId: "71000000-0000-4000-8000-000000000020",
       }),
       (db) =>
         revokeToken(
           {
+            accountId: baseInput.accountId,
             actingRole: baseInput.actingRole,
             actingUserId: baseInput.actingUserId,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             tokenId: "71000000-0000-4000-8000-000000000020",
           },
@@ -553,18 +570,18 @@ describe("feed token lifecycle with a mocked database", () => {
     );
     const nonExistent = await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         actingRole: baseInput.actingRole,
         actingUserId: baseInput.actingUserId,
-        clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         tokenId: "71000000-0000-4000-8000-000000000099",
       }),
       (db) =>
         revokeToken(
           {
+            accountId: baseInput.accountId,
             actingRole: baseInput.actingRole,
             actingUserId: baseInput.actingUserId,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             tokenId: "71000000-0000-4000-8000-000000000099",
           },
@@ -583,18 +600,18 @@ describe("feed token lifecycle with a mocked database", () => {
 
     await withTestTenantResult(
       tenantTestAccount({
+        accountId: baseInput.accountId,
         actingRole: baseInput.actingRole,
         actingUserId: baseInput.actingUserId,
-        clerkOrgId: baseInput.clerkOrgId,
         organisationId: baseInput.organisationId,
         tokenId: "71000000-0000-4000-8000-000000000099",
       }),
       (db) =>
         revokeToken(
           {
+            accountId: baseInput.accountId,
             actingRole: baseInput.actingRole,
             actingUserId: baseInput.actingUserId,
-            clerkOrgId: baseInput.clerkOrgId,
             organisationId: baseInput.organisationId,
             tokenId: "71000000-0000-4000-8000-000000000099",
           },
@@ -614,13 +631,13 @@ describe("feed token lifecycle with a mocked database", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: baseInput.clerkOrgId,
+        accountId: baseInput.accountId,
         organisationId: baseInput.organisationId,
       }),
       (db) =>
         revokeAllFeedTokens(
           {
-            clerkOrgId: baseInput.clerkOrgId,
+            accountId: baseInput.accountId,
             organisationId: baseInput.organisationId,
           },
           db
@@ -631,7 +648,7 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(mocks.feedTokenUpdateMany).toHaveBeenCalledWith({
       data: { revoked_at: expect.any(Date), status: "revoked" },
       where: {
-        clerk_org_id: baseInput.clerkOrgId,
+        account_id: baseInput.accountId,
         organisation_id: baseInput.organisationId,
         status: "active",
       },
@@ -639,7 +656,7 @@ describe("feed token lifecycle with a mocked database", () => {
     expect(mocks.feedFindMany).toHaveBeenCalledWith({
       select: { id: true },
       where: {
-        clerk_org_id: baseInput.clerkOrgId,
+        account_id: baseInput.accountId,
         organisation_id: baseInput.organisationId,
       },
     });
@@ -668,7 +685,7 @@ function mockDatabase() {
 
 function scopedFeed() {
   return {
-    clerk_org_id: baseInput.clerkOrgId,
+    account_id: baseInput.accountId,
     id: baseInput.feedId,
     OR: [
       { organisation_id: baseInput.organisationId },
@@ -679,7 +696,7 @@ function scopedFeed() {
 
 function scopedTokenByFeed() {
   return {
-    clerk_org_id: baseInput.clerkOrgId,
+    account_id: baseInput.accountId,
     feed_id: baseInput.feedId,
     OR: [
       { organisation_id: baseInput.organisationId },

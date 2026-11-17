@@ -271,8 +271,8 @@ describe("independent X24 ICS publication assertions", () => {
 const privateUrl =
   "https://api.example/ical/synthetic-complete-private-capability.ics";
 const fixture = {
+  accountId: "org_owned",
   alias: "fixture-owned",
-  clerkOrgId: "org_owned",
   feedId: "00000000-0000-4000-8000-000000000002",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };

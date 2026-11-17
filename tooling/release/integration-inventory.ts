@@ -16,7 +16,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/availability/index.integration.test.ts",
   "packages/availability/src/approvals/multi-company-routing.integration.test.ts",
   "packages/availability/src/calendar/calendar-service.integration.test.ts",
-  "packages/availability/src/people/clerk-access-service.integration.test.ts",
+  "packages/availability/src/people/account-access-service.integration.test.ts",
   "packages/availability/src/people/current-user-service.integration.test.ts",
   "packages/availability/src/people/manager-assignment-service.integration.test.ts",
   "packages/database/authoritative-usage.integration.test.ts",

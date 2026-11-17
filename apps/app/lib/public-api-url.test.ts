@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { getPublicApiOrigin, getPublicApiUrl } from "./public-api-url";
+import {
+  getBrowserApiUrl,
+  getPublicApiOrigin,
+  getPublicApiUrl,
+} from "./public-api-url";
 
 describe("public API URL helpers", () => {
   afterEach(() => {
@@ -28,5 +32,22 @@ describe("public API URL helpers", () => {
 
     expect(getPublicApiOrigin()).toBeNull();
     expect(getPublicApiUrl("/api/notifications/stream")).toBeNull();
+  });
+  test("uses same-origin browser routes for unrelated Preview hosts", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app-candidate.vercel.app");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api-candidate.vercel.app");
+    expect(getBrowserApiUrl("/api/notifications/stream")).toBe(
+      "/api/notifications/stream"
+    );
+    expect(getPublicApiUrl("/api/sync/dispatch")).toBe(
+      "https://api-candidate.vercel.app/api/sync/dispatch"
+    );
+  });
+  test("keeps the approved sibling-subdomain production API URL", () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.teamcalendar.online");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.teamcalendar.online");
+    expect(getBrowserApiUrl("/api/notifications/stream")).toBe(
+      "https://api.teamcalendar.online/api/notifications/stream"
+    );
   });
 });

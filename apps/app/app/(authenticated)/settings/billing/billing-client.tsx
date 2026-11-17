@@ -1,6 +1,10 @@
 "use client";
 
 import type { BillingSummary } from "@repo/availability";
+import {
+  Alert,
+  AlertDescription,
+} from "@repo/design-system/components/ui/alert";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
@@ -11,6 +15,7 @@ import {
   CardTitle,
 } from "@repo/design-system/components/ui/card";
 import { isEarlyAccess } from "@repo/next-config/launch-mode";
+import { useState, useTransition } from "react";
 import { SettingsSectionHeader } from "../components/settings-section-header";
 import { startCheckout, startPortal } from "./actions";
 
@@ -50,8 +55,69 @@ const usageBarColour = (percentage: number) => {
   return "bg-primary";
 };
 
+function isNextRedirect(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  if ("message" in error && error.message === "NEXT_REDIRECT") {
+    return true;
+  }
+  if (
+    "digest" in error &&
+    typeof error.digest === "string" &&
+    error.digest.startsWith("NEXT_REDIRECT")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export const BillingClient = ({ summary }: BillingClientProps) => {
   const earlyAccess = isEarlyAccess();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handlePortal = () => {
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        const result = await startPortal();
+        if (!result.ok) {
+          setActionError(result.error.message);
+        }
+      } catch (error) {
+        if (isNextRedirect(error)) {
+          throw error;
+        }
+        setActionError(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred."
+        );
+      }
+    });
+  };
+
+  const handleCheckout = (planKey: "basic" | "premium") => {
+    setActionError(null);
+    startTransition(async () => {
+      try {
+        const result = await startCheckout(planKey);
+        if (!result.ok) {
+          setActionError(result.error.message);
+        }
+      } catch (error) {
+        if (isNextRedirect(error)) {
+          throw error;
+        }
+        setActionError(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred."
+        );
+      }
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -59,6 +125,11 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
         description="Review your organisation billing status and usage limits."
         title="Billing"
       />
+      {actionError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{actionError}</AlertDescription>
+        </Alert>
+      ) : null}
       {summary.isOverLimit ? (
         <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-label-lg">
           This account is over one or more plan limits.
@@ -172,12 +243,15 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
         </Card>
       ) : (
         <div className="flex flex-wrap gap-3">
-          <form action={startPortal}>
-            <Button variant="outline">Manage billing</Button>
-          </form>
-          <form action={startCheckout.bind(null, "premium")}>
-            <Button>Upgrade to Premium</Button>
-          </form>
+          <Button disabled={isPending} onClick={handlePortal} variant="outline">
+            Manage billing
+          </Button>
+          <Button
+            disabled={isPending}
+            onClick={() => handleCheckout("premium")}
+          >
+            Upgrade to Premium
+          </Button>
         </div>
       )}
     </div>

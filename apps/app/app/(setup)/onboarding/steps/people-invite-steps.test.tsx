@@ -66,10 +66,10 @@ const baseProps = {
 function match(index: number) {
   return {
     candidate_person: {
-      clerk_user_id: null,
       email: `old${index}@example.test`,
       first_name: "Old",
       last_name: `Person ${index}`,
+      user_id: null,
     },
     id: `match-${index}`,
     xero_person: {
@@ -282,8 +282,8 @@ describe("InviteStep", () => {
     expect(mocks.sendInvitesAction).toHaveBeenCalledWith({
       organisationId,
       rows: [
-        { email: "mia@example.test", role: "org:manager" },
-        { email: "tom@example.test", role: "org:viewer" },
+        { email: "mia@example.test", role: "manager" },
+        { email: "tom@example.test", role: "viewer" },
       ],
     });
     expect(

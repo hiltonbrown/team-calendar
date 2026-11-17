@@ -19,8 +19,8 @@ interface TestNotificationEvent {
 }
 const mocks = vi.hoisted(() => ({
   dispatchManualSyncAction: vi.fn(),
-  inviteClerkAccessCandidatesAction: vi.fn(),
-  loadClerkAccessCandidatesAction: vi.fn(),
+  inviteAccountAccessCandidatesAction: vi.fn(),
+  loadAccountAccessCandidatesAction: vi.fn(),
   push: vi.fn(),
   refresh: vi.fn(),
   setFilterParams: vi.fn(),
@@ -44,10 +44,10 @@ vi.mock("@/app/(authenticated)/sync/_actions", () => ({
     mocks.dispatchManualSyncAction(input),
 }));
 vi.mock("./_actions", () => ({
-  inviteClerkAccessCandidatesAction: (input: unknown) =>
-    mocks.inviteClerkAccessCandidatesAction(input),
-  loadClerkAccessCandidatesAction: (input: unknown) =>
-    mocks.loadClerkAccessCandidatesAction(input),
+  inviteAccountAccessCandidatesAction: (input: unknown) =>
+    mocks.inviteAccountAccessCandidatesAction(input),
+  loadAccountAccessCandidatesAction: (input: unknown) =>
+    mocks.loadAccountAccessCandidatesAction(input),
 }));
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const connectionId = "00000000-0000-4000-8000-000000000002";
@@ -453,9 +453,9 @@ describe("PeopleClient", () => {
       });
     });
   });
-  describe("clerk access reconciliation modal", () => {
+  describe("account access reconciliation modal", () => {
     it("opens dialog, loads candidate review, and sends invitations upon confirmation", async () => {
-      mocks.loadClerkAccessCandidatesAction.mockResolvedValue({
+      mocks.loadAccountAccessCandidatesAction.mockResolvedValue({
         ok: true,
         value: {
           alreadyInvitedCount: 1,
@@ -503,7 +503,7 @@ describe("PeopleClient", () => {
           memberCount: 1,
         },
       });
-      mocks.inviteClerkAccessCandidatesAction.mockResolvedValue({
+      mocks.inviteAccountAccessCandidatesAction.mockResolvedValue({
         ok: true,
         value: {
           alreadyInvitedCount: 1,
@@ -517,7 +517,7 @@ describe("PeopleClient", () => {
       render(
         <PeopleClient
           canIncludeArchived={true}
-          canManageClerkAccess={true}
+          canManageAccountAccess={true}
           connectionId={connectionId}
           filters={defaultFilters}
           locations={[]}
@@ -531,16 +531,16 @@ describe("PeopleClient", () => {
         />
       );
       const reconcileBtn = screen.getByRole("button", {
-        name: "Reconcile Clerk access",
+        name: "Reconcile Account access",
       });
       fireEvent.click(reconcileBtn);
       await waitFor(() => {
-        expect(mocks.loadClerkAccessCandidatesAction).toHaveBeenCalledWith({
+        expect(mocks.loadAccountAccessCandidatesAction).toHaveBeenCalledWith({
           organisationId,
         });
       });
       expect(
-        await screen.findByRole("heading", { name: "Reconcile Clerk access" })
+        await screen.findByRole("heading", { name: "Reconcile Account access" })
       ).toBeDefined();
       expect(screen.getByText("Alice Smith")).toBeDefined();
       expect(screen.getByText("Bob Jones")).toBeDefined();
@@ -550,7 +550,7 @@ describe("PeopleClient", () => {
       });
       fireEvent.click(sendBtn);
       await waitFor(() => {
-        expect(mocks.inviteClerkAccessCandidatesAction).toHaveBeenCalledWith({
+        expect(mocks.inviteAccountAccessCandidatesAction).toHaveBeenCalledWith({
           organisationId,
         });
       });

@@ -20,8 +20,8 @@ vi.mock("pg", () => ({
       return Promise.resolve({
         rows: [
           {
+            account_id: "owned-account",
             approval_status: "approved",
-            clerk_org_id: "owned-account",
             known_remote_id: "remote-1",
             organisation_id: "owned-organisation",
             request_employee_id: currentApproval ? "employee-1" : null,
@@ -41,7 +41,7 @@ vi.mock("pg", () => ({
 vi.mock("../database-guard.js", () => ({
   assertLiveDatabaseAuthority: () => ({
     owned: {
-      clerkOrgIds: ["owned-account"],
+      accountIds: ["owned-account"],
       organisationIds: ["owned-organisation"],
     },
     runId: "owned-run",
@@ -139,10 +139,19 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
   "executes the actual snapshot SQL with both tenant boundaries and scoped operation join",
   async () => {
     const { randomUUID } = await import("node:crypto");
-    const { xeroSimplificationFixture } = await import(
-      "../../../packages/database/src/test-fixtures/xero-simplification-fixture.js"
+    const { assertTestDatabaseConnectionAllowed } = await import(
+      "../../../packages/database/src/live-test-guard.js"
     );
-    const { database } = xeroSimplificationFixture();
+    assertTestDatabaseConnectionAllowed();
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error("Snapshot SQL test requires the configured database");
+    }
+    const { createStandaloneDatabaseClient } = await import(
+      "../../../packages/database/src/standalone-client.js"
+    );
+    // This case keeps every fixture write inside its forced rollback.
+    const database = createStandaloneDatabaseClient(databaseUrl);
     const { sql, params: originalParams } = state.query;
     expect(typeof sql).toBe("string");
     const rollback = new Error("snapshot fixture rollback");
@@ -150,18 +159,18 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
       await database
         .$transaction(async (tx) => {
           const createRecord = async () => {
-            const clerkOrgId = `snapshot-fixture-${randomUUID()}`;
+            const accountId = `snapshot-fixture-${randomUUID()}`;
             const organisation = await tx.organisation.create({
               data: {
-                clerk_org_id: clerkOrgId,
+                account_id: accountId,
                 country_code: "AU",
                 name: "Owned snapshot fixture",
               },
             });
             const person = await tx.person.create({
               data: {
-                clerk_org_id: clerkOrgId,
-                email: `${clerkOrgId}@example.com`,
+                account_id: accountId,
+                email: `${accountId}@example.com`,
                 employment_type: "employee",
                 first_name: "Snapshot",
                 last_name: "Fixture",
@@ -171,8 +180,8 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
             });
             const record = await tx.availabilityRecord.create({
               data: {
+                account_id: accountId,
                 approval_status: "approved",
-                clerk_org_id: clerkOrgId,
                 contactability: "contactable",
                 derived_uid_key: `snapshot:${randomUUID()}`,
                 ends_at: new Date("2026-10-02"),
@@ -185,7 +194,7 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
               },
             });
             return {
-              clerkOrgId,
+              accountId,
               organisationId: organisation.id,
               recordId: record.id,
             };
@@ -196,10 +205,10 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
           // sibling journal's request through a record in this account.
           await tx.outboundOperation.create({
             data: {
+              account_id: foreign.accountId,
               action: "approve",
               actor_user_id: "fixture-user",
               availability_record_id: owned.recordId,
-              clerk_org_id: foreign.clerkOrgId,
               organisation_id: foreign.organisationId,
               request_employee_id: "foreign-employee",
               request_fingerprint: "foreign-fingerprint",
@@ -208,10 +217,10 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
           });
           const query = (
             recordId: string,
-            clerkOrgIds: string[],
+            accountIds: string[],
             organisationIds: string[]
           ) => {
-            const params = [recordId, clerkOrgIds, organisationIds].slice(
+            const params = [recordId, accountIds, organisationIds].slice(
               0,
               originalParams.length
             );
@@ -222,20 +231,20 @@ it.skipIf(process.env.ALLOW_LOCAL_DATABASE_TESTS !== "1")(
           expect(
             await query(
               foreign.recordId,
-              [owned.clerkOrgId],
+              [owned.accountId],
               [owned.organisationId, foreign.organisationId]
             )
           ).toEqual([]);
           expect(
             await query(
               foreign.recordId,
-              [owned.clerkOrgId, foreign.clerkOrgId],
+              [owned.accountId, foreign.accountId],
               [owned.organisationId]
             )
           ).toEqual([]);
           const result = await query(
             owned.recordId,
-            [owned.clerkOrgId],
+            [owned.accountId],
             [owned.organisationId]
           );
           expect(result).toHaveLength(1);

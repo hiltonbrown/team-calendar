@@ -3,7 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { type AppError, appError, type PlanKey, type Result } from "@repo/core";
 import {
-  getSubscriptionForOrg,
+  getSubscriptionForAccount,
   PLAN_CATALOGUE,
   withTenantDb,
 } from "@repo/database";
@@ -58,16 +58,16 @@ const TERMINAL_SUBSCRIPTION_STATUSES = new Set([
 ]);
 
 const checkoutIdempotencyKey = (
-  clerkOrgId: string,
+  accountId: string,
   planKey: PlanKey,
   subscriptionId: string | null
 ): string =>
   `team-calendar:checkout:${createHash("sha256")
-    .update(`${clerkOrgId}:${planKey}:${subscriptionId ?? "initial"}`)
+    .update(`${accountId}:${planKey}:${subscriptionId ?? "initial"}`)
     .digest("hex")}`;
 
 export const createCheckoutSession = async (
-  clerkOrgId: string,
+  accountId: string,
   planKey: PlanKey
 ): Promise<Result<string, AppError>> => {
   assertNoTenantTransaction("createCheckoutSession");
@@ -90,8 +90,8 @@ export const createCheckoutSession = async (
   if (!cancel.ok) {
     return cancel;
   }
-  const subscription = await withTenantDb(clerkOrgId, (db) =>
-    getSubscriptionForOrg(clerkOrgId, db)
+  const subscription = await withTenantDb(accountId, (db) =>
+    getSubscriptionForAccount(accountId, db)
   );
   if (
     subscription &&
@@ -111,14 +111,14 @@ export const createCheckoutSession = async (
       cancel_url: cancel.value,
       customer: subscription?.stripe_customer_id ?? undefined,
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      metadata: { clerk_org_id: clerkOrgId },
+      metadata: { account_id: accountId },
       mode: "subscription",
-      subscription_data: { metadata: { clerk_org_id: clerkOrgId } },
+      subscription_data: { metadata: { account_id: accountId } },
       success_url: success.value,
     },
     {
       idempotencyKey: checkoutIdempotencyKey(
-        clerkOrgId,
+        accountId,
         planKey,
         subscription?.stripe_subscription_id ?? null
       ),
@@ -133,7 +133,7 @@ export const createCheckoutSession = async (
 };
 
 export const createPortalSession = async (
-  clerkOrgId: string
+  accountId: string
 ): Promise<Result<string>> => {
   assertNoTenantTransaction("createPortalSession");
   const stripe = getStripe();
@@ -141,8 +141,8 @@ export const createPortalSession = async (
   if (!(stripe.ok && returnUrl.ok)) {
     return stripe.ok ? returnUrl : stripe;
   }
-  const subscription = await withTenantDb(clerkOrgId, (db) =>
-    getSubscriptionForOrg(clerkOrgId, db)
+  const subscription = await withTenantDb(accountId, (db) =>
+    getSubscriptionForAccount(accountId, db)
   );
   if (!subscription?.stripe_customer_id) {
     return {

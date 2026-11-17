@@ -57,10 +57,10 @@ const { dispatchNotification, publishPersistedNotification } = await import(
 );
 
 const input = {
+  accountId: "org_1",
   actionUrl: "/leave-approvals?recordId=00000000-0000-4000-8000-000000000099",
   actorUserId: "manager_1",
   body: "Ava submitted leave.",
-  clerkOrgId: "org_1",
   objectId: "00000000-0000-4000-8000-000000000099",
   objectType: "availability_record",
   organisationId: "00000000-0000-4000-8000-000000000001",
@@ -185,7 +185,7 @@ describe("dispatchNotification", () => {
     expect(mocks.notificationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
           recipient_user_id: input.recipientUserId,
         }),
@@ -293,9 +293,9 @@ describe("publishPersistedNotification", () => {
   it("reads the committed scoped row and publishes without creating rows", async () => {
     vi.clearAllMocks();
     mocks.notificationFindFirst.mockResolvedValue({
+      account_id: input.accountId,
       action_url: input.actionUrl,
       body: input.body,
-      clerk_org_id: input.clerkOrgId,
       created_at: new Date("2026-04-18T00:00:00Z"),
       id: "notification_1",
       organisation: { name: "Company A" },
@@ -307,20 +307,20 @@ describe("publishPersistedNotification", () => {
     mocks.count.mockResolvedValue(2);
     mocks.publish.mockResolvedValue(undefined);
     await publishPersistedNotification({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       notificationId: "notification_1",
       organisationId: input.organisationId,
     });
     expect(mocks.notificationFindFirst).toHaveBeenCalledWith({
       include: { organisation: { select: { name: true } } },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         id: "notification_1",
         organisation_id: input.organisationId,
       },
     });
     expect(mocks.publish).toHaveBeenCalledWith(
-      { clerkOrgId: input.clerkOrgId, userId: input.recipientUserId },
+      { accountId: input.accountId, userId: input.recipientUserId },
       expect.objectContaining({
         payload: expect.objectContaining({
           notificationId: "notification_1",
@@ -336,7 +336,7 @@ describe("publishPersistedNotification", () => {
     vi.clearAllMocks();
     mocks.notificationFindFirst.mockResolvedValue(null);
     await publishPersistedNotification({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       notificationId: "rolled_back",
       organisationId: input.organisationId,
     });

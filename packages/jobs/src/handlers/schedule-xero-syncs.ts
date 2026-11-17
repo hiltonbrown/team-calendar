@@ -258,7 +258,7 @@ export async function scheduleXeroSyncsPage(
     if (!isValidTimezone(tenant.timezone)) {
       invalidTimezone += 1;
       log.warn("Skipping Xero tenant with invalid timezone", {
-        clerkOrgId: tenant.clerkOrgId,
+        accountId: tenant.accountId,
         connectionId: tenant.connectionId,
         organisationId: tenant.organisationId,
       });
@@ -276,7 +276,7 @@ export async function scheduleXeroSyncsPage(
         (mode === "full" ? ":full" : "");
       const dispatchRes = await dispatchSyncEvent(
         {
-          clerkOrgId: tenant.clerkOrgId,
+          accountId: tenant.accountId,
           connectionId: tenant.connectionId,
           organisationId: tenant.organisationId,
           runType,
@@ -289,7 +289,7 @@ export async function scheduleXeroSyncsPage(
         dispatched += 1;
       } else {
         log.error("Failed to dispatch scheduled sync event", {
-          clerkOrgId: tenant.clerkOrgId,
+          accountId: tenant.accountId,
           connectionId: tenant.connectionId,
           error: dispatchRes.error,
           organisationId: tenant.organisationId,

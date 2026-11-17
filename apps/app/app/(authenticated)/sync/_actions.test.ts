@@ -55,25 +55,31 @@ vi.mock("@repo/database", async () => ({
   >("../../../../../packages/database/src/queries/organisations")),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+  hasPermission: async (
+    request: import("@repo/auth/permissions").PermissionRequest
+  ) =>
+    (await import("@repo/auth/permissions")).hasPermission(
+      (await mocks.getSession())?.role,
+      request
+    ),
 }));
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   cancelRun: vi.fn(),
-  currentUser: vi.fn(),
   exportFailedRecordsCsv: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
   getPublicApiUrl: vi.fn(),
-  getToken: vi.fn(),
+  getSession: vi.fn(),
+  getSessionAuthorizationHeaders: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   exportFailedRecordsCsv: mocks.exportFailedRecordsCsv,
@@ -103,26 +109,28 @@ const {
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const runId = "00000000-0000-4000-8000-000000000002";
 const connectionId = "00000000-0000-4000-8000-000000000003";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 
 describe("sync server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      getToken: mocks.getToken,
-      orgId: clerkOrgId,
-      orgRole: "org:admin",
+    mocks.getSession.mockResolvedValue({
+      accountId,
+      role: "admin",
     });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.getPublicApiUrl.mockReturnValue(
       "https://api.example.com/api/sync/dispatch"
     );
-    mocks.getToken.mockResolvedValue("session_token");
+    mocks.getSessionAuthorizationHeaders.mockResolvedValue({
+      Cookie: "team-calendar-dev-auth.session_token=opaque",
+      Origin: "http://localhost:3000",
+    });
     mocks.cancelRun.mockResolvedValue({
       ok: true,
       value: { cancellationRequested: true, eventQueued: true },
@@ -150,7 +158,7 @@ describe("sync server actions", () => {
   });
 
   it("rejects unauthenticated callers", async () => {
-    mocks.currentUser.mockResolvedValue(null);
+    mocks.getCurrentUser.mockResolvedValue(null);
 
     const result = await dispatchManualSyncAction({
       connectionId,
@@ -169,10 +177,9 @@ describe("sync server actions", () => {
   });
 
   it("rejects non-admin roles", async () => {
-    mocks.auth.mockResolvedValue({
-      getToken: mocks.getToken,
-      orgId: clerkOrgId,
-      orgRole: "org:manager",
+    mocks.getSession.mockResolvedValue({
+      accountId,
+      role: "manager",
     });
 
     const result = await cancelRunAction({ organisationId, runId });
@@ -196,9 +203,9 @@ describe("sync server actions", () => {
     await cancelRunAction({ organisationId, runId });
 
     expect(mocks.cancelRun).toHaveBeenCalledWith({
+      accountId,
       actingRole: "admin",
       actingUserId: userId,
-      clerkOrgId,
       organisationId,
       runId,
     });
@@ -225,16 +232,17 @@ describe("sync server actions", () => {
         }),
         cache: "no-store",
         headers: {
-          authorization: "Bearer session_token",
+          Cookie: "team-calendar-dev-auth.session_token=opaque",
           "content-type": "application/json",
+          Origin: "http://localhost:3000",
         },
         method: "POST",
       }
     );
   });
 
-  it("does not dispatch without a Clerk session token", async () => {
-    mocks.getToken.mockResolvedValueOnce(null);
+  it("does not dispatch without a session cookie", async () => {
+    mocks.getSessionAuthorizationHeaders.mockResolvedValueOnce(null);
 
     const result = await dispatchManualSyncAction({
       connectionId,
@@ -342,3 +350,7 @@ describe("sync server actions", () => {
     });
   });
 });
+
+vi.mock("@repo/auth/transport", () => ({
+  getSessionAuthorizationHeaders: mocks.getSessionAuthorizationHeaders,
+}));

@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   lockActiveScopedXeroConnection: vi.fn(async () => true),
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   updateMany: vi.fn(),
@@ -43,7 +43,7 @@ const {
 } = await import("./xero-write-claim");
 
 const claimScope = {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   recordId: "00000000-0000-4000-8000-000000000099",
 };
@@ -141,9 +141,9 @@ describe("xero write claim", () => {
     expect(mocks.updateMany).toHaveBeenCalledWith({
       data: { xero_write_claimed_at: now },
       where: expect.objectContaining({
+        account_id: claimScope.accountId,
         approval_status: "xero_sync_failed",
         archived_at: null,
-        clerk_org_id: claimScope.clerkOrgId,
         derived_sequence: 3,
         failed_action: "approve",
         id: claimScope.recordId,
@@ -183,7 +183,7 @@ describe("xero write claim", () => {
     expect(mocks.updateMany).toHaveBeenCalledWith({
       data: { xero_write_claimed_at: null },
       where: expect.objectContaining({
-        clerk_org_id: claimScope.clerkOrgId,
+        account_id: claimScope.accountId,
         organisation_id: claimScope.organisationId,
         xero_write_claimed_at: oldClaim,
       }),

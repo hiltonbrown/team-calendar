@@ -76,7 +76,7 @@ export async function fetchEmployees(input: {
       const mappedPage = tryMapXeroEmployees(rawPayload);
       if (!mappedPage.ok) {
         log.warn("Xero employee page could not be parsed", {
-          clerkOrgId: input.xeroConnection.clerk_org_id,
+          accountId: input.xeroConnection.account_id,
           organisationId: input.xeroConnection.organisation_id,
           page,
         });
@@ -112,7 +112,7 @@ export async function fetchEmployees(input: {
       page += 1;
     }
     log.warn("Xero employee pagination exceeded the maximum page count", {
-      clerkOrgId: input.xeroConnection.clerk_org_id,
+      accountId: input.xeroConnection.account_id,
       organisationId: input.xeroConnection.organisation_id,
       page: XERO_MAX_PAGES,
     });
@@ -329,7 +329,7 @@ export async function fetchUkLeaveForEmployee(input: {
     const mapped = tryMapUkLeaveRecords(rawPayload, employeeId);
     if (!mapped.ok) {
       log.warn("Xero UK employee leave payload could not be parsed", {
-        clerkOrgId: input.xeroConnection.clerk_org_id,
+        accountId: input.xeroConnection.account_id,
         employeeId,
         organisationId: input.xeroConnection.organisation_id,
       });
@@ -535,7 +535,7 @@ export async function fetchUkLeaveBalancesForEmployee(input: {
     const mapped = tryMapUkLeaveBalances(rawPayload, employeeId);
     if (!mapped.ok) {
       log.warn("Xero UK employee leave balances payload could not be parsed", {
-        clerkOrgId: input.xeroConnection.clerk_org_id,
+        accountId: input.xeroConnection.account_id,
         employeeId,
         organisationId: input.xeroConnection.organisation_id,
       });

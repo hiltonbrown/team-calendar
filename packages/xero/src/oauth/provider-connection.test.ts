@@ -21,7 +21,7 @@ const tenantId = "00000000-0000-4000-8000-000000000002";
 function context(): XeroAccessContext {
   return {
     accessToken: "server-access",
-    clerk_org_id: "account",
+    account_id: "account",
     deadline: { expiresAtMs: 1_791_405_200_000 },
     id: "connection",
     organisation_id: "payroll",
@@ -73,7 +73,7 @@ describe("confirmed selected provider connection", () => {
     expect(await verify()).toBe("reconnect_required");
     expect(mocks.mark).toHaveBeenCalledWith({
       ...context().providerConnection,
-      clerkOrgId: "account",
+      accountId: "account",
       connectionId: "connection",
       organisationId: "payroll",
       xeroTenantId: tenantId,

@@ -18,7 +18,13 @@ import {
   xeroSimplificationFixture,
 } from "./src/test-fixtures/xero-simplification-fixture";
 
-const { database } = xeroSimplificationFixture();
+const { database, fixture: ownedFixture } = xeroSimplificationFixture(
+  "packages/database/xero-tenancy.integration.test.ts"
+);
+const [primaryTenant] = ownedFixture.tenants;
+if (!primaryTenant) {
+  throw new Error("Fixture tenant slot is not allocated");
+}
 const maintenanceNow = new Date("2026-10-07T00:00:00.000Z");
 const fortyFiveDaysAgo = new Date(
   maintenanceNow.getTime() - 45 * 24 * 60 * 60 * 1000
@@ -42,9 +48,9 @@ async function rolledBack(
 test("dormant maintenance becomes due exactly 45 days after successful rotation", async () => {
   await rolledBack(async (tx) => {
     const fixtures = await Promise.all([
-      createXeroConnectionFixture(tx),
-      createXeroConnectionFixture(tx),
-      createXeroConnectionFixture(tx),
+      createXeroConnectionFixture(tx, ownedFixture, 0),
+      createXeroConnectionFixture(tx, ownedFixture, 1),
+      createXeroConnectionFixture(tx, ownedFixture, 2),
     ]);
     for (const [index, fixture] of fixtures.entries()) {
       await tx.xeroAuthorisation.update({
@@ -68,8 +74,8 @@ test("dormant maintenance becomes due exactly 45 days after successful rotation"
 
 test("paused active connections in two accounts select their shared grant once", async () => {
   await rolledBack(async (tx) => {
-    const first = await createXeroConnectionFixture(tx);
-    const second = await createXeroConnectionFixture(tx);
+    const first = await createXeroConnectionFixture(tx, ownedFixture);
+    const second = await createXeroConnectionFixture(tx, ownedFixture, 1);
     await tx.xeroAuthorisation.update({
       data: { last_refreshed_at: fortyFiveDaysAgo },
       where: { id: first.authorisation.id },
@@ -105,13 +111,17 @@ test("paused active connections in two accounts select their shared grant once",
 
 test("maintenance excludes grants without a live active connection or with revoked access", async () => {
   await rolledBack(async (tx) => {
-    const inactive = await createXeroConnectionFixture(tx);
-    const archived = await createXeroConnectionFixture(tx);
-    const disconnected = await createXeroConnectionFixture(tx);
-    const disconnectedAt = await createXeroConnectionFixture(tx);
-    const reconnect = await createXeroConnectionFixture(tx);
-    const revoked = await createXeroConnectionFixture(tx);
-    const unlinked = await createXeroAuthorisationFixture(tx);
+    const inactive = await createXeroConnectionFixture(tx, ownedFixture, 0);
+    const archived = await createXeroConnectionFixture(tx, ownedFixture, 1);
+    const disconnected = await createXeroConnectionFixture(tx, ownedFixture, 2);
+    const disconnectedAt = await createXeroConnectionFixture(
+      tx,
+      ownedFixture,
+      3
+    );
+    const reconnect = await createXeroConnectionFixture(tx, ownedFixture, 4);
+    const revoked = await createXeroConnectionFixture(tx, ownedFixture, 5);
+    const unlinked = await createXeroAuthorisationFixture(tx, ownedFixture, 6);
     const fixtureIds = [
       inactive,
       archived,
@@ -161,7 +171,10 @@ test("maintenance excludes grants without a live active connection or with revok
 });
 test("rejects duplicate canonical app and verified user", async () => {
   await rolledBack(async (tx) => {
-    const { authorisation } = await createXeroConnectionFixture(tx);
+    const { authorisation } = await createXeroConnectionFixture(
+      tx,
+      ownedFixture
+    );
     const {
       id: _id,
       created_at: _created,
@@ -175,11 +188,11 @@ test("rejects duplicate canonical app and verified user", async () => {
 });
 test("rejects a second connection for the same payroll organisation", async () => {
   await rolledBack(async (tx) => {
-    const { connection } = await createXeroConnectionFixture(tx);
+    const { connection } = await createXeroConnectionFixture(tx, ownedFixture);
     await expect(
       tx.xeroConnection.create({
         data: {
-          clerk_org_id: connection.clerk_org_id,
+          account_id: connection.account_id,
           organisation_id: connection.organisation_id,
           payroll_region: "AU",
           xero_tenant_id: randomUUID(),
@@ -188,19 +201,20 @@ test("rejects a second connection for the same payroll organisation", async () =
     ).rejects.toMatchObject({ code: "P2002" });
   });
 });
-test("rejects a connection owned by another Clerk account", async () => {
+test("rejects a connection owned by another Account", async () => {
   await rolledBack(async (tx) => {
     const organisation = await tx.organisation.create({
       data: {
-        clerk_org_id: randomUUID(),
+        account_id: primaryTenant.accountId,
         country_code: "AU",
+        id: primaryTenant.organisationId,
         name: "Owned test payroll",
       },
     });
     await expect(
       tx.xeroConnection.create({
         data: {
-          clerk_org_id: "foreign-account",
+          account_id: "foreign-account",
           organisation_id: organisation.id,
           payroll_region: "AU",
           xero_tenant_id: randomUUID(),
@@ -211,11 +225,11 @@ test("rejects a connection owned by another Clerk account", async () => {
 });
 test("rejects a cursor attached to another account", async () => {
   await rolledBack(async (tx) => {
-    const { connection } = await createXeroConnectionFixture(tx);
+    const { connection } = await createXeroConnectionFixture(tx, ownedFixture);
     await expect(
       tx.xeroSyncCursor.create({
         data: {
-          clerk_org_id: "foreign-account",
+          account_id: "foreign-account",
           entity_type: "people",
           modified_since: new Date(),
           organisation_id: connection.organisation_id,
@@ -227,15 +241,15 @@ test("rejects a cursor attached to another account", async () => {
 });
 test("does not reveal sibling account metadata from real rows", async () => {
   await withCommittedConnection(async (connection) => {
-    await withTenantDb(connection.clerk_org_id, async (tx) => {
+    await withTenantDb(connection.account_id, async (tx) => {
       const owned = {
-        clerkOrgId: connection.clerk_org_id,
+        accountId: connection.account_id,
         connectionId: connection.id,
         organisationId: connection.organisation_id,
       };
       expect((await getScopedXeroConnection(owned, tx)).ok).toBe(true);
       await expect(
-        getScopedXeroConnection({ ...owned, clerkOrgId: "foreign-account" }, tx)
+        getScopedXeroConnection({ ...owned, accountId: "foreign-account" }, tx)
       ).rejects.toBeInstanceOf(TenantMismatchError);
       expect(
         (
@@ -250,9 +264,9 @@ test("does not reveal sibling account metadata from real rows", async () => {
 });
 test("advances completed provider watermarks monotonically within both scope keys", async () => {
   await withCommittedConnection(async (connection) => {
-    await withTenantDb(connection.clerk_org_id, async (tx) => {
+    await withTenantDb(connection.account_id, async (tx) => {
       const scope = {
-        clerkOrgId: connection.clerk_org_id,
+        accountId: connection.account_id,
         organisationId: connection.organisation_id,
       };
       const next = new Date("2026-10-07T00:00:00Z");
@@ -282,7 +296,7 @@ test("advances completed provider watermarks monotonically within both scope key
       ).toBe(false);
       const result = await tx.xeroSyncCursor.findFirstOrThrow({
         where: {
-          clerk_org_id: scope.clerkOrgId,
+          account_id: scope.accountId,
           organisation_id: scope.organisationId,
           xero_connection_id: connection.id,
         },
@@ -293,10 +307,13 @@ test("advances completed provider watermarks monotonically within both scope key
 });
 test("preserves manual balance uniqueness", async () => {
   await rolledBack(async (tx) => {
-    const { organisation } = await createXeroConnectionFixture(tx);
+    const { organisation } = await createXeroConnectionFixture(
+      tx,
+      ownedFixture
+    );
     const person = await tx.person.create({
       data: {
-        clerk_org_id: organisation.clerk_org_id,
+        account_id: organisation.account_id,
         email: `${randomUUID()}@example.test`,
         employment_type: "employee",
         first_name: "Test",
@@ -306,8 +323,8 @@ test("preserves manual balance uniqueness", async () => {
       },
     });
     const data = {
+      account_id: organisation.account_id,
       balance: "5",
-      clerk_org_id: organisation.clerk_org_id,
       leave_type_xero_id: "manual-annual",
       organisation_id: organisation.id,
       person_id: person.id,
@@ -322,7 +339,10 @@ test("preserves manual balance uniqueness", async () => {
 
 test("reauthorisation preserves the canonical grant ID and original creation timestamp", async () => {
   await rolledBack(async (tx) => {
-    const { authorisation } = await createXeroConnectionFixture(tx);
+    const { authorisation } = await createXeroConnectionFixture(
+      tx,
+      ownedFixture
+    );
     const replacement = await saveXeroAuthorisation(
       {
         ...authorisation,
@@ -337,9 +357,9 @@ test("reauthorisation preserves the canonical grant ID and original creation tim
     expect(replacement.access_token_encrypted).toBe("new-encrypted-grant");
   });
 });
-test("cursor helper refuses wrong Clerk and organisation keys without creating rows", async () => {
+test("cursor helper refuses wrong account and organisation keys without creating rows", async () => {
   await withCommittedConnection(async (connection) => {
-    await withTenantDb(connection.clerk_org_id, async (tx) => {
+    await withTenantDb(connection.account_id, async (tx) => {
       const input = {
         connectionId: connection.id,
         entityType: "people" as const,
@@ -351,7 +371,7 @@ test("cursor helper refuses wrong Clerk and organisation keys without creating r
           {
             ...input,
             scope: {
-              clerkOrgId: "foreign",
+              accountId: "foreign",
               organisationId: connection.organisation_id,
             },
           },
@@ -363,7 +383,7 @@ test("cursor helper refuses wrong Clerk and organisation keys without creating r
           {
             ...input,
             scope: {
-              clerkOrgId: connection.clerk_org_id,
+              accountId: connection.account_id,
               organisationId: randomUUID(),
             },
           },
@@ -373,7 +393,7 @@ test("cursor helper refuses wrong Clerk and organisation keys without creating r
       expect(
         await tx.xeroSyncCursor.count({
           where: {
-            clerk_org_id: connection.clerk_org_id,
+            account_id: connection.account_id,
             organisation_id: connection.organisation_id,
             xero_connection_id: connection.id,
           },
@@ -384,10 +404,10 @@ test("cursor helper refuses wrong Clerk and organisation keys without creating r
 });
 test("concurrent first watermark writes return one success without a unique-key error", async () => {
   const fixture = await database.$transaction((tx) =>
-    createXeroConnectionFixture(tx)
+    createXeroConnectionFixture(tx, ownedFixture)
   );
   const scope = {
-    clerkOrgId: fixture.connection.clerk_org_id,
+    accountId: fixture.connection.account_id,
     organisationId: fixture.connection.organisation_id,
   };
   try {
@@ -399,10 +419,10 @@ test("concurrent first watermark writes return one success without a unique-key 
       scope,
     };
     const outcomes = await Promise.all([
-      withTestTenantDb(scope.clerkOrgId, (db) =>
+      withTestTenantDb(scope.accountId, (db) =>
         advanceXeroSyncCursor(input, db)
       ),
-      withTestTenantDb(scope.clerkOrgId, (db) =>
+      withTestTenantDb(scope.accountId, (db) =>
         advanceXeroSyncCursor(input, db)
       ),
     ]);
@@ -410,20 +430,20 @@ test("concurrent first watermark writes return one success without a unique-key 
   } finally {
     await database.xeroSyncCursor.deleteMany({
       where: {
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         organisation_id: scope.organisationId,
         xero_connection_id: fixture.connection.id,
       },
     });
     await database.xeroConnection.deleteMany({
       where: {
-        clerk_org_id: scope.clerkOrgId,
+        account_id: scope.accountId,
         id: fixture.connection.id,
         organisation_id: scope.organisationId,
       },
     });
     await database.organisation.deleteMany({
-      where: { clerk_org_id: scope.clerkOrgId, id: scope.organisationId },
+      where: { account_id: scope.accountId, id: scope.organisationId },
     });
     await database.xeroAuthorisation.delete({
       where: { id: fixture.authorisation.id },
@@ -438,7 +458,9 @@ async function withCommittedConnection(
     >["connection"]
   ) => Promise<void>
 ) {
-  const fixture = await database.$transaction(createXeroConnectionFixture);
+  const fixture = await database.$transaction((tx) =>
+    createXeroConnectionFixture(tx, ownedFixture)
+  );
   try {
     await work(fixture.connection);
   } finally {

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type {
-  ClerkOrgId,
+  AccountId,
   OrganisationId,
   Result,
   SupportSubmissionCategory,
@@ -9,8 +9,8 @@ import type {
 import { assertTenantDb, type TenantDb } from "@repo/database";
 
 export interface PersistSupportSubmissionAuditInput {
+  accountId: AccountId;
   category: SupportSubmissionCategory;
-  clerkOrgId: ClerkOrgId;
   issueNumber: number;
   issueUrl: string;
   labelAssignmentSucceeded: boolean;
@@ -25,14 +25,14 @@ export async function persistSupportSubmissionAudit(
   input: PersistSupportSubmissionAuditInput,
   db: TenantDb
 ): Promise<Result<void>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const issueId = String(input.issueNumber);
 
   await db.auditEvent.create({
     data: {
+      account_id: input.accountId,
       action: "support_submissions.github_issue_created",
       actor_user_id: input.userId,
-      clerk_org_id: input.clerkOrgId,
       entity_id: issueId,
       entity_type: "support_submission",
       organisation_id: input.organisationId,

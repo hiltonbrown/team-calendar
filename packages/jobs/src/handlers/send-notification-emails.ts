@@ -22,15 +22,15 @@ export async function drainNotificationEmailQueue(): Promise<{
 }> {
   assertNoTenantTransaction("drainNotificationEmailQueue");
   const accounts = await systemDatabase.notificationEmailQueue.findMany({
-    distinct: ["clerk_org_id"],
-    select: { clerk_org_id: true },
+    distinct: ["account_id"],
+    select: { account_id: true },
     where: { status: "queued" },
   });
   const summary = { failed: 0, processed: 0, sent: 0 };
   const accountFailures = new Set<string>();
   // One account's failure must not hold back every later account's email.
   for (const account of accounts) {
-    const result = await sendQueuedNotificationEmails(account.clerk_org_id);
+    const result = await sendQueuedNotificationEmails(account.account_id);
     if (!result.ok) {
       accountFailures.add(result.error.message);
       continue;

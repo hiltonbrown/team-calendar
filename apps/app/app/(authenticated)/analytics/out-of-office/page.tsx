@@ -1,12 +1,12 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   type AnalyticsRole,
   aggregateOutOfOffice,
   type DateRangePreset,
   resolveDateRange,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { getAvailabilityRecordLabel } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import {
@@ -21,8 +21,8 @@ import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
 import {
   PermissionDeniedError,
-  requirePageRole,
-} from "@/lib/auth/require-page-role";
+  requirePagePermission,
+} from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 import {
@@ -43,7 +43,7 @@ interface OutOfOfficePageProps {
 
 const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
   try {
-    await requirePageRole("org:manager");
+    await requirePagePermission({ reports: ["read"] });
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
@@ -60,8 +60,19 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
 
   const params = await searchParams;
   const orgParam = Array.isArray(params.org) ? params.org[0] : params.org;
-  const [{ orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  const role = analyticsRole(orgRole);
+  const [{ role: sessionRole }, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+  ]);
+  const role = analyticsRole(sessionRole);
   if (!(role && user)) {
     return (
       <>
@@ -73,16 +84,16 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
     );
   }
 
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  const accountId = (await requireAccount()) as AccountId;
   const { organisationId, fromParam, toParam, preset, dataResult, personType } =
-    await withTenantDb(clerkOrgId, async (db) => {
+    await withTenantDb(accountId, async (db) => {
       const { organisationId: scopedOrganisationId } =
-        await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+        await resolveActiveOrgPageContext(accountId, orgParam, db);
       const preparedOrganisation = await db.organisation.findFirst({
         select: { timezone: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: scopedOrganisationId,
         },
       });
@@ -137,8 +148,8 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
       }
       const preparedDataResult = await aggregateOutOfOffice(
         {
+          accountId,
           actingUserId: user.id,
-          clerkOrgId,
           dateRange: rangeResult.value,
           filters: {
             includeArchivedPeople: false,
@@ -326,13 +337,13 @@ function isDateRangePreset(
 }
 
 function analyticsRole(role: string | null | undefined): AnalyticsRole | null {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
-  if (role === "org:manager") {
+  if (role === "manager") {
     return "manager";
   }
   return null;

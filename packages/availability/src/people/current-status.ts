@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  type ClerkOrgId,
-  type OrganisationId,
-  startOfUtcDay,
-} from "@repo/core";
+import { type AccountId, type OrganisationId, startOfUtcDay } from "@repo/core";
 import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import type {
   availability_approval_status,
@@ -132,18 +128,18 @@ const LOCAL_PRIORITY: Array<{
 export async function computeCurrentStatusForPeople(
   input: {
     at: Date;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     people: CurrentStatusPersonInput[];
   },
   db: TenantDb
 ): Promise<Map<string, CurrentStatus>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+    const accountId = input.accountId as AccountId;
     const organisationId = input.organisationId as OrganisationId;
     const personIds = input.people.map((person) => person.personId);
     if (personIds.length === 0) {
@@ -168,7 +164,7 @@ export async function computeCurrentStatusForPeople(
               timezone: true,
             },
             where: {
-              ...scopedQuery(clerkOrgId, organisationId),
+              ...scopedQuery(accountId, organisationId),
               id: { in: locationIds },
             },
           })
@@ -179,8 +175,8 @@ export async function computeCurrentStatusForPeople(
           timezone: true,
         },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       }),
@@ -198,7 +194,7 @@ export async function computeCurrentStatusForPeople(
           title: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           approval_status: { in: ["approved", "submitted"] },
           archived_at: null,
           ends_at: { gte: input.at },
@@ -229,7 +225,7 @@ export async function computeCurrentStatusForPeople(
     });
     const holidays = await resolveHolidaysForDates(
       {
-        clerkOrgId,
+        accountId,
         localDates,
         organisationId,
       },
@@ -261,18 +257,18 @@ export async function computeCurrentStatusForPeople(
 export async function computePublicHolidayApplicability(
   input: {
     at: Date;
-    clerkOrgId: string;
+    accountId: string;
     locationIds: string[];
     organisationId: string;
   },
   db: TenantDb
 ): Promise<PublicHolidayApplicability> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+    const accountId = input.accountId as AccountId;
     const organisationId = input.organisationId as OrganisationId;
     const [locations, organisation] = [
       await (input.locationIds.length
@@ -284,7 +280,7 @@ export async function computePublicHolidayApplicability(
               timezone: true,
             },
             where: {
-              ...scopedQuery(clerkOrgId, organisationId),
+              ...scopedQuery(accountId, organisationId),
               id: { in: input.locationIds },
             },
           })
@@ -292,8 +288,8 @@ export async function computePublicHolidayApplicability(
       await client.organisation.findFirst({
         select: { country_code: true, timezone: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       }),
@@ -316,7 +312,7 @@ export async function computePublicHolidayApplicability(
     ];
     const holidays = await resolveHolidaysForDates(
       {
-        clerkOrgId,
+        accountId,
         localDates: subjects.map((subject) => subject.localDate),
         organisationId,
       },
@@ -346,19 +342,19 @@ export async function computePublicHolidayApplicability(
 export async function computeCurrentStatus(
   input: {
     at: Date;
-    clerkOrgId: string;
+    accountId: string;
     locationId: string | null;
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<CurrentStatus> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+    const accountId = input.accountId as AccountId;
     const organisationId = input.organisationId as OrganisationId;
     const [location, organisation, activeRecords] = [
       await (input.locationId
@@ -369,7 +365,7 @@ export async function computeCurrentStatus(
               timezone: true,
             },
             where: {
-              ...scopedQuery(clerkOrgId, organisationId),
+              ...scopedQuery(accountId, organisationId),
               id: input.locationId,
             },
           })
@@ -380,8 +376,8 @@ export async function computeCurrentStatus(
           timezone: true,
         },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       }),
@@ -398,7 +394,7 @@ export async function computeCurrentStatus(
           title: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           approval_status: { in: ["approved", "submitted"] },
           archived_at: null,
           ends_at: { gte: input.at },
@@ -418,7 +414,7 @@ export async function computeCurrentStatus(
     const localDate = dateOnlyInTimeZone(input.at, timezone);
     const holidays = await resolveHolidaysForDates(
       {
-        clerkOrgId,
+        accountId,
         localDates: [localDate],
         organisationId,
       },
@@ -548,7 +544,7 @@ function statusFromHolidayOrLocal(
 /** Resolves holidays covering every local date the lookups need, in one call. */
 async function resolveHolidaysForDates(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     localDates: string[];
     organisationId: OrganisationId;
   },
@@ -562,7 +558,7 @@ async function resolveHolidaysForDates(
   }
   const result = await resolvePublicHolidays(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       from,
       organisationId: input.organisationId,
       to,

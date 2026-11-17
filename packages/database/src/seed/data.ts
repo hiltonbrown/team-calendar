@@ -7,14 +7,14 @@ import {
 /**
  * Declarative development seed dataset.
  *
- * Every row except `clerk_org_id` is described here; the seed runner injects the
- * resolved `clerk_org_id` so the tenancy key is applied centrally and uniformly.
+ * Every row except `account_id` is described here; the seed runner injects the
+ * resolved `account_id` so the tenancy key is applied centrally and uniformly.
  *
  * Identifiers are fixed UUIDs so the seed is idempotent: organisations, teams and
  * locations upsert on `id`, while people upsert on the natural key
  * (organisation_id, source_system, source_person_key). Re-running never duplicates.
  *
- * The data is realistic Australian sample data for a single Clerk Organisation
+ * The data is realistic Australian sample data for a single Account
  * spanning two payroll entities. It seeds canonical data only. No Xero tokens,
  * connections or other secrets are present.
  */
@@ -59,8 +59,8 @@ export interface OrganisationSeed {
   timezone: string;
 }
 
-/** Default Clerk Organisation id used when SEED_CLERK_ORG_ID is not provided. */
-export const DEFAULT_SEED_CLERK_ORG_ID = "org_dev_teamcalendar";
+/** Default Account id used when SEED_ACCOUNT_ID is not provided. */
+export const DEFAULT_SEED_ACCOUNT_ID = "org_dev_teamcalendar";
 
 // Acme Restaurants Pty Ltd (Queensland payroll entity).
 const ORG_RESTAURANTS_ID = "a1000000-0000-4000-8000-000000000001";

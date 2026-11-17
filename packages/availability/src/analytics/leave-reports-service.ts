@@ -1,8 +1,9 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { tenantAggregationCache } from "./tenant-request-cache";
 import "server-only";
 
 import {
-  type ClerkOrgId,
+  type AccountId,
   getAvailabilityRecordLabel,
   type OrganisationId,
   type Result,
@@ -150,8 +151,8 @@ const FiltersSchema = z
   .default({ includeArchivedPeople: false, personType: "all" });
 
 const AggregateSchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   dateRange: DateRangeSchema,
   filters: FiltersSchema.optional(),
   includePublicHolidays: z.boolean().default(false),
@@ -188,7 +189,7 @@ export async function aggregateLeaveReports(
   input: z.input<typeof AggregateSchema> & { cache?: AggregationCache },
   db: TenantDb
 ): Promise<Result<LeaveReportsData, AnalyticsServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = AggregateSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -200,7 +201,7 @@ export async function aggregateLeaveReports(
     const dataset = await loadDataset(
       parsed.data,
       filters,
-      tenantAggregationCache(input.clerkOrgId, client),
+      tenantAggregationCache(input.accountId, client),
       client
     );
     if (!dataset.ok) {
@@ -256,7 +257,7 @@ export async function aggregateLeaveReports(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -265,7 +266,7 @@ export async function listLeaveReportRecordsForDrilldown(
   input: z.input<typeof DrilldownSchema> & { cache?: AggregationCache },
   db: TenantDb
 ): Promise<Result<RecordListPage, AnalyticsServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = DrilldownSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -309,7 +310,7 @@ export async function listLeaveReportRecordsForDrilldown(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -319,10 +320,9 @@ function normaliseFilters(
   role: AnalyticsRole
 ): LeaveReportsFilters {
   return {
-    includeArchivedPeople:
-      role === "admin" || role === "owner"
-        ? (filters?.includeArchivedPeople ?? false)
-        : false,
+    includeArchivedPeople: hasPermission(role, { people: ["readArchived"] })
+      ? (filters?.includeArchivedPeople ?? false)
+      : false,
     leaveType: filters?.leaveType?.filter(isXeroLeaveRecordType),
     locationId: filters?.locationId,
     personId: filters?.personId,
@@ -337,13 +337,13 @@ async function loadDataset(
   cache: AggregationCache | undefined,
   db: TenantDb
 ): Promise<Result<Dataset, AnalyticsServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const key = aggregationFingerprint({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       dateRangeKey: `${input.dateRange.start.toISOString()}:${input.dateRange.end.toISOString()}`,
       filterKey: {
         actingUserId: input.actingUserId,
@@ -364,9 +364,9 @@ async function loadDatasetUncached(
   filters: LeaveReportsFilters,
   db: TenantDb
 ): Promise<Result<Dataset, AnalyticsServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const peopleResult = await loadPeople(input, filters, client);
@@ -417,18 +417,18 @@ async function loadDatasetUncached(
 async function loadPeople(
   input: Pick<
     AggregateInput,
-    "actingUserId" | "clerkOrgId" | "organisationId" | "role"
+    "actingUserId" | "accountId" | "organisationId" | "role"
   >,
   filters: LeaveReportsFilters,
   db: TenantDb
 ): Promise<Result<PersonRow[], AnalyticsServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const scoped = scopedQuery(
-      input.clerkOrgId as ClerkOrgId,
+      input.accountId as AccountId,
       input.organisationId as OrganisationId
     );
     const where: Prisma.PersonWhereInput = {
@@ -445,19 +445,19 @@ async function loadPeople(
     };
 
     if (input.role === "viewer") {
-      where.clerk_user_id = input.actingUserId;
+      where.user_id = input.actingUserId;
     } else if (input.role === "manager") {
       const actingPerson = await client.person.findFirst({
         select: { id: true },
         where: {
+          account_id: input.accountId,
           archived_at: null,
-          clerk_org_id: input.clerkOrgId,
-          clerk_user_id: input.actingUserId,
           organisation: {
+            account_id: input.accountId,
             archived_at: null,
-            clerk_org_id: input.clerkOrgId,
             is_active: true,
           },
+          user_id: input.actingUserId,
         },
       });
       if (!actingPerson) {
@@ -466,8 +466,8 @@ async function loadPeople(
       where.id = {
         in: await managerScopePersonIds(
           {
+            accountId: input.accountId,
             actingPersonId: actingPerson.id,
-            clerkOrgId: input.clerkOrgId,
           },
           client
         ),
@@ -484,13 +484,13 @@ async function loadPeople(
 }
 
 function recordWhere(
-  input: Pick<AggregateInput, "clerkOrgId" | "dateRange" | "organisationId">,
+  input: Pick<AggregateInput, "accountId" | "dateRange" | "organisationId">,
   filters: LeaveReportsFilters,
   personIds: string[]
 ): Prisma.AvailabilityRecordWhereInput {
   return {
     ...scopedQuery(
-      input.clerkOrgId as ClerkOrgId,
+      input.accountId as AccountId,
       input.organisationId as OrganisationId
     ),
     approval_status: "approved",
@@ -506,13 +506,13 @@ function recordWhere(
 }
 
 async function loadHolidays(input: AggregateInput, db: TenantDb) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
     return await resolvePublicHolidays(
       {
-        clerkOrgId: input.clerkOrgId as ClerkOrgId,
+        accountId: input.accountId as AccountId,
         from: toDateOnly(input.dateRange.start),
         organisationId: input.organisationId as OrganisationId,
         to: toDateOnly(input.dateRange.end),
@@ -553,9 +553,9 @@ async function workingDaysByRecord(
   includePublicHolidays: boolean,
   db: TenantDb
 ): Promise<Map<string, number>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const holidayRows = includePublicHolidays

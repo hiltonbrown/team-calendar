@@ -28,9 +28,9 @@ import {
 import { completeSubmitSideEffects } from "./submit-side-effects";
 
 export interface PrepareXeroWriteInput {
+  accountId: string;
   action: "approve" | "decline" | "withdraw";
   actorUserId: string;
-  clerkOrgId: string;
   employeeId: string;
   endsAt: Date;
   expectedFailedAction: "approve" | "decline" | "withdraw" | null;
@@ -60,8 +60,8 @@ export async function prepareXeroWrite(
 ): Promise<Result<PreparedSubmitOperation, ProviderWriteError>> {
   assertNoTenantTransaction("prepareXeroWrite");
   const descriptor = await port.prepareLeaveMutation({
+    accountId: input.accountId,
     action: input.remoteId ? input.action : "create",
-    clerkOrgId: input.clerkOrgId,
     employeeId: input.employeeId,
     endsAt: input.endsAt,
     leaveTypeId: input.leaveTypeId,
@@ -76,11 +76,11 @@ export async function prepareXeroWrite(
     return descriptor;
   }
   const prepared = await prepareAndClaimSubmitOperation({
+    accountId: input.accountId,
     action: input.action,
     actorUserId: input.actorUserId,
     availabilityRecordId: input.recordId,
     claimableBefore: new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
-    clerkOrgId: input.clerkOrgId,
     expectedFailedAction: input.expectedFailedAction,
     expectedSequence: input.expectedSequence,
     expectedStatus: input.expectedStatus,
@@ -101,10 +101,10 @@ export async function prepareXeroWrite(
     return { error: unknownOutcome, ok: false };
   }
   const attempt = {
+    accountId: input.accountId,
     action: input.action,
     attemptGeneration: prepared.attemptGeneration,
     availabilityRecordId: input.recordId,
-    clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
   };
   if (
@@ -112,19 +112,19 @@ export async function prepareXeroWrite(
       prepared.providerAccepted ||
       (await withTenantDb(
         {
+          accountId: input.accountId,
           action: input.action,
           attemptGeneration: prepared.attemptGeneration,
           availabilityRecordId: input.recordId,
-          clerkOrgId: input.clerkOrgId,
           organisationId: input.organisationId,
-        }.clerkOrgId,
+        }.accountId,
         (db) =>
           markSubmitDispatchStarted(
             {
+              accountId: input.accountId,
               action: input.action,
               attemptGeneration: prepared.attemptGeneration,
               availabilityRecordId: input.recordId,
-              clerkOrgId: input.clerkOrgId,
               organisationId: input.organisationId,
             },
             prepared.mutation,
@@ -134,17 +134,17 @@ export async function prepareXeroWrite(
     )
   ) {
     if (prepared.replayedUnknown) {
-      await withTenantDb(attempt.clerkOrgId, (db) =>
+      await withTenantDb(attempt.accountId, (db) =>
         markSubmitOutcomeUnknown(attempt, "replay_not_dispatched", db)
       );
     }
     const phaseInput1 = {
+      accountId: input.accountId,
       claimedAt: prepared.claimedAt,
-      clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
       recordId: input.recordId,
     } satisfies Parameters<typeof releaseXeroWriteClaim>[0];
-    await withTenantDb(phaseInput1.clerkOrgId, (db) =>
+    await withTenantDb(phaseInput1.accountId, (db) =>
       releaseXeroWriteClaim(phaseInput1, db)
     );
     return { error: unknownOutcome, ok: false };
@@ -160,22 +160,22 @@ export async function recordXeroWriteOutcome(
   assertNoTenantTransaction("recordXeroWriteOutcome");
   if (outcome.ok) {
     return remoteId
-      ? await withTenantDb(scope.clerkOrgId, (db) =>
+      ? await withTenantDb(scope.accountId, (db) =>
           markSubmitProviderAccepted(scope, remoteId, db)
         )
       : false;
   }
   const { error } = outcome;
   if (preserveUncertainty) {
-    return await withTenantDb(scope.clerkOrgId, (db) =>
+    return await withTenantDb(scope.accountId, (db) =>
       markSubmitOutcomeUnknown(scope, error.code, db)
     );
   }
   return isDefinitiveWriteFailure(error)
-    ? await withTenantDb(scope.clerkOrgId, (db) =>
+    ? await withTenantDb(scope.accountId, (db) =>
         markSubmitDefinitiveFailure(scope, error.code, db)
       )
-    : await withTenantDb(scope.clerkOrgId, (db) =>
+    : await withTenantDb(scope.accountId, (db) =>
         markSubmitOutcomeUnknown(scope, error.code, db)
       );
 }
@@ -199,14 +199,14 @@ export async function completeXeroWriteSideEffects(input: {
   actorUserId: string;
   declineReason?: string | null;
   attempt: OutboundOperationAttemptScope;
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   recordId: string;
-  recipient: { clerkUserId: string; personId: string } | null;
-  manager: { clerkUserId: string; personId: string } | null;
+  recipient: { userId: string; personId: string } | null;
+  manager: { userId: string; personId: string } | null;
 }): Promise<boolean> {
   assertNoTenantTransaction("completeXeroWriteSideEffects");
-  const claimedAt = await withTenantDb(input.attempt.clerkOrgId, (db) =>
+  const claimedAt = await withTenantDb(input.attempt.accountId, (db) =>
     acquireSubmitRecoverySideEffects(
       input.attempt,
       new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
@@ -224,12 +224,12 @@ export async function completeXeroWriteSideEffects(input: {
     notifyManager: input.attempt.action === "withdraw",
   });
   if (!outcome.ok) {
-    await withTenantDb(input.attempt.clerkOrgId, (db) =>
+    await withTenantDb(input.attempt.accountId, (db) =>
       releaseSubmitRecoverySideEffects(input.attempt, claimedAt, db)
     );
     return false;
   }
-  return await withTenantDb(input.clerkOrgId, (db) =>
+  return await withTenantDb(input.accountId, (db) =>
     markSubmitCompleted(input.attempt, db)
   );
 }

@@ -1,26 +1,26 @@
+import { getAccount } from "@repo/auth/accounts";
 import { withTenantDb } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
 
-import { clerkClient } from "@repo/auth/server";
-import { ensureOrganisationForClerk } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { ensureOrganisationForAccount } from "@repo/availability";
+import type { AccountId, OrganisationId } from "@repo/core";
 
 interface DefaultOrganisationContext {
-  clerkOrgId: ClerkOrgId;
+  accountId: AccountId;
   organisationId: OrganisationId;
 }
 
 export async function ensureDefaultOrganisation(
-  clerkOrgId: ClerkOrgId
+  accountId: AccountId
 ): Promise<DefaultOrganisationContext> {
   assertNoTenantTransaction("ensureDefaultOrganisation");
-  const name = await loadClerkOrganisationName(clerkOrgId);
+  const name = await loadAccountName(accountId);
 
-  return withTenantDb(clerkOrgId, (db) =>
-    ensureOrganisationForClerk(
+  return withTenantDb(accountId, (db) =>
+    ensureOrganisationForAccount(
       {
-        clerkOrgId,
+        accountId,
         countryCode: "AU",
         name,
       },
@@ -29,14 +29,9 @@ export async function ensureDefaultOrganisation(
   );
 }
 
-async function loadClerkOrganisationName(
-  clerkOrgId: ClerkOrgId
-): Promise<string> {
+async function loadAccountName(accountId: AccountId): Promise<string> {
   try {
-    const clerk = await clerkClient();
-    const organisation = await clerk.organizations.getOrganization({
-      organizationId: clerkOrgId,
-    });
+    const organisation = await getAccount(accountId);
     const name = organisation.name.trim();
     return name || "Organisation";
   } catch {

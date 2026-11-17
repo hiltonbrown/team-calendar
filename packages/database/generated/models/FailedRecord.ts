@@ -26,7 +26,7 @@ export type AggregateFailedRecord = {
 
 export type FailedRecordMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   sync_run_id: string | null
   entity_type: $Enums.xero_sync_entity_type | null
@@ -41,7 +41,7 @@ export type FailedRecordMinAggregateOutputType = {
 
 export type FailedRecordMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   sync_run_id: string | null
   entity_type: $Enums.xero_sync_entity_type | null
@@ -56,7 +56,7 @@ export type FailedRecordMaxAggregateOutputType = {
 
 export type FailedRecordCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   sync_run_id: number
   entity_type: number
@@ -74,7 +74,7 @@ export type FailedRecordCountAggregateOutputType = {
 
 export type FailedRecordMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   sync_run_id?: true
   entity_type?: true
@@ -89,7 +89,7 @@ export type FailedRecordMinAggregateInputType = {
 
 export type FailedRecordMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   sync_run_id?: true
   entity_type?: true
@@ -104,7 +104,7 @@ export type FailedRecordMaxAggregateInputType = {
 
 export type FailedRecordCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   sync_run_id?: true
   entity_type?: true
@@ -193,7 +193,7 @@ export type FailedRecordGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 
 export type FailedRecordGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   sync_run_id: string
   entity_type: $Enums.xero_sync_entity_type
@@ -230,7 +230,7 @@ export type FailedRecordWhereInput = {
   OR?: Prisma.FailedRecordWhereInput[]
   NOT?: Prisma.FailedRecordWhereInput | Prisma.FailedRecordWhereInput[]
   id?: Prisma.UuidFilter<"FailedRecord"> | string
-  clerk_org_id?: Prisma.StringFilter<"FailedRecord"> | string
+  account_id?: Prisma.StringFilter<"FailedRecord"> | string
   organisation_id?: Prisma.UuidFilter<"FailedRecord"> | string
   sync_run_id?: Prisma.UuidFilter<"FailedRecord"> | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFilter<"FailedRecord"> | $Enums.xero_sync_entity_type
@@ -248,7 +248,7 @@ export type FailedRecordWhereInput = {
 
 export type FailedRecordOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   sync_run_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
@@ -269,7 +269,7 @@ export type FailedRecordWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.FailedRecordWhereInput | Prisma.FailedRecordWhereInput[]
   OR?: Prisma.FailedRecordWhereInput[]
   NOT?: Prisma.FailedRecordWhereInput | Prisma.FailedRecordWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"FailedRecord"> | string
+  account_id?: Prisma.StringFilter<"FailedRecord"> | string
   organisation_id?: Prisma.UuidFilter<"FailedRecord"> | string
   sync_run_id?: Prisma.UuidFilter<"FailedRecord"> | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFilter<"FailedRecord"> | $Enums.xero_sync_entity_type
@@ -287,7 +287,7 @@ export type FailedRecordWhereUniqueInput = Prisma.AtLeast<{
 
 export type FailedRecordOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   sync_run_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
@@ -309,7 +309,7 @@ export type FailedRecordScalarWhereWithAggregatesInput = {
   OR?: Prisma.FailedRecordScalarWhereWithAggregatesInput[]
   NOT?: Prisma.FailedRecordScalarWhereWithAggregatesInput | Prisma.FailedRecordScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"FailedRecord"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"FailedRecord"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"FailedRecord"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"FailedRecord"> | string
   sync_run_id?: Prisma.UuidWithAggregatesFilter<"FailedRecord"> | string
   entity_type?: Prisma.Enumxero_sync_entity_typeWithAggregatesFilter<"FailedRecord"> | $Enums.xero_sync_entity_type
@@ -325,7 +325,7 @@ export type FailedRecordScalarWhereWithAggregatesInput = {
 
 export type FailedRecordCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
   source_id: string
@@ -341,7 +341,7 @@ export type FailedRecordCreateInput = {
 
 export type FailedRecordUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   sync_run_id: string
   entity_type: $Enums.xero_sync_entity_type
@@ -357,7 +357,7 @@ export type FailedRecordUncheckedCreateInput = {
 
 export type FailedRecordUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
   source_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -373,7 +373,7 @@ export type FailedRecordUpdateInput = {
 
 export type FailedRecordUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   sync_run_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
@@ -389,7 +389,7 @@ export type FailedRecordUncheckedUpdateInput = {
 
 export type FailedRecordCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   sync_run_id: string
   entity_type: $Enums.xero_sync_entity_type
@@ -405,7 +405,7 @@ export type FailedRecordCreateManyInput = {
 
 export type FailedRecordUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
   source_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -419,7 +419,7 @@ export type FailedRecordUpdateManyMutationInput = {
 
 export type FailedRecordUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   sync_run_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
@@ -445,7 +445,7 @@ export type FailedRecordOrderByRelationAggregateInput = {
 
 export type FailedRecordCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   sync_run_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
@@ -461,7 +461,7 @@ export type FailedRecordCountOrderByAggregateInput = {
 
 export type FailedRecordMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   sync_run_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
@@ -476,7 +476,7 @@ export type FailedRecordMaxOrderByAggregateInput = {
 
 export type FailedRecordMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   sync_run_id?: Prisma.SortOrder
   entity_type?: Prisma.SortOrder
@@ -583,7 +583,7 @@ export type Enumsync_failed_record_typeFieldUpdateOperationsInput = {
 
 export type FailedRecordCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
   source_id: string
@@ -598,7 +598,7 @@ export type FailedRecordCreateWithoutOrganisationInput = {
 
 export type FailedRecordUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   sync_run_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
@@ -642,7 +642,7 @@ export type FailedRecordScalarWhereInput = {
   OR?: Prisma.FailedRecordScalarWhereInput[]
   NOT?: Prisma.FailedRecordScalarWhereInput | Prisma.FailedRecordScalarWhereInput[]
   id?: Prisma.UuidFilter<"FailedRecord"> | string
-  clerk_org_id?: Prisma.StringFilter<"FailedRecord"> | string
+  account_id?: Prisma.StringFilter<"FailedRecord"> | string
   organisation_id?: Prisma.UuidFilter<"FailedRecord"> | string
   sync_run_id?: Prisma.UuidFilter<"FailedRecord"> | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFilter<"FailedRecord"> | $Enums.xero_sync_entity_type
@@ -658,7 +658,7 @@ export type FailedRecordScalarWhereInput = {
 
 export type FailedRecordCreateWithoutSync_runInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
   source_id: string
@@ -673,7 +673,7 @@ export type FailedRecordCreateWithoutSync_runInput = {
 
 export type FailedRecordUncheckedCreateWithoutSync_runInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
@@ -714,7 +714,7 @@ export type FailedRecordUpdateManyWithWhereWithoutSync_runInput = {
 
 export type FailedRecordCreateManyOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   sync_run_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
@@ -729,7 +729,7 @@ export type FailedRecordCreateManyOrganisationInput = {
 
 export type FailedRecordUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
   source_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -744,7 +744,7 @@ export type FailedRecordUpdateWithoutOrganisationInput = {
 
 export type FailedRecordUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   sync_run_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
@@ -759,7 +759,7 @@ export type FailedRecordUncheckedUpdateWithoutOrganisationInput = {
 
 export type FailedRecordUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   sync_run_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
@@ -774,7 +774,7 @@ export type FailedRecordUncheckedUpdateManyWithoutOrganisationInput = {
 
 export type FailedRecordCreateManySync_runInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   entity_type: $Enums.xero_sync_entity_type
   record_type: $Enums.sync_failed_record_type
@@ -789,7 +789,7 @@ export type FailedRecordCreateManySync_runInput = {
 
 export type FailedRecordUpdateWithoutSync_runInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
   source_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -804,7 +804,7 @@ export type FailedRecordUpdateWithoutSync_runInput = {
 
 export type FailedRecordUncheckedUpdateWithoutSync_runInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
@@ -819,7 +819,7 @@ export type FailedRecordUncheckedUpdateWithoutSync_runInput = {
 
 export type FailedRecordUncheckedUpdateManyWithoutSync_runInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   entity_type?: Prisma.Enumxero_sync_entity_typeFieldUpdateOperationsInput | $Enums.xero_sync_entity_type
   record_type?: Prisma.Enumsync_failed_record_typeFieldUpdateOperationsInput | $Enums.sync_failed_record_type
@@ -836,7 +836,7 @@ export type FailedRecordUncheckedUpdateManyWithoutSync_runInput = {
 
 export type FailedRecordSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   sync_run_id?: boolean
   entity_type?: boolean
@@ -854,7 +854,7 @@ export type FailedRecordSelect<ExtArgs extends runtime.Types.Extensions.Internal
 
 export type FailedRecordSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   sync_run_id?: boolean
   entity_type?: boolean
@@ -872,7 +872,7 @@ export type FailedRecordSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type FailedRecordSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   sync_run_id?: boolean
   entity_type?: boolean
@@ -890,7 +890,7 @@ export type FailedRecordSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
 
 export type FailedRecordSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   sync_run_id?: boolean
   entity_type?: boolean
@@ -904,7 +904,7 @@ export type FailedRecordSelectScalar = {
   updated_at?: boolean
 }
 
-export type FailedRecordOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "sync_run_id" | "entity_type" | "record_type" | "source_id" | "source_remote_id" | "error_code" | "error_message" | "raw_payload" | "created_at" | "updated_at", ExtArgs["result"]["failedRecord"]>
+export type FailedRecordOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "sync_run_id" | "entity_type" | "record_type" | "source_id" | "source_remote_id" | "error_code" | "error_message" | "raw_payload" | "created_at" | "updated_at", ExtArgs["result"]["failedRecord"]>
 export type FailedRecordInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   sync_run?: boolean | Prisma.SyncRunDefaultArgs<ExtArgs>
@@ -926,7 +926,7 @@ export type $FailedRecordPayload<ExtArgs extends runtime.Types.Extensions.Intern
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     sync_run_id: string
     entity_type: $Enums.xero_sync_entity_type
@@ -1364,7 +1364,7 @@ export interface Prisma__FailedRecordClient<T, Null = never, ExtArgs extends run
  */
 export interface FailedRecordFieldRefs {
   readonly id: Prisma.FieldRef<"FailedRecord", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"FailedRecord", 'String'>
+  readonly account_id: Prisma.FieldRef<"FailedRecord", 'String'>
   readonly organisation_id: Prisma.FieldRef<"FailedRecord", 'String'>
   readonly sync_run_id: Prisma.FieldRef<"FailedRecord", 'String'>
   readonly entity_type: Prisma.FieldRef<"FailedRecord", 'xero_sync_entity_type'>

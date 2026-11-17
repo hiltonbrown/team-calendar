@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withTenantResult as withTestTenantResult } from "../tenant-db";
 import { tenantTestAccount } from "../test-fixtures/tenant-scope";
@@ -26,7 +26,7 @@ vi.mock("../tenant-client", () => ({
 const { listAvailabilityForCalendar } = await import("./availability-records");
 
 describe("availability-records queries", () => {
-  const clerkOrgId = "org_test_avail" as ClerkOrgId;
+  const accountId = "org_test_avail" as AccountId;
   const organisationId =
     "11111111-1111-4111-8111-111111111111" as OrganisationId;
 
@@ -41,10 +41,10 @@ describe("availability-records queries", () => {
     const endDate = new Date("2026-08-31");
 
     const result = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
+      tenantTestAccount(accountId),
       (db) =>
         listAvailabilityForCalendar(
-          clerkOrgId,
+          accountId,
           organisationId,
           {
             endDate,
@@ -59,7 +59,7 @@ describe("availability-records queries", () => {
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
         }),
       })

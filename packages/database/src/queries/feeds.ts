@@ -1,11 +1,11 @@
-import type { ClerkOrgId, FeedId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, FeedId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 export interface FeedData {
+  accountId: string;
   activeTokenHint: string | null;
-  clerkOrgId: string;
   createdAt: Date;
   id: FeedId;
   name: string;
@@ -45,19 +45,19 @@ export interface FeedPublicationData {
 }
 
 export async function listFeedsForOrganisation(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   db: TenantDb
 ): Promise<Result<FeedData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
       const feeds = await tenantDb2.feed.findMany({
         orderBy: { slug: "asc" },
         select: {
-          clerk_org_id: true,
+          account_id: true,
           created_at: true,
           id: true,
           name: true,
@@ -79,17 +79,17 @@ export async function listFeedsForOrganisation(
           updated_at: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
         },
       });
 
       return {
         ok: true,
         value: feeds.map((f) => ({
+          accountId: f.account_id,
           activeTokenHint:
             f.tokens.find((token) => token.status === "active")?.token_hint ??
             null,
-          clerkOrgId: f.clerk_org_id,
           createdAt: f.created_at,
           id: f.id as FeedId,
           name: f.name,
@@ -114,19 +114,19 @@ export async function listFeedsForOrganisation(
 }
 
 export async function getFeedDetail(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   feedId: FeedId,
   db: TenantDb
 ): Promise<Result<FeedDetailData>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb3 = db;
 
     try {
       const feed = await tenantDb3.feed.findFirst({
         select: {
-          clerk_org_id: true,
+          account_id: true,
           created_at: true,
           id: true,
           name: true,
@@ -155,7 +155,7 @@ export async function getFeedDetail(
           updated_at: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           id: feedId,
         },
       });
@@ -170,10 +170,10 @@ export async function getFeedDetail(
       return {
         ok: true,
         value: {
+          accountId: feed.account_id,
           activeTokenHint:
             feed.tokens.find((token) => token.status === "active")
               ?.token_hint ?? null,
-          clerkOrgId: feed.clerk_org_id,
           createdAt: feed.created_at,
           id: feed.id as FeedId,
           name: feed.name,
@@ -211,7 +211,7 @@ export async function getFeedDetail(
 }
 
 export async function listFeedPublications(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   filters:
     | { dateRange?: { startDate: Date; endDate: Date }; limit?: number }
@@ -219,7 +219,7 @@ export async function listFeedPublications(
   db: TenantDb
 ): Promise<Result<FeedPublicationData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
@@ -237,7 +237,7 @@ export async function listFeedPublications(
         },
         take: filters?.limit ?? 50,
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           ...(filters?.dateRange && {
             published_at: {
               gte: filters.dateRange.startDate,

@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => ({
   auditEventCreate: vi.fn(),
   logError: vi.fn(),
   personFindFirst: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
   transaction: vi.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
@@ -78,10 +78,10 @@ const {
 } = await import("./alternative-contact-service");
 
 const testContext = {
+  accountId: "org_test_alt_contacts",
   actingPersonId: "10000000-0000-4000-8000-000000000001",
   actingRole: "admin" as const,
   actingUserId: "user_test_admin",
-  clerkOrgId: "org_test_alt_contacts",
   organisationId: "20000000-0000-4000-8000-000000000001",
   personId: "30000000-0000-4000-8000-000000000001",
 };
@@ -197,7 +197,7 @@ describe("alternative contact service", () => {
         ok: false,
       });
       expect(mocks.scopedQuery).toHaveBeenCalledWith(
-        testContext.clerkOrgId,
+        testContext.accountId,
         testContext.organisationId
       );
     });
@@ -206,7 +206,7 @@ describe("alternative contact service", () => {
       mocks.personFindFirst
         .mockResolvedValueOnce(null) // scoped query misses
         .mockResolvedValueOnce({
-          clerk_org_id: "org_other",
+          account_id: "org_other",
           organisation_id: "99999999-0000-4000-8000-000000000099",
         }); // unscoped lookup finds across tenant boundary
 
@@ -234,7 +234,7 @@ describe("alternative contact service", () => {
       expect(mocks.logError).toHaveBeenCalledWith(
         "Cross-tenant resource access attempt",
         expect.objectContaining({
-          actingClerkOrgId: testContext.clerkOrgId,
+          actingAccountId: testContext.accountId,
           actingOrganisationId: testContext.organisationId,
           resourceId: testContext.personId,
           resourceType: "person",
@@ -371,7 +371,7 @@ describe("alternative contact service", () => {
       expect(result.ok).toBe(true);
       expect(mocks.alternativeContactCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          clerk_org_id: testContext.clerkOrgId,
+          account_id: testContext.accountId,
           display_order: 0,
           email: "jane@example.com",
           name: "Jane Doe",
@@ -385,9 +385,9 @@ describe("alternative contact service", () => {
       });
       expect(mocks.auditEventCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
+          account_id: testContext.accountId,
           action: "alternative_contacts.added",
           actor_user_id: testContext.actingUserId,
-          clerk_org_id: testContext.clerkOrgId,
           organisation_id: testContext.organisationId,
           resource_type: "alternative_contact",
         }),
@@ -561,7 +561,7 @@ describe("alternative contact service", () => {
       mocks.alternativeContactFindFirst
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
-          clerk_org_id: "org_other",
+          account_id: "org_other",
           organisation_id: "99999999-0000-4000-8000-000000000099",
         });
 
@@ -589,7 +589,7 @@ describe("alternative contact service", () => {
       expect(mocks.logError).toHaveBeenCalledWith(
         "Cross-tenant resource access attempt",
         expect.objectContaining({
-          actingClerkOrgId: testContext.clerkOrgId,
+          actingAccountId: testContext.accountId,
           actingOrganisationId: testContext.organisationId,
           resourceId: contactId,
           resourceType: "alternative_contact",

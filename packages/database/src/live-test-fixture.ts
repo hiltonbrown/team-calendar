@@ -13,15 +13,25 @@ export const LIVE_FIXTURE_SUITES = {
       tenants: 2,
     },
   "packages/availability/index.integration.test.ts": { tenants: 3 },
+  "packages/availability/src/approvals/multi-company-routing.integration.test.ts":
+    {
+      globalKeys: { authorisation: 2, provider_app: 1 },
+      tenants: 2,
+    },
   "packages/availability/src/calendar/calendar-service.integration.test.ts": {
     tenants: 3,
   },
-  "packages/availability/src/people/clerk-access-service.integration.test.ts": {
-    tenants: 2,
-  },
+  "packages/availability/src/people/account-access-service.integration.test.ts":
+    {
+      tenants: 2,
+    },
   "packages/availability/src/people/current-user-service.integration.test.ts": {
     tenants: 2,
   },
+  "packages/availability/src/people/manager-assignment-service.integration.test.ts":
+    {
+      tenants: 1,
+    },
   "packages/database/authoritative-usage.integration.test.ts": { tenants: 2 },
   "packages/database/availability_records.integration.test.ts": { tenants: 2 },
   "packages/database/billing.integration.test.ts": {
@@ -30,11 +40,24 @@ export const LIVE_FIXTURE_SUITES = {
   },
   "packages/database/leave_balances.integration.test.ts": { tenants: 1 },
   "packages/database/live-rollback.integration.test.ts": { tenants: 2 },
+  "packages/database/multi-company-migration.integration.test.ts": {
+    globalKeys: { plan_id: 1, plan_key: 1 },
+    tenants: 1,
+  },
   "packages/database/onboarding.integration.test.ts": { tenants: 2 },
+  "packages/database/payroll-entitlements.integration.test.ts": {
+    globalKeys: { plan_id: 2, plan_key: 2 },
+    tenants: 6,
+  },
   "packages/database/plan_limits.integration.test.ts": {
     globalKeys: { plan_id: 1, plan_key: 1 },
     tenants: 0,
   },
+  "packages/database/plan-sync-multi-company.integration.test.ts": {
+    globalKeys: { plan_id: 1, plan_key: 1 },
+    tenants: 0,
+  },
+  "packages/database/row-level-security.integration.test.ts": { tenants: 2 },
   "packages/database/src/seed/seed.integration.test.ts": {
     globalKeys: { plan_id: 3, plan_key: 3 },
     tenants: 2,
@@ -43,27 +66,43 @@ export const LIVE_FIXTURE_SUITES = {
   "packages/database/xero-authorisation-locks.integration.test.ts": {
     tenants: 0,
   },
+  "packages/database/xero-ownership.integration.test.ts": {
+    globalKeys: { provider_app: 1 },
+    tenants: 14,
+  },
+  "packages/database/xero-provider-fence.integration.test.ts": {
+    globalKeys: { provider_app: 1 },
+    tenants: 1,
+  },
   "packages/database/xero-simplification-schema.integration.test.ts": {
+    globalKeys: { provider_app: 1 },
     tenants: 2,
   },
-  "packages/database/xero-tenancy.integration.test.ts": { tenants: 2 },
+  "packages/database/xero-sync-cursors.integration.test.ts": {
+    globalKeys: { provider_app: 1 },
+    tenants: 1,
+  },
+  "packages/database/xero-tenancy.integration.test.ts": {
+    globalKeys: { provider_app: 1 },
+    tenants: 6,
+  },
   "packages/feeds/index.integration.test.ts": { tenants: 3 },
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts":
-    { globalKeys: {}, tenants: 2 },
+    { globalKeys: { authorisation: 2 }, tenants: 2 },
   "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts": {
-    globalKeys: {},
+    globalKeys: { authorisation: 2 },
     tenants: 2,
   },
   "packages/jobs/src/handlers/sync-xero-leave-balances.integration.test.ts": {
-    globalKeys: {},
+    globalKeys: { authorisation: 4 },
     tenants: 4,
   },
   "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts": {
-    globalKeys: {},
+    globalKeys: { authorisation: 2 },
     tenants: 2,
   },
   "packages/jobs/src/handlers/sync-xero-people.integration.test.ts": {
-    globalKeys: {},
+    globalKeys: { authorisation: 2 },
     tenants: 2,
   },
   "packages/xero/src/oauth/disconnect.integration.test.ts": {
@@ -75,7 +114,7 @@ export const LIVE_FIXTURE_SUITES = {
   },
   "packages/xero/src/oauth/service.integration.test.ts": {
     globalKeys: { authorisation: 1, plan_id: 1, plan_key: 1, provider_app: 1 },
-    tenants: 2,
+    tenants: 5,
   },
   "packages/xero/src/rate-limit/shared-store.integration.test.ts": {
     globalKeys: { shared_store_namespace: 1 },
@@ -88,7 +127,7 @@ const manifestSchema = z.object({
   durableManifestConfirmed: z.literal(true),
   namespace: z.string(),
   owned: z.object({
-    clerkOrgIds: z.array(z.string().min(1)),
+    accountIds: z.array(z.string().min(1)),
     globalKeys: z.array(z.string().min(1)),
     organisationIds: z.array(z.string().uuid()),
   }),
@@ -130,7 +169,7 @@ export const REQUIRED_LIVE_FIXTURE_TENANT_SLOTS = suiteEntries.reduce(
   0
 );
 export interface LiveFixtureTenant {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }
 export interface LiveTestFixture {
@@ -159,7 +198,7 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
     .reduce((total, [, allocation]) => total + allocation.tenants, 0);
   const count = suiteAllocation.tenants;
   const tenants = Array.from({ length: count }, (_, index) => ({
-    clerkOrgId: `org_test_local_${String(offset + index + 1).padStart(3, "0")}`,
+    accountId: `org_test_local_${String(offset + index + 1).padStart(3, "0")}`,
     organisationId: uuidFrom(`local-tenant:${offset + index + 1}`),
   }));
   const globalOffset = (kind: GlobalKeyKind) =>
@@ -228,8 +267,8 @@ export const allocateLiveTestFixture = (
     throw new Error("Live integration suite is not in the protected registry");
   }
   if (
-    new Set(manifest.owned.clerkOrgIds).size !==
-      manifest.owned.clerkOrgIds.length ||
+    new Set(manifest.owned.accountIds).size !==
+      manifest.owned.accountIds.length ||
     new Set(manifest.owned.globalKeys).size !==
       manifest.owned.globalKeys.length ||
     new Set(manifest.owned.organisationIds).size !==
@@ -238,7 +277,7 @@ export const allocateLiveTestFixture = (
     throw new Error("Protected live fixture ownership slots must be unique");
   }
   if (
-    manifest.owned.clerkOrgIds.length < REQUIRED_LIVE_FIXTURE_TENANT_SLOTS ||
+    manifest.owned.accountIds.length < REQUIRED_LIVE_FIXTURE_TENANT_SLOTS ||
     manifest.owned.organisationIds.length < REQUIRED_LIVE_FIXTURE_TENANT_SLOTS
   ) {
     throw new Error(
@@ -254,13 +293,13 @@ export const allocateLiveTestFixture = (
   }
   const count = suiteAllocation.tenants;
   const tenants = Array.from({ length: count }, (_, index) => ({
-    clerkOrgId: manifest.owned.clerkOrgIds[offset + index] as string,
+    accountId: manifest.owned.accountIds[offset + index] as string,
     organisationId: manifest.owned.organisationIds[offset + index] as string,
   }));
   for (const tenant of tenants) {
     if (
       !(
-        manifest.owned.clerkOrgIds.includes(tenant.clerkOrgId) &&
+        manifest.owned.accountIds.includes(tenant.accountId) &&
         manifest.owned.organisationIds.includes(tenant.organisationId)
       )
     ) {

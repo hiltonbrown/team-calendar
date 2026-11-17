@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   findLocation: vi.fn(),
   findOrganisation: vi.fn(),
   resolvePublicHolidays: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
 }));
@@ -96,8 +96,8 @@ describe("computeWorkingDays", () => {
 
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           allDay: true,
-          clerkOrgId: "org_1",
           endsAt: new Date("2026-01-07T23:59:59.999Z"),
           locationId: "loc_1",
           organisationId: "00000000-0000-4000-8000-000000000001",
@@ -106,8 +106,8 @@ describe("computeWorkingDays", () => {
         (db) =>
           computeWorkingDays(
             {
+              accountId: "org_1",
               allDay: true,
-              clerkOrgId: "org_1",
               endsAt: new Date("2026-01-07T23:59:59.999Z"),
               locationId: "loc_1",
               organisationId: "00000000-0000-4000-8000-000000000001",
@@ -128,8 +128,8 @@ describe("computeWorkingDays", () => {
 
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           allDay: true,
-          clerkOrgId: "org_1",
           endsAt: new Date("2026-01-09T23:59:59.999Z"),
           locationId: "loc_1",
           organisationId: "00000000-0000-4000-8000-000000000001",
@@ -138,8 +138,8 @@ describe("computeWorkingDays", () => {
         (db) =>
           computeWorkingDays(
             {
+              accountId: "org_1",
               allDay: true,
-              clerkOrgId: "org_1",
               endsAt: new Date("2026-01-09T23:59:59.999Z"),
               locationId: "loc_1",
               organisationId: "00000000-0000-4000-8000-000000000001",
@@ -160,8 +160,8 @@ describe("computeWorkingDays", () => {
 
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           allDay: false,
-          clerkOrgId: "org_1",
           endsAt: new Date("2026-01-05T17:00:00.000Z"),
           locationId: "loc_1",
           organisationId: "00000000-0000-4000-8000-000000000001",
@@ -170,8 +170,8 @@ describe("computeWorkingDays", () => {
         (db) =>
           computeWorkingDays(
             {
+              accountId: "org_1",
               allDay: false,
-              clerkOrgId: "org_1",
               endsAt: new Date("2026-01-05T17:00:00.000Z"),
               locationId: "loc_1",
               organisationId: "00000000-0000-4000-8000-000000000001",
@@ -192,8 +192,8 @@ describe("computeWorkingDays", () => {
 
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           allDay: false,
-          clerkOrgId: "org_1",
           endsAt: new Date("2026-01-05T13:00:00.000Z"),
           locationId: "loc_1",
           organisationId: "00000000-0000-4000-8000-000000000001",
@@ -202,8 +202,8 @@ describe("computeWorkingDays", () => {
         (db) =>
           computeWorkingDays(
             {
+              accountId: "org_1",
               allDay: false,
-              clerkOrgId: "org_1",
               endsAt: new Date("2026-01-05T13:00:00.000Z"),
               locationId: "loc_1",
               organisationId: "00000000-0000-4000-8000-000000000001",
@@ -228,8 +228,8 @@ describe("computeWorkingDays", () => {
 
       const result = await withTestTenantResult(
         tenantTestAccount({
+          accountId: "org_1",
           allDay: true,
-          clerkOrgId: "org_1",
           endsAt: new Date("2026-01-07T23:59:59.999Z"),
           locationId: "loc_1",
           organisationId: "00000000-0000-4000-8000-000000000001",
@@ -238,8 +238,8 @@ describe("computeWorkingDays", () => {
         (db) =>
           computeWorkingDays(
             {
+              accountId: "org_1",
               allDay: true,
-              clerkOrgId: "org_1",
               endsAt: new Date("2026-01-07T23:59:59.999Z"),
               locationId: "loc_1",
               organisationId: "00000000-0000-4000-8000-000000000001",
@@ -256,8 +256,8 @@ describe("computeWorkingDays", () => {
   it("counts Monday to Friday all-day as five working days", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-08T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -266,8 +266,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-08T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -283,8 +283,8 @@ describe("computeWorkingDays", () => {
   it("excludes weekends", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-11T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -293,8 +293,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-11T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -315,8 +315,8 @@ describe("computeWorkingDays", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-08T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -325,8 +325,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-08T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -347,8 +347,8 @@ describe("computeWorkingDays", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-08T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -357,8 +357,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-08T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -379,8 +379,8 @@ describe("computeWorkingDays", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-08T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -389,8 +389,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-08T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -414,8 +414,8 @@ describe("computeWorkingDays", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-08T00:00:00.000Z"),
         locationId: null,
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -424,8 +424,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-08T00:00:00.000Z"),
             locationId: null,
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -441,8 +441,8 @@ describe("computeWorkingDays", () => {
   it("resolves holidays for every year in the range from one load", async () => {
     await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2027-01-05T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -451,8 +451,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2027-01-05T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -466,7 +466,7 @@ describe("computeWorkingDays", () => {
       mocks.resolvePublicHolidays.mock.calls.map(([input]) => input)
     ).toEqual([
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         from: "2026-01-01",
         organisationId: "00000000-0000-4000-8000-000000000001",
         to: "2027-12-31",
@@ -482,8 +482,8 @@ describe("computeWorkingDays", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2027-01-04T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -492,8 +492,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2027-01-04T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -510,8 +510,8 @@ describe("computeWorkingDays", () => {
   it("rounds part-day ranges half-up to the nearest quarter", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: false,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-04T13:07:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -520,8 +520,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: false,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-04T13:07:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -537,8 +537,8 @@ describe("computeWorkingDays", () => {
   it("returns invalid_range when end precedes start", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-04T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -547,8 +547,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-04T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",
@@ -569,8 +569,8 @@ describe("computeWorkingDays", () => {
 
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         allDay: true,
-        clerkOrgId: "org_1",
         endsAt: new Date("2026-05-05T00:00:00.000Z"),
         locationId: "loc_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
@@ -579,8 +579,8 @@ describe("computeWorkingDays", () => {
       (db) =>
         computeWorkingDays(
           {
+            accountId: "org_1",
             allDay: true,
-            clerkOrgId: "org_1",
             endsAt: new Date("2026-05-05T00:00:00.000Z"),
             locationId: "loc_1",
             organisationId: "00000000-0000-4000-8000-000000000001",

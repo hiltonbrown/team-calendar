@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import type { Result } from "@repo/core";
 import type { TenantDb } from "@repo/database";
 import { assertTenantDb } from "@repo/database";
@@ -25,7 +26,7 @@ export const TEAM_COVERAGE_MINIMUM_AUDIT_ACTION =
   "teams.coverage_minimum_updated";
 
 const ScopeSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -44,7 +45,8 @@ const failure = (
   ok: false,
 });
 
-const canManage = (role: string) => role === "owner" || role === "admin";
+const canManage = (role: string) =>
+  hasPermission(role, { settings: ["update"] });
 
 const rangeMessage = (teamSize: number) =>
   `Minimum must be between 0 and ${teamSize} ${teamSize === 1 ? "person" : "people"}.`;
@@ -54,9 +56,9 @@ export async function listTeamCoverageMinimums(
   input: z.input<typeof ScopeSchema> & { actingRole: string },
   db: TenantDb
 ): Promise<Result<TeamCoverageMinimumRow[], TeamCoverageMinimumError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     if (!canManage(input.actingRole)) {
@@ -85,7 +87,7 @@ export async function updateTeamCoverageMinimum(
   input: z.input<typeof UpdateSchema>,
   db: TenantDb
 ): Promise<Result<TeamCoverageMinimumReceipt, TeamCoverageMinimumError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   if (!canManage(input.actingRole)) {
     return failure(
       "not_authorised",
@@ -125,7 +127,7 @@ export async function updateTeamCoverageMinimum(
     const result = await (async (tx: TenantDb) => {
       const change = await setTeamCoverageMinimum(
         {
-          clerkOrgId: value.clerkOrgId,
+          accountId: value.accountId,
           minimum,
           organisationId: value.organisationId,
           teamId: value.teamId,
@@ -137,11 +139,11 @@ export async function updateTeamCoverageMinimum(
       }
       await tx.auditEvent.create({
         data: {
+          account_id: value.accountId,
           action: TEAM_COVERAGE_MINIMUM_AUDIT_ACTION,
           actor_user_id: value.actingUserId,
           after_value: { minimum: change.value.after },
           before_value: { minimum: change.value.before },
-          clerk_org_id: value.clerkOrgId,
           entity_id: value.teamId,
           entity_type: "team",
           metadata: { actingUserId: value.actingUserId },
@@ -164,7 +166,7 @@ export async function updateTeamCoverageMinimum(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }

@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
 import { systemDatabase } from "@repo/database";
-import { isLocalDatabase } from "@repo/database/is-local-database";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { withTenantResult } from "@repo/database/tenant-db";
 import { afterAll, beforeAll, expect, test, vi } from "vitest";
 import { setPersonManager } from "./manager-assignment-service";
@@ -8,35 +7,39 @@ import { setPersonManager } from "./manager-assignment-service";
 vi.mock("server-only", () => ({}));
 vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });
 
-const ownerUrl = process.env.DATABASE_URL;
-if (!(ownerUrl && isLocalDatabase(ownerUrl))) {
-  throw new Error(
-    "Manager assignment fixtures require disposable local PostgreSQL"
-  );
+const allocation = allocateLiveTestFixture(
+  "packages/availability/src/people/manager-assignment-service.integration.test.ts"
+);
+const [tenant] = allocation.tenants;
+if (!tenant) {
+  throw new Error("Manager assignment fixture account is missing");
 }
-
-const accountA = `manager-cycle-${randomUUID()}`;
-let companyA: string;
+const accountA = tenant.accountId;
+const companyA = tenant.organisationId;
 
 beforeAll(async () => {
-  const company = await systemDatabase.organisation.create({
-    data: { clerk_org_id: accountA, country_code: "AU", name: accountA },
+  await systemDatabase.organisation.create({
+    data: {
+      account_id: accountA,
+      country_code: "AU",
+      id: companyA,
+      name: accountA,
+    },
   });
-  companyA = company.id;
 });
 afterAll(async () => {
   await systemDatabase.accountSettings.deleteMany({
-    where: { clerk_org_id: accountA },
+    where: { account_id: accountA },
   });
   await systemDatabase.organisation.deleteMany({
-    where: { clerk_org_id: accountA },
+    where: { account_id: accountA },
   });
 });
 
 test("concurrent opposing manager assignments cannot create a cycle", async () => {
   const fixture = await systemDatabase.$transaction(async (db) => {
     const base = {
-      clerk_org_id: accountA,
+      account_id: accountA,
       email: "cycle@example.test",
       employment_type: "employee" as const,
       first_name: "Cycle",
@@ -52,9 +55,9 @@ test("concurrent opposing manager assignments cannot create a cycle", async () =
   const [first, second] = fixture;
   try {
     const base = {
+      accountId: accountA,
       actingRole: "owner" as const,
       actingUserId: "integration-owner",
-      clerkOrgId: accountA,
     };
     const results = await Promise.all([
       withTenantResult(accountA, (db) =>
@@ -81,7 +84,7 @@ test("concurrent opposing manager assignments cannot create a cycle", async () =
   } finally {
     await systemDatabase.auditEvent.deleteMany({
       where: {
-        clerk_org_id: accountA,
+        account_id: accountA,
         resource_id: { in: [first.id, second.id] },
         resource_type: "person",
       },

@@ -20,7 +20,7 @@ import {
 // this to avoid invalidating unrelated feeds.
 export async function feedIdsForPeople(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personIds: string[];
   },
@@ -29,14 +29,14 @@ export async function feedIdsForPeople(
   Array<{ id: string; organisationId: string | null; privacyMode: string }>
 > {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     if (input.personIds.length === 0) {
       return [];
     }
     const scopeInput = {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       organisationId: input.organisationId,
     };
     const preloadedResult = await loadFeedScopeData(scopeInput, client);
@@ -49,8 +49,8 @@ export async function feedIdsForPeople(
     const feeds = await client.feed.findMany({
       select: feedScopeSelect,
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         OR: [
           { organisation_id: input.organisationId },
           { organisation_id: null },
@@ -75,7 +75,7 @@ export async function feedIdsForPeople(
       }
       const people = await resolvePeopleForFeed(
         {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           createdByUserId: feed.created_by_user_id,
           organisationId: input.organisationId,
           preloaded,
@@ -110,19 +110,19 @@ export async function feedIdsForPeople(
 
 export async function invalidateFeedCachesForPerson(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<Result<{ feedIds: string[] }, FeedCacheError>> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const feeds = await feedIdsForPeople(
       {
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         organisationId: input.organisationId,
         personIds: [input.personId],
       },
@@ -150,19 +150,19 @@ const feedScopeSelect = {
 // Company membership or removal changes every account feed, even without a remaining person.
 export async function invalidateAccountFeedCaches(
   input: {
-    clerkOrgId: string;
+    accountId: string;
   },
   db: TenantDb
 ): Promise<Result<{ feedIds: string[] }, FeedCacheError>> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const feeds = await client.feed.findMany({
       select: { id: true },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         organisation_id: null,
       },
     });

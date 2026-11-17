@@ -1,8 +1,8 @@
 "use client";
 import type {
-  ClerkAccessReviewResult,
-  ClerkAccessState,
-  ClerkInvitationDispatchResult,
+  AccountAccessReviewResult,
+  AccountAccessState,
+  AccountInvitationDispatchResult,
   PersonListItem,
 } from "@repo/availability";
 import { xeroRecoveryMessage } from "@repo/core";
@@ -59,8 +59,8 @@ import { EmptyState } from "@/components/states/empty-state";
 import { withOrg } from "@/lib/navigation/org-url";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
 import {
-  inviteClerkAccessCandidatesAction,
-  loadClerkAccessCandidatesAction,
+  inviteAccountAccessCandidatesAction,
+  loadAccountAccessCandidatesAction,
 } from "./_actions";
 import { type PeopleFilterInput, PeopleFilterSchema } from "./_schemas";
 
@@ -70,7 +70,7 @@ interface FilterOption {
 }
 interface PeopleClientProps {
   canIncludeArchived: boolean;
-  canManageClerkAccess?: boolean;
+  canManageAccountAccess?: boolean;
   companies?: FilterOption[];
   companyIds?: string[];
   connectionId: string | null;
@@ -171,7 +171,7 @@ function renderEmptyState({
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This directory coordinates role-gated sync, filters and responsive person rows in one URL-backed surface.
 export function PeopleClient({
   canIncludeArchived,
-  canManageClerkAccess = canIncludeArchived,
+  canManageAccountAccess = canIncludeArchived,
   filters,
   xeroConnectionState,
   locations,
@@ -344,14 +344,14 @@ export function PeopleClient({
                 Sync from Xero
               </Button>
             ) : null}
-            {canManageClerkAccess ? (
+            {canManageAccountAccess ? (
               <Button
                 onClick={() => setIsAccessDialogOpen(true)}
                 size="sm"
                 type="button"
                 variant="outline"
               >
-                Reconcile Clerk access
+                Reconcile Account access
               </Button>
             ) : null}
             {canIncludeArchived ? (
@@ -626,8 +626,8 @@ export function PeopleClient({
         </div>
       ) : null}
 
-      {canManageClerkAccess ? (
-        <ClerkAccessReviewDialog
+      {canManageAccountAccess ? (
+        <AccountAccessReviewDialog
           isOpen={isAccessDialogOpen}
           onClose={() => setIsAccessDialogOpen(false)}
           organisationId={organisationId}
@@ -636,7 +636,7 @@ export function PeopleClient({
     </section>
   );
 }
-export function ClerkAccessReviewDialog({
+export function AccountAccessReviewDialog({
   isOpen,
   onClose,
   organisationId,
@@ -649,16 +649,15 @@ export function ClerkAccessReviewDialog({
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [reviewData, setReviewData] = useState<ClerkAccessReviewResult | null>(
-    null
-  );
+  const [reviewData, setReviewData] =
+    useState<AccountAccessReviewResult | null>(null);
   const [resultData, setResultData] =
-    useState<ClerkInvitationDispatchResult | null>(null);
+    useState<AccountInvitationDispatchResult | null>(null);
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await loadClerkAccessCandidatesAction({ organisationId });
+      const res = await loadAccountAccessCandidatesAction({ organisationId });
       if (res.ok) {
         setReviewData(res.value);
       } else {
@@ -668,7 +667,7 @@ export function ClerkAccessReviewDialog({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to load Clerk access review."
+          : "Failed to load Account access review."
       );
     } finally {
       setIsLoading(false);
@@ -684,7 +683,7 @@ export function ClerkAccessReviewDialog({
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await inviteClerkAccessCandidatesAction({ organisationId });
+      const res = await inviteAccountAccessCandidatesAction({ organisationId });
       if (res.ok) {
         setResultData(res.value);
       } else {
@@ -706,7 +705,7 @@ export function ClerkAccessReviewDialog({
     <Dialog onOpenChange={(open) => !open && onClose()} open={isOpen}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Reconcile Clerk access</DialogTitle>
+          <DialogTitle>Reconcile Account access</DialogTitle>
           <DialogDescription>
             Link existing members and invite eligible payroll employees.
           </DialogDescription>
@@ -770,8 +769,8 @@ function ReviewDialogBody({
 }: {
   error: string | null;
   isLoading: boolean;
-  resultData: ClerkInvitationDispatchResult | null;
-  reviewData: ClerkAccessReviewResult | null;
+  resultData: AccountInvitationDispatchResult | null;
+  reviewData: AccountAccessReviewResult | null;
 }) {
   if (isLoading) {
     return (
@@ -822,8 +821,8 @@ function ReviewDialogBody({
         <div className="rounded-xl bg-muted/60 p-3 text-label-md text-muted-foreground">
           Invitations grant the{" "}
           <span className="font-medium text-foreground">viewer</span> role.
-          One-to-one email matches will be linked to their Clerk account.
-          Fallback addresses and conflicting emails are excluded.
+          One-to-one email matches will be linked to their Account. Fallback
+          addresses and conflicting emails are excluded.
         </div>
         <ReviewCandidateTable candidates={reviewData.candidates} />
       </div>
@@ -834,7 +833,7 @@ function ReviewDialogBody({
 function ReviewStatChips({
   reviewData,
 }: {
-  reviewData: ClerkAccessReviewResult;
+  reviewData: AccountAccessReviewResult;
 }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -874,7 +873,7 @@ function ReviewStatChips({
 function ReviewCandidateTable({
   candidates,
 }: {
-  candidates: ClerkAccessReviewResult["candidates"];
+  candidates: AccountAccessReviewResult["candidates"];
 }) {
   return (
     <div className="max-h-60 overflow-y-auto rounded-xl border border-border/50">
@@ -922,7 +921,7 @@ function CandidateStateBadge({
   state,
 }: {
   conflictReason: string | null;
-  state: ClerkAccessState;
+  state: AccountAccessState;
 }) {
   switch (state) {
     case "linkable":

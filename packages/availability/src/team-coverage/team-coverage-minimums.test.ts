@@ -49,7 +49,7 @@ const {
 
 const TEAM_ID = "33333333-3333-4333-8333-333333333333";
 const scope = {
-  clerkOrgId: "org_coverage",
+  accountId: "org_coverage",
   organisationId: "11111111-1111-4111-8111-111111111111",
 };
 
@@ -196,11 +196,11 @@ describe("updateTeamCoverageMinimum", () => {
     expect(mocks.tx.auditEvent.create).toHaveBeenCalledOnce();
     expect(mocks.tx.auditEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        account_id: scope.accountId,
         action: TEAM_COVERAGE_MINIMUM_AUDIT_ACTION,
         actor_user_id: "user_admin",
         after_value: { minimum: 2 },
         before_value: { minimum: 1 },
-        clerk_org_id: scope.clerkOrgId,
         entity_id: TEAM_ID,
         entity_type: "team",
         organisation_id: scope.organisationId,

@@ -20,3 +20,27 @@ export function getPublicApiUrl(path: `/${string}`): string | null {
 
   return origin ? `${origin}${path}` : null;
 }
+
+/** Unrelated HTTPS Preview hosts need the app's fixed same-path proxy. */
+export function getBrowserApiUrl(path: `/${string}`): string | null {
+  const apiOrigin = getPublicApiOrigin();
+  if (!apiOrigin) {
+    return null;
+  }
+  const appOrigin = process.env.NEXT_PUBLIC_APP_URL;
+  if (appOrigin) {
+    const app = new URL(appOrigin);
+    const api = new URL(apiOrigin);
+    const production =
+      app.origin === "https://app.teamcalendar.online" &&
+      api.origin === "https://api.teamcalendar.online";
+    if (
+      app.protocol === "https:" &&
+      app.hostname !== api.hostname &&
+      !production
+    ) {
+      return path;
+    }
+  }
+  return `${apiOrigin}${path}`;
+}

@@ -18,7 +18,7 @@ vi.mock("@repo/database", async () => ({
   )),
   resolveAccountCompanies: async () => companies,
   scopedQuery: (account: string, company: string) => ({
-    clerk_org_id: account,
+    account_id: account,
     organisation_id: company,
   }),
 }));
@@ -64,9 +64,9 @@ const companies = [
   { id: companyB, name: "Company B" },
 ];
 const rows = companies.map((company, index) => ({
+  account_id: "account-A",
   archived_at: null,
   avatar_url: null,
-  clerk_org_id: "account-A",
   email: "person@example.com",
   employment_type: "employee",
   first_name: index ? "Blair" : "Alex",
@@ -83,14 +83,14 @@ const rows = companies.map((company, index) => ({
   xero_employee_id: null,
 }));
 interface DirectoryWhere {
-  clerk_org_id: string;
+  account_id: string;
   id?: { in: string[] };
   organisation_id: { in: string[] };
 }
 function matchingRows(where: DirectoryWhere) {
   return rows.filter(
     (row) =>
-      row.clerk_org_id === where.clerk_org_id &&
+      row.account_id === where.account_id &&
       where.organisation_id.in.includes(row.organisation_id) &&
       (!where.id || where.id.in.includes(row.id))
   );
@@ -118,7 +118,7 @@ beforeEach(() => {
     }
   );
 });
-const input = { actingPersonId: actorId, clerkOrgId: "account-A" };
+const input = { accountId: "account-A", actingPersonId: actorId };
 test.each(["owner", "admin"] as const)(
   "%s sees each owned company with provenance by default",
   async (role) => {
@@ -178,8 +178,8 @@ test.each(["viewer", "manager"] as const)(
 );
 test("unlinked viewer sees no people", async () => {
   const result = await withTestTenantResult(
-    tenantTestAccount({ clerkOrgId: "account-A", role: "viewer" }),
-    (db) => listPeople({ clerkOrgId: "account-A", role: "viewer" }, db)
+    tenantTestAccount({ accountId: "account-A", role: "viewer" }),
+    (db) => listPeople({ accountId: "account-A", role: "viewer" }, db)
   );
   expect(result.ok && result.value.totalCount).toBe(0);
   expect(state.findMany).not.toHaveBeenCalled();

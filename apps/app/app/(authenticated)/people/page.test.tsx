@@ -2,16 +2,16 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   connection: vi.fn(),
+  getSession: vi.fn(),
   listPeople: vi.fn(),
   resolveAccountCompanies: vi.fn(),
   state: vi.fn(),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: async () => "org_1",
+  requireAccount: async () => "org_1",
 }));
-vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
+vi.mock("@repo/auth/server", () => ({ getSession: mocks.getSession }));
 vi.mock("@repo/availability", async () => ({
   getXeroConnectionStateForScope: mocks.state,
   listPeople: mocks.listPeople,
@@ -40,8 +40,8 @@ vi.mock("@repo/database", async () => ({
   )),
   resolveAccountCompanies: mocks.resolveAccountCompanies,
 }));
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: vi.fn(),
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => {
@@ -77,7 +77,7 @@ describe("PeoplePage", () => {
   afterEach(cleanup);
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:owner", userId: "user_1" });
+    mocks.getSession.mockResolvedValue({ role: "owner", userId: "user_1" });
     mocks.resolveAccountCompanies.mockResolvedValue([
       { id: companyId, name: "Acme", timezone: "Australia/Brisbane" },
     ]);
@@ -94,7 +94,7 @@ describe("PeoplePage", () => {
     expect(mocks.connection).toHaveBeenCalledWith({
       select: { id: true },
       where: {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         organisation_id: companyId,
         released_at: null,
       },

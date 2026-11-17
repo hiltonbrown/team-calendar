@@ -58,12 +58,12 @@ vi.mock("@repo/database", async () => {
 
 const { recountUsage } = await import("./recount-usage");
 
-const CLERK_ORG_ID = "org_recount";
+const ACCOUNT_ID = "org_recount";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 
 function input(overrides: Record<string, unknown> = {}) {
   return {
-    clerkOrgId: CLERK_ORG_ID,
+    accountId: ACCOUNT_ID,
     organisationId: ORGANISATION_ID,
     ...overrides,
   };
@@ -86,22 +86,22 @@ describe("recountUsage", () => {
     expect(result).toEqual({ feeds: 3, payrollEntities: 2, seats: 7 });
     expect(mocks.personCount).toHaveBeenCalledWith({
       where: {
+        account_id: ACCOUNT_ID,
         archived_at: null,
-        clerk_org_id: CLERK_ORG_ID,
         is_active: true,
       },
     });
     expect(mocks.organisationCount).toHaveBeenCalledWith({
       where: {
+        account_id: ACCOUNT_ID,
         archived_at: null,
-        clerk_org_id: CLERK_ORG_ID,
         is_active: true,
       },
     });
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: {
+        account_id: ACCOUNT_ID,
         archived_at: null,
-        clerk_org_id: CLERK_ORG_ID,
         status: "active",
       },
     });
@@ -119,10 +119,10 @@ describe("recountUsage", () => {
     ).toHaveLength(3);
   });
 
-  it("rejects input with a missing clerkOrgId", async () => {
+  it("rejects input with a missing accountId", async () => {
     await expect(
-      withTestTenantDb(tenantTestAccount(input({ clerkOrgId: "" })), (db) =>
-        recountUsage(input({ clerkOrgId: "" }), db)
+      withTestTenantDb(tenantTestAccount(input({ accountId: "" })), (db) =>
+        recountUsage(input({ accountId: "" }), db)
       )
     ).rejects.toThrow();
     expect(mocks.executeRaw).not.toHaveBeenCalled();

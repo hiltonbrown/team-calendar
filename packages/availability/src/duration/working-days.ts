@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import {
   nonWorkingHolidayDates,
@@ -14,8 +14,8 @@ export type DurationError =
   | { code: "unknown_error"; message: string };
 
 export interface ComputeWorkingDaysInput {
+  accountId: string;
   allDay: boolean;
-  clerkOrgId: string;
   endsAt: Date;
   locationId: string | null;
   organisationId: string;
@@ -65,7 +65,7 @@ export async function loadWorkingDaysReferenceData(
   if (
     inputs.some(
       (item) =>
-        item.clerkOrgId !== first.clerkOrgId ||
+        item.accountId !== first.accountId ||
         item.organisationId !== first.organisationId
     )
   ) {
@@ -73,13 +73,13 @@ export async function loadWorkingDaysReferenceData(
       "Working-day reference batches must belong to one company."
     );
   }
-  assertTenantDb(db, first.clerkOrgId);
+  assertTenantDb(db, first.accountId);
   {
-    assertTenantDb(db, first.clerkOrgId);
+    assertTenantDb(db, first.accountId);
     const client = db;
 
     const scoped = scopedQuery(
-      first.clerkOrgId as ClerkOrgId,
+      first.accountId as AccountId,
       first.organisationId as OrganisationId
     );
     const ids = [
@@ -104,8 +104,8 @@ export async function loadWorkingDaysReferenceData(
       await client.organisation.findFirst({
         select: { country_code: true, timezone: true },
         where: {
+          account_id: scoped.account_id,
           archived_at: null,
-          clerk_org_id: scoped.clerk_org_id,
           id: scoped.organisation_id,
         },
       }),
@@ -134,7 +134,7 @@ export async function loadWorkingDaysReferenceData(
     }
     return {
       holidaysByYear: await loadHolidaysForYears(
-        first.clerkOrgId as ClerkOrgId,
+        first.accountId as AccountId,
         first.organisationId as OrganisationId,
         years,
         client
@@ -150,14 +150,14 @@ export async function loadWorkingDaysReferenceData(
  * year. A failure applies to every year.
  */
 export async function loadHolidaysForYears(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   years: Iterable<number>,
   db: TenantDb
 ): Promise<Map<number, Result<ResolvedPublicHoliday[], HolidayLoadError>>> {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const client = db;
 
     const sorted = [...new Set(years)].sort((left, right) => left - right);
@@ -168,7 +168,7 @@ export async function loadHolidaysForYears(
     }
     const result = await resolvePublicHolidays(
       {
-        clerkOrgId,
+        accountId,
         from: `${first}-01-01`,
         organisationId,
         to: `${last}-12-31`,
@@ -200,9 +200,9 @@ export async function computeWorkingDays(
   input: ComputeWorkingDaysInput,
   db: TenantDb
 ): Promise<Result<number, DurationError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     if (input.endsAt < input.startsAt) {
@@ -231,7 +231,7 @@ export async function computeWorkingDays(
       holidayResults: [
         ...(
           await loadHolidaysForYears(
-            input.clerkOrgId as ClerkOrgId,
+            input.accountId as AccountId,
             input.organisationId as OrganisationId,
             yearsBetween(startParts.year, endParts.year),
             client
@@ -369,9 +369,9 @@ async function loadDurationLocation(
   input: ComputeWorkingDaysInput,
   db: TenantDb
 ) {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     if (input.locationId) {
@@ -383,7 +383,7 @@ async function loadDurationLocation(
         },
         where: {
           ...scopedQuery(
-            input.clerkOrgId as ClerkOrgId,
+            input.accountId as AccountId,
             input.organisationId as OrganisationId
           ),
           id: input.locationId,
@@ -397,8 +397,8 @@ async function loadDurationLocation(
         timezone: true,
       },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         id: input.organisationId,
       },
     });

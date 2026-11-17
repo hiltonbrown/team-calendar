@@ -104,7 +104,7 @@ export const changelog: ChangelogEntry[] = [
       },
       { text: "Leave balance sync from Xero Payroll", type: "feat" },
       {
-        text: "Multi-tenant architecture with Clerk Organisation isolation",
+        text: "Multi-tenant architecture with Account isolation",
         type: "feat",
       },
     ],

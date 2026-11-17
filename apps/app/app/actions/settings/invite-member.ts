@@ -1,24 +1,36 @@
 "use server";
 
-import { auth, clerkClient } from "@repo/auth/server";
+import { inviteAccountMember } from "@repo/auth/accounts";
+import { hasPermission as can } from "@repo/auth/permissions";
+
+import { getSession } from "@repo/auth/server";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
 
 const InviteMemberSchema = z.object({
   emailAddress: z.string().email("Invalid email address"),
-  role: z.enum(["org:owner", "org:admin", "org:manager", "org:viewer"]),
+  role: z.enum(["owner", "admin", "manager", "viewer"]),
 });
 
 type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 
 export const inviteMember = async (input: unknown): Promise<Result<void>> => {
   assertNoTenantTransaction("inviteMember");
-  const { orgId, orgRole, userId } = await auth();
+  const {
+    accountId: sessionAccountId,
+    role: sessionRole,
+    userId,
+  } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
 
-  if (!(orgId && userId)) {
+  if (!(sessionAccountId && userId)) {
     return { error: "Not authenticated", ok: false };
   }
-  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+  if (!can(sessionRole, { invitation: ["create"] })) {
     return { error: "You do not have permission to manage members", ok: false };
   }
 
@@ -29,16 +41,18 @@ export const inviteMember = async (input: unknown): Promise<Result<void>> => {
       ok: false,
     };
   }
-  if (parsed.data.role === "org:owner" && orgRole !== "org:owner") {
+  if (
+    parsed.data.role === "owner" &&
+    !can(sessionRole, { ownership: ["manage"] })
+  ) {
     return { error: "Only owners can invite another owner", ok: false };
   }
 
   try {
-    const clerk = await clerkClient();
-    await clerk.organizations.createOrganizationInvitation({
-      emailAddress: parsed.data.emailAddress,
+    await inviteAccountMember({
+      accountId: sessionAccountId,
+      email: parsed.data.emailAddress,
       inviterUserId: userId,
-      organizationId: orgId,
       role: parsed.data.role,
     });
     return { ok: true, value: undefined };

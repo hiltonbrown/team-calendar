@@ -283,7 +283,7 @@ function captureProviderConnection(
 }
 
 export async function resolveXeroAccess(input: {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
   connectionId?: string;
   deadline?: XeroDeadline;
@@ -304,7 +304,7 @@ export async function resolveXeroAccess(input: {
 > {
   assertNoTenantTransaction("resolveXeroAccess");
   const deadline = input.deadline ?? { expiresAtMs: Date.now() + 120_000 };
-  const scoped = await withTenantResult(input.clerkOrgId, (db) =>
+  const scoped = await withTenantResult(input.accountId, (db) =>
     getScopedXeroConnection(input, db)
   );
   if (!scoped.ok) {
@@ -372,7 +372,7 @@ export async function resolveXeroAccess(input: {
   if (!grant.ok) {
     return grant;
   }
-  const current = await withTenantResult(input.clerkOrgId, (db) =>
+  const current = await withTenantResult(input.accountId, (db) =>
     getScopedXeroConnection(input, db)
   );
   if (

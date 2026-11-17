@@ -1,18 +1,18 @@
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_1"),
+  requireAccount: () => Promise.resolve("org_1"),
 }));
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  getSession: vi.fn(),
   locationFindMany: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
+  requirePagePermission: vi.fn(),
   resolvePublicHolidays: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, scopedOrganisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, scopedOrganisationId: string) => ({
+    account_id: accountId,
     organisation_id: scopedOrganisationId,
   })),
 }));
@@ -43,14 +43,14 @@ function buildTenantTestDatabase() {
     location: { findMany: mocks.locationFindMany },
   };
 }
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
   resolveActiveOrgPageContext: mocks.requireActiveOrgPageContext,
 }));
-vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
+vi.mock("@repo/auth/server", () => ({ getSession: mocks.getSession }));
 vi.mock("../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,
 }));
@@ -105,9 +105,9 @@ describe("PublicHolidaysPage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ role: "admin" });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
     });
     mocks.resolvePublicHolidays.mockResolvedValue({ ok: true, value: [] });
@@ -127,10 +127,12 @@ describe("PublicHolidaysPage", () => {
       })
     );
 
-    expect(mocks.requirePageRole).toHaveBeenCalledWith("org:viewer");
+    expect(mocks.requirePagePermission).toHaveBeenCalledWith({
+      calendar: ["read"],
+    });
     expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         from: "2026-01-01",
         includeHidden: true,
         organisationId,
@@ -141,7 +143,7 @@ describe("PublicHolidaysPage", () => {
     );
     expect(mocks.locationFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { clerk_org_id: "org_1", organisation_id: organisationId },
+        where: { account_id: "org_1", organisation_id: organisationId },
       })
     );
     expect(
@@ -169,7 +171,7 @@ describe("PublicHolidaysPage", () => {
   });
 
   it("shows the list read-only to viewers", async () => {
-    mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
+    mocks.getSession.mockResolvedValue({ role: "viewer" });
 
     render(await Page({ searchParams: Promise.resolve({}) }));
 

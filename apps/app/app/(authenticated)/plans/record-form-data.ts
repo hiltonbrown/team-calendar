@@ -1,13 +1,14 @@
+import { hasPermission as can } from "@repo/auth/permissions";
 import { toXeroConnectionDisplayState } from "@repo/core";
 import "server-only";
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import {
   getRecord,
   getXeroConnectionStateForScope,
   isXeroLeaveType,
   managerScopePersonIds,
 } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import {
   resolveAccountCompanies,
   scopedQuery,
@@ -41,20 +42,32 @@ export async function loadPlanFormData({
   startsAt,
 }: LoadPlanFormDataInput) {
   assertNoTenantTransaction("loadPlanFormData");
-  const [user, { orgId, orgRole }] = await Promise.all([currentUser(), auth()]);
-  if (!(user && orgId)) {
+  const [user, { accountId: sessionAccountId, role: sessionRole }] =
+    await Promise.all([
+      getCurrentUser(),
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+    ]);
+  if (!(user && sessionAccountId)) {
     redirect("/");
   }
-  // Trusted Clerk account is resolved before one form-data read scope.
-  const clerkOrgId = orgId as ClerkOrgId;
+  // Trusted Account is resolved before one form-data read scope.
+  const accountId = sessionAccountId as AccountId;
   return withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
-      const companies = await resolveAccountCompanies(clerkOrgId, db);
+      const companies = await resolveAccountCompanies(accountId, db);
       const companyIds = companies.map((company) => company.id);
       const { currentPerson, organisationId } = await resolveFormTarget(
         {
-          clerkOrgId,
+          accountId,
           companies,
           companyIds,
           org,
@@ -66,9 +79,7 @@ export async function loadPlanFormData({
       );
       const orgQueryValue = organisationId;
       const canSelectPerson =
-        orgRole === "org:admin" ||
-        orgRole === "org:owner" ||
-        orgRole === "org:manager";
+        can(sessionRole, { plans: ["manageAll"] }) || sessionRole === "manager";
       let people: Array<{
         email: string;
         first_name: string | null;
@@ -76,12 +87,18 @@ export async function loadPlanFormData({
         last_name: string | null;
       }> = [];
       people = await resolveFormPeople(
-        { canSelectPerson, clerkOrgId, currentPerson, organisationId, orgRole },
+        {
+          accountId,
+          canSelectPerson,
+          currentPerson,
+          organisationId,
+          role: sessionRole,
+        },
         db
       );
       const xeroStateResult = await getXeroConnectionStateForScope(
         {
-          clerkOrgId,
+          accountId,
           organisationId,
         },
         db
@@ -90,9 +107,9 @@ export async function loadPlanFormData({
       const recordResult = recordId
         ? await getRecord(
             {
-              actingOrgRole: orgRole,
+              accountId,
+              actingRole: sessionRole,
               actingUserId: user.id,
-              clerkOrgId,
               organisationId,
               recordId,
             },
@@ -105,8 +122,8 @@ export async function loadPlanFormData({
       const organisation = await db.organisation.findFirst({
         select: { timezone: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       });
@@ -133,7 +150,7 @@ export async function loadPlanFormData({
                 currency_code: true,
               },
               where: {
-                ...scopedQuery(clerkOrgId, organisationId as OrganisationId),
+                ...scopedQuery(accountId, organisationId as OrganisationId),
                 person_id: balancePersonId,
                 record_type: balanceRecordType,
               },
@@ -223,17 +240,17 @@ function toEditableRecord(
 
 async function resolveFormTarget(
   input: LoadPlanFormDataInput & {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     userId: string;
     companyIds: string[];
     companies: Array<{ id: string }>;
   },
   db: TenantDb
 ) {
-  const { org, personId, recordId, clerkOrgId, userId, companyIds, companies } =
+  const { org, personId, recordId, accountId, userId, companyIds, companies } =
     input;
   const accountScope = {
-    clerk_org_id: clerkOrgId,
+    account_id: accountId,
     organisation_id: { in: companyIds },
   };
   const currentPerson = await db.person.findFirst({
@@ -245,7 +262,7 @@ async function resolveFormTarget(
       last_name: true,
       organisation_id: true,
     },
-    where: { ...accountScope, archived_at: null, clerk_user_id: userId },
+    where: { ...accountScope, archived_at: null, user_id: userId },
   });
   let target: { organisation_id: string } | null = null;
   if (recordId) {
@@ -279,9 +296,9 @@ async function resolveFormTarget(
 
 async function resolveFormPeople(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     organisationId: string;
-    orgRole: string | null | undefined;
+    role: string | null | undefined;
     currentPerson: Awaited<
       ReturnType<typeof resolveFormTarget>
     >["currentPerson"];
@@ -290,9 +307,9 @@ async function resolveFormPeople(
   db: TenantDb
 ) {
   const {
-    clerkOrgId,
+    accountId,
     organisationId,
-    orgRole,
+    role: sessionRole,
     currentPerson,
     canSelectPerson,
   } = input;
@@ -303,10 +320,10 @@ async function resolveFormPeople(
     last_name: string | null;
   }> = [];
   let managerIds: string[] | null = null;
-  if (orgRole === "org:manager") {
+  if (sessionRole === "manager") {
     managerIds = currentPerson
       ? await managerScopePersonIds(
-          { actingPersonId: currentPerson.id, clerkOrgId },
+          { accountId, actingPersonId: currentPerson.id },
           db
         )
       : [];
@@ -321,7 +338,7 @@ async function resolveFormPeople(
         last_name: true,
       },
       where: {
-        ...scopedQuery(clerkOrgId, organisationId as OrganisationId),
+        ...scopedQuery(accountId, organisationId as OrganisationId),
         archived_at: null,
         ...(managerIds ? { id: { in: managerIds } } : {}),
       },

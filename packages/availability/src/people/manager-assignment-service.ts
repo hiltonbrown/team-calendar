@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import "server-only";
 import type { Result } from "@repo/core";
 import {
@@ -8,9 +9,9 @@ import {
 import { z } from "zod";
 
 const InputSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.enum(["owner", "admin", "manager", "viewer"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   managerPersonId: z.string().uuid().nullable(),
   personId: z.string().uuid(),
 });
@@ -33,11 +34,8 @@ export async function setPersonManager(
   if (!parsed.success) {
     return failure("validation_error", "Invalid manager assignment.");
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
-  if (
-    parsed.data.actingRole !== "owner" &&
-    parsed.data.actingRole !== "admin"
-  ) {
+  assertTenantDb(db, parsed.data.accountId);
+  if (!hasPermission(parsed.data.actingRole, { people: ["manage"] })) {
     return failure(
       "not_authorised",
       "Only owners and admins can assign managers."
@@ -47,15 +45,15 @@ export async function setPersonManager(
     return failure("validation_error", "A person cannot manage themselves.");
   }
   // Serialise graph edits for the account so simultaneous A->B and B->A cannot both pass.
-  await db.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-calendar:manager-assignment:${parsed.data.clerkOrgId}`}, 0))::text AS acquired`;
+  await db.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-calendar:manager-assignment:${parsed.data.accountId}`}, 0))::text AS acquired`;
   const companyIds = (
-    await resolveAccountCompanies(parsed.data.clerkOrgId, db)
+    await resolveAccountCompanies(parsed.data.accountId, db)
   ).map((company) => company.id);
   const people = await db.person.findMany({
     select: { id: true, manager_person_id: true, organisation_id: true },
     where: {
+      account_id: parsed.data.accountId,
       archived_at: null,
-      clerk_org_id: parsed.data.clerkOrgId,
       organisation_id: { in: companyIds },
     },
   });
@@ -90,8 +88,8 @@ export async function setPersonManager(
   const updated = await db.person.updateMany({
     data: { manager_person_id: parsed.data.managerPersonId },
     where: {
+      account_id: parsed.data.accountId,
       archived_at: null,
-      clerk_org_id: parsed.data.clerkOrgId,
       id: person.id,
       manager_person_id: person.manager_person_id,
       organisation_id: person.organisation_id,
@@ -105,11 +103,11 @@ export async function setPersonManager(
   }
   await db.auditEvent.create({
     data: {
+      account_id: parsed.data.accountId,
       action: "people.manager_assigned",
       actor_user_id: parsed.data.actingUserId,
       after_value: { managerPersonId: parsed.data.managerPersonId },
       before_value: { managerPersonId: person.manager_person_id },
-      clerk_org_id: parsed.data.clerkOrgId,
       entity_id: person.id,
       entity_type: "person",
       organisation_id: person.organisation_id,
@@ -125,11 +123,11 @@ export interface ManagerChoice {
   name: string;
 }
 export async function listManagerChoices(
-  clerkOrgId: string,
+  accountId: string,
   db: TenantDb
 ): Promise<ManagerChoice[]> {
-  assertTenantDb(db, clerkOrgId);
-  const companies = await resolveAccountCompanies(clerkOrgId, db);
+  assertTenantDb(db, accountId);
+  const companies = await resolveAccountCompanies(accountId, db);
   const names = new Map(companies.map((company) => [company.id, company.name]));
   const people = await db.person.findMany({
     orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
@@ -140,8 +138,8 @@ export async function listManagerChoices(
       organisation_id: true,
     },
     where: {
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
       organisation_id: { in: companies.map((company) => company.id) },
     },
   });

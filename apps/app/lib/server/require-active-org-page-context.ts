@@ -2,8 +2,8 @@ import { withTenantDb } from "@repo/database";
 import { z } from "zod";
 import "server-only";
 
-import { requireOrg } from "@repo/auth/helpers";
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "@repo/database";
 import { resolveAccountCompanies } from "@repo/database/queries/account-companies";
 import { getOrganisationById } from "@repo/database/queries/organisations";
@@ -12,10 +12,10 @@ import { notFound } from "next/navigation";
 import { getActiveOrgContext } from "./get-active-org-context";
 
 export interface ActiveOrgPageContext {
-  clerkOrgId: ClerkOrgId;
+  accountId: AccountId;
   organisationId: OrganisationId;
   orgQueryValue: string | null;
-  orgSource: "clerk_cookie" | "query";
+  orgSource: "auth_session" | "query";
 }
 
 export async function requireActiveOrgPageContext(
@@ -38,17 +38,17 @@ export async function requireActiveOrgPageContext(
     };
   }
 
-  let clerkOrgId: ClerkOrgId;
+  let accountId: AccountId;
   try {
-    clerkOrgId = (await requireOrg()) as ClerkOrgId;
+    accountId = (await requireAccount()) as AccountId;
   } catch {
     notFound();
   }
 
   let companies: Awaited<ReturnType<typeof resolveAccountCompanies>>;
   try {
-    companies = await withTenantDb(clerkOrgId, (db) =>
-      resolveAccountCompanies(clerkOrgId, db)
+    companies = await withTenantDb(accountId, (db) =>
+      resolveAccountCompanies(accountId, db)
     );
   } catch {
     notFound();
@@ -60,11 +60,11 @@ export async function requireActiveOrgPageContext(
   }
 
   return {
-    clerkOrgId,
+    accountId,
     // The canonical resolver returns owned organisation UUIDs.
     organisationId: organisationId as OrganisationId,
     orgQueryValue: null,
-    orgSource: "clerk_cookie",
+    orgSource: "auth_session",
   };
 }
 
@@ -75,11 +75,11 @@ function normaliseOrgQueryValue(org?: string): string | null {
 
 /** Resolve company ownership using the caller's authenticated account and request client. */
 export async function resolveActiveOrgPageContext(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   org: string | undefined,
   db: TenantDb
 ): Promise<ActiveOrgPageContext> {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   const orgQueryValue = normaliseOrgQueryValue(org);
   if (orgQueryValue) {
     if (!z.string().uuid().safeParse(orgQueryValue).success) {
@@ -87,7 +87,7 @@ export async function resolveActiveOrgPageContext(
     }
     // The query validates both ownership and the organisation identifier before returning context.
     const result = await getOrganisationById(
-      clerkOrgId,
+      accountId,
       orgQueryValue as OrganisationId,
       db
     );
@@ -95,20 +95,20 @@ export async function resolveActiveOrgPageContext(
       notFound();
     }
     return {
-      clerkOrgId,
+      accountId,
       organisationId: result.value.id as OrganisationId,
       orgQueryValue,
       orgSource: "query",
     };
   }
-  const [company] = await resolveAccountCompanies(clerkOrgId, db);
+  const [company] = await resolveAccountCompanies(accountId, db);
   if (!company) {
     notFound();
   }
   return {
-    clerkOrgId,
+    accountId,
     organisationId: company.id as OrganisationId,
     orgQueryValue: null,
-    orgSource: "clerk_cookie",
+    orgSource: "auth_session",
   };
 }

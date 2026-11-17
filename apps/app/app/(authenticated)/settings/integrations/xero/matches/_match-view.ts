@@ -4,10 +4,10 @@ import type { Prisma } from "@repo/database/generated/client";
 export const xeroPersonMatchSelect = {
   candidate_person: {
     select: {
-      clerk_user_id: true,
       email: true,
       first_name: true,
       last_name: true,
+      user_id: true,
     },
   },
   id: true,
@@ -25,10 +25,10 @@ export type XeroPersonMatchQueryResult = Prisma.XeroPersonMatchGetPayload<{
 }>;
 
 export interface XeroPersonCandidatePersonView {
-  clerk_user_id: string | null;
   email: string;
   first_name: string;
   last_name: string;
+  user_id: string | null;
 }
 
 export interface XeroPersonTargetView {
@@ -49,10 +49,10 @@ export function toXeroPersonMatchView(
   return {
     candidate_person: match.candidate_person
       ? {
-          clerk_user_id: match.candidate_person.clerk_user_id,
           email: match.candidate_person.email,
           first_name: match.candidate_person.first_name,
           last_name: match.candidate_person.last_name,
+          user_id: match.candidate_person.user_id,
         }
       : null,
     id: match.id,

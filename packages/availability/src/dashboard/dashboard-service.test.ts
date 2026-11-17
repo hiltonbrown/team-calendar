@@ -117,8 +117,8 @@ const ids = {
   self: "00000000-0000-4000-8000-000000000011",
 };
 const baseInput = {
+  accountId: "org_1",
   actingRole: "employee" as const,
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   personId: ids.self,
   userId: "user_1",
@@ -370,31 +370,31 @@ describe("dashboard-service", () => {
   });
 
   it.each([
-    ["org:owner", 3, "owner"],
-    ["org:admin", 3, "admin"],
-    ["org:viewer", 2, "manager"],
-    ["org:viewer", 0, "employee"],
-    ["org:viewer", 0, "viewer", null],
+    ["owner", 3, "owner"],
+    ["admin", 3, "admin"],
+    ["viewer", 2, "manager"],
+    ["viewer", 0, "employee"],
+    ["viewer", 0, "viewer", null],
   ] as const)(
     "resolves %s role to %s",
-    async (orgRole, directReportCount, expectedRole, person = {
+    async (role, directReportCount, expectedRole, person = {
       id: baseInput.personId,
     }) => {
       mocks.personFindFirst.mockResolvedValue(person);
       mocks.personCount.mockResolvedValue(directReportCount);
       const result = await withTestTenantResult(
         tenantTestAccount({
-          clerkOrgId: baseInput.clerkOrgId,
+          accountId: baseInput.accountId,
           organisationId: baseInput.organisationId,
-          orgRole,
+          role,
           userId: baseInput.userId,
         }),
         (db) =>
           resolveDashboardRole(
             {
-              clerkOrgId: baseInput.clerkOrgId,
+              accountId: baseInput.accountId,
               organisationId: baseInput.organisationId,
-              orgRole,
+              role,
               userId: baseInput.userId,
             },
             db
@@ -413,10 +413,10 @@ describe("dashboard-service", () => {
       );
       expect(calendarCalls()).toEqual([
         {
+          accountId: baseInput.accountId,
           actingPersonId: ids.self,
           actingUserId: baseInput.userId,
           anchorDate: weekAnchor,
-          clerkOrgId: baseInput.clerkOrgId,
           companyIds: undefined,
           filters: {
             approvalStatus: ["approved"],
@@ -558,7 +558,7 @@ describe("dashboard-service", () => {
       );
       expect(mocks.listMyRecords).toHaveBeenCalledWith(
         {
-          clerkOrgId: baseInput.clerkOrgId,
+          accountId: baseInput.accountId,
           filters: {
             approvalStatus: ["submitted", "approved", "declined"],
             dateRange: { from: new Date("2026-10-09T00:00:00.000Z") },
@@ -639,7 +639,7 @@ describe("dashboard-service", () => {
       const cache = createDashboardCache();
       const first = new Date("2026-10-12T00:00:00.000Z");
       const second = new Date("2026-10-19T00:00:00.000Z");
-      await withTenantDb(baseInput.clerkOrgId, async (db) => {
+      await withTenantDb(baseInput.accountId, async (db) => {
         await getEmployeeView({ ...baseInput, weekAnchor: first }, cache, db);
         await getEmployeeView({ ...baseInput, weekAnchor: first }, cache, db);
         await getEmployeeView({ ...baseInput, weekAnchor: second }, cache, db);
@@ -707,7 +707,7 @@ describe("dashboard-service", () => {
       );
       expect(mocks.loadManagerCoverage).toHaveBeenCalledWith(
         {
-          clerkOrgId: baseInput.clerkOrgId,
+          accountId: baseInput.accountId,
           organisationId: baseInput.organisationId,
           ranges: [currentWeek, expect.objectContaining({ view: "week" })],
           today: NOW,
@@ -716,7 +716,7 @@ describe("dashboard-service", () => {
       );
       expect(mocks.listForApprover).toHaveBeenCalledWith(
         expect.objectContaining({
-          clerkOrgId: baseInput.clerkOrgId,
+          accountId: baseInput.accountId,
           filters: { status: ["submitted"] },
           role: "manager",
         }),
@@ -974,7 +974,7 @@ describe("dashboard-service", () => {
       });
       expect(mocks.resolvePublicHolidays).toHaveBeenCalledWith(
         {
-          clerkOrgId: baseInput.clerkOrgId,
+          accountId: baseInput.accountId,
           from: "2026-04-20",
           organisationId: baseInput.organisationId,
           to: "2027-05-25",

@@ -1,4 +1,4 @@
-const ADMIN_ROLES = new Set(["admin", "org:admin", "org:owner", "owner"]);
+import { hasPermission } from "@repo/auth/permissions";
 
 // The wizard sends admins through these Xero pages (choosing between several
 // payroll files, reviewing matches), so they must not bounce back to it.
@@ -14,15 +14,15 @@ function isExempt(pathname: string): boolean {
 }
 
 export function resolveOnboardingRedirect(input: {
-  orgRole: string | null | undefined;
+  role: string | null | undefined;
   pathname: string;
   welcomeEligible: boolean;
   wizardCompleted: boolean;
 }): "/onboarding" | "/welcome" | null {
-  if (!input.orgRole) {
+  if (!input.role) {
     return null;
   }
-  if (ADMIN_ROLES.has(input.orgRole)) {
+  if (hasPermission(input.role, { settings: ["update"] })) {
     return input.wizardCompleted || isExempt(input.pathname)
       ? null
       : "/onboarding";

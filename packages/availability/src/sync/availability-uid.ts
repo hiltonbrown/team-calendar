@@ -6,7 +6,7 @@ import type {
 import { icsUidSuffix } from "@repo/seo/branding";
 
 export function deriveAvailabilityUidKey(input: {
-  clerkOrgId: string;
+  accountId: string;
   endsAt: Date;
   organisationId: string;
   personId: string;
@@ -18,7 +18,7 @@ export function deriveAvailabilityUidKey(input: {
   const digest = createHash("sha256")
     .update(
       [
-        input.clerkOrgId,
+        input.accountId,
         input.organisationId,
         input.personId,
         input.sourceType,

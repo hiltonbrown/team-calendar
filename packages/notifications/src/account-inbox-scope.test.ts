@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
   publish: vi.fn(),
   rows: [] as Array<{
     id: string;
-    clerk_org_id: string;
+    account_id: string;
     organisation_id: string;
     recipient_user_id: string;
     read_at: Date | null;
@@ -54,16 +54,16 @@ const companyA = "11111111-1111-4111-8111-111111111111";
 const companyB = "22222222-2222-4222-8222-222222222222";
 const notificationA = "33333333-3333-4333-8333-333333333333";
 const notificationB = "44444444-4444-4444-8444-444444444444";
-const input = { clerkOrgId: "account-A", userId: "manager-A" };
+const input = { accountId: "account-A", userId: "manager-A" };
 interface Where {
-  clerk_org_id: string;
+  account_id: string;
   id?: string;
   organisation_id?: string;
   read_at?: null;
   recipient_user_id?: string;
 }
 const matches = (row: (typeof state.rows)[number], where: Where) =>
-  row.clerk_org_id === where.clerk_org_id &&
+  row.account_id === where.account_id &&
   (!where.recipient_user_id ||
     row.recipient_user_id === where.recipient_user_id) &&
   (!where.id || row.id === where.id) &&
@@ -98,28 +98,28 @@ beforeEach(() => {
   ]);
   state.rows = [
     {
-      clerk_org_id: "account-A",
+      account_id: "account-A",
       id: notificationA,
       organisation_id: companyA,
       read_at: null,
       recipient_user_id: "manager-A",
     },
     {
-      clerk_org_id: "account-A",
+      account_id: "account-A",
       id: notificationB,
       organisation_id: companyB,
       read_at: null,
       recipient_user_id: "manager-A",
     },
     {
-      clerk_org_id: "account-B",
+      account_id: "account-B",
       id: "foreign",
       organisation_id: companyB,
       read_at: null,
       recipient_user_id: "manager-A",
     },
     {
-      clerk_org_id: "account-A",
+      account_id: "account-A",
       id: "someone-else",
       organisation_id: companyB,
       read_at: null,

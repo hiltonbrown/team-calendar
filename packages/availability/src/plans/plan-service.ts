@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import {
   TENANT_READ_TRANSACTION_OPTIONS,
   withTenantResult,
@@ -98,12 +99,12 @@ const unresolvedSubmitError = (): PlanServiceError => ({
     "Xero may have received this leave request. An administrator must resolve it before this record can be changed.",
 });
 export interface PlanRecord {
+  accountId: string;
   allDay: boolean;
   approvalNote: string | null;
   approvalStatus: availability_approval_status;
   approvedAt: Date | null;
   archivedAt: Date | null;
-  clerkOrgId: string;
   contactabilityStatus: availability_contactability;
   createdAt: Date;
   createdByUserId: string | null;
@@ -169,7 +170,7 @@ export interface PlanFilters {
   sourceType?: availability_source_type[];
 }
 export interface RoleScopedInput {
-  actingOrgRole?: string | null;
+  actingRole?: string | null;
 }
 const RecordTypeSchema = z.enum(USER_CREATABLE_RECORD_TYPES);
 const ApprovalStatusSchema = z.enum([
@@ -213,8 +214,8 @@ const FiltersSchema = z.object({
 });
 const CreateRecordSchema = z
   .object({
+    accountId: z.string().min(1),
     allDay: z.boolean().default(true),
-    clerkOrgId: z.string().min(1),
     contactabilityStatus: ContactabilitySchema.default("contactable"),
     createdByUserId: z.string().min(1),
     endsAt: z.coerce.date(),
@@ -230,8 +231,8 @@ const CreateRecordSchema = z
     path: ["endsAt"],
   });
 const UpdateRecordSchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   patch: z
     .object({
@@ -254,23 +255,23 @@ const UpdateRecordSchema = z.object({
   recordId: z.string().uuid(),
 });
 const RecordActionSchema = z.object({
+  accountId: z.string().min(1),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   recordId: z.string().uuid(),
 });
 export async function listMyRecords(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     filters?: unknown;
     organisationId: string;
     userId: string;
   },
   db: TenantDb
 ): Promise<Result<RecordListItem[], PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsedFilters = parseFilters(input.filters);
@@ -278,7 +279,7 @@ export async function listMyRecords(
       return parsedFilters;
     }
     const person = await resolvePersonForUser(
-      input.clerkOrgId,
+      input.accountId,
       input.userId,
       client
     );
@@ -287,8 +288,8 @@ export async function listMyRecords(
     }
     return listRecordsForScope(
       {
+        accountId: input.accountId,
         authorisedPersonIds: [person.id],
-        clerkOrgId: input.clerkOrgId,
         filters: parsedFilters.value,
         organisationId: input.organisationId,
       },
@@ -298,26 +299,26 @@ export async function listMyRecords(
 }
 export async function listTeamRecords(
   input: {
-    actingOrgRole?: string | null;
-    clerkOrgId: string;
+    actingRole?: string | null;
+    accountId: string;
     filters?: unknown;
     managerPersonId?: null | string;
     organisationId: string;
   },
   db: TenantDb
 ): Promise<Result<RecordListItem[], PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsedFilters = parseFilters(input.filters);
   if (!parsedFilters.ok) {
     return parsedFilters;
   }
   const run = async (client: TenantDb): ReturnType<typeof listTeamRecords> => {
     const filters = parsedFilters.value;
-    if (isAdminOrOwner(input.actingOrgRole)) {
+    if (isAdminOrOwner(input.actingRole)) {
       return listRecordsForScope(
         {
+          accountId: input.accountId,
           authorisedPersonIds: null,
-          clerkOrgId: input.clerkOrgId,
           filters,
           organisationId: input.organisationId,
         },
@@ -329,29 +330,29 @@ export async function listTeamRecords(
     }
     const reportIds = await managerScopePersonIds(
       {
+        accountId: input.accountId,
         actingPersonId: input.managerPersonId,
-        clerkOrgId: input.clerkOrgId,
         excludeSelf: true,
       },
       client
     );
     return listRecordsForScope(
       {
+        accountId: input.accountId,
         authorisedPersonIds: reportIds,
-        clerkOrgId: input.clerkOrgId,
         filters,
         organisationId: input.organisationId,
       },
       client
     );
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function listMyRecordsPage(
   input: {
     allHistory?: boolean;
-    clerkOrgId: string;
+    accountId: string;
     cursor?: string | null;
     filters?: unknown;
     organisationId: string;
@@ -360,7 +361,7 @@ export async function listMyRecordsPage(
   },
   db: TenantDb
 ): Promise<Result<PlanListPage, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const filters = parseFilters(input.filters);
   if (!filters.ok) {
     return filters;
@@ -369,7 +370,7 @@ export async function listMyRecordsPage(
     client: TenantDb
   ): ReturnType<typeof listMyRecordsPage> => {
     const person = await resolvePersonForUser(
-      input.clerkOrgId,
+      input.accountId,
       input.userId,
       client
     );
@@ -385,14 +386,14 @@ export async function listMyRecordsPage(
       client
     );
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function listTeamRecordsPage(
   input: {
-    actingOrgRole?: string | null;
+    actingRole?: string | null;
     allHistory?: boolean;
-    clerkOrgId: string;
+    accountId: string;
     cursor?: string | null;
     filters?: unknown;
     managerPersonId?: null | string;
@@ -401,7 +402,7 @@ export async function listTeamRecordsPage(
   },
   db: TenantDb
 ): Promise<Result<PlanListPage, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const filters = parseFilters(input.filters);
   if (!filters.ok) {
     return filters;
@@ -410,14 +411,14 @@ export async function listTeamRecordsPage(
     client: TenantDb
   ): ReturnType<typeof listTeamRecordsPage> => {
     let authorisedPersonIds: string[] | null = null;
-    if (!isAdminOrOwner(input.actingOrgRole)) {
+    if (!isAdminOrOwner(input.actingRole)) {
       if (!input.managerPersonId) {
         return notAuthorised();
       }
       authorisedPersonIds = await managerScopePersonIds(
         {
+          accountId: input.accountId,
           actingPersonId: input.managerPersonId,
-          clerkOrgId: input.clerkOrgId,
           excludeSelf: true,
         },
         client
@@ -432,29 +433,29 @@ export async function listTeamRecordsPage(
       client
     );
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function getRecord(
   input: {
-    actingOrgRole?: string | null;
+    actingRole?: string | null;
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     recordId: string;
   },
   db: TenantDb
 ): Promise<Result<RecordDetail, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (client: TenantDb): ReturnType<typeof getRecord> => {
     const [record, actingPerson] = [
       await loadScopedRecord(
-        input.clerkOrgId,
+        input.accountId,
         input.organisationId,
         input.recordId,
         client
       ),
-      await resolvePersonForUser(input.clerkOrgId, input.actingUserId, client),
+      await resolvePersonForUser(input.accountId, input.actingUserId, client),
     ];
     if (!record) {
       return recordNotFound();
@@ -462,9 +463,9 @@ export async function getRecord(
     if (
       !(await canActOnPerson(
         {
-          actingOrgRole: input.actingOrgRole,
+          accountId: input.accountId,
           actingPersonId: actingPerson?.id ?? null,
-          clerkOrgId: input.clerkOrgId,
+          actingRole: input.actingRole,
           targetPerson: record.person,
         },
         client
@@ -486,14 +487,14 @@ export async function getRecord(
       },
     };
   };
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await run(db);
 }
 export async function createRecord(
   input: z.infer<typeof CreateRecordSchema> & RoleScopedInput,
   db: TenantDb
 ): Promise<Result<PlanRecord, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = CreateRecordSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -504,7 +505,7 @@ export async function createRecord(
         select: personSelect,
         where: {
           ...scopedTo({
-            clerkOrgId: parsed.data.clerkOrgId,
+            accountId: parsed.data.accountId,
             organisationId: parsed.data.organisationId,
           }),
           archived_at: null,
@@ -512,14 +513,14 @@ export async function createRecord(
         },
       }),
       await resolvePersonForUser(
-        parsed.data.clerkOrgId,
+        parsed.data.accountId,
         parsed.data.createdByUserId,
         client
       ),
       await getXeroConnectionStateForScope(parsed.data, client),
       await getSettings(
         {
-          clerkOrgId: parsed.data.clerkOrgId,
+          accountId: parsed.data.accountId,
           organisationId: parsed.data.organisationId,
         },
         client
@@ -548,9 +549,9 @@ export async function createRecord(
     if (
       !(await canActOnPerson(
         {
-          actingOrgRole: input.actingOrgRole,
+          accountId: input.accountId,
           actingPersonId: actingPerson?.id ?? null,
-          clerkOrgId: input.clerkOrgId,
+          actingRole: input.actingRole,
           targetPerson,
         },
         client
@@ -564,7 +565,7 @@ export async function createRecord(
       (settingsResult.ok ? settingsResult.value.defaultPrivacyMode : "named");
     const id = randomUUID();
     const derivedUidKey = deriveAvailabilityUidKey({
-      clerkOrgId: parsed.data.clerkOrgId,
+      accountId: parsed.data.accountId,
       endsAt: parsed.data.endsAt,
       organisationId: parsed.data.organisationId,
       personId: parsed.data.personId,
@@ -576,11 +577,11 @@ export async function createRecord(
     const record = await (async (tx: TenantDb) => {
       const created = await tx.availabilityRecord.create({
         data: {
+          account_id: parsed.data.accountId,
           all_day: parsed.data.allDay,
           approval_status: routing.approvalStatus,
           approved_at:
             routing.approvalStatus === "approved" ? new Date() : null,
-          clerk_org_id: parsed.data.clerkOrgId,
           contactability: parsed.data.contactabilityStatus,
           created_by_user_id: parsed.data.createdByUserId,
           derived_sequence: 0,
@@ -601,9 +602,9 @@ export async function createRecord(
       });
       await tx.auditEvent.create({
         data: {
+          account_id: parsed.data.accountId,
           action: "availability_records.created",
           actor_user_id: parsed.data.createdByUserId,
-          clerk_org_id: parsed.data.clerkOrgId,
           organisation_id: parsed.data.organisationId,
           payload: {
             approvalStatus: routing.approvalStatus,
@@ -619,8 +620,8 @@ export async function createRecord(
     })(client);
     afterTenantCommit(client, async () => {
       await materialisePlanPublication({
+        accountId: parsed.data.accountId,
         availabilityRecordId: record.id,
-        clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
       });
     });
@@ -630,7 +631,7 @@ export async function createRecord(
     };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -638,7 +639,7 @@ export async function updateRecord(
   input: z.infer<typeof UpdateRecordSchema> & RoleScopedInput,
   db: TenantDb
 ): Promise<Result<PlanRecord, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = UpdateRecordSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -648,13 +649,13 @@ export async function updateRecord(
     const run = async (client: TenantDb): ReturnType<typeof updateRecord> => {
       const [existing, actingPerson, xeroStateResult] = [
         await loadScopedRecord(
-          parsed.data.clerkOrgId,
+          parsed.data.accountId,
           parsed.data.organisationId,
           parsed.data.recordId,
           client
         ),
         await resolvePersonForUser(
-          parsed.data.clerkOrgId,
+          parsed.data.accountId,
           parsed.data.actingUserId,
           client
         ),
@@ -686,8 +687,8 @@ export async function updateRecord(
       if (
         await hasUnresolvedSubmitOperation(
           {
+            accountId: parsed.data.accountId,
             availabilityRecordId: existing.id,
-            clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           },
           client
@@ -698,9 +699,9 @@ export async function updateRecord(
       if (
         !(await canActOnPerson(
           {
-            actingOrgRole: input.actingOrgRole,
+            accountId: input.accountId,
             actingPersonId: actingPerson?.id ?? null,
-            clerkOrgId: input.clerkOrgId,
+            actingRole: input.actingRole,
             targetPerson: existing.person,
           },
           client
@@ -728,7 +729,7 @@ export async function updateRecord(
       const routing = editedRecordRouting(existing, patch.recordType, hasXero);
       const materialChange = hasMaterialChange(existing, patch, routing);
       const derivedUidKey = deriveAvailabilityUidKey({
-        clerkOrgId: parsed.data.clerkOrgId,
+        accountId: parsed.data.accountId,
         endsAt: nextEndsAt,
         organisationId: parsed.data.organisationId,
         personId: existing.person_id,
@@ -767,7 +768,7 @@ export async function updateRecord(
           },
           where: {
             ...scopedTo({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: parsed.data.organisationId,
             }),
             archived_at: existing.archived_at,
@@ -782,9 +783,9 @@ export async function updateRecord(
         }
         await tx.auditEvent.create({
           data: {
+            account_id: parsed.data.accountId,
             action: "availability_records.updated",
             actor_user_id: parsed.data.actingUserId,
-            clerk_org_id: parsed.data.clerkOrgId,
             organisation_id: parsed.data.organisationId,
             payload: {
               materialChange,
@@ -801,7 +802,7 @@ export async function updateRecord(
         });
       })(client);
       const updated = await loadScopedRecord(
-        parsed.data.clerkOrgId,
+        parsed.data.accountId,
         parsed.data.organisationId,
         parsed.data.recordId,
         client
@@ -811,8 +812,8 @@ export async function updateRecord(
       }
       afterTenantCommit(client, async () => {
         await materialisePlanPublication({
+          accountId: parsed.data.accountId,
           availabilityRecordId: updated.id,
-          clerkOrgId: parsed.data.clerkOrgId,
           organisationId: parsed.data.organisationId,
         });
       });
@@ -822,7 +823,7 @@ export async function updateRecord(
       };
     };
     return await (async () => {
-      assertTenantDb(db, input.clerkOrgId);
+      assertTenantDb(db, input.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -842,7 +843,7 @@ export async function deleteDraftRecord(
   input: z.infer<typeof RecordActionSchema> & RoleScopedInput,
   db: TenantDb
 ): Promise<Result<void, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -854,7 +855,7 @@ export async function deleteDraftRecord(
     ): ReturnType<typeof deleteDraftRecord> => {
       const existing = await loadAndAuthorise(
         parsed.data,
-        input.actingOrgRole,
+        input.actingRole,
         client
       );
       if (!existing.ok) {
@@ -863,8 +864,8 @@ export async function deleteDraftRecord(
       if (
         await hasUnresolvedSubmitOperation(
           {
+            accountId: parsed.data.accountId,
             availabilityRecordId: existing.value.id,
-            clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           },
           client
@@ -888,7 +889,7 @@ export async function deleteDraftRecord(
         const deleted = await tx.availabilityRecord.deleteMany({
           where: {
             ...scopedTo({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: parsed.data.organisationId,
             }),
             approval_status: existing.value.approval_status,
@@ -908,7 +909,7 @@ export async function deleteDraftRecord(
       return { ok: true, value: undefined };
     };
     return await (async () => {
-      assertTenantDb(db, input.clerkOrgId);
+      assertTenantDb(db, input.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -929,7 +930,7 @@ export async function archiveRecord(
   input: z.infer<typeof RecordActionSchema> & RoleScopedInput,
   db: TenantDb
 ): Promise<Result<void, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -939,7 +940,7 @@ export async function archiveRecord(
     const run = async (client: TenantDb): ReturnType<typeof archiveRecord> => {
       const existing = await loadAndAuthorise(
         parsed.data,
-        input.actingOrgRole,
+        input.actingRole,
         client
       );
       if (!existing.ok) {
@@ -948,8 +949,8 @@ export async function archiveRecord(
       if (
         await hasUnresolvedSubmitOperation(
           {
+            accountId: parsed.data.accountId,
             availabilityRecordId: existing.value.id,
-            clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           },
           client
@@ -991,7 +992,7 @@ export async function archiveRecord(
           },
           where: {
             ...scopedTo({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: parsed.data.organisationId,
             }),
             approval_status: existing.value.approval_status,
@@ -1010,15 +1011,15 @@ export async function archiveRecord(
       })(client);
       afterTenantCommit(client, async () => {
         await materialisePlanPublication({
+          accountId: parsed.data.accountId,
           availabilityRecordId: parsed.data.recordId,
-          clerkOrgId: parsed.data.clerkOrgId,
           organisationId: parsed.data.organisationId,
         });
       });
       return { ok: true, value: undefined };
     };
     return await (async () => {
-      assertTenantDb(db, input.clerkOrgId);
+      assertTenantDb(db, input.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -1039,7 +1040,7 @@ export async function restoreRecord(
   input: z.infer<typeof RecordActionSchema> & RoleScopedInput,
   db: TenantDb
 ): Promise<Result<void, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const parsed = RecordActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -1049,7 +1050,7 @@ export async function restoreRecord(
     const run = async (client: TenantDb): ReturnType<typeof restoreRecord> => {
       const existing = await loadAndAuthorise(
         parsed.data,
-        input.actingOrgRole,
+        input.actingRole,
         client
       );
       if (!existing.ok) {
@@ -1076,7 +1077,7 @@ export async function restoreRecord(
           },
           where: {
             ...scopedTo({
-              clerkOrgId: parsed.data.clerkOrgId,
+              accountId: parsed.data.accountId,
               organisationId: parsed.data.organisationId,
             }),
             derived_sequence: existing.value.derived_sequence,
@@ -1094,15 +1095,15 @@ export async function restoreRecord(
       })(client);
       afterTenantCommit(client, async () => {
         await materialisePlanPublication({
+          accountId: parsed.data.accountId,
           availabilityRecordId: parsed.data.recordId,
-          clerkOrgId: parsed.data.clerkOrgId,
           organisationId: parsed.data.organisationId,
         });
       });
       return { ok: true, value: undefined };
     };
     return await (async () => {
-      assertTenantDb(db, input.clerkOrgId);
+      assertTenantDb(db, input.accountId);
       return await run(db);
     })();
   } catch (error) {
@@ -1156,7 +1157,7 @@ async function listRecordsPageForScope(
   input: {
     allHistory?: boolean;
     authorisedPersonIds: null | string[];
-    clerkOrgId: string;
+    accountId: string;
     cursor?: string | null;
     filters: PlanFilters;
     organisationId: string;
@@ -1164,9 +1165,9 @@ async function listRecordsPageForScope(
   },
   db: TenantDb
 ): Promise<Result<PlanListPage, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const personIds = visiblePlanPeople(
@@ -1237,7 +1238,7 @@ async function listRecordsPageForScope(
       await client.availabilityRecord.count({ where }),
       await getXeroConnectionStateForScope(
         {
-          clerkOrgId: input.clerkOrgId,
+          accountId: input.accountId,
           organisationId: input.organisationId,
         },
         client
@@ -1358,20 +1359,20 @@ function decodePlanCursor(value: string | null): {
 async function listRecordsForScope(
   {
     authorisedPersonIds,
-    clerkOrgId,
+    accountId,
     filters,
     organisationId,
   }: {
     authorisedPersonIds: null | string[];
-    clerkOrgId: string;
+    accountId: string;
     filters: PlanFilters;
     organisationId: string;
   },
   db: TenantDb
 ): Promise<Result<RecordListItem[], PlanServiceError>> {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const client = db;
 
     const requestedPersonIds = filters.personId;
@@ -1388,7 +1389,7 @@ async function listRecordsForScope(
     }
     const xeroStateResult = await getXeroConnectionStateForScope(
       {
-        clerkOrgId,
+        accountId,
         organisationId,
       },
       client
@@ -1401,8 +1402,8 @@ async function listRecordsForScope(
       orderBy: [{ starts_at: "asc" }, { created_at: "asc" }],
       select: { id: true },
       where: {
-        ...scopedTo({ clerkOrgId, organisationId }),
-        ...planSourceFilter({ clerkOrgId, filters, organisationId }),
+        ...scopedTo({ accountId, organisationId }),
+        ...planSourceFilter({ accountId, filters, organisationId }),
         ...planListFilterWhere(filters),
         ...(personIds?.length ? { person_id: { in: personIds } } : {}),
       },
@@ -1410,7 +1411,7 @@ async function listRecordsForScope(
     const items: RecordListItem[] = [];
     for (const record of records) {
       const loaded = await loadScopedRecord(
-        clerkOrgId,
+        accountId,
         organisationId,
         record.id,
         client
@@ -1427,9 +1428,9 @@ async function toRecordListItem(
   hasXero: boolean | null,
   db: TenantDb
 ): Promise<RecordListItem> {
-  assertTenantDb(db, record.clerk_org_id);
+  assertTenantDb(db, record.account_id);
   {
-    assertTenantDb(db, record.clerk_org_id);
+    assertTenantDb(db, record.account_id);
     const client = db;
     return await {
       ...toPlanRecord(record, deriveActions(record, hasXero)),
@@ -1441,9 +1442,9 @@ async function balanceChipForRecord(
   record: ScopedRecord,
   db: TenantDb
 ): Promise<BalanceChip | null> {
-  assertTenantDb(db, record.clerk_org_id);
+  assertTenantDb(db, record.account_id);
   {
-    assertTenantDb(db, record.clerk_org_id);
+    assertTenantDb(db, record.account_id);
     const client = db;
 
     if (isLocalOnlyType(record.record_type)) {
@@ -1468,7 +1469,7 @@ async function balanceChipForRecord(
       },
       where: {
         ...scopedTo({
-          clerkOrgId: record.clerk_org_id,
+          accountId: record.account_id,
           organisationId: record.organisation_id,
         }),
         person_id: record.person_id,
@@ -1494,19 +1495,19 @@ async function balanceChipForRecord(
   }
 }
 async function loadScopedRecord(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   recordId: string,
   db: TenantDb
 ) {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const client = db;
     return await client.availabilityRecord.findFirst({
       include: recordInclude,
       where: {
-        ...scopedTo({ clerkOrgId, organisationId }),
+        ...scopedTo({ accountId, organisationId }),
         id: recordId,
       },
     });
@@ -1514,22 +1515,22 @@ async function loadScopedRecord(
 }
 async function loadAndAuthorise(
   input: z.infer<typeof RecordActionSchema>,
-  actingOrgRole: string | null | undefined,
+  actingRole: string | null | undefined,
   db: TenantDb
 ): Promise<Result<ScopedRecord, PlanServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const [record, actingPerson] = [
       await loadScopedRecord(
-        input.clerkOrgId,
+        input.accountId,
         input.organisationId,
         input.recordId,
         client
       ),
-      await resolvePersonForUser(input.clerkOrgId, input.actingUserId, client),
+      await resolvePersonForUser(input.accountId, input.actingUserId, client),
     ];
     if (!record) {
       return recordNotFound();
@@ -1537,9 +1538,9 @@ async function loadAndAuthorise(
     if (
       !(await canActOnPerson(
         {
-          actingOrgRole,
+          accountId: input.accountId,
           actingPersonId: actingPerson?.id ?? null,
-          clerkOrgId: input.clerkOrgId,
+          actingRole,
           targetPerson: record.person,
         },
         client
@@ -1551,23 +1552,23 @@ async function loadAndAuthorise(
   }
 }
 async function resolvePersonForUser(
-  clerkOrgId: string,
+  accountId: string,
   userId: string,
   db: TenantDb
 ) {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const client = db;
 
-    const companies = await resolveAccountCompanies(clerkOrgId, client);
+    const companies = await resolveAccountCompanies(accountId, client);
     return client.person.findFirst({
       select: personSelect,
       where: {
+        account_id: accountId,
         archived_at: null,
-        clerk_org_id: clerkOrgId,
-        clerk_user_id: userId,
         organisation_id: { in: companies.map((company) => company.id) },
+        user_id: userId,
       },
     });
   }
@@ -1577,12 +1578,12 @@ function toPlanRecord(
   editableActions: EditableAction[]
 ): PlanRecord {
   return {
+    accountId: record.account_id,
     allDay: record.all_day,
     approvalNote: record.approval_note,
     approvalStatus: record.approval_status,
     approvedAt: record.approved_at,
     archivedAt: record.archived_at,
-    clerkOrgId: record.clerk_org_id,
     contactabilityStatus: record.contactability,
     createdAt: record.created_at,
     createdByUserId: record.created_by_user_id,
@@ -1726,12 +1727,12 @@ function routeRecord(
 }
 export async function materialisePlanPublication(input: {
   availabilityRecordId: string;
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }): Promise<void> {
   assertNoTenantTransaction("materialisePlanPublication");
   const result = await withTenantResult(
-    input.clerkOrgId,
+    input.accountId,
     (db) => materialiseAvailabilityPublication(input, db),
     TENANT_READ_TRANSACTION_OPTIONS
   );
@@ -1740,8 +1741,8 @@ export async function materialisePlanPublication(input: {
     // projection rather than failing the write; it is corrected on the next
     // successful materialisation for the record.
     log.error("Failed to materialise availability publication", {
+      accountId: input.accountId,
       availabilityRecordId: input.availabilityRecordId,
-      clerkOrgId: input.clerkOrgId,
       error: result.error.message,
       organisationId: input.organisationId,
     });
@@ -1777,7 +1778,7 @@ function categoryChanged(first: RecordType, second: RecordType): boolean {
   );
 }
 function planSourceFilter(input: {
-  clerkOrgId: string;
+  accountId: string;
   filters: PlanFilters;
   organisationId: string;
 }): Prisma.AvailabilityRecordWhereInput {
@@ -1840,41 +1841,42 @@ function parseFilters(filters: unknown): Result<PlanFilters, PlanServiceError> {
 }
 async function canActOnPerson(
   {
-    clerkOrgId,
-    actingOrgRole,
+    accountId,
+    actingRole,
     actingPersonId,
     targetPerson,
   }: {
-    clerkOrgId: string;
-    actingOrgRole?: string | null;
+    accountId: string;
+    actingRole?: string | null;
     actingPersonId: string | null;
     targetPerson: SelectedPerson;
   },
   db: TenantDb
 ): Promise<boolean> {
-  assertTenantDb(db, clerkOrgId);
-  if (
-    isAdminOrOwner(actingOrgRole) ||
-    targetPerson.id === actingPersonId ||
-    (actingPersonId && targetPerson.manager_person_id === actingPersonId)
-  ) {
+  assertTenantDb(db, accountId);
+  if (isAdminOrOwner(actingRole) || targetPerson.id === actingPersonId) {
     return true;
   }
-  if (actingOrgRole !== "org:manager" || !actingPersonId) {
+  if (
+    !(hasPermission(actingRole, { plans: ["manageReports"] }) && actingPersonId)
+  ) {
     return false;
   }
+  if (targetPerson.manager_person_id === actingPersonId) {
+    return true;
+  }
   return (
-    await managerScopePersonIds({ actingPersonId, clerkOrgId }, db)
+    await managerScopePersonIds({ accountId, actingPersonId }, db)
   ).includes(targetPerson.id);
 }
 function isAdminOrOwner(role?: string | null): boolean {
-  return role === "org:admin" || role === "org:owner";
+  return hasPermission(role, { plans: ["manageAll"] });
 }
 function auditData(input: z.infer<typeof RecordActionSchema>, action: string) {
   return {
+    account_id: input.accountId,
     action,
     actor_user_id: input.actingUserId,
-    clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
     payload: { recordId: input.recordId },
     resource_id: input.recordId,

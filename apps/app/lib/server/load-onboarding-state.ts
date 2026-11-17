@@ -26,7 +26,7 @@ export interface OnboardingState {
   xeroConnectionState: XeroConnectionDisplayState;
 }
 interface LoadOnboardingStateInput {
-  clerkOrgId: string;
+  accountId: string;
   organisationId: string;
 }
 
@@ -34,29 +34,29 @@ interface LoadOnboardingStateInput {
 // organisation profile, Xero decision and people, so this lists only what
 // remains useful afterwards.
 export async function loadOnboardingState(
-  { clerkOrgId, organisationId }: LoadOnboardingStateInput,
+  { accountId, organisationId }: LoadOnboardingStateInput,
   db: TenantDb
 ): Promise<OnboardingState> {
-  assertTenantDb(db, clerkOrgId);
+  assertTenantDb(db, accountId);
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const client = db;
 
     const scope = {
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
       organisation_id: organisationId,
     };
     const [connection, organisation, activeFeedCount] = [
       await getXeroConnectionStateForScope(
-        { clerkOrgId, organisationId },
+        { accountId, organisationId },
         client
       ),
       await client.organisation.findFirst({
         select: { country_code: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
           id: organisationId,
         },
       }),

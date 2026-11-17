@@ -16,7 +16,7 @@ const fixture = parseDisconnectFixture(
   JSON.parse(process.env.TC_E2E_XERO_DISCONNECT_FIXTURE_JSON ?? "null"),
   {
     foreignOrganisationId: environment.fixtures.organisations.foreign,
-    ownedClerkOrgIds: environment.manifest.owned.clerkOrgIds,
+    ownedAccountIds: environment.manifest.owned.accountIds,
     ownedOrganisationIds: environment.manifest.owned.organisationIds,
     primaryOrganisationId: environment.fixtures.organisations.primary,
     providerAppId: process.env.XERO_CLIENT_ID ?? "",
@@ -56,16 +56,13 @@ try {
     `SELECT xc.organisation_id, xc.status, xc.xero_authorisation_id,
             xc.remote_connection_id, xc.xero_tenant_id, xa.provider_app_id,
             (SELECT count(*)::text FROM availability_records ar
-             WHERE ar.clerk_org_id = xc.clerk_org_id
+             WHERE ar.account_id = xc.account_id
                AND ar.organisation_id = xc.organisation_id
                AND ar.source_remote_id IS NOT NULL) AS history_count
      FROM xero_connections xc
      LEFT JOIN xero_authorisations xa ON xa.id = xc.xero_authorisation_id
-     WHERE xc.clerk_org_id = $1 AND xc.organisation_id = ANY($2::uuid[])`,
-    [
-      fixture.clerkOrgId,
-      [fixture.organisationId, fixture.siblingOrganisationId],
-    ]
+     WHERE xc.account_id = $1 AND xc.organisation_id = ANY($2::uuid[])`,
+    [fixture.accountId, [fixture.organisationId, fixture.siblingOrganisationId]]
   );
   const target = result.rows.find(
     (row) => row.organisation_id === fixture.organisationId
@@ -107,8 +104,8 @@ try {
   let demoVerifiedAt: string | null = null;
   if (mode === "before") {
     const targetAccess = await resolveXeroAccess({
+      accountId: fixture.accountId,
       capability: "accounting.settings.read",
-      clerkOrgId: fixture.clerkOrgId,
       deadline,
       organisationId: fixture.organisationId,
     });
@@ -127,8 +124,8 @@ try {
     const demoResponse = await xeroFetch({
       accessContext: toResolvedXeroConnection(
         {
+          accountId: fixture.accountId,
           capability: "accounting.settings.read",
-          clerkOrgId: fixture.clerkOrgId,
           organisationId: fixture.organisationId,
         },
         targetAccess.value
@@ -163,7 +160,7 @@ try {
     demoVerifiedAt = new Date().toISOString();
   }
   const access = await resolveXeroAccess({
-    clerkOrgId: fixture.clerkOrgId,
+    accountId: fixture.accountId,
     deadline,
     organisationId: fixture.siblingOrganisationId,
   });
@@ -180,7 +177,7 @@ try {
   const response = await xeroFetch({
     accessContext: toResolvedXeroConnection(
       {
-        clerkOrgId: fixture.clerkOrgId,
+        accountId: fixture.accountId,
         organisationId: fixture.siblingOrganisationId,
       },
       access.value

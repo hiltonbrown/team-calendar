@@ -23,7 +23,7 @@ vi.mock("@repo/database", async () => ({
     { id: "company-B" },
   ],
   scopedQuery: (account: string, company: string) => ({
-    clerk_org_id: account,
+    account_id: account,
     organisation_id: company,
   }),
 }));
@@ -35,20 +35,19 @@ vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), warn: vi.fn() },
 }));
 
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import { ensureCurrentUserPerson } from "./current-user-service";
 
 // The fake account/company ids identify fixtures; production ids come from authenticated/validated input.
 const tenant = {
-  clerkOrgId: "account-A" as ClerkOrgId,
+  accountId: "account-A" as AccountId,
   organisationId: "company-A" as OrganisationId,
 };
 const person = {
+  account_id: "account-A",
   archived_at: null,
   avatar_url: null,
-  clerk_org_id: "account-A",
-  clerk_user_id: null,
   display_name: "Blair Person",
   email: "blair@example.com",
   employment_type: "employee",
@@ -60,6 +59,7 @@ const person = {
   organisation_id: "company-B",
   person_type: "employee",
   team: null,
+  user_id: null,
 };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -68,17 +68,17 @@ beforeEach(() => {
       where,
     }: {
       where: {
-        clerk_org_id: string;
+        account_id: string;
         organisation_id: { in?: string[] } | string;
       };
     }) =>
-      where.clerk_org_id === "account-A" &&
+      where.account_id === "account-A" &&
       typeof where.organisation_id === "object" &&
       where.organisation_id.in?.includes("company-B")
         ? [person]
         : []
   );
-  state.update.mockResolvedValue({ ...person, clerk_user_id: "user-B" });
+  state.update.mockResolvedValue({ ...person, user_id: "user-B" });
   state.create.mockRejectedValue(
     new Error("A second person must not be created")
   );
@@ -105,10 +105,9 @@ test("a B-employed user opening A links the existing B profile instead of creati
     const result = await ensureCurrentUserPerson(
       tenant,
       {
-        clerkUserId: "user-B",
+        displayName: "Blair Person",
         email: "blair@example.com",
-        firstName: "Blair",
-        lastName: "Person",
+        userId: "user-B",
       },
       db
     );
@@ -121,7 +120,7 @@ test("a B-employed user opening A links the existing B profile instead of creati
   expect(state.emailLookup).toHaveBeenCalledWith(
     expect.objectContaining({
       where: expect.objectContaining({
-        clerk_org_id: "account-A",
+        account_id: "account-A",
         organisation_id: { in: ["company-A", "company-B"] },
       }),
     })
@@ -137,8 +136,8 @@ test("ambiguous account email matches retain the existing conflict policy withou
     ensureCurrentUserPerson(
       tenant,
       {
-        clerkUserId: "user-B",
         email: "blair@example.com",
+        userId: "user-B",
       },
       db
     )

@@ -1,19 +1,19 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth } from "@repo/auth/server";
+import { requireAccount } from "@repo/auth/helpers";
+import { getSession } from "@repo/auth/server";
 import {
   listRuns,
   listTenantSummaries,
   type SyncMonitorRole,
 } from "@repo/availability";
-import type { ClerkOrgId } from "@repo/core";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
 import {
   PermissionDeniedError,
-  requirePageRole,
-} from "@/lib/auth/require-page-role";
+  requirePagePermission,
+} from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
@@ -33,7 +33,7 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
   const params = await searchParams;
 
   try {
-    await requirePageRole("org:admin");
+    await requirePagePermission({ xero: ["sync"] });
   } catch (error) {
     if (error instanceof PermissionDeniedError) {
       return (
@@ -48,8 +48,13 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     throw error;
   }
 
-  const { orgRole } = await auth();
-  const role = effectiveRole(orgRole);
+  const { role: sessionRole } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  const role = effectiveRole(sessionRole);
   if (!role) {
     return (
       <>
@@ -74,14 +79,13 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     status: parsedFilters.status,
     triggerType: parsedFilters.triggerType,
   };
-  // Clerk supplied the authenticated account identifier.
-  const accountId = (await requireOrg()) as ClerkOrgId;
+  // Authentication supplied the authenticated account identifier.
+  const accountId = (await requireAccount()) as AccountId;
   const { organisationId, orgQueryValue, summariesResult, runsResult } =
     await withTenantDb(
       accountId,
       async (db) => {
         const {
-          clerkOrgId,
           organisationId: scopedOrganisationId,
           orgQueryValue: preparedOrgQueryValue,
         } = await resolveActiveOrgPageContext(
@@ -91,16 +95,16 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
         );
         const preparedSummariesResult = await listTenantSummaries(
           {
+            accountId,
             actingRole: role,
-            clerkOrgId,
             organisationId: scopedOrganisationId,
           },
           db
         );
         const preparedRunsResult = await listRuns(
           {
+            accountId,
             actingRole: role,
-            clerkOrgId,
             filters,
             organisationId: scopedOrganisationId,
             pagination: {
@@ -151,10 +155,10 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
 function effectiveRole(
   role: string | null | undefined
 ): SyncMonitorRole | null {
-  if (role === "org:owner") {
+  if (role === "owner") {
     return "owner";
   }
-  if (role === "org:admin") {
+  if (role === "admin") {
     return "admin";
   }
   return null;

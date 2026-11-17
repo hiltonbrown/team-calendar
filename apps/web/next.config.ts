@@ -11,6 +11,10 @@ const { signInHref, signUpHref } = resolveAuthLinks({
 
 const webConfig: NextConfig = {
   ...config,
+  experimental: {
+    ...config.experimental,
+    turbopackPluginRuntimeStrategy: "childProcesses",
+  },
   pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
   async redirects() {
     return [

@@ -59,8 +59,8 @@ export const SupportSubmissionPayloadSchema = z.object({
 });
 
 export const SupportSubmissionContextSchema = z.object({
+  account_id: optionalTrimmedString(),
   app_version: optionalTrimmedString(),
-  clerk_org_id: optionalTrimmedString(),
   current_route: optionalTrimmedString(),
   environment: optionalTrimmedString(),
   organisation_id: optionalTrimmedString(),
@@ -174,7 +174,7 @@ function buildMetadataLines(input: SupportSubmissionIssueInput): string[] {
   const rows: [label: string, value: string | undefined][] = [
     ["Category", CATEGORY_LABELS[input.category]],
     ["Priority", PRIORITY_LABELS[input.priority]],
-    ["Clerk organisation ID", input.clerk_org_id],
+    ["Account ID", input.account_id],
     ["Organisation ID", input.organisation_id],
     ["User ID", input.user_id],
     ["Current route", input.current_route],

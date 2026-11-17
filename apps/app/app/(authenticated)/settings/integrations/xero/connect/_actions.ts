@@ -1,6 +1,8 @@
 "use server";
-import { requireRole } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
+
+import { hasPermission } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -51,8 +53,8 @@ export async function completeTenantSelectionAction(input: {
 > {
   assertNoTenantTransaction("completeTenantSelectionAction");
   const [admin, owner] = await Promise.all([
-    requireRole("org:admin"),
-    requireRole("org:owner"),
+    hasPermission({ xero: ["connect"] }),
+    hasPermission({ ownership: ["manage"] }),
   ]);
   if (!(admin || owner)) {
     return notAuthorised();
@@ -68,18 +70,27 @@ export async function completeTenantSelectionAction(input: {
       ok: false,
     };
   }
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
-  if (
-    !(orgId && user) ||
-    (orgRole !== "org:admin" && orgRole !== "org:owner")
-  ) {
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
+  if (!(sessionAccountId && user && can(sessionRole, { xero: ["manage"] }))) {
     return notAuthorised();
   }
-  const session = await withTenantDb(orgId, (db) =>
+  const session = await withTenantDb(sessionAccountId, (db) =>
     db.xeroOAuthSession.findFirst({
       select: { organisation_id: true },
       where: {
-        clerk_org_id: orgId,
+        account_id: sessionAccountId,
         created_by_user_id: user.id,
         id: parsed.data.sessionId,
       },
@@ -108,7 +119,7 @@ export async function completeTenantSelectionAction(input: {
     };
   }
   const result = await completeXeroTenantSelection({
-    clerkOrgId: orgId,
+    accountId: sessionAccountId,
     organisationId: session.organisation_id,
     sessionId: parsed.data.sessionId,
     tenantIds: [...new Set(parsed.data.tenantIds)],
@@ -126,7 +137,7 @@ export async function completeTenantSelectionAction(input: {
   }
   const successes = result.value.outcomes.filter((outcome) => outcome.ok);
   for (const outcome of successes) {
-    await recordSelectedConnection(orgId, user, outcome);
+    await recordSelectedConnection(sessionAccountId, user, outcome);
   }
   for (const path of [
     "/",
@@ -183,23 +194,21 @@ function notAuthorised(): Result<never, ActionError> {
 }
 
 async function recordSelectedConnection(
-  orgId: string,
-  user: { id: string; firstName: string | null; lastName: string | null },
+  sessionAccountId: string,
+  user: { id: string; name: string | null },
   outcome: Extract<XeroTenantSelectionOutcome, { ok: true }>
 ): Promise<void> {
   try {
-    await withTenantDb(orgId, (db) =>
+    await withTenantDb(sessionAccountId, (db) =>
       db.auditEvent.create({
         data: {
+          account_id: sessionAccountId,
           action:
             outcome.action === "reconnected"
               ? "xero.connection_reconnected"
               : "xero.connection_connected",
-          actor_display:
-            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-            user.id,
+          actor_display: user.name || user.id,
           actor_user_id: user.id,
-          clerk_org_id: orgId,
           entity_id: outcome.connectionId,
           entity_type: "xero_connection",
           metadata: {
@@ -216,13 +225,13 @@ async function recordSelectedConnection(
     /* Canonical connection audit is committed. */
   }
   await captureXeroConnected({
-    clerkOrgId: orgId,
+    accountId: sessionAccountId,
     connectionId: outcome.connectionId,
     organisationId: outcome.organisationId,
   });
   try {
     await dispatchInitialXeroSync({
-      clerkOrgId: orgId,
+      accountId: sessionAccountId,
       connectionId: outcome.connectionId,
       organisationId: outcome.organisationId,
       triggeredByUserId: user.id,

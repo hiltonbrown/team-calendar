@@ -9,14 +9,14 @@ export class TenantPhaseError extends Error {
 
 const activeScope = new AsyncLocalStorage<{
   active: boolean;
-  clerkOrgId: string;
+  accountId: string;
 }>();
 
 export const isTenantScopeActive = (): boolean =>
   activeScope.getStore()?.active ?? false;
 
 export const runInTenantScope = <T>(
-  scope: { active: boolean; clerkOrgId: string },
+  scope: { active: boolean; accountId: string },
   fn: () => T
 ): T => activeScope.run(scope, fn);
 

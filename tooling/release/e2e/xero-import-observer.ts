@@ -37,6 +37,7 @@ export const rawAuEnumerationSchema = z.strictObject({
   origin: z.literal("https://api.xero.com"),
 });
 export const canonicalImportSchema = z.strictObject({
+  accountId: z.string().min(1),
   balances: z.array(
     z.strictObject({
       leaveTypeId: z.string().min(1),
@@ -45,7 +46,6 @@ export const canonicalImportSchema = z.strictObject({
       value: z.number(),
     })
   ),
-  clerkOrgId: z.string().min(1),
   leaves: z.array(
     z.strictObject({
       endsAt: z.string(),
@@ -90,7 +90,7 @@ export function assertIndependentInitialImport(
   rawValue: unknown,
   canonicalValue: unknown,
   scope: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     xeroTenantId: string;
     verificationStartedAt: string;
@@ -111,7 +111,7 @@ export function assertIndependentInitialImport(
     expectedRunIds
   );
   if (
-    canonical.clerkOrgId !== scope.clerkOrgId ||
+    canonical.accountId !== scope.accountId ||
     canonical.organisationId !== scope.organisationId ||
     canonical.xeroTenantId !== scope.xeroTenantId
   ) {
@@ -214,9 +214,9 @@ export function assertIndependentInitialImport(
   };
 }
 const scheduledSchema = z.strictObject({
+  accountId: z.string().min(1),
   candidateSha: z.string().regex(/^[a-f0-9]{40}$/),
   canonicalRemoteIds: z.array(z.string().min(1)),
-  clerkOrgId: z.string().min(1),
   completedAt: z.iso.datetime(),
   dispatchedAt: z.iso.datetime(),
   eventId: z.string().min(1),
@@ -235,7 +235,7 @@ export function assertActualScheduledDiscovery(
   value: unknown,
   expected: {
     candidateSha: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     xeroTenantId: string;
     remoteId: string;
@@ -247,7 +247,7 @@ export function assertActualScheduledDiscovery(
   if (
     observation.xeroTenantId !== expected.xeroTenantId ||
     observation.candidateSha !== expected.candidateSha ||
-    observation.clerkOrgId !== expected.clerkOrgId ||
+    observation.accountId !== expected.accountId ||
     observation.organisationId !== expected.organisationId ||
     observation.providerRemoteId !== expected.remoteId ||
     Date.parse(observation.dispatchedAt) < Date.parse(expected.startedAt) ||

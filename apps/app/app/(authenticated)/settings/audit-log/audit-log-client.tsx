@@ -1,6 +1,5 @@
 "use client";
 
-import type { AuditEventDetail, AuditEventListItem } from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
   Card,
@@ -10,13 +9,36 @@ import {
 } from "@repo/design-system/components/ui/card";
 import { Input } from "@repo/design-system/components/ui/input";
 import { toast } from "@repo/design-system/components/ui/sonner";
+import { cn } from "@repo/design-system/lib/utils";
 import { useState, useTransition } from "react";
 import { SettingsSectionHeader } from "../components/settings-section-header";
 import { exportAuditLogCsvAction } from "./_actions";
 
+export interface CombinedAuditEventItem {
+  action: string;
+  actorDisplay: string;
+  actorUserId: string | null;
+  createdAt: Date;
+  entityId: string | null;
+  entityType: string | null;
+  hasBeforeAfter: boolean;
+  id: string;
+  ipAddress?: string | null;
+  metadata: Record<string, unknown>;
+  source: "auth" | "domain";
+  userAgent?: string | null;
+}
+
+export interface CombinedAuditEventDetail {
+  afterValue: unknown;
+  beforeValue: unknown;
+  id: string;
+  source: "auth" | "domain";
+}
+
 interface AuditLogClientProps {
-  details: Record<string, AuditEventDetail>;
-  events: AuditEventListItem[];
+  details: Record<string, CombinedAuditEventDetail>;
+  events: CombinedAuditEventItem[];
   filters: {
     actionPrefix: string;
     dateFrom: string;
@@ -24,7 +46,7 @@ interface AuditLogClientProps {
     searchEntityId: string;
   };
   nextCursor: null | string;
-  organisationId: string;
+  organisationId: string | null;
 }
 
 export const AuditLogClient = ({
@@ -38,6 +60,10 @@ export const AuditLogClient = ({
   const [exporting, setExporting] = useState(false);
 
   const exportCsv = () => {
+    if (!organisationId) {
+      toast.error("No payroll organisation available for CSV export.");
+      return;
+    }
     setExporting(true);
     startTransition(async () => {
       const result = await exportAuditLogCsvAction({
@@ -144,7 +170,19 @@ export const AuditLogClient = ({
               <summary className="cursor-pointer list-none">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium text-body-sm">{event.action}</p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "rounded px-1.5 py-0.5 font-medium text-xs",
+                          event.source === "auth"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {event.source === "auth" ? "Auth" : "Payroll"}
+                      </span>
+                      <p className="font-medium text-body-sm">{event.action}</p>
+                    </div>
                     <p className="text-label-md text-muted-foreground">
                       {event.entityType} · {event.entityId} ·{" "}
                       {event.actorDisplay}

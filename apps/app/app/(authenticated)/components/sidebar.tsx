@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@repo/auth/client";
+import { useSession } from "@repo/auth/client";
 import {
   Sidebar,
   SidebarContent,
@@ -35,8 +35,9 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
   const sidebar = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const orgId = getOrgFromSearchParams(searchParams);
-  const { orgRole } = useAuth();
+  const sessionAccountId = getOrgFromSearchParams(searchParams);
+  const { session } = useSession();
+  const role = session?.role ?? null;
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -106,7 +107,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.items
-                    .filter((item) => isNavItemVisible(item.roles, orgRole))
+                    .filter((item) => isNavItemVisible(item.permission, role))
                     .map((item) => (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
@@ -115,7 +116,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                           isActive={isActive(item.href)}
                           tooltip={item.title}
                         >
-                          <Link href={withOrg(item.href, orgId)}>
+                          <Link href={withOrg(item.href, sessionAccountId)}>
                             <item.icon
                               className="h-4 w-4 shrink-0"
                               strokeWidth={1.75}
@@ -142,7 +143,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                 isActive={pathname.startsWith(settingsNavItem.href)}
                 tooltip={settingsNavItem.title}
               >
-                <Link href={withOrg(settingsNavItem.href, orgId)}>
+                <Link href={withOrg(settingsNavItem.href, sessionAccountId)}>
                   <settingsNavItem.icon
                     className="h-4 w-4 shrink-0"
                     strokeWidth={1.75}

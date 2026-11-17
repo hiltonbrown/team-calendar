@@ -27,9 +27,9 @@ const SENSITIVE_PATTERNS = [
 ];
 
 const NON_SECRET_OPERATIONAL_KEYS = new Set([
-  "actingClerkOrgId",
+  "actingAccountId",
   "blockedOrigin",
-  "clerkOrgId",
+  "accountId",
   "columnNumber",
   "disposition",
   "documentOrigin",

@@ -27,7 +27,7 @@ export type AggregateNotificationPreference = {
 export type NotificationPreferenceMinAggregateOutputType = {
   id: string | null
   user_id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   notification_type: $Enums.notification_type | null
   in_app_enabled: boolean | null
@@ -39,7 +39,7 @@ export type NotificationPreferenceMinAggregateOutputType = {
 export type NotificationPreferenceMaxAggregateOutputType = {
   id: string | null
   user_id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   notification_type: $Enums.notification_type | null
   in_app_enabled: boolean | null
@@ -51,7 +51,7 @@ export type NotificationPreferenceMaxAggregateOutputType = {
 export type NotificationPreferenceCountAggregateOutputType = {
   id: number
   user_id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   notification_type: number
   in_app_enabled: number
@@ -65,7 +65,7 @@ export type NotificationPreferenceCountAggregateOutputType = {
 export type NotificationPreferenceMinAggregateInputType = {
   id?: true
   user_id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   notification_type?: true
   in_app_enabled?: true
@@ -77,7 +77,7 @@ export type NotificationPreferenceMinAggregateInputType = {
 export type NotificationPreferenceMaxAggregateInputType = {
   id?: true
   user_id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   notification_type?: true
   in_app_enabled?: true
@@ -89,7 +89,7 @@ export type NotificationPreferenceMaxAggregateInputType = {
 export type NotificationPreferenceCountAggregateInputType = {
   id?: true
   user_id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   notification_type?: true
   in_app_enabled?: true
@@ -174,7 +174,7 @@ export type NotificationPreferenceGroupByArgs<ExtArgs extends runtime.Types.Exte
 export type NotificationPreferenceGroupByOutputType = {
   id: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   notification_type: $Enums.notification_type
   in_app_enabled: boolean
@@ -207,7 +207,7 @@ export type NotificationPreferenceWhereInput = {
   NOT?: Prisma.NotificationPreferenceWhereInput | Prisma.NotificationPreferenceWhereInput[]
   id?: Prisma.UuidFilter<"NotificationPreference"> | string
   user_id?: Prisma.StringFilter<"NotificationPreference"> | string
-  clerk_org_id?: Prisma.StringFilter<"NotificationPreference"> | string
+  account_id?: Prisma.StringFilter<"NotificationPreference"> | string
   organisation_id?: Prisma.UuidFilter<"NotificationPreference"> | string
   notification_type?: Prisma.Enumnotification_typeFilter<"NotificationPreference"> | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFilter<"NotificationPreference"> | boolean
@@ -220,7 +220,7 @@ export type NotificationPreferenceWhereInput = {
 export type NotificationPreferenceOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   user_id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_type?: Prisma.SortOrder
   in_app_enabled?: Prisma.SortOrder
@@ -237,7 +237,7 @@ export type NotificationPreferenceWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.NotificationPreferenceWhereInput[]
   NOT?: Prisma.NotificationPreferenceWhereInput | Prisma.NotificationPreferenceWhereInput[]
   user_id?: Prisma.StringFilter<"NotificationPreference"> | string
-  clerk_org_id?: Prisma.StringFilter<"NotificationPreference"> | string
+  account_id?: Prisma.StringFilter<"NotificationPreference"> | string
   organisation_id?: Prisma.UuidFilter<"NotificationPreference"> | string
   notification_type?: Prisma.Enumnotification_typeFilter<"NotificationPreference"> | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFilter<"NotificationPreference"> | boolean
@@ -250,7 +250,7 @@ export type NotificationPreferenceWhereUniqueInput = Prisma.AtLeast<{
 export type NotificationPreferenceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   user_id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_type?: Prisma.SortOrder
   in_app_enabled?: Prisma.SortOrder
@@ -268,7 +268,7 @@ export type NotificationPreferenceScalarWhereWithAggregatesInput = {
   NOT?: Prisma.NotificationPreferenceScalarWhereWithAggregatesInput | Prisma.NotificationPreferenceScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"NotificationPreference"> | string
   user_id?: Prisma.StringWithAggregatesFilter<"NotificationPreference"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"NotificationPreference"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"NotificationPreference"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"NotificationPreference"> | string
   notification_type?: Prisma.Enumnotification_typeWithAggregatesFilter<"NotificationPreference"> | $Enums.notification_type
   in_app_enabled?: Prisma.BoolWithAggregatesFilter<"NotificationPreference"> | boolean
@@ -280,7 +280,7 @@ export type NotificationPreferenceScalarWhereWithAggregatesInput = {
 export type NotificationPreferenceCreateInput = {
   id?: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   notification_type: $Enums.notification_type
   in_app_enabled?: boolean
   email_enabled?: boolean
@@ -292,7 +292,7 @@ export type NotificationPreferenceCreateInput = {
 export type NotificationPreferenceUncheckedCreateInput = {
   id?: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   notification_type: $Enums.notification_type
   in_app_enabled?: boolean
@@ -304,7 +304,7 @@ export type NotificationPreferenceUncheckedCreateInput = {
 export type NotificationPreferenceUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   email_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -316,7 +316,7 @@ export type NotificationPreferenceUpdateInput = {
 export type NotificationPreferenceUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -328,7 +328,7 @@ export type NotificationPreferenceUncheckedUpdateInput = {
 export type NotificationPreferenceCreateManyInput = {
   id?: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   notification_type: $Enums.notification_type
   in_app_enabled?: boolean
@@ -340,7 +340,7 @@ export type NotificationPreferenceCreateManyInput = {
 export type NotificationPreferenceUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   email_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -351,7 +351,7 @@ export type NotificationPreferenceUpdateManyMutationInput = {
 export type NotificationPreferenceUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -379,7 +379,7 @@ export type NotificationPreferenceUser_idOrganisation_idNotification_typeCompoun
 export type NotificationPreferenceCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   user_id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_type?: Prisma.SortOrder
   in_app_enabled?: Prisma.SortOrder
@@ -391,7 +391,7 @@ export type NotificationPreferenceCountOrderByAggregateInput = {
 export type NotificationPreferenceMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   user_id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_type?: Prisma.SortOrder
   in_app_enabled?: Prisma.SortOrder
@@ -403,7 +403,7 @@ export type NotificationPreferenceMaxOrderByAggregateInput = {
 export type NotificationPreferenceMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   user_id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   notification_type?: Prisma.SortOrder
   in_app_enabled?: Prisma.SortOrder
@@ -457,7 +457,7 @@ export type NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedIn
 export type NotificationPreferenceCreateWithoutOrganisationInput = {
   id?: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   notification_type: $Enums.notification_type
   in_app_enabled?: boolean
   email_enabled?: boolean
@@ -468,7 +468,7 @@ export type NotificationPreferenceCreateWithoutOrganisationInput = {
 export type NotificationPreferenceUncheckedCreateWithoutOrganisationInput = {
   id?: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   notification_type: $Enums.notification_type
   in_app_enabled?: boolean
   email_enabled?: boolean
@@ -508,7 +508,7 @@ export type NotificationPreferenceScalarWhereInput = {
   NOT?: Prisma.NotificationPreferenceScalarWhereInput | Prisma.NotificationPreferenceScalarWhereInput[]
   id?: Prisma.UuidFilter<"NotificationPreference"> | string
   user_id?: Prisma.StringFilter<"NotificationPreference"> | string
-  clerk_org_id?: Prisma.StringFilter<"NotificationPreference"> | string
+  account_id?: Prisma.StringFilter<"NotificationPreference"> | string
   organisation_id?: Prisma.UuidFilter<"NotificationPreference"> | string
   notification_type?: Prisma.Enumnotification_typeFilter<"NotificationPreference"> | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFilter<"NotificationPreference"> | boolean
@@ -520,7 +520,7 @@ export type NotificationPreferenceScalarWhereInput = {
 export type NotificationPreferenceCreateManyOrganisationInput = {
   id?: string
   user_id: string
-  clerk_org_id: string
+  account_id: string
   notification_type: $Enums.notification_type
   in_app_enabled?: boolean
   email_enabled?: boolean
@@ -531,7 +531,7 @@ export type NotificationPreferenceCreateManyOrganisationInput = {
 export type NotificationPreferenceUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   email_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -542,7 +542,7 @@ export type NotificationPreferenceUpdateWithoutOrganisationInput = {
 export type NotificationPreferenceUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   email_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -553,7 +553,7 @@ export type NotificationPreferenceUncheckedUpdateWithoutOrganisationInput = {
 export type NotificationPreferenceUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   user_id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   notification_type?: Prisma.Enumnotification_typeFieldUpdateOperationsInput | $Enums.notification_type
   in_app_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   email_enabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -566,7 +566,7 @@ export type NotificationPreferenceUncheckedUpdateManyWithoutOrganisationInput = 
 export type NotificationPreferenceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   user_id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_type?: boolean
   in_app_enabled?: boolean
@@ -579,7 +579,7 @@ export type NotificationPreferenceSelect<ExtArgs extends runtime.Types.Extension
 export type NotificationPreferenceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   user_id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_type?: boolean
   in_app_enabled?: boolean
@@ -592,7 +592,7 @@ export type NotificationPreferenceSelectCreateManyAndReturn<ExtArgs extends runt
 export type NotificationPreferenceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   user_id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_type?: boolean
   in_app_enabled?: boolean
@@ -605,7 +605,7 @@ export type NotificationPreferenceSelectUpdateManyAndReturn<ExtArgs extends runt
 export type NotificationPreferenceSelectScalar = {
   id?: boolean
   user_id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   notification_type?: boolean
   in_app_enabled?: boolean
@@ -614,7 +614,7 @@ export type NotificationPreferenceSelectScalar = {
   updated_at?: boolean
 }
 
-export type NotificationPreferenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "user_id" | "clerk_org_id" | "organisation_id" | "notification_type" | "in_app_enabled" | "email_enabled" | "created_at" | "updated_at", ExtArgs["result"]["notificationPreference"]>
+export type NotificationPreferenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "user_id" | "account_id" | "organisation_id" | "notification_type" | "in_app_enabled" | "email_enabled" | "created_at" | "updated_at", ExtArgs["result"]["notificationPreference"]>
 export type NotificationPreferenceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
 }
@@ -633,7 +633,7 @@ export type $NotificationPreferencePayload<ExtArgs extends runtime.Types.Extensi
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     user_id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     notification_type: $Enums.notification_type
     in_app_enabled: boolean
@@ -1066,7 +1066,7 @@ export interface Prisma__NotificationPreferenceClient<T, Null = never, ExtArgs e
 export interface NotificationPreferenceFieldRefs {
   readonly id: Prisma.FieldRef<"NotificationPreference", 'String'>
   readonly user_id: Prisma.FieldRef<"NotificationPreference", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"NotificationPreference", 'String'>
+  readonly account_id: Prisma.FieldRef<"NotificationPreference", 'String'>
   readonly organisation_id: Prisma.FieldRef<"NotificationPreference", 'String'>
   readonly notification_type: Prisma.FieldRef<"NotificationPreference", 'notification_type'>
   readonly in_app_enabled: Prisma.FieldRef<"NotificationPreference", 'Boolean'>

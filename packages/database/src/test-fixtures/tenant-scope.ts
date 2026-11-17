@@ -4,7 +4,7 @@ export const tenantTestAccount = (input: unknown): string => {
     return input;
   }
   if (typeof input === "object" && input !== null) {
-    for (const key of ["clerkOrgId", "clerk_org_id"] as const) {
+    for (const key of ["accountId", "account_id"] as const) {
       if (key in input) {
         const value = Reflect.get(input, key);
         if (typeof value === "string" && value.trim()) {

@@ -1,8 +1,4 @@
-import type {
-  ClerkOrgId,
-  OrganisationId,
-  ResolveHolidayData,
-} from "@repo/core";
+import type { AccountId, OrganisationId, ResolveHolidayData } from "@repo/core";
 import { startOfUtcDay, toDateOnly } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
@@ -15,7 +11,7 @@ import { scopedQuery } from "../tenant-query";
  */
 export async function loadHolidayResolutionData(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     /** Inclusive YYYY-MM-DD. */
     from: string;
     organisationId: OrganisationId;
@@ -25,15 +21,15 @@ export async function loadHolidayResolutionData(
   db: TenantDb
 ): Promise<ResolveHolidayData | null> {
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
-    const scope = scopedQuery(input.clerkOrgId, input.organisationId);
+    const scope = scopedQuery(input.accountId, input.organisationId);
     const organisation = await client.organisation.findFirst({
       select: { country_code: true, region_code: true },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         id: input.organisationId,
       },
     });

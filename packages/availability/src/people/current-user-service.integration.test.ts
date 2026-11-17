@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import type { AccountId, OrganisationId } from "@repo/core";
 import { employment_type, source_system } from "@repo/database/generated/enums";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { withTenantResult as withTestTenantResult } from "@repo/database/tenant-db";
@@ -20,10 +20,10 @@ const tenantA = {
 const tenantB = {
   ...fixture.tenants[1],
 };
-if (!(tenantA.clerkOrgId && tenantB.clerkOrgId)) {
+if (!(tenantA.accountId && tenantB.accountId)) {
   throw new Error("Current-user live fixture tenants were not allocated");
 }
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const testAccountIds = [tenantA.accountId, tenantB.accountId];
 
 describe("current-user-service integration", () => {
   beforeEach(async () => {
@@ -31,13 +31,13 @@ describe("current-user-service integration", () => {
     await database.organisation.createMany({
       data: [
         {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           country_code: "AU",
           id: tenantA.organisationId,
           name: "Current user integration A",
         },
         {
-          clerk_org_id: tenantB.clerkOrgId,
+          account_id: tenantB.accountId,
           country_code: "AU",
           id: tenantB.organisationId,
           name: "Current user integration B",
@@ -50,7 +50,7 @@ describe("current-user-service integration", () => {
     await cleanTestData();
     await expect(
       database.organisation.count({
-        where: { clerk_org_id: { in: testClerkOrgIds } },
+        where: { account_id: { in: testAccountIds } },
       })
     ).resolves.toBe(0);
     await database.$disconnect();
@@ -68,9 +68,9 @@ describe("current-user-service integration", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_case_match",
             displayName: "Case Match",
             email: " case.match@example.com ",
+            userId: "user_case_match",
           },
           db
         )
@@ -79,16 +79,16 @@ describe("current-user-service integration", () => {
     expect(result).toMatchObject({ ok: true, value: { id: candidateA.id } });
     await expect(
       database.person.findUnique({
-        select: { clerk_user_id: true },
+        select: { user_id: true },
         where: { id: candidateB.id },
       })
-    ).resolves.toEqual({ clerk_user_id: null });
+    ).resolves.toEqual({ user_id: null });
   });
 
   test("accepts the final authoritative seat and rejects the next person", async () => {
     await database.person.createMany({
       data: Array.from({ length: 8 }, (_, index) => ({
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: `existing-${index}@example.com`,
         employment_type: employment_type.employee,
         first_name: "Existing",
@@ -104,8 +104,8 @@ describe("current-user-service integration", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_ninth",
             email: "ninth@example.com",
+            userId: "user_ninth",
           },
           db
         )
@@ -116,8 +116,8 @@ describe("current-user-service integration", () => {
         ensureCurrentUserPerson(
           contextFor(tenantA),
           {
-            clerkUserId: "user_tenth",
             email: "tenth@example.com",
+            userId: "user_tenth",
           },
           db
         )
@@ -134,18 +134,18 @@ describe("current-user-service integration", () => {
     await expect(
       database.person.count({
         where: {
+          account_id: tenantA.accountId,
           archived_at: null,
-          clerk_org_id: tenantA.clerkOrgId,
           is_active: true,
         },
       })
     ).resolves.toBe(9);
   });
 
-  test("returns one winner for concurrent provisioning of the same Clerk user", async () => {
+  test("returns one winner for concurrent provisioning of the same user", async () => {
     const input = {
-      clerkUserId: "user_concurrent",
       displayName: "Concurrent User",
+      userId: "user_concurrent",
     };
 
     const results = await Promise.all([
@@ -165,9 +165,9 @@ describe("current-user-service integration", () => {
     await expect(
       database.person.count({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
-          clerk_user_id: input.clerkUserId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
+          user_id: input.userId,
         },
       })
     ).resolves.toBe(1);
@@ -177,7 +177,7 @@ describe("current-user-service integration", () => {
 function contextFor(input: typeof tenantA): TenantContext {
   return {
     // Fixed integration IDs match the branded runtime representation.
-    clerkOrgId: input.clerkOrgId as ClerkOrgId,
+    accountId: input.accountId as AccountId,
     organisationId: input.organisationId as OrganisationId,
   };
 }
@@ -190,7 +190,7 @@ function createPerson(
 ) {
   return database.person.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       email,
       employment_type: "employee",
       first_name: firstName,
@@ -202,13 +202,13 @@ function createPerson(
 }
 
 async function cleanTestData() {
-  await database.clerkOrgSubscription.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+  await database.accountSubscription.deleteMany({
+    where: { account_id: { in: testAccountIds } },
   });
   await database.person.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
   await database.organisation.deleteMany({
-    where: { clerk_org_id: { in: testClerkOrgIds } },
+    where: { account_id: { in: testAccountIds } },
   });
 }

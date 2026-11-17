@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getAuthoritativeUsageCount: vi.fn(),
   getPlanLimits: vi.fn(),
-  getSubscriptionForOrg: vi.fn(),
+  getSubscriptionForAccount: vi.fn(),
 }));
 
 vi.mock("@repo/database/tenant-client", () => ({
@@ -25,24 +25,24 @@ vi.mock("@repo/database", async () => ({
     name: `${key.charAt(0).toUpperCase()}${key.slice(1)}`,
   }),
   getPlanLimits: mocks.getPlanLimits,
-  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  getSubscriptionForAccount: mocks.getSubscriptionForAccount,
   limitTypes: ["payroll_entities", "seats", "feeds"],
 }));
 
 const { getBillingSummary } = await import("./billing-service");
 
 const baseInput = {
+  accountId: "org_1",
   actingRole: "owner" as const,
   actingUserId: "user_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 
 describe("billing-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getSubscriptionForOrg.mockResolvedValue({
-      clerk_org_id: "org_1",
+    mocks.getSubscriptionForAccount.mockResolvedValue({
+      account_id: "org_1",
       current_period_end: new Date("2026-05-01T00:00:00.000Z"),
       plan_key: "premium",
       status: "active",
@@ -53,7 +53,7 @@ describe("billing-service", () => {
       seats: 50,
     });
     mocks.getAuthoritativeUsageCount.mockImplementation(
-      (_clerkOrgId: string, limitType: string) =>
+      (_accountId: string, limitType: string) =>
         Promise.resolve({ feeds: 0, payroll_entities: 1, seats: 8 }[limitType])
     );
   });
@@ -152,7 +152,7 @@ describe("billing-service", () => {
   });
 
   it("defaults to the basic plan when no subscription row exists", async () => {
-    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getSubscriptionForAccount.mockResolvedValue(null);
     mocks.getPlanLimits.mockResolvedValue({
       feeds: 2,
       payroll_entities: 1,
@@ -177,7 +177,7 @@ describe("billing-service", () => {
       seats: 10,
     });
     mocks.getAuthoritativeUsageCount.mockImplementation(
-      (_clerkOrgId: string, limitType: string) =>
+      (_accountId: string, limitType: string) =>
         Promise.resolve({ feeds: 5, payroll_entities: 1, seats: 10 }[limitType])
     );
 
@@ -194,7 +194,7 @@ describe("billing-service", () => {
 
   it("treats an unlimited (-1) limit as never over-limit", async () => {
     mocks.getAuthoritativeUsageCount.mockImplementation(
-      (_clerkOrgId: string, limitType: string) =>
+      (_accountId: string, limitType: string) =>
         Promise.resolve(
           { feeds: 9999, payroll_entities: 1, seats: 8 }[limitType]
         )

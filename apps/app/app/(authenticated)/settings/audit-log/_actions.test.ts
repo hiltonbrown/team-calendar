@@ -58,15 +58,15 @@ vi.mock("@repo/database", async () => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   exportAuditLogCsv: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   exportAuditLogCsv: mocks.exportAuditLogCsv,
@@ -78,17 +78,17 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 const { exportAuditLogCsvAction } = await import("./_actions");
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 
 describe("settings audit-log server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.exportAuditLogCsv.mockResolvedValue({
       ok: true,
@@ -101,7 +101,7 @@ describe("settings audit-log server actions", () => {
 
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
 
       const result = await exportAuditLogCsvAction({
         filters: {},
@@ -119,9 +119,9 @@ describe("settings audit-log server actions", () => {
     });
 
     it("rejects non-admin roles (manager, viewer)", async () => {
-      mocks.auth.mockResolvedValue({
-        orgId: "org_123",
-        orgRole: "org:manager",
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "manager",
       });
 
       const result = await exportAuditLogCsvAction({
@@ -152,7 +152,7 @@ describe("settings audit-log server actions", () => {
       expect(mocks.exportAuditLogCsv).not.toHaveBeenCalled();
     });
 
-    it("scopes export call to clerkOrgId and organisationId", async () => {
+    it("scopes export call to accountId and organisationId", async () => {
       await exportAuditLogCsvAction({
         filters: {},
         organisationId,
@@ -160,9 +160,9 @@ describe("settings audit-log server actions", () => {
 
       expect(mocks.exportAuditLogCsv).toHaveBeenCalledWith(
         {
+          accountId,
           actingRole: "admin",
           actingUserId: userId,
-          clerkOrgId,
           filters: {},
           organisationId,
         },

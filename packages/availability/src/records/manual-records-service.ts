@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { TENANT_READ_TRANSACTION_OPTIONS } from "@repo/database";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import "server-only";
@@ -136,7 +137,7 @@ function mergeManualAvailabilityPatch(
 }
 
 export interface ManualAvailabilityActor {
-  orgRole?: string | null;
+  role?: string | null;
   userId: string;
 }
 
@@ -206,7 +207,7 @@ export async function listAvailabilityRecords(
     | undefined,
   db: TenantDb
 ): Promise<AvailabilityRecordView[]> {
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof listAvailabilityRecords> => {
@@ -214,7 +215,7 @@ export async function listAvailabilityRecords(
       include: { person: true },
       orderBy: [{ starts_at: "asc" }, { title: "asc" }],
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
         ...(range?.personId ? { person_id: range.personId } : {}),
         ...(range?.startsBefore
@@ -226,7 +227,7 @@ export async function listAvailabilityRecords(
 
     return records.map(mapRecord);
   };
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   return await run(db);
 }
 
@@ -246,7 +247,7 @@ export async function createManualAvailability(
   actor: ManualAvailabilityActor,
   db: TenantDb
 ): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> {
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof createManualAvailability> => {
@@ -263,7 +264,7 @@ export async function createManualAvailability(
 
     const person = await client.person.findFirst({
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
         id: parsed.data.personId,
       },
@@ -286,7 +287,7 @@ export async function createManualAvailability(
     const duplicate = await client.availabilityRecord.findFirst({
       select: { id: true },
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
         ends_at: parsed.data.endsAt,
         person_id: parsed.data.personId,
@@ -308,14 +309,14 @@ export async function createManualAvailability(
     try {
       const record = await client.availabilityRecord.create({
         data: {
+          account_id: tenant.accountId,
           all_day: parsed.data.allDay,
           approval_status: "approved",
           approved_at: new Date(),
-          clerk_org_id: tenant.clerkOrgId,
           contactability: parsed.data.contactability,
           created_by_user_id: actor.userId,
           derived_uid_key: deriveAvailabilityUidKey({
-            clerkOrgId: tenant.clerkOrgId,
+            accountId: tenant.accountId,
             endsAt: parsed.data.endsAt,
             organisationId: tenant.organisationId,
             personId: parsed.data.personId,
@@ -358,7 +359,7 @@ export async function createManualAvailability(
     }
   };
   return await (async () => {
-    assertTenantDb(db, tenant.clerkOrgId);
+    assertTenantDb(db, tenant.accountId);
     return await run(db);
   })();
 }
@@ -370,7 +371,7 @@ export async function updateManualAvailability(
   actor: ManualAvailabilityActor,
   db: TenantDb
 ): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> {
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof updateManualAvailability> => {
@@ -394,9 +395,9 @@ export async function updateManualAvailability(
         notes_internal: true,
         person: {
           select: {
-            clerk_user_id: true,
             id: true,
             manager_person_id: true,
+            user_id: true,
           },
         },
         person_id: true,
@@ -408,7 +409,7 @@ export async function updateManualAvailability(
         working_location: true,
       },
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
         id: recordId,
         source_type: "manual",
@@ -453,7 +454,7 @@ export async function updateManualAvailability(
     const duplicate = await client.availabilityRecord.findFirst({
       select: { id: true },
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
         ends_at: merged.data.endsAt,
         id: { not: recordId },
@@ -490,7 +491,7 @@ export async function updateManualAvailability(
         },
         include: { person: true },
         where: {
-          ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+          ...scopedQuery(tenant.accountId, tenant.organisationId),
           archived_at: null,
           id: recordId,
           source_type: "manual",
@@ -513,7 +514,7 @@ export async function updateManualAvailability(
     }
   };
   return await (async () => {
-    assertTenantDb(db, tenant.clerkOrgId);
+    assertTenantDb(db, tenant.accountId);
     return await run(db);
   })();
 }
@@ -524,7 +525,7 @@ export async function archiveManualAvailability(
   actor: ManualAvailabilityActor,
   db: TenantDb
 ): Promise<Result<void, ManualAvailabilityServiceError>> {
-  assertTenantDb(db, tenant.clerkOrgId);
+  assertTenantDb(db, tenant.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof archiveManualAvailability> => {
@@ -532,14 +533,14 @@ export async function archiveManualAvailability(
       select: {
         person: {
           select: {
-            clerk_user_id: true,
             id: true,
             manager_person_id: true,
+            user_id: true,
           },
         },
       },
       where: {
-        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        ...scopedQuery(tenant.accountId, tenant.organisationId),
         archived_at: null,
         id: recordId,
         source_type: "manual",
@@ -576,7 +577,7 @@ export async function archiveManualAvailability(
     return { ok: true, value: undefined };
   };
   return await (async () => {
-    assertTenantDb(db, tenant.clerkOrgId);
+    assertTenantDb(db, tenant.accountId);
     return await run(db);
   })();
 }
@@ -587,12 +588,12 @@ export async function materialisePublication(
 ): Promise<void> {
   assertNoTenantTransaction("materialisePublication");
   const phaseInput1 = {
+    accountId: tenant.accountId,
     availabilityRecordId,
-    clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
   } satisfies Parameters<typeof materialiseAvailabilityPublication>[0];
   const result = await withTenantResult(
-    phaseInput1.clerkOrgId,
+    phaseInput1.accountId,
     (db) => materialiseAvailabilityPublication(phaseInput1, db),
     TENANT_READ_TRANSACTION_OPTIONS
   );
@@ -601,8 +602,8 @@ export async function materialisePublication(
     // feed projection rather than failing the write; it is corrected on the next
     // successful materialisation for the record.
     log.error("Failed to materialise availability publication", {
+      accountId: tenant.accountId,
       availabilityRecordId,
-      clerkOrgId: tenant.clerkOrgId,
       error: result.error.message,
       organisationId: tenant.organisationId,
     });
@@ -614,31 +615,31 @@ async function authoriseManualAvailabilityActor(
   tenant: TenantContext,
   actor: ManualAvailabilityActor,
   targetPerson: {
-    clerk_user_id: string | null;
+    user_id: string | null;
     id: string;
     manager_person_id: string | null;
   },
   db: TenantDb
 ): Promise<Result<void, ManualAvailabilityServiceError>> {
-  if (isAdminOrOwner(actor.orgRole)) {
+  if (isAdminOrOwner(actor.role)) {
     return { ok: true, value: undefined };
   }
 
   const actingPerson = await db.person.findFirst({
     select: { id: true },
     where: {
+      account_id: tenant.accountId,
       archived_at: null,
-      clerk_org_id: tenant.clerkOrgId,
-      clerk_user_id: actor.userId,
       organisation: {
+        account_id: tenant.accountId,
         archived_at: null,
-        clerk_org_id: tenant.clerkOrgId,
         is_active: true,
       },
+      user_id: actor.userId,
     },
   });
 
-  const isOwner = targetPerson.clerk_user_id === actor.userId;
+  const isOwner = targetPerson.user_id === actor.userId;
   const isDirectManager = targetPerson.manager_person_id === actingPerson?.id;
 
   if (isOwner || isDirectManager) {
@@ -655,5 +656,5 @@ async function authoriseManualAvailabilityActor(
 }
 
 function isAdminOrOwner(role?: string | null): boolean {
-  return role === "org:admin" || role === "org:owner";
+  return hasPermission(role, { manualAvailability: ["manageAll"] });
 }

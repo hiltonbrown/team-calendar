@@ -1,6 +1,6 @@
 import type {
+  AccountId,
   AvailabilityRecordId,
-  ClerkOrgId,
   FeedId,
   OrganisationId,
   PersonId,
@@ -22,7 +22,7 @@ vi.mock("../tenant-client", () => ({
   referenceDatabase: { $transaction: state.transaction },
 }));
 vi.mock("./billing", () => ({
-  getUnresolvedStripeEventsForOrg: async () => [],
+  getUnresolvedStripeEventsForAccount: async () => [],
 }));
 vi.mock("../system-client", () => ({
   systemDatabase: { xeroAuthorisation: { findUnique: async () => null } },
@@ -70,7 +70,7 @@ import {
 import {
   getOrganisationById as organisationsGetOrganisationById,
   hasXeroConnection as organisationsHasXeroConnection,
-  listOrganisationsByClerkOrg as organisationsListOrganisationsByClerkOrg,
+  listOrganisationsByAccount as organisationsListOrganisationsByAccount,
 } from "./organisations";
 import {
   acquireSubmitRecoverySideEffects as operationsAcquireSubmitRecoverySideEffects,
@@ -117,12 +117,12 @@ import {
 } from "./xero-sync-cursors";
 
 // These brands model validated identifiers at the server entry point.
-const account = "account-A" as ClerkOrgId;
+const account = "account-A" as AccountId;
 const organisation = "11111111-1111-4111-8111-111111111111" as OrganisationId;
 const person = "22222222-2222-4222-8222-222222222222" as PersonId;
 const feed = "33333333-3333-4333-8333-333333333333" as FeedId;
 const record = "44444444-4444-4444-8444-444444444444" as AvailabilityRecordId;
-const scope = { clerkOrgId: account, organisationId: organisation };
+const scope = { accountId: account, organisationId: organisation };
 const operation = {
   ...scope,
   action: "approve" as const,
@@ -137,7 +137,7 @@ const range = {
 const cases: { name: string; run: (db: TenantDb) => Promise<unknown> }[] = [
   {
     name: "list organisations",
-    run: (db) => organisationsListOrganisationsByClerkOrg(account, db),
+    run: (db) => organisationsListOrganisationsByAccount(account, db),
   },
   {
     name: "get organisation",
@@ -550,7 +550,7 @@ beforeEach(() => {
         findFirstOrThrow: async () => {
           state.queries();
           return await {
-            clerk_org_id: account,
+            account_id: account,
             id: "settings-1",
             organisation_id: organisation,
           };
@@ -566,7 +566,7 @@ beforeEach(() => {
         upsert: async () => {
           state.queries();
           return await {
-            clerk_org_id: account,
+            account_id: account,
             created_at: new Date(),
             email_enabled: true,
             id: "preference-1",

@@ -1,7 +1,8 @@
+import { hasPermission } from "@repo/auth/permissions";
 import { log } from "@repo/observability/log";
 import "server-only";
 
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { assertTenantDb, scopedQuery, type TenantDb } from "@repo/database";
 import { z } from "zod";
 import type { AlternativeContactSnapshot, PeopleRole } from "./people-service";
@@ -16,10 +17,10 @@ export type AlternativeContactServiceError =
 
 const RoleSchema = z.enum(["admin", "manager", "owner", "viewer"]);
 const BaseInputSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable(),
   actingRole: RoleSchema,
   actingUserId: z.string().min(1).optional(),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -71,7 +72,7 @@ export async function addAlternativeContact(
     actingPersonId: null | string;
     actingRole: PeopleRole;
     actingUserId?: string;
-    clerkOrgId: string;
+    accountId: string;
     email?: string;
     name: string;
     notes?: string;
@@ -82,7 +83,7 @@ export async function addAlternativeContact(
   },
   db: TenantDb
 ): Promise<Result<AlternativeContactSnapshot, AlternativeContactServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof addAlternativeContact> => {
@@ -91,7 +92,7 @@ export async function addAlternativeContact(
       return validationError(parsed.error);
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const person = await client.person.findFirst({
@@ -121,7 +122,7 @@ export async function addAlternativeContact(
       });
       const created = await tx.alternativeContact.create({
         data: {
-          clerk_org_id: parsed.data.clerkOrgId,
+          account_id: parsed.data.accountId,
           display_order: (lastContact?.display_order ?? -1) + 1,
           email: emptyToNull(parsed.data.email),
           name: parsed.data.name,
@@ -151,7 +152,7 @@ export async function addAlternativeContact(
     return { ok: true, value: toAlternativeContactSnapshot(contact) };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -161,7 +162,7 @@ export async function updateAlternativeContact(
     actingPersonId: null | string;
     actingRole: PeopleRole;
     actingUserId?: string;
-    clerkOrgId: string;
+    accountId: string;
     contactId: string;
     organisationId: string;
     patch: {
@@ -174,7 +175,7 @@ export async function updateAlternativeContact(
   },
   db: TenantDb
 ): Promise<Result<AlternativeContactSnapshot, AlternativeContactServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof updateAlternativeContact> => {
@@ -183,7 +184,7 @@ export async function updateAlternativeContact(
       return validationError(parsed.error);
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const existing = await loadContact(scoped, parsed.data.contactId, client);
@@ -252,7 +253,7 @@ export async function updateAlternativeContact(
     return { ok: true, value: toAlternativeContactSnapshot(updated) };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -262,13 +263,13 @@ export async function deleteAlternativeContact(
     actingPersonId: null | string;
     actingRole: PeopleRole;
     actingUserId?: string;
-    clerkOrgId: string;
+    accountId: string;
     contactId: string;
     organisationId: string;
   },
   db: TenantDb
 ): Promise<Result<{ personId: string }, AlternativeContactServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof deleteAlternativeContact> => {
@@ -277,7 +278,7 @@ export async function deleteAlternativeContact(
       return validationError(parsed.error);
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const existing = await loadContact(scoped, parsed.data.contactId, client);
@@ -327,7 +328,7 @@ export async function deleteAlternativeContact(
     return { ok: true, value: { personId: existing.person_id } };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -337,14 +338,14 @@ export async function reorderAlternativeContacts(
     actingPersonId: null | string;
     actingRole: PeopleRole;
     actingUserId?: string;
-    clerkOrgId: string;
+    accountId: string;
     orderedContactIds: string[];
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<Result<{ personId: string }, AlternativeContactServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof reorderAlternativeContacts> => {
@@ -353,7 +354,7 @@ export async function reorderAlternativeContacts(
       return validationError(parsed.error);
     }
     const scoped = scopedQuery(
-      parsed.data.clerkOrgId as ClerkOrgId,
+      parsed.data.accountId as AccountId,
       parsed.data.organisationId as OrganisationId
     );
     const person = await client.person.findFirst({
@@ -422,7 +423,7 @@ export async function reorderAlternativeContacts(
     return { ok: true, value: { personId: person.id } };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }
@@ -439,7 +440,7 @@ const alternativeContactSelect = {
 } as const;
 
 async function loadContact(
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId },
+  scoped: { account_id: AccountId; organisation_id: OrganisationId },
   contactId: string,
   db: TenantDb
 ) {
@@ -466,8 +467,7 @@ function canMutate(
   actingRole: PeopleRole
 ): boolean {
   return (
-    actingRole === "admin" ||
-    actingRole === "owner" ||
+    hasPermission(actingRole, { people: ["manage"] }) ||
     actingPersonId === person.id ||
     (Boolean(actingPersonId) && person.manager_person_id === actingPersonId)
   );
@@ -477,7 +477,7 @@ function auditData(
   input: {
     actingPersonId: null | string;
     actingUserId?: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   },
   action: string,
@@ -486,9 +486,9 @@ function auditData(
   payload: Record<string, unknown>
 ) {
   return {
+    account_id: input.accountId,
     action,
     actor_user_id: input.actingUserId ?? null,
-    clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
     payload: {
       ...payload,
@@ -521,23 +521,23 @@ function toAlternativeContactSnapshot(contact: {
 
 async function personNotFound(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     personId: string;
   },
   db: TenantDb
 ): Promise<Result<never, AlternativeContactServiceError>> {
   const exists = await db.person.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { clerk_org_id: input.clerkOrgId, id: input.personId },
+    select: { account_id: true, organisation_id: true },
+    where: { account_id: input.accountId, id: input.personId },
   });
   if (
     exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
+    (exists.account_id !== input.accountId ||
       exists.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.personId,
       resourceType: "person",
@@ -551,23 +551,23 @@ async function personNotFound(
 
 async function contactNotFound(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     contactId: string;
     organisationId: string;
   },
   db: TenantDb
 ): Promise<Result<never, AlternativeContactServiceError>> {
   const exists = await db.alternativeContact.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { clerk_org_id: input.clerkOrgId, id: input.contactId },
+    select: { account_id: true, organisation_id: true },
+    where: { account_id: input.accountId, id: input.contactId },
   });
   if (
     exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
+    (exists.account_id !== input.accountId ||
       exists.organisation_id !== input.organisationId)
   ) {
     log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
+      actingAccountId: input.accountId,
       actingOrganisationId: input.organisationId,
       resourceId: input.contactId,
       resourceType: "alternative_contact",

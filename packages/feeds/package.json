@@ -16,14 +16,14 @@
     "@repo/observability": "*",
     "@repo/seo": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "ical-generator": "^11.1.2",
+    "ical-generator": "^11.1.3",
     "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "dotenv": "^18.0.9",
+    "dotenv": "^18.0.10",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }

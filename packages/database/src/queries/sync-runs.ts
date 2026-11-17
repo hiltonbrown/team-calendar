@@ -1,4 +1,4 @@
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
@@ -23,9 +23,9 @@ export interface FailedRecordData {
 }
 
 export interface AuditEventData {
+  accountId: string;
   action: string;
   actorUserId: string | null;
-  clerkOrgId: string;
   createdAt: Date;
   id: string;
   organisationId: OrganisationId;
@@ -35,12 +35,12 @@ export interface AuditEventData {
 }
 
 export async function getLatestSyncRunSummary(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   db: TenantDb
 ): Promise<Result<SyncRunSummaryData | null>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
@@ -56,7 +56,7 @@ export async function getLatestSyncRunSummary(
           status: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
         },
       });
 
@@ -92,13 +92,13 @@ export async function getLatestSyncRunSummary(
 }
 
 export async function listRecentSyncRuns(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   limit: number | undefined,
   db: TenantDb
 ): Promise<Result<SyncRunSummaryData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
@@ -115,7 +115,7 @@ export async function listRecentSyncRuns(
         },
         take: limit ?? 10,
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
         },
       });
 
@@ -144,13 +144,13 @@ export async function listRecentSyncRuns(
 }
 
 export async function listFailedRecordsForSyncRun(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   syncRunId: string,
   db: TenantDb
 ): Promise<Result<FailedRecordData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb3 = db;
 
     try {
@@ -165,7 +165,7 @@ export async function listFailedRecordsForSyncRun(
           sync_run_id: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           sync_run_id: syncRunId,
         },
       });
@@ -194,22 +194,22 @@ export async function listFailedRecordsForSyncRun(
 }
 
 export async function listRecentAuditEvents(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   limit: number | undefined,
   db: TenantDb
 ): Promise<Result<AuditEventData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb4 = db;
 
     try {
       const auditEvents = await tenantDb4.auditEvent.findMany({
         orderBy: { created_at: "desc" },
         select: {
+          account_id: true,
           action: true,
           actor_user_id: true,
-          clerk_org_id: true,
           created_at: true,
           id: true,
           organisation_id: true,
@@ -219,16 +219,16 @@ export async function listRecentAuditEvents(
         },
         take: limit ?? 20,
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
         },
       });
 
       return {
         ok: true,
         value: auditEvents.map((e) => ({
+          accountId: e.account_id,
           action: e.action,
           actorUserId: e.actor_user_id,
-          clerkOrgId: e.clerk_org_id,
           createdAt: e.created_at,
           id: e.id,
           organisationId: e.organisation_id as OrganisationId,

@@ -55,7 +55,7 @@ const { establishFeedRepresentation, hashEventRepresentation } = await import(
 );
 const { Prisma } = await import("@repo/database/generated/client");
 const input = {
-  clerkOrgId: "org_ledger",
+  accountId: "org_ledger",
   feedId: "10000000-0000-4000-8000-000000000002",
   organisationId: "10000000-0000-4000-8000-000000000001",
 };
@@ -130,7 +130,7 @@ describe("durable feed representation", () => {
     expect(mocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           feed_id: input.feedId,
           organisation_id: input.organisationId,
           published_sequence: 0,

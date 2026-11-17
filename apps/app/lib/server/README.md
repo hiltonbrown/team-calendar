@@ -1,7 +1,7 @@
 # Server Helpers
 
 This directory contains server-only helpers for authenticated app routes. These
-helpers establish the Clerk Organisation and Team Calendar organisation context that
+helpers establish the Account and Team Calendar organisation context that
 pages need before calling domain services.
 
 All files import `server-only` or are intended for server contexts. Do not import
@@ -10,7 +10,7 @@ them from Client Components.
 ## Current Pattern
 
 Server pages should resolve the active organisation first, then call the relevant
-domain service or query with both `clerkOrgId` and `organisationId`.
+domain service or query with both `accountId` and `organisationId`.
 
 ```typescript
 import { listAvailabilityRecords } from "@repo/availability";
@@ -25,7 +25,7 @@ export default async function Page({
   const context = await requireActiveOrgPageContext(org);
 
   const records = await listAvailabilityRecords({
-    clerkOrgId: context.clerkOrgId,
+    accountId: context.accountId,
     organisationId: context.organisationId,
   });
 
@@ -39,13 +39,13 @@ export default async function Page({
 
 Use this from Server Components that need an active organisation. It accepts the
 optional `org` query value, validates it when present, otherwise falls back to the
-selected Clerk Organisation and ensures a default Team Calendar organisation exists.
+selected Account and ensures a default Team Calendar organisation exists.
 
 It returns:
 
 ```typescript
 {
-  clerkOrgId,
+  accountId,
   organisationId,
   orgQueryValue,
   orgSource,
@@ -56,25 +56,25 @@ Invalid or inaccessible organisation context calls `notFound()`.
 
 ### `get-active-org-context.ts`
 
-Validates a supplied `organisationId` against the authenticated Clerk
-Organisation. Use it when a route already has an explicit organisation id and
+Validates a supplied `organisationId` against the authenticated Account. Use it when a route already has an explicit
+organisation id and
 needs a `Result` instead of page-level `notFound()` handling.
 
 ### `ensure-default-organisation.ts`
 
-Creates or resolves the default Team Calendar organisation for a Clerk Organisation.
+Creates or resolves the default Team Calendar organisation for an Account.
 It is used by `requireActiveOrgPageContext` when no `org` query value is present
-and the current Clerk Organisation does not yet have a Team Calendar organisation.
+and the current Account does not yet have a Team Calendar organisation.
 
 ### `load-onboarding-state.ts`
 
 Loads the onboarding checklist state for setup surfaces. This is the only
 remaining page-shaped loader in this directory. It scopes every query by both
-`clerkOrgId` and `organisationId`.
+`accountId` and `organisationId`.
 
 ## Rules
 
-1. Resolve `clerkOrgId` and `organisationId` before loading tenant data.
+1. Resolve `accountId` and `organisationId` before loading tenant data.
 2. Pass both ids to domain services and database queries.
 3. Prefer `requireActiveOrgPageContext()` for page routes.
 4. Keep Xero, availability, and feed behaviour in their domain packages.

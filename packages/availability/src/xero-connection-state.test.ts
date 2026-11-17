@@ -11,7 +11,7 @@ const { getXeroConnectionStateForScope } = await import(
   "./xero-connection-state"
 );
 const scope = {
-  clerkOrgId: "org_1",
+  accountId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 describe("getXeroConnectionStateForScope", () => {

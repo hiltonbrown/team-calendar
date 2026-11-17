@@ -9,7 +9,7 @@ const staleTerms = [
   "top navigation CTA",
   "location filters",
   "Revoke Token",
-  "Clerk Organisation boundary",
+  "Account boundary",
 ];
 
 describe("AU onboarding guide", () => {

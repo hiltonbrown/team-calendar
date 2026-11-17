@@ -40,7 +40,7 @@ describe("org-aware URLs", () => {
     expect(params.toString()).toBe(`week=2026-04-20&org=${orgId}`);
   });
 
-  it("removes org from filter params when routing uses Clerk cookie state", () => {
+  it("removes org from filter params when routing uses session state", () => {
     const params = new URLSearchParams(`week=2026-04-20&org=${orgId}`);
     preserveOrgQueryParam(params, null);
     expect(params.toString()).toBe("week=2026-04-20");

@@ -1,29 +1,59 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import AuthLayout from "./(unauthenticated)/(auth)/layout";
+
+vi.mock("@/components/brand/brand-panel", () => ({
+  BrandPanel: () => null,
+  MobileBrand: () => null,
+}));
+vi.mock("@repo/design-system/components/mode-toggle", () => ({
+  ModeToggle: () => null,
+}));
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 describe("legal link destinations", () => {
-  it("uses canonical web routes /privacy-policy and /terms-of-service in RootLayout", () => {
-    const layoutPath = path.resolve(import.meta.dirname, "./layout.tsx");
-    const content = fs.readFileSync(layoutPath, "utf-8");
-
-    expect(content).toContain('privacyUrl={webUrl("/privacy-policy")}');
-    expect(content).toContain('termsUrl={webUrl("/terms-of-service")}');
-    expect(content).not.toContain("/legal/privacy");
-    expect(content).not.toContain("/legal/terms");
-  });
-
+  it.each([
+    "https://teamcalendar.online",
+    "https://candidate-web.vercel.app",
+    "http://localhost:3001",
+  ])(
+    "renders auth legal links on the configured web origin %s",
+    (webOrigin) => {
+      vi.stubEnv("NEXT_PUBLIC_WEB_URL", webOrigin);
+      render(AuthLayout({ children: null }));
+      expect(
+        screen
+          .getByRole("link", { name: "Privacy policy" })
+          .getAttribute("href")
+      ).toBe(`${webOrigin}/privacy-policy`);
+      expect(
+        screen
+          .getByRole("link", { name: "Terms of service" })
+          .getAttribute("href")
+      ).toBe(`${webOrigin}/terms-of-service`);
+    }
+  );
   it("verifies target legal routes exist in apps/web", () => {
-    const webPrivacyPath = path.resolve(
-      import.meta.dirname,
-      "../../web/app/(legal)/privacy-policy/page.tsx"
-    );
-    const webTermsPath = path.resolve(
-      import.meta.dirname,
-      "../../web/app/(legal)/terms-of-service/page.tsx"
-    );
-
-    expect(fs.existsSync(webPrivacyPath)).toBe(true);
-    expect(fs.existsSync(webTermsPath)).toBe(true);
+    expect(
+      fs.existsSync(
+        path.resolve(
+          import.meta.dirname,
+          "../../web/app/(legal)/privacy-policy/page.tsx"
+        )
+      )
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.resolve(
+          import.meta.dirname,
+          "../../web/app/(legal)/terms-of-service/page.tsx"
+        )
+      )
+    ).toBe(true);
   });
 });

@@ -7,11 +7,15 @@ import {
   xeroSimplificationFixture,
 } from "./src/test-fixtures/xero-simplification-fixture";
 
-const { database } = xeroSimplificationFixture();
+const { database, fixture: ownedFixture } = xeroSimplificationFixture(
+  "packages/database/xero-provider-fence.integration.test.ts"
+);
 afterAll(() => database.$disconnect());
 
 test("a grant rotated after scoped resolution refuses the stale provider disconnect", async () => {
-  const fixture = await database.$transaction(createXeroConnectionFixture);
+  const fixture = await database.$transaction((tx) =>
+    createXeroConnectionFixture(tx, ownedFixture)
+  );
   const update = systemDatabase.xeroConnection.updateMany.bind(
     systemDatabase.xeroConnection
   );
@@ -34,9 +38,9 @@ test("a grant rotated after scoped resolution refuses the stale provider disconn
     });
   try {
     const changed = await markScopedXeroConnectionReconnectRequired({
+      accountId: fixture.connection.account_id,
       authorisationId: fixture.authorisation.id,
       authorisationUpdatedAt: fixture.authorisation.updated_at,
-      clerkOrgId: fixture.connection.clerk_org_id,
       connectionId: fixture.connection.id,
       lastConnectedAt: fixture.connection.last_connected_at,
       organisationId: fixture.connection.organisation_id,

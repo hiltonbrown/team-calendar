@@ -1,28 +1,43 @@
-import { signInCopy } from "@repo/auth/components/sign-in";
 import { brandNameDisplay } from "@repo/seo/branding";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import Page, {
   metadata,
 } from "../app/(unauthenticated)/(auth)/sign-in/[[...sign-in]]/page";
+import { authCopy } from "../components/auth/auth-copy";
 
-vi.mock("@repo/auth/components/sign-in", () => ({
-  SignIn: () => <div data-testid="sign-in-component" />,
-  signInCopy: {
-    description:
-      "Sign in to manage leave and availability for your organisation.",
-    title: "Welcome back",
-  },
+vi.mock("@/components/auth/auth-forms", () => ({
+  SignInForm: ({
+    returnTo,
+    verified,
+  }: {
+    returnTo?: string;
+    verified?: boolean;
+  }) => (
+    <div
+      data-return-to={returnTo}
+      data-testid="sign-in-form"
+      data-verified={String(verified)}
+    />
+  ),
 }));
 
-describe("Sign In Page", () => {
-  it("renders the sign in component", () => {
-    const { container } = render(<Page />);
-    expect(container).toBeDefined();
+describe("sign-in page", () => {
+  it("renders the custom form and forwards only scalar route parameters", async () => {
+    render(
+      await Page({
+        searchParams: Promise.resolve({ returnTo: "/calendar", verified: "1" }),
+      })
+    );
+    expect(screen.getByTestId("sign-in-form").dataset.returnTo).toBe(
+      "/calendar"
+    );
+    expect(screen.getByTestId("sign-in-form").dataset.verified).toBe("true");
   });
-
-  it("exports metadata aligned with canonical sign-in copy", () => {
-    expect(metadata.title).toBe(`${signInCopy.title} | ${brandNameDisplay}`);
-    expect(metadata.description).toBe(signInCopy.description);
+  it("uses the canonical page copy for metadata", () => {
+    expect(metadata.title).toBe(
+      `${authCopy.signIn.title} | ${brandNameDisplay}`
+    );
+    expect(metadata.description).toBe(authCopy.signIn.description);
   });
 });

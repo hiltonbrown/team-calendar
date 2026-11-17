@@ -56,18 +56,18 @@ vi.mock("@repo/notifications", () => ({
 
 const { completeSubmitSideEffects } = await import("./submit-side-effects");
 const input = {
+  accountId: "org_1",
   actorUserId: "user_1",
   attempt: {
+    accountId: "org_1",
     attemptGeneration: 1,
     availabilityRecordId: "00000000-0000-4000-8000-000000000099",
-    clerkOrgId: "org_1",
     organisationId: "00000000-0000-4000-8000-000000000001",
   },
   claimedAt: new Date("2026-09-19T00:00:00Z"),
-  clerkOrgId: "org_1",
   manager: {
-    clerkUserId: "manager_1",
     personId: "00000000-0000-4000-8000-000000000011",
+    userId: "manager_1",
   },
   notifyManager: true,
   organisationId: "00000000-0000-4000-8000-000000000001",
@@ -111,8 +111,8 @@ describe("submit side effects", () => {
     const approval = {
       ...input,
       approvalRecipient: {
-        clerkUserId: "employee_1",
         personId: "00000000-0000-4000-8000-000000000022",
+        userId: "employee_1",
       },
       attempt: { ...input.attempt, action: "approve" as const },
       notifyManager: false,
@@ -142,7 +142,7 @@ describe("submit side effects", () => {
     const result = await completeSubmitSideEffects({
       ...input,
       actorUserId: "original_manager",
-      approvalRecipient: { clerkUserId: "employee", personId: "person" },
+      approvalRecipient: { personId: "person", userId: "employee" },
       attempt: { ...input.attempt, action: "decline" },
       declineReason: "Original coverage decision",
     });

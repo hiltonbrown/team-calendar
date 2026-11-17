@@ -58,20 +58,20 @@ vi.mock("@repo/database", async () => ({
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  currentUser: vi.fn(),
   ensureCurrentUserPerson: vi.fn(),
-  ensureOrganisationForClerk: vi.fn(),
+  ensureOrganisationForAccount: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   redirect: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
-  ensureOrganisationForClerk: mocks.ensureOrganisationForClerk,
+  ensureOrganisationForAccount: mocks.ensureOrganisationForAccount,
 }));
 vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
@@ -82,16 +82,15 @@ const { createOrganisationAction } = await import("./_actions");
 describe("setup organisation actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "admin@example.com" }],
-      firstName: "Admin",
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "admin@example.com",
       id: "user_1",
-      imageUrl: "https://img.clerk.com/user.png",
-      lastName: "User",
+      image: "https://images.example.test/user.png",
+      name: "Admin User",
     });
-    mocks.ensureOrganisationForClerk.mockResolvedValue({
-      clerkOrgId: "org_1",
+    mocks.ensureOrganisationForAccount.mockResolvedValue({
+      accountId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
     });
     mocks.ensureCurrentUserPerson.mockResolvedValue({
@@ -106,9 +105,9 @@ describe("setup organisation actions", () => {
       name: "Team Calendar Test",
     });
 
-    expect(mocks.ensureOrganisationForClerk).toHaveBeenCalledWith(
+    expect(mocks.ensureOrganisationForAccount).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         countryCode: "AU",
         name: "Team Calendar Test",
       },
@@ -116,18 +115,16 @@ describe("setup organisation actions", () => {
     );
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledWith(
       {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
       },
       {
-        avatarUrl: "https://img.clerk.com/user.png",
-        clerkUserId: "user_1",
+        avatarUrl: "https://images.example.test/user.png",
         displayName: "Admin User",
         email: "admin@example.com",
-        firstName: "Admin",
-        lastName: "User",
+        userId: "user_1",
       },
-      mocks.ensureOrganisationForClerk.mock.calls[0]?.[1]
+      mocks.ensureOrganisationForAccount.mock.calls[0]?.[1]
     );
     expect(mocks.redirect).toHaveBeenCalledWith("/");
   });
@@ -148,7 +145,7 @@ describe("setup organisation actions", () => {
         },
         ok: false,
       });
-      expect(mocks.ensureOrganisationForClerk).not.toHaveBeenCalled();
+      expect(mocks.ensureOrganisationForAccount).not.toHaveBeenCalled();
       expect(mocks.redirect).not.toHaveBeenCalled();
     }
   );

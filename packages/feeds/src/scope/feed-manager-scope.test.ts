@@ -40,36 +40,36 @@ import { resolvePeopleForFeed } from "./feed-scope";
 
 const rows = [
   {
-    clerk_org_id: "account-A",
-    clerk_user_id: "manager-user",
+    account_id: "account-A",
     first_name: "Manager",
     id: "manager-A",
     manager_person_id: null,
     organisation_id: "company-A",
+    user_id: "manager-user",
   },
   {
-    clerk_org_id: "account-A",
-    clerk_user_id: null,
+    account_id: "account-A",
     first_name: "Report",
     id: "report-B",
     manager_person_id: "manager-A",
     organisation_id: "company-B",
+    user_id: null,
   },
   {
-    clerk_org_id: "account-A",
-    clerk_user_id: null,
+    account_id: "account-A",
     first_name: "Indirect",
     id: "indirect-B",
     manager_person_id: "report-B",
     organisation_id: "company-B",
+    user_id: null,
   },
   {
-    clerk_org_id: "account-foreign",
-    clerk_user_id: null,
+    account_id: "account-foreign",
     first_name: "Foreign",
     id: "foreign",
     manager_person_id: "manager-A",
     organisation_id: "company-foreign",
+    user_id: null,
   },
 ].map((person) => ({
   ...person,
@@ -82,7 +82,7 @@ const rows = [
   team_id: null,
 }));
 const input = {
-  clerkOrgId: "account-A",
+  accountId: "account-A",
   createdByUserId: "manager-user",
   organisationId: null,
   scopes: [{ scopeType: "manager_team" as const }],
@@ -99,7 +99,7 @@ beforeEach(() => {
             where,
           }: {
             where: {
-              clerk_org_id: string;
+              account_id: string;
               organisation_id: string | { in: string[] };
             };
           }) => {
@@ -110,7 +110,7 @@ beforeEach(() => {
                 : where.organisation_id.in;
             return await rows.filter(
               (person) =>
-                person.clerk_org_id === where.clerk_org_id &&
+                person.account_id === where.account_id &&
                 companyIds.includes(person.organisation_id)
             );
           },
@@ -164,7 +164,7 @@ test("company feed resolves a creator employed solely in another company", async
   ]);
 });
 test("manager-team preparation reuses a supplied request client", async () => {
-  await withTenantDb(input.clerkOrgId, async (db) => {
+  await withTenantDb(input.accountId, async (db) => {
     await resolvePeopleForFeed(input, db);
   });
   expect(state.transaction).toHaveBeenCalledOnce();

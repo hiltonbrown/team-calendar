@@ -50,7 +50,7 @@ import {
 } from "./preferences-service";
 
 const scope = {
-  clerkOrgId: "account-A",
+  accountId: "account-A",
   organisationId: "11111111-1111-4111-8111-111111111111",
   userId: "user-1",
 };
@@ -200,10 +200,10 @@ beforeEach(() => {
 });
 
 test.each(cases)("$name reuses its entry-point scope", async ({ run }) => {
-  await withTenantDb(scope.clerkOrgId, (db) => run(db));
+  await withTenantDb(scope.accountId, (db) => run(db));
   expect(state.transaction).toHaveBeenCalledTimes(1);
   state.transaction.mockClear();
-  await withTenantDb(scope.clerkOrgId, async (db) => {
+  await withTenantDb(scope.accountId, async (db) => {
     await run(db);
     expect(state.transaction).toHaveBeenCalledTimes(1);
   });
@@ -219,7 +219,7 @@ test.each(cases)("$name rejects another account's client", async ({ run }) => {
 
 test("mark-read publication waits for commit and is discarded on rollback", async () => {
   const failed = await withTenantResult(
-    scope.clerkOrgId,
+    scope.accountId,
     async (db): Promise<Result<void, string>> => {
       await markAsRead({ ...scope, notificationId }, db);
       expect(state.publish).not.toHaveBeenCalled();
@@ -229,7 +229,7 @@ test("mark-read publication waits for commit and is discarded on rollback", asyn
   expect(failed.ok).toBe(false);
   expect(state.readAt).toBeNull();
   expect(state.publish).not.toHaveBeenCalled();
-  await withTenantDb(scope.clerkOrgId, async (db) => {
+  await withTenantDb(scope.accountId, async (db) => {
     await markAsRead({ ...scope, notificationId }, db);
     expect(state.publish).not.toHaveBeenCalled();
   });
@@ -255,7 +255,7 @@ test("transaction-local unread counts bypass a previously committed cache entry"
       getUnreadCount(scope, db)
     )
   ).resolves.toEqual({ ok: true, value: 1 });
-  await withTenantDb(scope.clerkOrgId, async (db) => {
+  await withTenantDb(scope.accountId, async (db) => {
     await markAsRead({ ...scope, notificationId }, db);
     await expect(getUnreadCount(scope, db)).resolves.toEqual({
       ok: true,
@@ -288,12 +288,12 @@ test("manager email lookup can reach another owned company while the notificatio
   expect(state.recipientLookup).toHaveBeenCalledWith(
     expect.objectContaining({
       where: expect.objectContaining({
-        clerk_org_id: scope.clerkOrgId,
-        clerk_user_id: scope.userId,
+        account_id: scope.accountId,
         id: personId,
         organisation: expect.objectContaining({
-          clerk_org_id: scope.clerkOrgId,
+          account_id: scope.accountId,
         }),
+        user_id: scope.userId,
       }),
     })
   );

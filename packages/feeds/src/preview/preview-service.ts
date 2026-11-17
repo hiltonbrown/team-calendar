@@ -12,11 +12,7 @@ import {
   projectFeedEvents,
 } from "../projection/feed-projection";
 import { isFeedOwner } from "../scope/feed-ownership";
-import {
-  canViewFeed,
-  isAdminOrOwner,
-  normaliseRole,
-} from "../scope/feed-scope";
+import { canViewFeed, isAdminOrOwner } from "../scope/feed-scope";
 import { scopedFeed } from "../scope/scoped-feed";
 
 export type PreviewServiceError =
@@ -27,10 +23,10 @@ export type PreviewServiceError =
   | { code: "validation_error"; message: string };
 
 const PreviewFeedSchema = z.object({
+  accountId: z.string().min(1),
   actingPersonId: z.string().uuid().nullable().optional(),
-  actingRole: z.string().min(1),
+  actingRole: z.enum(["owner", "admin", "manager", "viewer"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   horizonDays: z.number().int().min(1).max(90).default(30),
   organisationId: z.string().uuid().nullable(),
@@ -45,13 +41,13 @@ export async function previewFeed(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  assertTenantDb(db, parsed.data.clerkOrgId);
+  assertTenantDb(db, parsed.data.accountId);
   try {
     {
-      assertTenantDb(db, parsed.data.clerkOrgId);
+      assertTenantDb(db, parsed.data.accountId);
       const client = db;
 
-      const role = normaliseRole(parsed.data.actingRole);
+      const role = parsed.data.actingRole;
       const feed = await client.feed.findFirst({
         select: {
           created_by_user_id: true,
@@ -73,15 +69,15 @@ export async function previewFeed(
       const actingPerson = await client.person.findFirst({
         select: { id: true },
         where: {
+          account_id: parsed.data.accountId,
           archived_at: null,
-          clerk_org_id: parsed.data.clerkOrgId,
-          clerk_user_id: parsed.data.actingUserId,
           is_active: true,
           organisation_id: parsed.data.organisationId ?? {
             in: (
-              await resolveAccountCompanies(parsed.data.clerkOrgId, client)
+              await resolveAccountCompanies(parsed.data.accountId, client)
             ).map((company) => company.id),
           },
+          user_id: parsed.data.actingUserId,
         },
       });
       const actingPersonId = actingPerson?.id ?? null;
@@ -105,8 +101,8 @@ export async function previewFeed(
 
       const visible = await canViewFeed(
         {
+          accountId: parsed.data.accountId,
           actingPersonId,
-          clerkOrgId: parsed.data.clerkOrgId,
           createdByUserId: feed.created_by_user_id,
           organisationId: feed.organisation_id,
           role,
@@ -126,9 +122,9 @@ export async function previewFeed(
 
       const result = await projectFeedEvents(
         {
+          accountId: parsed.data.accountId,
           actingPersonId,
           actingRole: role,
-          clerkOrgId: parsed.data.clerkOrgId,
           feedId: parsed.data.feedId,
           horizonDays: parsed.data.horizonDays,
           organisationId: feed.organisation_id,

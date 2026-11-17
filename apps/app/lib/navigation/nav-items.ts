@@ -1,3 +1,4 @@
+import { hasPermission, type PermissionRequest } from "@repo/auth/permissions";
 import {
   ActivityIcon,
   BarChart3Icon,
@@ -17,7 +18,7 @@ import {
 export interface NavItem {
   href: string;
   icon: LucideIcon;
-  roles?: readonly string[];
+  permission?: PermissionRequest;
   title: string;
 }
 
@@ -25,9 +26,6 @@ export interface NavGroup {
   items: NavItem[];
   label: string | null;
 }
-
-const ANALYTICS_NAV_ROLES = ["org:manager", "org:admin", "org:owner"] as const;
-const ADMIN_ROLES = ["org:admin", "org:owner"] as const;
 
 /**
  * Single source of truth for primary navigation. Consumed by both the sidebar
@@ -53,13 +51,13 @@ export const navGroups: NavGroup[] = [
       {
         href: "/analytics/leave-reports",
         icon: BarChart3Icon,
-        roles: ANALYTICS_NAV_ROLES,
+        permission: { reports: ["read"] },
         title: "Leave Reports",
       },
       {
         href: "/analytics/out-of-office",
         icon: BarChart3Icon,
-        roles: ANALYTICS_NAV_ROLES,
+        permission: { reports: ["read"] },
         title: "Out of Office",
       },
     ],
@@ -76,7 +74,7 @@ export const navGroups: NavGroup[] = [
       {
         href: "/sync",
         icon: ActivityIcon,
-        roles: ADMIN_ROLES,
+        permission: { xero: ["sync"] },
         title: "Sync Health",
       },
     ],
@@ -94,7 +92,7 @@ export interface QuickAction {
   href: string;
   icon: LucideIcon;
   keywords?: readonly string[];
-  roles?: readonly string[];
+  permission?: PermissionRequest;
   title: string;
 }
 
@@ -124,25 +122,25 @@ export const quickActions: QuickAction[] = [
     href: "/people/new",
     icon: UserPlusIcon,
     keywords: ["person", "member", "employee", "team"],
-    roles: ADMIN_ROLES,
+    permission: { people: ["manage"] },
     title: "Add person",
   },
   {
     href: "/public-holidays/holidays/new",
     icon: FlagIcon,
     keywords: ["holiday", "public", "day off"],
-    roles: ADMIN_ROLES,
+    permission: { settings: ["update"] },
     title: "Add public holiday",
   },
 ];
 
 /**
- * A nav or quick action with a `roles` list is visible only to those roles;
- * an item without `roles` is visible to everyone.
+ * A nav or quick action requests its permission from the shared map;
+ * an item without a permission is visible to everyone.
  */
 export function isNavItemVisible(
-  roles: readonly string[] | undefined,
-  orgRole: string | null | undefined
+  permission: PermissionRequest | undefined,
+  role: string | null | undefined
 ): boolean {
-  return roles ? roles.includes(orgRole ?? "") : true;
+  return permission ? hasPermission(role, permission) : true;
 }

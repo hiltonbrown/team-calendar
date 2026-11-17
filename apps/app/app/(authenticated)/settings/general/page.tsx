@@ -1,8 +1,9 @@
-import { auth, clerkClient } from "@repo/auth/server";
-import { type ClerkOrgId, isCountryCode, REGIONS } from "@repo/core";
+import { getAccount } from "@repo/auth/accounts";
+import { getSession } from "@repo/auth/server";
+import { type AccountId, isCountryCode, REGIONS } from "@repo/core";
 import { withTenantDb } from "@repo/database";
 import type { Metadata } from "next";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { GeneralClient } from "./general-client";
 
@@ -18,23 +19,26 @@ interface GeneralPageProps {
 }
 
 const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
-  await requirePageRole("org:admin");
+  await requirePagePermission({ settings: ["update"] });
 
   const { org: orgParam } = await searchParams;
-  const { orgId } = await auth();
-  if (!orgId) {
+  const { accountId: sessionAccountId } = (await getSession()) ?? {
+    accountId: null,
+    role: null,
+    sessionId: null,
+    userId: null,
+  };
+  if (!sessionAccountId) {
     throw new Error("No active account selected.");
   }
-  const clerk = await clerkClient();
-  const account = await clerk.organizations.getOrganization({
-    organizationId: orgId,
-  });
-  const clerkOrgId = orgId as ClerkOrgId;
+
+  const account = await getAccount(sessionAccountId);
+  const accountId = sessionAccountId as AccountId;
   const { organisation, organisationId } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const { organisationId: scopedOrganisationId } =
-        await resolveActiveOrgPageContext(clerkOrgId, orgParam, db);
+        await resolveActiveOrgPageContext(accountId, orgParam, db);
       const preparedOrganisation = await db.organisation.findFirst({
         select: {
           country_code: true,
@@ -42,7 +46,7 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
           region_code: true,
           timezone: true,
         },
-        where: { clerk_org_id: clerkOrgId, id: scopedOrganisationId },
+        where: { account_id: accountId, id: scopedOrganisationId },
       });
       if (!preparedOrganisation) {
         throw new Error("Organisation not found.");
@@ -58,7 +62,7 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
     <GeneralClient
       account={{
         name: account.name,
-        slug: account.slug ?? null,
+        slug: account.slug,
       }}
       organisation={{
         countryCode: organisation.country_code as "AU" | "NZ" | "UK",

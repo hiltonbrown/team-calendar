@@ -70,23 +70,6 @@
   background-repeat: no-repeat;
 }
 
-/* Clerk's card carries a fixed ~25rem width that overflows on phones. Let it  */
-/* flow to the column instead. Scoped to the auth pane so the in-app Clerk      */
-/* widgets (OrganizationSwitcher, UserButton) keep their own sizing.           */
-.auth-form-pane :is(.cl-rootBox, .cl-cardBox, .cl-card, .cl-main, .cl-form) {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-}
-
-/* AuthFormFrame supplies the title/subtitle on sign-in and sign-up, so the    */
-/* embedded Clerk card sets header="hidden". Clerk's own display rule defeats   */
-/* Tailwind's .hidden, so enforce it. Only headers carrying .hidden are         */
-/* affected, leaving the choose-organization task header intact.                */
-.auth-form-pane .cl-header.hidden {
-  display: none !important;
-}
-
 /* Theme toggle sitting on the deep panel needs light ink, not --foreground,   */
 /* and a light focus ring (the default green ring is invisible on deep green).  */
 .auth-toggle button {

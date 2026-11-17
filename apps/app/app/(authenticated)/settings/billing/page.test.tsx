@@ -5,15 +5,15 @@ const recoveryMessagePattern = /Billing changes are still being reconciled/;
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
-  currentUser: vi.fn(),
   getActivationDashboardSummary: vi.fn(),
   getBillingSummary: vi.fn(),
-  getSubscriptionForOrg: vi.fn(),
-  getUnresolvedStripeEventsForOrg: vi.fn(),
-  hasUnresolvedStripeEventForOrg: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSubscriptionForAccount: vi.fn(),
+  getUnresolvedStripeEventsForAccount: vi.fn(),
+  hasPermission: vi.fn(),
+  hasUnresolvedStripeEventForAccount: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
-  requirePageRole: vi.fn(),
-  requireRole: vi.fn(),
+  requirePagePermission: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -22,11 +22,11 @@ vi.mock("./actions", () => ({
   startPortal: vi.fn(),
 }));
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: vi.fn(async () => "org_1"),
-  requireRole: mocks.requireRole,
+  hasPermission: mocks.hasPermission,
+  requireAccount: vi.fn(async () => "org_1"),
 }));
 vi.mock("@repo/auth/server", () => ({
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
 }));
 vi.mock("@repo/availability", () => ({
   getBillingSummary: mocks.getBillingSummary,
@@ -45,9 +45,10 @@ vi.mock("@repo/database/tenant-client", () => ({
 }));
 vi.mock("@repo/database", async () => ({
   getActivationDashboardSummary: mocks.getActivationDashboardSummary,
-  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
-  getUnresolvedStripeEventsForOrg: mocks.getUnresolvedStripeEventsForOrg,
-  hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
+  getSubscriptionForAccount: mocks.getSubscriptionForAccount,
+  getUnresolvedStripeEventsForAccount:
+    mocks.getUnresolvedStripeEventsForAccount,
+  hasUnresolvedStripeEventForAccount: mocks.hasUnresolvedStripeEventForAccount,
   ...(await vi.importActual<typeof import("@repo/database/tenant-db")>(
     "@repo/database/tenant-db"
   )),
@@ -55,8 +56,8 @@ vi.mock("@repo/database", async () => ({
 function buildTenantTestDatabase() {
   return { auditEvent: { create: mocks.auditCreate } };
 }
-vi.mock("@/lib/auth/require-page-role", () => ({
-  requirePageRole: mocks.requirePageRole,
+vi.mock("@/lib/auth/require-page-permission", () => ({
+  requirePagePermission: mocks.requirePagePermission,
 }));
 vi.mock("@/lib/server/require-active-org-page-context", () => ({
   requireActiveOrgPageContext: mocks.requireActiveOrgPageContext,
@@ -88,16 +89,15 @@ describe("BillingPage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requirePageRole.mockResolvedValue(undefined);
-    mocks.requireRole.mockResolvedValue(true);
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "owner@example.com" }],
-      firstName: "Owner",
+    mocks.requirePagePermission.mockResolvedValue(undefined);
+    mocks.hasPermission.mockResolvedValue(true);
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "owner@example.com",
       id: "user_1",
-      lastName: "User",
+      name: "Owner",
     });
     mocks.requireActiveOrgPageContext.mockResolvedValue({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       organisationId,
     });
     mocks.getBillingSummary.mockResolvedValue({ ok: true, value: summary });
@@ -112,15 +112,15 @@ describe("BillingPage", () => {
         xeroConnected: false,
       },
     });
-    mocks.getSubscriptionForOrg.mockResolvedValue(null);
-    mocks.getUnresolvedStripeEventsForOrg.mockResolvedValue([]);
-    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(false);
+    mocks.getSubscriptionForAccount.mockResolvedValue(null);
+    mocks.getUnresolvedStripeEventsForAccount.mockResolvedValue([]);
+    mocks.hasUnresolvedStripeEventForAccount.mockResolvedValue(false);
   });
 
   it("shows a paid-mode recovery state for unresolved billing events", async () => {
     vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
-    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
-    mocks.getUnresolvedStripeEventsForOrg.mockResolvedValue([
+    mocks.hasUnresolvedStripeEventForAccount.mockResolvedValue(true);
+    mocks.getUnresolvedStripeEventsForAccount.mockResolvedValue([
       {
         errorCategory: "provider_fetch",
         eventId: "evt_operator_1",
@@ -137,11 +137,15 @@ describe("BillingPage", () => {
   it("requires admin access", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
-    expect(mocks.requirePageRole).toHaveBeenCalledWith("org:admin");
+    expect(mocks.requirePagePermission).toHaveBeenCalledWith({
+      billing: ["read"],
+    });
   });
 
   it("denies managers and below when the role guard rejects", async () => {
-    mocks.requirePageRole.mockRejectedValue(new Error("Permission denied"));
+    mocks.requirePagePermission.mockRejectedValue(
+      new Error("Permission denied")
+    );
 
     await expect(Page({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       "Permission denied"
@@ -150,7 +154,7 @@ describe("BillingPage", () => {
   });
 
   it("renders the owner billing view when the user is an owner", async () => {
-    mocks.requireRole.mockResolvedValue(true);
+    mocks.hasPermission.mockResolvedValue(true);
 
     render(await Page({ searchParams: Promise.resolve({}) }));
 
@@ -164,7 +168,7 @@ describe("BillingPage", () => {
   });
 
   it("renders the billing view for admins as the admin role", async () => {
-    mocks.requireRole.mockResolvedValue(false);
+    mocks.hasPermission.mockResolvedValue(false);
 
     render(await Page({ searchParams: Promise.resolve({}) }));
 

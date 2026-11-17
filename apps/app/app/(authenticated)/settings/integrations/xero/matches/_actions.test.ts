@@ -1,13 +1,16 @@
 vi.mock("@repo/auth/helpers", () => ({
-  requireRole: async (role: string) => (await mocks.auth()).orgRole === role,
+  hasPermission: async (
+    request: import("@repo/auth/permissions").PermissionRequest
+  ) =>
+    (await import("@repo/auth/permissions")).hasPermission(
+      (await mocks.getSession())?.role,
+      request
+    ),
 }));
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  clerkClient: vi.fn(),
-  currentUser: vi.fn(),
   database: {
     $transaction: vi.fn(),
     organisation: { findFirst: vi.fn(), findMany: vi.fn() },
@@ -15,6 +18,9 @@ const mocks = vi.hoisted(() => ({
     xeroPersonMatch: { findFirst: vi.fn() },
   },
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
+  listAccountMembers: vi.fn(),
   log: { error: vi.fn() },
   revalidatePath: vi.fn(),
 }));
@@ -31,9 +37,8 @@ vi.mock("@repo/feeds", () => ({
     .mockResolvedValue({ ok: true, value: { feedIds: [] } }),
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  clerkClient: mocks.clerkClient,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
   referenceDatabase: {
@@ -70,7 +75,7 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 const { resolveXeroPersonMatchAction } = await import("./_actions");
 
 describe("resolveXeroPersonMatchAction", () => {
-  const orgId = "org_1";
+  const accountId = "org_1";
   const matchId = "00000000-0000-4000-8000-000000000001";
   const xeroPersonId = "00000000-0000-4000-8000-000000000002";
   const candidatePersonId = "00000000-0000-4000-8000-000000000003";
@@ -78,12 +83,12 @@ describe("resolveXeroPersonMatchAction", () => {
 
   function baseMatch(overrides: Record<string, unknown> = {}) {
     return {
+      account_id: accountId,
       candidate_person: {
-        clerk_user_id: "user_candidate",
         id: candidatePersonId,
+        user_id: "user_candidate",
       },
       candidate_person_id: candidatePersonId,
-      clerk_org_id: orgId,
       id: matchId,
       organisation_id: organisationId,
       status: "pending",
@@ -95,16 +100,15 @@ describe("resolveXeroPersonMatchAction", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId, orgRole: "org:admin" });
-    mocks.currentUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: "admin@example.com" }],
-      firstName: "Admin",
+    mocks.getSession.mockResolvedValue({ accountId, role: "admin" });
+    mocks.getCurrentUser.mockResolvedValue({
+      email: "admin@example.com",
       id: "user_admin",
-      lastName: "User",
+      name: "Admin",
     });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId: orgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.database.organisation.findFirst.mockResolvedValue({
       id: organisationId,
@@ -115,29 +119,29 @@ describe("resolveXeroPersonMatchAction", () => {
     mocks.database.xeroPersonMatch.findFirst.mockResolvedValue(baseMatch());
     mocks.database.person.findFirst.mockImplementation(
       (args?: {
-        where?: { clerk_user_id?: string; id?: string | { notIn?: string[] } };
+        where?: { user_id?: string; id?: string | { notIn?: string[] } };
       }) => {
         if (!args?.where) {
           return null;
         }
         if (args.where.id === xeroPersonId) {
           return {
+            account_id: accountId,
             archived_at: null,
-            clerk_org_id: orgId,
-            clerk_user_id: null,
             id: xeroPersonId,
             manager_person_id: null,
             organisation_id: organisationId,
+            user_id: null,
           };
         }
         if (args.where.id === candidatePersonId) {
           return {
+            account_id: accountId,
             archived_at: null,
-            clerk_org_id: orgId,
-            clerk_user_id: "user_candidate",
             id: candidatePersonId,
             manager_person_id: null,
             organisation_id: organisationId,
+            user_id: "user_candidate",
           };
         }
         return null;
@@ -168,15 +172,15 @@ describe("resolveXeroPersonMatchAction", () => {
           if (args.where.id === xeroPersonId) {
             return {
               archived_at: null,
-              clerk_user_id: null,
               id: xeroPersonId,
+              user_id: null,
             };
           }
           if (args.where.id === candidatePersonId) {
             return {
               archived_at: null,
-              clerk_user_id: "user_candidate",
               id: candidatePersonId,
+              user_id: "user_candidate",
             };
           }
           return null;
@@ -198,13 +202,13 @@ describe("resolveXeroPersonMatchAction", () => {
         findMany: vi.fn(() =>
           Promise.resolve([
             {
-              clerk_org_id: orgId,
+              account_id: accountId,
               id: xeroPersonId,
               manager_person_id: null,
               organisation_id: organisationId,
             },
             {
-              clerk_org_id: orgId,
+              account_id: accountId,
               id: candidatePersonId,
               manager_person_id: null,
               organisation_id: organisationId,
@@ -217,13 +221,7 @@ describe("resolveXeroPersonMatchAction", () => {
         findFirst: mocks.database.xeroPersonMatch.findFirst,
       },
     });
-    mocks.clerkClient.mockResolvedValue({
-      organizations: {
-        getOrganizationMembershipList: vi
-          .fn()
-          .mockResolvedValue({ data: [{ id: "mem_1" }] }),
-      },
-    });
+    mocks.listAccountMembers.mockResolvedValue({ data: [{ id: "mem_1" }] });
   });
 
   it("calls findFirst with the active organisation scope on happy path", async () => {
@@ -236,7 +234,7 @@ describe("resolveXeroPersonMatchAction", () => {
     expect(result.ok).toBe(true);
     expect(mocks.database.organisation.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { clerk_org_id: orgId, id: organisationId },
+        where: { account_id: accountId, id: organisationId },
       })
     );
     expect(mocks.database.xeroPersonMatch.findFirst).toHaveBeenCalledTimes(3);
@@ -244,7 +242,7 @@ describe("resolveXeroPersonMatchAction", () => {
       mocks.database.xeroPersonMatch.findFirst.mock.calls[0]?.[0]?.where;
     expect(where).toEqual(
       expect.objectContaining({
-        clerk_org_id: orgId,
+        account_id: accountId,
         id: matchId,
         organisation_id: organisationId,
       })
@@ -252,16 +250,12 @@ describe("resolveXeroPersonMatchAction", () => {
   });
 
   it("rejects a non-member", async () => {
-    mocks.clerkClient.mockResolvedValue({
-      organizations: {
-        getOrganizationMembershipList: vi.fn().mockResolvedValue({ data: [] }),
-      },
-    });
+    mocks.listAccountMembers.mockResolvedValue({ data: [] });
     const result = await resolveXeroPersonMatchAction({
-      clerkUserId: "user_outsider123",
       matchId,
       organisationId,
       resolution: "match",
+      userId: "user_outsider123",
     });
     expect(result).toEqual(expect.objectContaining({ ok: false }));
     expect((result as { ok: false; error: { code: string } }).error.code).toBe(
@@ -272,10 +266,10 @@ describe("resolveXeroPersonMatchAction", () => {
 
   it("accepts a member", async () => {
     const result = await resolveXeroPersonMatchAction({
-      clerkUserId: "user_valid123",
       matchId,
       organisationId,
       resolution: "match",
+      userId: "user_valid123",
     });
     expect(result).toEqual({ ok: true, value: { resolved: true } });
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
@@ -283,19 +277,16 @@ describe("resolveXeroPersonMatchAction", () => {
     );
   });
 
-  it("fails closed on Clerk error", async () => {
-    mocks.clerkClient.mockResolvedValue({
-      organizations: {
-        getOrganizationMembershipList: vi
-          .fn()
-          .mockRejectedValue(new Error("down")),
-      },
-    });
+  it("fails closed on directory error", async () => {
+    mocks.listAccountMembers.mockRejectedValueOnce(
+      new Error("Directory unavailable")
+    );
+
     const result = await resolveXeroPersonMatchAction({
-      clerkUserId: "user_valid123",
       matchId,
       organisationId,
       resolution: "match",
+      userId: "user_valid123",
     });
     expect(result.ok).toBe(false);
     expect((result as { ok: false; error: { code: string } }).error.code).toBe(
@@ -310,7 +301,7 @@ describe("resolveXeroPersonMatchAction", () => {
       organisationId,
       resolution: "match",
     });
-    expect(mocks.clerkClient).not.toHaveBeenCalled();
+
     expect(mocks.revalidatePath).toHaveBeenCalledWith(
       "/settings/integrations/xero/matches"
     );
@@ -319,10 +310,10 @@ describe("resolveXeroPersonMatchAction", () => {
   it("rejects duplicate binding", async () => {
     mocks.database.person.findFirst.mockResolvedValue({ id: "other-person" });
     const result = await resolveXeroPersonMatchAction({
-      clerkUserId: "user_valid123",
       matchId,
       organisationId,
       resolution: "match",
+      userId: "user_valid123",
     });
     expect(result.ok).toBe(false);
     expect(
@@ -333,16 +324,15 @@ describe("resolveXeroPersonMatchAction", () => {
 
   it("rejects malformed id", async () => {
     const result = await resolveXeroPersonMatchAction({
-      clerkUserId: "not-a-user-id",
       matchId,
       organisationId,
       resolution: "match",
+      userId: "not-a-user-id",
     });
     expect(result.ok).toBe(false);
     expect((result as { ok: false; error: { code: string } }).error.code).toBe(
       "validation_error"
     );
-    expect(mocks.clerkClient).not.toHaveBeenCalled();
   });
 
   it("ignore resolution is unaffected", async () => {
@@ -352,6 +342,14 @@ describe("resolveXeroPersonMatchAction", () => {
       resolution: "ignore",
     });
     expect(result).toEqual({ ok: true, value: { resolved: true } });
-    expect(mocks.clerkClient).not.toHaveBeenCalled();
   });
 });
+
+vi.mock("@repo/auth/accounts", () => ({
+  accountDirectory: {
+    inviteMembers: vi.fn(),
+    listInvitations: vi.fn(),
+    listMembers: vi.fn(),
+  },
+  listAccountMembers: mocks.listAccountMembers,
+}));

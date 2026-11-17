@@ -5,12 +5,12 @@ const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
   analyticsFlush: vi.fn(),
   archiveRecord: vi.fn(),
-  auth: vi.fn(),
   availabilityFindFirst: vi.fn(),
   createRecord: vi.fn(),
-  currentUser: vi.fn(),
   deleteDraftRecord: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: vi.fn(),
   listSubmitRecoveryCandidates: vi.fn(),
   organisationFindFirst: vi.fn(),
   restoreRecord: vi.fn(),
@@ -61,8 +61,8 @@ vi.mock("@repo/xero", () => ({
   XeroWriteAdapter: {},
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
+  getSession: mocks.getSession,
 }));
 vi.mock("@repo/availability", () => ({
   archiveRecord: mocks.archiveRecord,
@@ -83,7 +83,10 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
 const {
+  archiveRecordAction,
   createRecordAction,
+  deleteDraftAction,
+  restoreRecordAction,
   listSubmitRecoveryCandidatesAction,
   retrySubmissionAction,
   revertToDraftAction,
@@ -122,28 +125,28 @@ describe("plans actions", () => {
         submitted_at: new Date("2026-09-19T01:00:00.000Z"),
       });
     });
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:viewer" });
-    mocks.currentUser.mockResolvedValue({ id: "user_1" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: "viewer" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
       value: {
-        clerkOrgId: "org_1",
+        accountId: "org_1",
         organisationId: validInput.organisationId,
       },
     });
   });
   it("rejects unauthorised callers", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: null });
+    mocks.getSession.mockResolvedValue({ accountId: "org_1", role: null });
     const result = await createRecordAction(validInput);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("not_authorised");
     }
   });
-  it.each(["org:viewer", "org:manager"])(
+  it.each(["viewer", "manager"])(
     "denies imported recovery reads for %s",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       await expect(
         listSubmitRecoveryCandidatesAction({
           organisationId: validInput.organisationId,
@@ -156,10 +159,10 @@ describe("plans actions", () => {
       expect(mocks.listSubmitRecoveryCandidates).not.toHaveBeenCalled();
     }
   );
-  it.each(["org:admin", "org:owner"])(
+  it.each(["admin", "owner"])(
     "scopes imported recovery reads for %s",
-    async (orgRole) => {
-      mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole });
+    async (role) => {
+      mocks.getSession.mockResolvedValue({ accountId: "org_1", role });
       mocks.listSubmitRecoveryCandidates.mockResolvedValue({
         ok: true,
         value: { candidates: [] },
@@ -170,9 +173,9 @@ describe("plans actions", () => {
       });
       expect(mocks.listSubmitRecoveryCandidates).toHaveBeenCalledWith(
         {
-          actingOrgRole: orgRole,
+          accountId: "org_1",
+          actingRole: role,
           actingUserId: "user_1",
-          clerkOrgId: "org_1",
           organisationId: validInput.organisationId,
           recordId: "00000000-0000-4000-8000-000000000099",
         },
@@ -228,8 +231,8 @@ describe("plans actions", () => {
     expect(mocks.organisationFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
+          account_id: "org_1",
           archived_at: null,
-          clerk_org_id: "org_1",
           id: validInput.organisationId,
         },
       })
@@ -294,7 +297,7 @@ describe("plans actions", () => {
     expect(mocks.availabilityFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           organisation_id: validInput.organisationId,
         }),
       })
@@ -500,6 +503,61 @@ describe("plans actions", () => {
       expect(mocks.updateRecord).not.toHaveBeenCalled();
     }
   );
+  it.each(["viewer", "manager"])(
+    "preserves the %s role across regular plan service calls",
+    async (role) => {
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_1",
+        role,
+        sessionId: "session_1",
+        userId: "user_1",
+      });
+      const recordId = "00000000-0000-4000-8000-000000000099";
+      const recordInput = {
+        organisationId: validInput.organisationId,
+        recordId,
+      };
+      const value = {
+        approval_status: "submitted",
+        id: recordId,
+        submitted_at: new Date("2026-09-19T01:00:00.000Z"),
+        xero_write_error: null,
+      };
+      const services = [
+        mocks.createRecord,
+        mocks.updateRecord,
+        mocks.deleteDraftRecord,
+        mocks.archiveRecord,
+        mocks.restoreRecord,
+        mocks.submitDraftRecord,
+        mocks.retrySubmission,
+        mocks.revertToDraft,
+        mocks.withdrawSubmission,
+      ];
+      for (const service of services) {
+        service.mockResolvedValue({ ok: true, value });
+      }
+      const results = [
+        await createRecordAction(validInput),
+        await updateRecordAction({ ...validInput, recordId }),
+        await deleteDraftAction(recordInput),
+        await archiveRecordAction(recordInput),
+        await restoreRecordAction(recordInput),
+        await submitForApprovalAction(recordInput),
+        await retrySubmissionAction(recordInput),
+        await revertToDraftAction(recordInput),
+        await withdrawSubmissionAction(recordInput),
+      ];
+      for (const result of results) {
+        expect(result.ok).toBe(true);
+      }
+      for (const service of services) {
+        expect(service.mock.calls[0]?.[0]).toEqual(
+          expect.objectContaining({ actingRole: role })
+        );
+      }
+    }
+  );
   it("revalidates expected paths on submit success", async () => {
     mocks.submitDraftRecord.mockResolvedValue({
       ok: true,
@@ -517,9 +575,9 @@ describe("plans actions", () => {
     expect(result.ok).toBe(true);
     expect(mocks.submitDraftRecord).toHaveBeenCalledWith(
       expect.objectContaining({
-        actingOrgRole: "org:viewer",
+        accountId: "org_1",
+        actingRole: "viewer",
         actingUserId: "user_1",
-        clerkOrgId: "org_1",
       }),
       expect.anything()
     );

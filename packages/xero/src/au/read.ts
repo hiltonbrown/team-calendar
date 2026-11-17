@@ -121,7 +121,7 @@ export async function fetchEmployees(input: {
         // treated like a truncated leave-record fetch: return what has been
         // gathered so far as incomplete rather than discarding it.
         log.warn("Xero employee page could not be parsed", {
-          clerkOrgId: input.xeroConnection.clerk_org_id,
+          accountId: input.xeroConnection.account_id,
           organisationId: input.xeroConnection.organisation_id,
           page,
         });
@@ -160,7 +160,7 @@ export async function fetchEmployees(input: {
       page += 1;
     }
     log.warn("Xero employee pagination exceeded the maximum page count", {
-      clerkOrgId: input.xeroConnection.clerk_org_id,
+      accountId: input.xeroConnection.account_id,
       organisationId: input.xeroConnection.organisation_id,
       page: XERO_MAX_PAGES,
     });
@@ -242,7 +242,7 @@ export async function fetchLeaveRecords(input: {
       );
       if (!mappedPage.ok) {
         log.warn("Xero leave record page could not be parsed", {
-          clerkOrgId: input.xeroConnection.clerk_org_id,
+          accountId: input.xeroConnection.account_id,
           organisationId: input.xeroConnection.organisation_id,
           page,
         });
@@ -285,7 +285,7 @@ export async function fetchLeaveRecords(input: {
       page += 1;
     }
     log.warn("Xero leave record pagination exceeded the maximum page count", {
-      clerkOrgId: input.xeroConnection.clerk_org_id,
+      accountId: input.xeroConnection.account_id,
       organisationId: input.xeroConnection.organisation_id,
       page: XERO_MAX_PAGES,
     });

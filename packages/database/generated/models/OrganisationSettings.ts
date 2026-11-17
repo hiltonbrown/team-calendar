@@ -36,7 +36,7 @@ export type OrganisationSettingsSumAggregateOutputType = {
 
 export type OrganisationSettingsMinAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   show_pending_on_calendar: boolean | null
   show_declined_on_approvals: boolean | null
@@ -52,7 +52,7 @@ export type OrganisationSettingsMinAggregateOutputType = {
 
 export type OrganisationSettingsMaxAggregateOutputType = {
   id: string | null
-  clerk_org_id: string | null
+  account_id: string | null
   organisation_id: string | null
   show_pending_on_calendar: boolean | null
   show_declined_on_approvals: boolean | null
@@ -68,7 +68,7 @@ export type OrganisationSettingsMaxAggregateOutputType = {
 
 export type OrganisationSettingsCountAggregateOutputType = {
   id: number
-  clerk_org_id: number
+  account_id: number
   organisation_id: number
   show_pending_on_calendar: number
   show_declined_on_approvals: number
@@ -94,7 +94,7 @@ export type OrganisationSettingsSumAggregateInputType = {
 
 export type OrganisationSettingsMinAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   show_pending_on_calendar?: true
   show_declined_on_approvals?: true
@@ -110,7 +110,7 @@ export type OrganisationSettingsMinAggregateInputType = {
 
 export type OrganisationSettingsMaxAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   show_pending_on_calendar?: true
   show_declined_on_approvals?: true
@@ -126,7 +126,7 @@ export type OrganisationSettingsMaxAggregateInputType = {
 
 export type OrganisationSettingsCountAggregateInputType = {
   id?: true
-  clerk_org_id?: true
+  account_id?: true
   organisation_id?: true
   show_pending_on_calendar?: true
   show_declined_on_approvals?: true
@@ -229,7 +229,7 @@ export type OrganisationSettingsGroupByArgs<ExtArgs extends runtime.Types.Extens
 
 export type OrganisationSettingsGroupByOutputType = {
   id: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   show_pending_on_calendar: boolean
   show_declined_on_approvals: boolean
@@ -268,7 +268,7 @@ export type OrganisationSettingsWhereInput = {
   OR?: Prisma.OrganisationSettingsWhereInput[]
   NOT?: Prisma.OrganisationSettingsWhereInput | Prisma.OrganisationSettingsWhereInput[]
   id?: Prisma.UuidFilter<"OrganisationSettings"> | string
-  clerk_org_id?: Prisma.StringFilter<"OrganisationSettings"> | string
+  account_id?: Prisma.StringFilter<"OrganisationSettings"> | string
   organisation_id?: Prisma.UuidFilter<"OrganisationSettings"> | string
   show_pending_on_calendar?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   show_declined_on_approvals?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
@@ -285,7 +285,7 @@ export type OrganisationSettingsWhereInput = {
 
 export type OrganisationSettingsOrderByWithRelationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
@@ -306,7 +306,7 @@ export type OrganisationSettingsWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.OrganisationSettingsWhereInput | Prisma.OrganisationSettingsWhereInput[]
   OR?: Prisma.OrganisationSettingsWhereInput[]
   NOT?: Prisma.OrganisationSettingsWhereInput | Prisma.OrganisationSettingsWhereInput[]
-  clerk_org_id?: Prisma.StringFilter<"OrganisationSettings"> | string
+  account_id?: Prisma.StringFilter<"OrganisationSettings"> | string
   show_pending_on_calendar?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   show_declined_on_approvals?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
   notify_managers_on_status_change?: Prisma.BoolFilter<"OrganisationSettings"> | boolean
@@ -322,7 +322,7 @@ export type OrganisationSettingsWhereUniqueInput = Prisma.AtLeast<{
 
 export type OrganisationSettingsOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
@@ -346,7 +346,7 @@ export type OrganisationSettingsScalarWhereWithAggregatesInput = {
   OR?: Prisma.OrganisationSettingsScalarWhereWithAggregatesInput[]
   NOT?: Prisma.OrganisationSettingsScalarWhereWithAggregatesInput | Prisma.OrganisationSettingsScalarWhereWithAggregatesInput[]
   id?: Prisma.UuidWithAggregatesFilter<"OrganisationSettings"> | string
-  clerk_org_id?: Prisma.StringWithAggregatesFilter<"OrganisationSettings"> | string
+  account_id?: Prisma.StringWithAggregatesFilter<"OrganisationSettings"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"OrganisationSettings"> | string
   show_pending_on_calendar?: Prisma.BoolWithAggregatesFilter<"OrganisationSettings"> | boolean
   show_declined_on_approvals?: Prisma.BoolWithAggregatesFilter<"OrganisationSettings"> | boolean
@@ -362,7 +362,7 @@ export type OrganisationSettingsScalarWhereWithAggregatesInput = {
 
 export type OrganisationSettingsCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
@@ -378,7 +378,7 @@ export type OrganisationSettingsCreateInput = {
 
 export type OrganisationSettingsUncheckedCreateInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
@@ -394,7 +394,7 @@ export type OrganisationSettingsUncheckedCreateInput = {
 
 export type OrganisationSettingsUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -410,7 +410,7 @@ export type OrganisationSettingsUpdateInput = {
 
 export type OrganisationSettingsUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -426,7 +426,7 @@ export type OrganisationSettingsUncheckedUpdateInput = {
 
 export type OrganisationSettingsCreateManyInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   organisation_id: string
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
@@ -442,7 +442,7 @@ export type OrganisationSettingsCreateManyInput = {
 
 export type OrganisationSettingsUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -457,7 +457,7 @@ export type OrganisationSettingsUpdateManyMutationInput = {
 
 export type OrganisationSettingsUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -478,7 +478,7 @@ export type OrganisationSettingsNullableScalarRelationFilter = {
 
 export type OrganisationSettingsCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
@@ -498,7 +498,7 @@ export type OrganisationSettingsAvgOrderByAggregateInput = {
 
 export type OrganisationSettingsMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
@@ -514,7 +514,7 @@ export type OrganisationSettingsMaxOrderByAggregateInput = {
 
 export type OrganisationSettingsMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
-  clerk_org_id?: Prisma.SortOrder
+  account_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   show_pending_on_calendar?: Prisma.SortOrder
   show_declined_on_approvals?: Prisma.SortOrder
@@ -578,7 +578,7 @@ export type Enumavailability_privacy_modeFieldUpdateOperationsInput = {
 
 export type OrganisationSettingsCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
@@ -593,7 +593,7 @@ export type OrganisationSettingsCreateWithoutOrganisationInput = {
 
 export type OrganisationSettingsUncheckedCreateWithoutOrganisationInput = {
   id?: string
-  clerk_org_id: string
+  account_id: string
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
   notify_managers_on_status_change?: boolean
@@ -624,7 +624,7 @@ export type OrganisationSettingsUpdateToOneWithWhereWithoutOrganisationInput = {
 
 export type OrganisationSettingsUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -639,7 +639,7 @@ export type OrganisationSettingsUpdateWithoutOrganisationInput = {
 
 export type OrganisationSettingsUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  account_id?: Prisma.StringFieldUpdateOperationsInput | string
   show_pending_on_calendar?: Prisma.BoolFieldUpdateOperationsInput | boolean
   show_declined_on_approvals?: Prisma.BoolFieldUpdateOperationsInput | boolean
   notify_managers_on_status_change?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -656,7 +656,7 @@ export type OrganisationSettingsUncheckedUpdateWithoutOrganisationInput = {
 
 export type OrganisationSettingsSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
@@ -673,7 +673,7 @@ export type OrganisationSettingsSelect<ExtArgs extends runtime.Types.Extensions.
 
 export type OrganisationSettingsSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
@@ -690,7 +690,7 @@ export type OrganisationSettingsSelectCreateManyAndReturn<ExtArgs extends runtim
 
 export type OrganisationSettingsSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
@@ -707,7 +707,7 @@ export type OrganisationSettingsSelectUpdateManyAndReturn<ExtArgs extends runtim
 
 export type OrganisationSettingsSelectScalar = {
   id?: boolean
-  clerk_org_id?: boolean
+  account_id?: boolean
   organisation_id?: boolean
   show_pending_on_calendar?: boolean
   show_declined_on_approvals?: boolean
@@ -721,7 +721,7 @@ export type OrganisationSettingsSelectScalar = {
   updated_at?: boolean
 }
 
-export type OrganisationSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "show_pending_on_calendar" | "show_declined_on_approvals" | "notify_managers_on_status_change" | "default_leave_request_advance_days" | "require_decline_reason" | "default_privacy_mode" | "feeds_include_public_holidays_default" | "default_feed_privacy_mode" | "created_at" | "updated_at", ExtArgs["result"]["organisationSettings"]>
+export type OrganisationSettingsOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "account_id" | "organisation_id" | "show_pending_on_calendar" | "show_declined_on_approvals" | "notify_managers_on_status_change" | "default_leave_request_advance_days" | "require_decline_reason" | "default_privacy_mode" | "feeds_include_public_holidays_default" | "default_feed_privacy_mode" | "created_at" | "updated_at", ExtArgs["result"]["organisationSettings"]>
 export type OrganisationSettingsInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
 }
@@ -739,7 +739,7 @@ export type $OrganisationSettingsPayload<ExtArgs extends runtime.Types.Extension
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
-    clerk_org_id: string
+    account_id: string
     organisation_id: string
     show_pending_on_calendar: boolean
     show_declined_on_approvals: boolean
@@ -1176,7 +1176,7 @@ export interface Prisma__OrganisationSettingsClient<T, Null = never, ExtArgs ext
  */
 export interface OrganisationSettingsFieldRefs {
   readonly id: Prisma.FieldRef<"OrganisationSettings", 'String'>
-  readonly clerk_org_id: Prisma.FieldRef<"OrganisationSettings", 'String'>
+  readonly account_id: Prisma.FieldRef<"OrganisationSettings", 'String'>
   readonly organisation_id: Prisma.FieldRef<"OrganisationSettings", 'String'>
   readonly show_pending_on_calendar: Prisma.FieldRef<"OrganisationSettings", 'Boolean'>
   readonly show_declined_on_approvals: Prisma.FieldRef<"OrganisationSettings", 'Boolean'>

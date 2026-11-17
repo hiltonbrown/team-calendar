@@ -28,8 +28,8 @@ const mocks = vi.hoisted(() => ({
   releaseSideEffects: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
-  scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: vi.fn((scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   })),
   submitLeaveApplicationForRegion: vi.fn(),
@@ -146,34 +146,34 @@ const {
   withdrawSubmission,
 } = await import("./submit-service");
 const input = {
-  actingOrgRole: "org:admin",
+  accountId: "org_1",
   actingPersonId: "00000000-0000-4000-8000-000000000012",
+  actingRole: "admin",
   actingUserId: "user_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   recordId: "00000000-0000-4000-8000-000000000099",
 };
 const record = {
+  account_id: input.accountId,
   all_day: true,
   approval_status: "submitted",
-  clerk_org_id: input.clerkOrgId,
   derived_sequence: 2,
   ends_at: new Date("2026-05-05T23:59:59.999Z"),
   failed_action: null,
   id: input.recordId,
   organisation_id: input.organisationId,
   person: {
-    clerk_user_id: input.actingUserId,
     email: "person@example.com",
     first_name: "Test",
     id: "00000000-0000-4000-8000-000000000011",
     last_name: "Person",
     location_id: null,
     manager: {
-      clerk_user_id: "manager_1",
       id: "00000000-0000-4000-8000-000000000012",
+      user_id: "manager_1",
     },
     manager_person_id: "00000000-0000-4000-8000-000000000012",
+    user_id: input.actingUserId,
   },
   person_id: "00000000-0000-4000-8000-000000000011",
   record_type: "annual_leave",
@@ -183,7 +183,7 @@ const record = {
   title: "Annual leave",
 };
 const xeroConnection = {
-  clerk_org_id: input.clerkOrgId,
+  account_id: input.accountId,
   id: "00000000-0000-4000-8000-000000000201",
   organisation_id: input.organisationId,
   payroll_region: "AU",
@@ -326,7 +326,7 @@ describe("submit-service", () => {
       mocks.publishPersistedNotification.mock.invocationCallOrder[0]
     );
     expect(mocks.publishPersistedNotification).toHaveBeenCalledWith({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       notificationId: "notification_1",
       organisationId: input.organisationId,
     });
@@ -358,14 +358,14 @@ describe("submit-service", () => {
       expect(mocks.personFindFirst).toHaveBeenCalledWith({
         select: { id: true },
         where: {
+          account_id: input.accountId,
           archived_at: null,
-          clerk_org_id: input.clerkOrgId,
-          clerk_user_id: input.actingUserId,
           organisation: {
+            account_id: input.accountId,
             archived_at: null,
-            clerk_org_id: input.clerkOrgId,
             is_active: true,
           },
+          user_id: input.actingUserId,
         },
       });
       expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -491,14 +491,14 @@ describe("submit-service", () => {
           source_remote_id: "xero-leave-1",
         }),
         where: expect.objectContaining({
-          clerk_org_id: input.clerkOrgId,
+          account_id: input.accountId,
           organisation_id: input.organisationId,
         }),
       })
     );
     expect(mocks.completeSideEffects).toHaveBeenCalledWith(
       expect.objectContaining({
-        manager: expect.objectContaining({ clerkUserId: "manager_1" }),
+        manager: expect.objectContaining({ userId: "manager_1" }),
         notifyManager: false,
       })
     );
@@ -888,14 +888,14 @@ describe("submit-service", () => {
   it("allows an admin to withdraw another person's approved leave", async () => {
     const adminInput = {
       ...input,
-      actingOrgRole: "org:admin",
+      actingRole: "admin",
       actingUserId: "admin_1",
     };
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({
         ...record,
         approval_status: "approved",
-        person: { ...record.person, clerk_user_id: "other_user" },
+        person: { ...record.person, user_id: "other_user" },
         source_remote_id: "xero-leave-1",
       })
       .mockResolvedValueOnce({
@@ -1246,6 +1246,61 @@ describe("submit-service", () => {
         ok: false,
       });
       expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("role scoping and viewer direct-manager boundary", () => {
+    it("denies a viewer from submitting leave for another person even if linked as direct manager", async () => {
+      const managerPersonId = "00000000-0000-4000-8000-000000000031";
+      mocks.personFindFirst.mockResolvedValue({ id: managerPersonId });
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: "draft",
+        person: {
+          ...record.person,
+          id: "00000000-0000-4000-8000-000000000099",
+          manager_person_id: managerPersonId,
+          user_id: "other_user",
+        },
+      });
+      const viewerInput = {
+        ...input,
+        actingRole: "viewer",
+        actingUserId: "viewer_user",
+      };
+      const result = await submitDraftRecord(viewerInput, mockPort);
+      expect(result).toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+    });
+
+    it("allows a manager to submit leave for their direct report", async () => {
+      const managerPersonId = "00000000-0000-4000-8000-000000000031";
+      mocks.personFindFirst.mockResolvedValue({ id: managerPersonId });
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: "draft",
+        person: {
+          ...record.person,
+          id: "00000000-0000-4000-8000-000000000099",
+          manager_person_id: managerPersonId,
+          user_id: "other_user",
+        },
+      });
+      const managerInput = {
+        ...input,
+        actingRole: "manager",
+        actingUserId: "manager_user",
+      };
+      const result = await submitDraftRecord(managerInput, mockPort);
+      expect(result.ok).toBe(true);
+      expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ approval_status: "submitted" }),
+        })
+      );
     });
   });
 });

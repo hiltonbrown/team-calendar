@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
   database: {
     $transaction: vi.fn(),
     organisation: { findFirst: vi.fn() },
     person: { create: vi.fn() },
   },
   getActiveOrgContext: vi.fn(),
+  getSession: vi.fn(),
   lockPlanLimitMutations: vi.fn(),
   redirect: vi.fn(),
   revalidatePath: vi.fn(),
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/auth/server", () => ({
-  auth: mocks.auth,
+  getSession: mocks.getSession,
   withinLimit: mocks.withinLimit,
 }));
 vi.mock("@repo/database/tenant-client", () => ({
@@ -53,15 +53,15 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 const { createManualPersonAction } = await import("./_actions");
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 
 describe("people/new manual person creation action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: "org_123", orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId: "org_123", role: "admin" });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.database.organisation.findFirst.mockResolvedValue({
       id: organisationId,
@@ -81,9 +81,9 @@ describe("people/new manual person creation action", () => {
 
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated or non-admin callers", async () => {
-      mocks.auth.mockResolvedValue({
-        orgId: "org_123",
-        orgRole: "org:manager",
+      mocks.getSession.mockResolvedValue({
+        accountId: "org_123",
+        role: "manager",
       });
 
       const result = await createManualPersonAction({
@@ -120,7 +120,7 @@ describe("people/new manual person creation action", () => {
       expect(mocks.database.person.create).not.toHaveBeenCalled();
     });
 
-    it("scopes person creation to clerk_org_id and organisation_id", async () => {
+    it("scopes person creation to account_id and organisation_id", async () => {
       await createManualPersonAction({
         email: "JANE@EXAMPLE.COM",
         employmentType: "contractor",
@@ -132,7 +132,7 @@ describe("people/new manual person creation action", () => {
 
       expect(mocks.database.person.create).toHaveBeenCalledWith({
         data: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           email: "jane@example.com",
           employment_type: "contractor",
           first_name: "Jane",
@@ -169,11 +169,11 @@ describe("people/new manual person creation action", () => {
         ok: false,
       });
       expect(mocks.lockPlanLimitMutations).toHaveBeenCalledWith(
-        clerkOrgId,
+        accountId,
         expect.any(Object)
       );
       expect(mocks.withinLimit).toHaveBeenCalledWith(
-        clerkOrgId,
+        accountId,
         organisationId,
         "seats",
         mocks.lockPlanLimitMutations.mock.calls[0]?.[1]

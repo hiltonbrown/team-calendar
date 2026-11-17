@@ -151,8 +151,8 @@ const { labelForRecordType, projectFeedEvents } = await import(
 );
 
 const baseInput = {
+  accountId: "org_projection",
   actingRole: "viewer" as const,
-  clerkOrgId: "org_projection",
   feedId: "30000000-0000-4000-8000-000000000001",
   horizonDays: 30,
   organisationId: "40000000-0000-4000-8000-000000000001",
@@ -948,7 +948,7 @@ describe("projectFeedEvents", () => {
 
     expect(mocks.loadHolidayResolutionData).toHaveBeenCalledTimes(1);
     expect(mocks.loadHolidayResolutionData.mock.calls[0]?.[0]).toEqual({
-      clerkOrgId: baseInput.clerkOrgId,
+      accountId: baseInput.accountId,
       from: "2026-06-20",
       organisationId: baseInput.organisationId,
       to: "2026-07-20",
@@ -1151,7 +1151,7 @@ it("projects an account feed with an owned company filter and separate record id
   expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
     expect.objectContaining({
       where: expect.objectContaining({
-        clerk_org_id: baseInput.clerkOrgId,
+        account_id: baseInput.accountId,
         organisation_id: { in: ["company-a", "company-b"] },
       }),
     })

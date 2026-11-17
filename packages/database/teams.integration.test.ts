@@ -15,24 +15,24 @@ const {
 } = await import("./src/queries/teams.js");
 
 const tenantA = {
-  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  accountId: fixture.tenants[0]?.accountId as string,
   organisationId: fixture.tenants[0]?.organisationId as string,
   teamId: fixture.id("team", 0),
 } as const;
 const tenantB = {
-  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  accountId: fixture.tenants[1]?.accountId as string,
   organisationId: fixture.tenants[1]?.organisationId as string,
   teamId: fixture.id("team", 1),
 } as const;
 type Tenant = typeof tenantA | typeof tenantB;
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const testAccountIds = [tenantA.accountId, tenantB.accountId];
 const scopeOf = (tenant: Tenant) => ({
-  clerkOrgId: tenant.clerkOrgId,
+  accountId: tenant.accountId,
   organisationId: tenant.organisationId,
 });
 
 const cleanTestData = async () => {
-  const scope = { clerk_org_id: { in: testClerkOrgIds } };
+  const scope = { account_id: { in: testAccountIds } };
   await database.availabilityRecord.deleteMany({ where: scope });
   await database.person.deleteMany({ where: scope });
   await database.team.deleteMany({ where: scope });
@@ -42,16 +42,16 @@ const cleanTestData = async () => {
 const createTenant = async (tenant: Tenant, teamName: string) => {
   await database.organisation.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       country_code: "AU",
       id: tenant.organisationId,
-      name: `Test ${tenant.clerkOrgId}`,
+      name: `Test ${tenant.accountId}`,
       timezone: "Australia/Brisbane",
     },
   });
   await database.team.create({
     data: {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       id: tenant.teamId,
       minimum_available_people: 1,
       name: teamName,
@@ -69,8 +69,8 @@ const createPerson = async (
   const id = fixture.id("person", personIndex);
   await database.person.create({
     data: {
+      account_id: tenant.accountId,
       archived_at: state.archived ? new Date() : null,
-      clerk_org_id: tenant.clerkOrgId,
       email: `${fixture.key("person", personIndex)}@example.com`,
       employment_type: "employee",
       first_name: "Test",
@@ -100,9 +100,9 @@ const createRecord = (
   const id = fixture.id("availability-record", recordIndex);
   return database.availabilityRecord.create({
     data: {
+      account_id: tenant.accountId,
       approval_status: overrides.approvalStatus ?? "approved",
       archived_at: overrides.archived ? new Date() : null,
-      clerk_org_id: tenant.clerkOrgId,
       contactability: "contactable",
       derived_uid_key: `test:${id}`,
       // 12 October 2026 in Brisbane (UTC+10), or 09:00 to 13:00 that day.

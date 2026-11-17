@@ -23,8 +23,8 @@ vi.mock("@repo/database", async () => ({
     "@repo/database/tenant-db"
   )),
 
-  scopedQuery: (clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: (accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   }),
 }));
@@ -50,9 +50,9 @@ const { dispatchBalanceRefresh, setBalanceRefreshDispatcher } = await import(
   "./balance-refresh"
 );
 const input = {
+  accountId: "org_1",
   actingRole: "admin" as const,
   actingUserId: "admin_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   personId: "00000000-0000-4000-8000-000000000011",
 };
@@ -90,7 +90,7 @@ describe("dispatchBalanceRefresh", () => {
   );
   it("returns person_not_found and logs when person belongs to another org", async () => {
     mocks.personFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      clerk_org_id: "org_2",
+      account_id: "org_2",
       organisation_id: "00000000-0000-4000-8000-000000000002",
     });
     const result = await dispatchBalanceRefresh(input);
@@ -101,7 +101,7 @@ describe("dispatchBalanceRefresh", () => {
     expect(mocks.logError).toHaveBeenCalledWith(
       "Cross-tenant resource access attempt",
       {
-        actingClerkOrgId: input.clerkOrgId,
+        actingAccountId: input.accountId,
         actingOrganisationId: input.organisationId,
         resourceId: input.personId,
         resourceType: "person",
@@ -110,7 +110,7 @@ describe("dispatchBalanceRefresh", () => {
   });
   it("returns identical error for cross-org person and non-existent person", async () => {
     mocks.personFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      clerk_org_id: "org_2",
+      account_id: "org_2",
       organisation_id: "00000000-0000-4000-8000-000000000002",
     });
     const crossOrgResult = await dispatchBalanceRefresh(input);
@@ -194,7 +194,7 @@ describe("dispatchBalanceRefresh", () => {
       value: { queued: false, reason: "dispatch_failed" },
     });
     expect(dispatcher).toHaveBeenCalledWith({
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       connectionId: "xero-tenant-1",
       dispatchedBy: input.actingUserId,
       organisationId: input.organisationId,
@@ -212,7 +212,7 @@ describe("dispatchBalanceRefresh", () => {
       const result = await dispatchBalanceRefresh({ ...input, actingRole });
       expect(result).toEqual({ ok: true, value: { queued: true } });
       expect(dispatcher).toHaveBeenCalledWith({
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         connectionId: "xero-tenant-1",
         dispatchedBy: input.actingUserId,
         organisationId: input.organisationId,

@@ -47,8 +47,8 @@ export interface XeroMutationIdentity {
 }
 
 export interface PrepareLeaveMutationInput {
+  accountId: string;
   action: "create" | "approve" | "decline" | "withdraw";
-  clerkOrgId: string;
   employeeId: string;
   endsAt?: Date;
   leaveTypeId?: string;
@@ -61,7 +61,7 @@ export interface PrepareLeaveMutationInput {
 }
 
 export interface SubmitLeaveInput {
-  clerkOrgId: string;
+  accountId: string;
   employeeId: string;
   endsAt: Date;
   leaveTypeId: string;
@@ -90,7 +90,7 @@ export interface ProviderLeaveCandidate {
 }
 
 export interface WithdrawLeaveInput {
-  clerkOrgId: string;
+  accountId: string;
   employeeId: string;
   mutation?: XeroMutationIdentity;
   organisationId: string;
@@ -98,7 +98,7 @@ export interface WithdrawLeaveInput {
 }
 
 export interface ApproveLeaveInput {
-  clerkOrgId: string;
+  accountId: string;
   employeeId: string;
   mutation?: XeroMutationIdentity;
   organisationId: string;
@@ -106,7 +106,7 @@ export interface ApproveLeaveInput {
 }
 
 export interface DeclineLeaveInput {
-  clerkOrgId: string;
+  accountId: string;
   employeeId: string;
   mutation?: XeroMutationIdentity;
   organisationId: string;
@@ -123,7 +123,7 @@ export interface ExternalWritePort {
     input: DeclineLeaveInput
   ) => Promise<Result<void, ProviderWriteError>>;
   findLeaveApplicationCandidates?: (input: {
-    clerkOrgId: string;
+    accountId: string;
     employeeId: string;
     expectedXeroTenantId?: string;
     organisationId: string;
@@ -138,14 +138,14 @@ export interface ExternalWritePort {
   ) => Promise<Result<ProviderMutationRequest, ProviderWriteError>>;
   resolveEmployeeId: (input: {
     personId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   }) => Promise<Result<string, ProviderResolutionError>>;
 
   resolveLeaveTypeId: (input: {
     personId: string;
     recordType: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
   }) => Promise<Result<string, ProviderResolutionError>>;
 

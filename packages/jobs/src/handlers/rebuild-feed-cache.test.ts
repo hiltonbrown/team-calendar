@@ -80,12 +80,12 @@ vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn() },
 }));
 const { rebuildFeedCache } = await import("./rebuild-feed-cache");
-const CLERK_ORG_ID = "org_rebuild";
+const ACCOUNT_ID = "org_rebuild";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const FEED_ID = "20000000-0000-4000-8000-000000000001";
 function input(overrides: Record<string, unknown> = {}) {
   return {
-    clerkOrgId: CLERK_ORG_ID,
+    accountId: ACCOUNT_ID,
     feedId: FEED_ID,
     organisationId: ORGANISATION_ID,
     ...overrides,
@@ -106,7 +106,14 @@ it("throws execution failures with valid input at the queue boundary", async () 
   });
   await expect(
     handler({
-      event: { data: input() },
+      event: {
+        data: {
+          account_id: ACCOUNT_ID,
+          identity_generation: "gen_v1",
+          organisation_id: ORGANISATION_ID,
+          ...{ feedId: FEED_ID },
+        },
+      },
       step: {
         run: (_name: string, execute: () => Promise<unknown>) => execute(),
       },
@@ -130,18 +137,18 @@ describe("rebuildFeedCache", () => {
     expect(result.ok).toBe(true);
     expect(mocks.renderFeedBody).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         feedId: FEED_ID,
         organisationId: null,
       })
     );
   });
-  it("scopes the feed lookup by both clerk org and organisation", async () => {
+  it("scopes the feed lookup by both account and organisation", async () => {
     await rebuildFeedCache(input());
     expect(mocks.feedFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: CLERK_ORG_ID,
+          account_id: ACCOUNT_ID,
           id: FEED_ID,
           organisation_id: ORGANISATION_ID,
           status: "active",
@@ -158,7 +165,7 @@ describe("rebuildFeedCache", () => {
     expect(mocks.invalidateFeedCache).toHaveBeenCalledWith({ feedId: FEED_ID });
     expect(mocks.renderFeedBody).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkOrgId: CLERK_ORG_ID,
+        accountId: ACCOUNT_ID,
         feedId: FEED_ID,
         organisationId: ORGANISATION_ID,
         privacyMode: "named",

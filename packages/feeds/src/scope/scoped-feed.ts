@@ -4,16 +4,16 @@ import { scopedTo } from "@repo/database";
 // makes this specific to the feeds table, which is why it lives here rather
 // than in @repo/database.
 export function scopedFeed(input: {
-  clerkOrgId: string;
+  accountId: string;
   feedId: string;
   organisationId: string | null;
 }) {
   const scope =
     input.organisationId === null
-      ? { clerk_org_id: input.clerkOrgId }
+      ? { account_id: input.accountId }
       : scopedTo({ ...input, organisationId: input.organisationId });
   return {
-    clerk_org_id: scope.clerk_org_id,
+    account_id: scope.account_id,
     id: input.feedId,
     ...(input.organisationId === null
       ? { organisation_id: null }

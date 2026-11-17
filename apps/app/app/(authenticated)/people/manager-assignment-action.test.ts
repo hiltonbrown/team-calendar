@@ -1,16 +1,15 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  auth: vi.fn(),
   effects: [] as Array<() => Promise<void>>,
+  getSession: vi.fn(),
   revalidate: vi.fn(),
   setManager: vi.fn(),
   transaction: vi.fn(),
 }));
 vi.mock("@repo/auth/server", () => ({
-  auth: state.auth,
-  clerkClient: vi.fn(),
-  currentUser: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getSession: state.getSession,
 }));
 vi.mock("@repo/availability", () => ({ setPersonManager: state.setManager }));
 vi.mock("@repo/database", () => ({
@@ -33,9 +32,9 @@ const input = {
 beforeEach(() => {
   vi.clearAllMocks();
   state.effects = [];
-  state.auth.mockResolvedValue({
-    orgId: "account-A",
-    orgRole: "org:owner",
+  state.getSession.mockResolvedValue({
+    accountId: "account-A",
+    role: "owner",
     userId: "user-1",
   });
   state.setManager.mockResolvedValue({
@@ -64,20 +63,20 @@ test("manager assignment uses the authenticated account and an owned write scope
   expect(state.setManager).toHaveBeenCalledWith(
     {
       ...input,
+      accountId: "account-A",
       actingRole: "owner",
       actingUserId: "user-1",
-      clerkOrgId: "account-A",
     },
     expect.any(Object)
   );
   expect(state.revalidate).toHaveBeenCalledWith("/people");
 });
-test.each(["org:manager", "org:viewer"])(
+test.each(["manager", "viewer"])(
   "%s is rejected before starting a transaction",
-  async (orgRole) => {
-    state.auth.mockResolvedValue({
-      orgId: "account-A",
-      orgRole,
+  async (role) => {
+    state.getSession.mockResolvedValue({
+      accountId: "account-A",
+      role,
       userId: "user-1",
     });
     expect(await setPersonManagerAction(input)).toMatchObject({
@@ -96,3 +95,11 @@ test("a rejected graph change schedules no cache revalidation", async () => {
   expect(state.effects).toHaveLength(0);
   expect(state.revalidate).not.toHaveBeenCalled();
 });
+
+vi.mock("@repo/auth/accounts", () => ({
+  accountDirectory: {
+    inviteMembers: vi.fn(),
+    listInvitations: vi.fn(),
+    listMembers: vi.fn(),
+  },
+}));

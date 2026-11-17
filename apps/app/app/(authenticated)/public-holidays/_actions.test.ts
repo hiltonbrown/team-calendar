@@ -1,3 +1,5 @@
+import { hasPermission as can } from "@repo/auth/permissions";
+
 const tenantPoolMocks = vi.hoisted(() => ({
   organisationFindFirst: vi.fn((query: { where: { id?: string } }) =>
     Promise.resolve(
@@ -59,11 +61,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   addCustomHoliday: vi.fn(),
-  currentUser: vi.fn(),
   deleteCustomHoliday: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getCurrentUser: vi.fn(),
+  hasPermission: vi.fn(),
   hidePublicHoliday: vi.fn(),
-  requireRole: vi.fn(),
   restorePublicHoliday: vi.fn(),
   revalidatePath: vi.fn(),
   setLocalHolidayEnabled: vi.fn(),
@@ -71,11 +73,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
-  requireOrg: () => Promise.resolve("org_123"),
-  requireRole: mocks.requireRole,
+  hasPermission: mocks.hasPermission,
+  requireAccount: () => Promise.resolve("org_123"),
 }));
 vi.mock("@repo/auth/server", () => ({
-  currentUser: mocks.currentUser,
+  getCurrentUser: mocks.getCurrentUser,
 }));
 vi.mock("@repo/availability", () => ({
   addCustomHoliday: mocks.addCustomHoliday,
@@ -104,7 +106,7 @@ const {
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const holidayId = "00000000-0000-4000-8000-000000000002";
 const locationId = "00000000-0000-4000-8000-000000000003";
-const clerkOrgId = "org_123";
+const accountId = "org_123";
 const userId = "user_456";
 const holidayKey = "au-qld-2026-08-12-royal-queensland-show";
 const preferenceResult = {
@@ -115,13 +117,14 @@ const preferenceResult = {
 describe("public-holidays server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireRole.mockImplementation((role: string) =>
-      Promise.resolve(role === "org:admin")
+    mocks.hasPermission.mockImplementation(
+      (request: import("@repo/auth/permissions").PermissionRequest) =>
+        Promise.resolve(can("admin", request))
     );
-    mocks.currentUser.mockResolvedValue({ id: userId });
+    mocks.getCurrentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
       ok: true,
-      value: { clerkOrgId, organisationId },
+      value: { accountId, organisationId },
     });
     mocks.addCustomHoliday.mockResolvedValue({
       ok: true,
@@ -142,7 +145,7 @@ describe("public-holidays server actions", () => {
 
   describe("authorisation and scoping", () => {
     it("rejects unauthenticated callers", async () => {
-      mocks.currentUser.mockResolvedValue(null);
+      mocks.getCurrentUser.mockResolvedValue(null);
 
       const result = await hideHolidayAction({ holidayKey, organisationId });
 
@@ -154,7 +157,7 @@ describe("public-holidays server actions", () => {
     });
 
     it("rejects callers without an admin or owner role", async () => {
-      mocks.requireRole.mockResolvedValue(false);
+      mocks.hasPermission.mockResolvedValue(false);
 
       const result = await hideHolidayAction({ holidayKey, organisationId });
 
@@ -163,8 +166,9 @@ describe("public-holidays server actions", () => {
     });
 
     it("passes the owner role to the preference service", async () => {
-      mocks.requireRole.mockImplementation((role: string) =>
-        Promise.resolve(role === "org:owner")
+      mocks.hasPermission.mockImplementation(
+        (request: import("@repo/auth/permissions").PermissionRequest) =>
+          Promise.resolve(can("owner", request))
       );
 
       await hideHolidayAction({ holidayKey, organisationId });
@@ -184,7 +188,7 @@ describe("public-holidays server actions", () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(mocks.requireRole).not.toHaveBeenCalled();
+      expect(mocks.hasPermission).not.toHaveBeenCalled();
       expect(mocks.setLocalHolidayEnabled).not.toHaveBeenCalled();
     });
 
@@ -200,9 +204,9 @@ describe("public-holidays server actions", () => {
       });
       expect(mocks.hidePublicHoliday).toHaveBeenCalledWith(
         {
+          accountId,
           actingRole: "admin",
           actingUserId: userId,
-          clerkOrgId,
           holidayKey,
           locationId: null,
           organisationId,
@@ -230,8 +234,8 @@ describe("public-holidays server actions", () => {
       });
       expect(mocks.addCustomHoliday).toHaveBeenCalledWith(
         expect.objectContaining({
+          accountId,
           appliesToAllJurisdictions: false,
-          clerkOrgId,
           countryCode: "AU",
           name: "Company Day Off",
           organisationId,
@@ -273,7 +277,7 @@ describe("public-holidays server actions", () => {
         value: { message: "Company Day Off deleted." },
       });
       expect(mocks.deleteCustomHoliday).toHaveBeenCalledWith(
-        clerkOrgId,
+        accountId,
         organisationId,
         holidayId,
         expect.any(Object)

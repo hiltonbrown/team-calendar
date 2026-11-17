@@ -1,10 +1,10 @@
-import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { assertTenantDb, type TenantDb } from "../tenant-db";
 import { scopedQuery } from "../tenant-query";
 
 export interface PersonData {
-  clerkOrgId: string;
+  accountId: string;
   createdAt: Date;
   email: string;
   employmentType: string;
@@ -27,20 +27,20 @@ interface PeopleFilters {
 }
 
 export async function listPeopleForOrganisation(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   filters: PeopleFilters | undefined,
   db: TenantDb
 ): Promise<Result<PersonData[]>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
       const people = await tenantDb.person.findMany({
         orderBy: { first_name: "asc" },
         select: {
-          clerk_org_id: true,
+          account_id: true,
           created_at: true,
           email: true,
           employment_type: true,
@@ -56,7 +56,7 @@ export async function listPeopleForOrganisation(
           updated_at: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           ...(filters?.teamId && { team_id: filters.teamId }),
           ...(filters?.locationId && { location_id: filters.locationId }),
           ...(filters?.isActive !== undefined && {
@@ -82,7 +82,7 @@ export async function listPeopleForOrganisation(
 }
 
 export async function getPersonProfile(
-  clerkOrgId: ClerkOrgId,
+  accountId: AccountId,
   organisationId: OrganisationId,
   personId: PersonId,
   db: TenantDb
@@ -95,13 +95,13 @@ export async function getPersonProfile(
   >
 > {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
       const person = await tenantDb2.person.findFirst({
         select: {
-          clerk_org_id: true,
+          account_id: true,
           created_at: true,
           email: true,
           employment_type: true,
@@ -129,7 +129,7 @@ export async function getPersonProfile(
           updated_at: true,
         },
         where: {
-          ...scopedQuery(clerkOrgId, organisationId),
+          ...scopedQuery(accountId, organisationId),
           id: personId,
         },
       });
@@ -163,7 +163,7 @@ export async function getPersonProfile(
 
 function toPerson(p: {
   id: string;
-  clerk_org_id: string;
+  account_id: string;
   organisation_id: string;
   team_id: string | null;
   location_id: string | null;
@@ -178,7 +178,7 @@ function toPerson(p: {
   updated_at: Date;
 }): PersonData {
   return {
-    clerkOrgId: p.clerk_org_id,
+    accountId: p.account_id,
     createdAt: p.created_at,
     email: p.email,
     employmentType: p.employment_type,

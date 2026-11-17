@@ -12,7 +12,7 @@ const fixture = allocateLiveTestFixture(
 const { systemDatabase: database, getAuthoritativeUsageCount } = await import(
   "./index.js"
 );
-const clerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
+const accountId = fixture.tenants[0]?.accountId as string;
 const activeOrganisationId = fixture.tenants[0]?.organisationId as string;
 const archivedOrganisationId = fixture.tenants[1]?.organisationId as string;
 describe("authoritative billing usage", () => {
@@ -21,15 +21,15 @@ describe("authoritative billing usage", () => {
     await database.organisation.createMany({
       data: [
         {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           country_code: "AU",
           id: activeOrganisationId,
           is_active: true,
           name: "Active billing test organisation",
         },
         {
+          account_id: accountId,
           archived_at: new Date("2026-01-01T00:00:00.000Z"),
-          clerk_org_id: clerkOrgId,
           country_code: "AU",
           id: archivedOrganisationId,
           is_active: false,
@@ -76,28 +76,28 @@ describe("authoritative billing usage", () => {
       ],
     });
     await expect(
-      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
-        getAuthoritativeUsageCount(clerkOrgId, "seats", db)
+      withTestTenantDb(tenantTestAccount(accountId), (db) =>
+        getAuthoritativeUsageCount(accountId, "seats", db)
       )
     ).resolves.toBe(1);
     await expect(
-      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
-        getAuthoritativeUsageCount(clerkOrgId, "feeds", db)
+      withTestTenantDb(tenantTestAccount(accountId), (db) =>
+        getAuthoritativeUsageCount(accountId, "feeds", db)
       )
     ).resolves.toBe(1);
     await expect(
-      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
-        getAuthoritativeUsageCount(clerkOrgId, "payroll_entities", db)
+      withTestTenantDb(tenantTestAccount(accountId), (db) =>
+        getAuthoritativeUsageCount(accountId, "payroll_entities", db)
       )
     ).resolves.toBe(1);
     await expect(
-      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
-        getAuthoritativeUsageCount(clerkOrgId, "organisations", db)
+      withTestTenantDb(tenantTestAccount(accountId), (db) =>
+        getAuthoritativeUsageCount(accountId, "organisations", db)
       )
     ).resolves.toBe(1);
     await expect(
-      withTestTenantDb(tenantTestAccount(clerkOrgId), (db) =>
-        getAuthoritativeUsageCount(clerkOrgId, "connections", db)
+      withTestTenantDb(tenantTestAccount(accountId), (db) =>
+        getAuthoritativeUsageCount(accountId, "connections", db)
       )
     ).resolves.toBe(1);
   });
@@ -108,8 +108,8 @@ function person(
   archivedAt: Date | null
 ): Prisma.PersonCreateManyInput {
   return {
+    account_id: accountId,
     archived_at: archivedAt,
-    clerk_org_id: clerkOrgId,
     email: `${id}@example.com`,
     employment_type: "employee",
     first_name: "Billing",
@@ -126,8 +126,8 @@ function feed(
   archivedAt: Date | null
 ): Prisma.FeedCreateManyInput {
   return {
+    account_id: accountId,
     archived_at: archivedAt,
-    clerk_org_id: clerkOrgId,
     id,
     name: `Billing test ${id}`,
     organisation_id: activeOrganisationId,
@@ -142,7 +142,7 @@ function connection(
   disconnectedAt: Date | null
 ): Prisma.XeroConnectionCreateManyInput {
   return {
-    clerk_org_id: clerkOrgId,
+    account_id: accountId,
     disconnected_at: disconnectedAt,
     id,
     organisation_id:
@@ -154,11 +154,11 @@ function connection(
 }
 async function cleanTestData() {
   await database.xeroConnection.deleteMany({
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
-  await database.feed.deleteMany({ where: { clerk_org_id: clerkOrgId } });
-  await database.person.deleteMany({ where: { clerk_org_id: clerkOrgId } });
+  await database.feed.deleteMany({ where: { account_id: accountId } });
+  await database.person.deleteMany({ where: { account_id: accountId } });
   await database.organisation.deleteMany({
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
 }

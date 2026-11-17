@@ -38,42 +38,42 @@
     "adm-zip": "0.6.1",
     "fast-uri": "3.1.6",
     "hono": "4.12.34",
-    "import-in-the-middle": "3.5.2",
+    "import-in-the-middle": "3.6.0",
     "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
-    "next": "16.4.3",
-    "parse5": "^7.2.1",
+    "next": "16.4.6",
     "protobufjs": "7.6.5",
     "require-in-the-middle": "8.0.1",
     "vite": "8.3.5"
   },
   "dependencies": {
-    "@clack/prompts": "^1.8.1",
-    "commander": "^15.0.0",
-    "nypm": "^0.6.11"
+    "@clack/prompts": "^1.9.0",
+    "commander": "^15.1.0",
+    "nypm": "^0.6.12"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.14",
-    "@clerk/testing": "^2.2.50",
-    "@playwright/test": "1.64.1",
+    "@biomejs/biome": "2.6.8",
+    "@playwright/test": "1.65.1",
+    "@repo/auth": "*",
     "@repo/billing": "*",
     "@repo/database": "*",
     "@repo/typescript-config": "*",
-    "@turbo/gen": "^2.11.10",
-    "@types/node": "^26.6.5",
+    "@turbo/gen": "^2.11.11",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
-    "inngest-cli": "1.49.0",
+    "inngest-cli": "1.53.0",
     "pg": "^8.23.1",
     "tsup": "^9.0.0",
-    "turbo": "^2.11.10",
+    "turbo": "^2.11.11",
     "typescript": "^7.0.2",
-    "ultracite": "8.0.2",
-    "vitest": "^5.0.5",
+    "typescript-compiler-api": "npm:typescript@5.9.3",
+    "ultracite": "8.2.1",
+    "vitest": "^5.1.0",
     "zod": "^4.6.7"
   },
   "packageManager": "bun@1.4.0",
   "engines": {
-    "node": "22 || >=24.0.0"
+    "node": "22.x"
   },
   "patchedDependencies": {
     "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"

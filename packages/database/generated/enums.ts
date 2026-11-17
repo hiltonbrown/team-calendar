@@ -9,6 +9,34 @@
 * 🟢 You can import this file directly.
 */
 
+export const auth_member_role = {
+  owner: 'owner',
+  admin: 'admin',
+  manager: 'manager',
+  viewer: 'viewer'
+} as const
+
+export type auth_member_role = (typeof auth_member_role)[keyof typeof auth_member_role]
+
+
+export const auth_provisioning_status = {
+  pending: 'pending',
+  ready: 'ready'
+} as const
+
+export type auth_provisioning_status = (typeof auth_provisioning_status)[keyof typeof auth_provisioning_status]
+
+
+export const auth_invitation_status = {
+  pending: 'pending',
+  accepted: 'accepted',
+  rejected: 'rejected',
+  canceled: 'canceled'
+} as const
+
+export type auth_invitation_status = (typeof auth_invitation_status)[keyof typeof auth_invitation_status]
+
+
 export const onboarding_step = {
   details: 'details',
   xero: 'xero',

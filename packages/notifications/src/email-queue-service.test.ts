@@ -124,9 +124,9 @@ describe("email-queue-service", () => {
   it("creates a durable queue row with preference URL", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
+        accountId: "org_1",
         actionUrl: "/plans?recordId=00000000-0000-4000-8000-000000000099",
         body: "Approved.",
-        clerkOrgId: "org_1",
         emailTemplate: "LeaveApproved",
         notificationId: "00000000-0000-4000-8000-000000000101",
         notificationType: "leave_approved",
@@ -138,9 +138,9 @@ describe("email-queue-service", () => {
       (db) =>
         enqueueNotificationEmail(
           {
+            accountId: "org_1",
             actionUrl: "/plans?recordId=00000000-0000-4000-8000-000000000099",
             body: "Approved.",
-            clerkOrgId: "org_1",
             emailTemplate: "LeaveApproved",
             notificationId: "00000000-0000-4000-8000-000000000101",
             notificationType: "leave_approved",
@@ -186,7 +186,7 @@ describe("email-queue-service", () => {
     expect(mocks.poolTransaction).toHaveBeenCalledOnce();
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { clerk_org_id: "org_1", status: "queued" },
+        where: { account_id: "org_1", status: "queued" },
       })
     );
   });
@@ -229,7 +229,7 @@ describe("email-queue-service", () => {
         status: "queued",
       },
       where: {
-        clerk_org_id: "org_1",
+        account_id: "org_1",
         id: "00000000-0000-4000-8000-000000000201",
       },
     });

@@ -9,14 +9,14 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("./billing", () => ({
   getPlanLimits: mocks.limits,
-  hasUnresolvedStripeEventForOrg: mocks.unhealthy,
+  hasUnresolvedStripeEventForAccount: mocks.unhealthy,
 }));
 
 import { checkPayrollEntityEntitlement } from "./payroll-entitlements";
 
 const tx = {
   $queryRaw: mocks.queryRaw,
-  clerkOrgSubscription: { findFirst: mocks.subscription },
+  accountSubscription: { findFirst: mocks.subscription },
   organisation: { count: mocks.count },
   planLimit: { findFirst: mocks.limits },
 };

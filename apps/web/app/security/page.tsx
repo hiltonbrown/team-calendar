@@ -52,7 +52,7 @@ const SecurityPage = () => (
           <ul>
             <li>
               <Check aria-hidden="true" size={18} />
-              Clerk-authenticated product routes
+              Authenticated product routes with optimistic proxy protection
             </li>
             <li>
               <Check aria-hidden="true" size={18} />
@@ -93,14 +93,14 @@ const SecurityPage = () => (
         />
         <div className={styles.controlRows}>
           <Control title="Identity and route boundary">
-            Clerk provides identity and organisation membership. Authenticated
-            product routes are protected at the route boundary, while sensitive
-            services also enforce their own scope.
+            Self-hosted Better Auth provides identity and organisation
+            membership. Authenticated product routes are protected at the route
+            boundary, while sensitive services also enforce their own scope.
           </Control>
           <Control title="Tenant and organisation scope">
-            A Clerk Organisation is the top-level tenant boundary. Data access
-            applies both the Clerk organisation ID and the selected payroll
-            organisation where required.
+            An Account is the top-level tenant boundary. Data access applies
+            both the Account ID and the selected payroll organisation where
+            required.
           </Control>
           <Control title="Role boundaries">
             Owners and admins administer configuration. Managers are limited to
@@ -165,8 +165,8 @@ const SecurityPage = () => (
             authenticated Xero integration.
           </FlowStep>
           <FlowStep title="Team Calendar tenant boundary">
-            Canonical records are processed within Clerk organisation and
-            payroll organisation scope.
+            Canonical records are processed within Account and payroll
+            organisation scope.
           </FlowStep>
           <FlowStep title="Encrypted token and primary data storage">
             Primary records are stored in Neon PostgreSQL. Xero OAuth tokens
@@ -184,9 +184,9 @@ const SecurityPage = () => (
         <div className={styles.providerNote}>
           <h3>Processing locations depend on configuration</h3>
           <p>
-            Vercel, Neon, Clerk, Redis/KV and configured analytics or
-            observability providers participate in processing. Region and
-            replication depend on deployed account configuration.{" "}
+            Vercel, Neon, Redis/KV and configured analytics or observability
+            providers participate in processing. Region and replication depend
+            on deployed account configuration.{" "}
             <a className="marketing-content-link" href="/contact">
               Ask us about a residency requirement
             </a>

@@ -41,8 +41,8 @@ vi.mock("@repo/database", async () => ({
   markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
   persistSubmitRecoveryMerge: mocks.persistMerge,
   releaseSubmitRecoverySideEffects: mocks.releaseSideEffects,
-  scopedTo: (scope: { clerkOrgId: string; organisationId: string }) => ({
-    clerk_org_id: scope.clerkOrgId,
+  scopedTo: (scope: { accountId: string; organisationId: string }) => ({
+    account_id: scope.accountId,
     organisation_id: scope.organisationId,
   }),
 }));
@@ -90,9 +90,9 @@ const {
 } = await import("./submit-recovery-service");
 
 const input = {
-  actingOrgRole: "org:admin" as const,
+  accountId: "org_1",
+  actingRole: "admin" as const,
   actingUserId: "admin_1",
-  clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   recordId: "00000000-0000-4000-8000-000000000099",
 };
@@ -102,10 +102,10 @@ const record = {
   ends_at: new Date("2026-05-05T00:00:00.000Z"),
   id: input.recordId,
   person: {
-    clerk_user_id: "employee_1",
     id: "person_1",
     location_id: null,
-    manager: { clerk_user_id: "manager_user_1", id: "manager_person_1" },
+    manager: { id: "manager_person_1", user_id: "manager_user_1" },
+    user_id: "employee_1",
   },
   person_id: "person_1",
   record_type: "annual_leave",
@@ -192,7 +192,7 @@ describe("submit recovery service", () => {
 
   it("rejects non-admin recovery before provider or database reads", async () => {
     const result = await listSubmitRecoveryCandidates(
-      { ...input, actingOrgRole: "org:viewer" },
+      { ...input, actingRole: "viewer" },
       port
     );
 
@@ -215,8 +215,8 @@ describe("submit recovery service", () => {
         ...record,
         person: {
           ...record.person,
-          clerk_user_id: "employee_1",
           id: "person_1",
+          user_id: "employee_1",
         },
       })
       .mockResolvedValueOnce(null);
@@ -340,8 +340,8 @@ describe("submit recovery service", () => {
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        account_id: input.accountId,
         action: "availability_records.approval_recovery_attached",
-        clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
       }),
     });
@@ -886,7 +886,7 @@ describe("administrator imported leave transition recovery", () => {
         expect.objectContaining({
           data: expect.objectContaining({ approval_status: localStatus }),
           where: expect.objectContaining({
-            clerk_org_id: input.clerkOrgId,
+            account_id: input.accountId,
             organisation_id: input.organisationId,
             source_remote_id: "remote_1",
           }),

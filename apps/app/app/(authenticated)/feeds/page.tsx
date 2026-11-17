@@ -1,6 +1,7 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import { hasPermission as can } from "@repo/auth/permissions";
+import { getCurrentUser, getSession } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import { TENANT_READ_TRANSACTION_OPTIONS, withTenantDb } from "@repo/database";
 import { getOwnFeedEligibility, listFeeds, normaliseRole } from "@repo/feeds";
 import { PauseIcon, UserRoundXIcon } from "lucide-react";
@@ -9,7 +10,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { OtherFeedsList } from "@/components/feed/other-feeds-list";
 import { YourCalendar } from "@/components/feed/your-calendar";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { recommendFeed } from "@/lib/feeds/recommend-feed";
 import { withOrg } from "@/lib/navigation/org-url";
 import { resolveActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
@@ -30,28 +31,32 @@ interface FeedPageProps {
 // provider actions, then other feeds the person can use. Feed administration
 // lives on the feed detail page and S-21 `/settings/feeds`.
 const FeedPage = async ({ searchParams }: FeedPageProps) => {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ feeds: ["read"] });
   const { org } = await searchParams;
   const orgParam = Array.isArray(org) ? org[0] : org;
-  const [{ orgRole }, user, account] = await Promise.all([
-    auth(),
-    currentUser(),
-    requireOrg(),
+  const [{ role: sessionRole }, user, account] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+    requireAccount(),
   ]);
-  const clerkOrgId = account as ClerkOrgId;
-  const role = normaliseRole(orgRole);
-  const isAdmin =
-    role === "admin" ||
-    role === "owner" ||
-    role === "org:admin" ||
-    role === "org:owner";
+  const accountId = account as AccountId;
+  const role = normaliseRole(sessionRole);
+  const isAdmin = can(role, { feeds: ["manageAll"] });
 
   const { organisationId, orgQueryValue, feedsResult, eligibilityResult } =
     await withTenantDb(
-      clerkOrgId,
+      accountId,
       async (db) => {
         const context = await resolveActiveOrgPageContext(
-          clerkOrgId,
+          accountId,
           orgParam,
           db
         );
@@ -60,9 +65,9 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
           ? ([
               await listFeeds(
                 {
+                  accountId,
                   actingRole: role,
                   actingUserId: user.id,
-                  clerkOrgId,
                   filters: { status: ["active", "paused"] },
                   organisationId: scopedOrganisationId,
                   pagination: { pageSize: 100 },
@@ -71,8 +76,8 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
               ),
               await getOwnFeedEligibility(
                 {
+                  accountId,
                   actingUserId: user.id,
-                  clerkOrgId,
                   organisationId: scopedOrganisationId,
                 },
                 db

@@ -29,24 +29,24 @@ describe("local persistence integration", async () => {
   const { systemDatabase: database } = await import("@repo/database");
   const { syncXeroLeaveBalances } = await import("./sync-xero-leave-balances");
   const tenantA = {
-    authorisationId: fixture.id("authorisation", 0),
-    clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+    accountId: fixture.tenants[0]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 0),
     connectionId: fixture.id("connection", 0),
     organisationId: fixture.tenants[0]?.organisationId as string,
     personId: fixture.id("person", 0),
     xeroEmployeeId: fixture.id("employee", 0),
   } as const;
   const tenantB = {
-    authorisationId: fixture.id("authorisation", 1),
-    clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+    accountId: fixture.tenants[1]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 1),
     connectionId: fixture.id("connection", 1),
     organisationId: fixture.tenants[1]?.organisationId as string,
     personId: fixture.id("person", 1),
     xeroEmployeeId: tenantA.xeroEmployeeId,
   } as const;
   const tenantNz = {
-    authorisationId: fixture.id("authorisation", 2),
-    clerkOrgId: fixture.tenants[2]?.clerkOrgId as string,
+    accountId: fixture.tenants[2]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 2),
     connectionId: fixture.id("connection", 2),
     countryCode: "NZ",
     organisationId: fixture.tenants[2]?.organisationId as string,
@@ -55,8 +55,8 @@ describe("local persistence integration", async () => {
     xeroEmployeeId: fixture.id("employee", 2),
   } as const;
   const tenantUk = {
-    authorisationId: fixture.id("authorisation", 3),
-    clerkOrgId: fixture.tenants[3]?.clerkOrgId as string,
+    accountId: fixture.tenants[3]?.accountId as string,
+    authorisationId: fixture.globalKey("authorisation", 3),
     connectionId: fixture.id("connection", 3),
     countryCode: "GB",
     organisationId: fixture.tenants[3]?.organisationId as string,
@@ -70,11 +70,11 @@ describe("local persistence integration", async () => {
     tenantNz.authorisationId,
     tenantUk.authorisationId,
   ];
-  const testClerkOrgIds = [
-    tenantA.clerkOrgId,
-    tenantB.clerkOrgId,
-    tenantNz.clerkOrgId,
-    tenantUk.clerkOrgId,
+  const testAccountIds = [
+    tenantA.accountId,
+    tenantB.accountId,
+    tenantNz.accountId,
+    tenantUk.accountId,
   ] as const;
   describe("sync-xero-leave-balances handler", () => {
     it("is registered for dispatch", () => {
@@ -106,7 +106,7 @@ describe("local persistence integration", async () => {
       }));
       await database.person.createMany({
         data: people.map((person) => ({
-          clerk_org_id: person.clerkOrgId,
+          account_id: person.accountId,
           email: `${person.personId}@example.com`,
           employment_type: "employee",
           first_name: "Owned",
@@ -152,7 +152,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.leaveBalance.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
           },
         })
@@ -233,7 +233,7 @@ describe("local persistence integration", async () => {
       }
       const balances = await database.leaveBalance.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -273,7 +273,7 @@ describe("local persistence integration", async () => {
       }
       const balances = await database.leaveBalance.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -315,7 +315,7 @@ describe("local persistence integration", async () => {
       }
       const balances = await database.leaveBalance.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -344,7 +344,7 @@ describe("local persistence integration", async () => {
       }
       const tenantBRecords = await database.leaveBalance.findMany({
         where: {
-          clerk_org_id: tenantB.clerkOrgId,
+          account_id: tenantB.accountId,
           organisation_id: tenantB.organisationId,
         },
       });
@@ -382,7 +382,7 @@ describe("local persistence integration", async () => {
       }
       const failedRecords = await database.failedRecord.findMany({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -395,7 +395,7 @@ describe("local persistence integration", async () => {
     it("retains a failed first page through a clean final page and clears health only after a clean new sweep", async () => {
       await setupTenant(tenantA);
       const people = Array.from({ length: 41 }, (_, i) => ({
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: `failed-sweep-${i}@example.com`,
         employment_type: "employee" as const,
         first_name: "Employee",
@@ -447,7 +447,7 @@ describe("local persistence integration", async () => {
       const final = await syncXeroLeaveBalances(input);
       expect(final.ok && final.value.status).toBe("partial_success");
       const where = {
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         id: tenantA.connectionId,
         organisation_id: tenantA.organisationId,
       };
@@ -469,7 +469,7 @@ describe("local persistence integration", async () => {
       await setupTenant(tenantA);
       // Create 45 active people
       const peopleData = Array.from({ length: 45 }, (_, i) => ({
-        clerk_org_id: tenantA.clerkOrgId,
+        account_id: tenantA.accountId,
         email: `emp${i + 1}@example.com`,
         employment_type: "employee" as const,
         first_name: "Employee",
@@ -517,7 +517,7 @@ describe("local persistence integration", async () => {
       // Check cursor after Run 1
       const cursor1 = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -542,7 +542,7 @@ describe("local persistence integration", async () => {
       // Check cursor after Run 2: cleared to null
       const cursor2 = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
           organisation_id: tenantA.organisationId,
         },
@@ -556,7 +556,7 @@ describe("local persistence integration", async () => {
       // Total 45 balances in DB
       const totalBalances = await database.leaveBalance.count({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -564,7 +564,7 @@ describe("local persistence integration", async () => {
       expect(
         await database.xeroSyncCursor.count({
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             xero_connection_id: tenantA.connectionId,
           },
@@ -600,7 +600,7 @@ describe("local persistence integration", async () => {
           orderBy: { created_at: "desc" },
           select: { error_summary: true, status: true },
           where: {
-            clerk_org_id: tenantA.clerkOrgId,
+            account_id: tenantA.accountId,
             organisation_id: tenantA.organisationId,
             run_type: "leave_balances",
           },
@@ -608,7 +608,7 @@ describe("local persistence integration", async () => {
       ).toEqual({ error_summary: "retry_later", status: "failed" });
       const cursorAfterFailure = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
         },
       });
@@ -643,7 +643,7 @@ describe("local persistence integration", async () => {
       // Failed record was persisted in DB
       const failedRecord = await database.failedRecord.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           organisation_id: tenantA.organisationId,
         },
       });
@@ -652,7 +652,7 @@ describe("local persistence integration", async () => {
       // Single page completed so cursor was cleared to null (final page)
       const cursorAfterPartial = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
         },
       });
@@ -732,7 +732,7 @@ describe("local persistence integration", async () => {
       // Check Tenant A has cursor row
       const cursorA = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantA.clerkOrgId,
+          account_id: tenantA.accountId,
           id: tenantA.connectionId,
         },
       });
@@ -741,7 +741,7 @@ describe("local persistence integration", async () => {
       // Tenant B cursor does not exist
       const cursorB = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantB.clerkOrgId,
+          account_id: tenantB.accountId,
           id: tenantB.connectionId,
         },
       });
@@ -775,7 +775,7 @@ describe("local persistence integration", async () => {
       const balances = await database.leaveBalance.findMany({
         orderBy: { leave_type_xero_id: "asc" },
         where: {
-          clerk_org_id: tenantNz.clerkOrgId,
+          account_id: tenantNz.accountId,
           organisation_id: tenantNz.organisationId,
         },
       });
@@ -838,7 +838,7 @@ describe("local persistence integration", async () => {
       const balances = await database.leaveBalance.findMany({
         orderBy: { leave_type_xero_id: "asc" },
         where: {
-          clerk_org_id: tenantUk.clerkOrgId,
+          account_id: tenantUk.accountId,
           organisation_id: tenantUk.organisationId,
         },
       });
@@ -879,7 +879,7 @@ describe("local persistence integration", async () => {
       }
       const cursor = await database.xeroConnection.findFirst({
         where: {
-          clerk_org_id: tenantUk.clerkOrgId,
+          account_id: tenantUk.accountId,
           id: tenantUk.connectionId,
         },
       });
@@ -894,10 +894,10 @@ describe("local persistence integration", async () => {
       "payrollRegion" in tenant ? tenant.payrollRegion : "AU";
     await database.organisation.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         country_code: countryCode,
         id: tenant.organisationId,
-        name: `Test Org ${tenant.clerkOrgId}`,
+        name: `Test Org ${tenant.accountId}`,
       },
     });
     const access = encryptXeroToken("synthetic-access");
@@ -930,7 +930,7 @@ describe("local persistence integration", async () => {
       where: { id: tenant.authorisationId },
     });
     const connection = {
-      clerk_org_id: tenant.clerkOrgId,
+      account_id: tenant.accountId,
       organisation_id: tenant.organisationId,
       payroll_region: payrollRegion,
       remote_connection_id: `remote-${tenant.connectionId}`,
@@ -950,7 +950,7 @@ describe("local persistence integration", async () => {
   ) {
     await database.person.create({
       data: {
-        clerk_org_id: tenant.clerkOrgId,
+        account_id: tenant.accountId,
         email: `${tenant.personId}@example.com`,
         employment_type: "employee",
         first_name: "Pat",
@@ -964,7 +964,7 @@ describe("local persistence integration", async () => {
     });
   }
   async function cleanTestData() {
-    const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
+    const scope = { account_id: { in: [...testAccountIds] } };
     await database.failedRecord.deleteMany({ where: scope });
     await database.syncRun.deleteMany({ where: scope });
     await database.leaveBalance.deleteMany({ where: scope });
@@ -980,7 +980,7 @@ describe("local persistence integration", async () => {
     tenant: typeof tenantA | typeof tenantB | typeof tenantNz | typeof tenantUk
   ) {
     return {
-      clerkOrgId: tenant.clerkOrgId,
+      accountId: tenant.accountId,
       connectionId: tenant.connectionId,
       organisationId: tenant.organisationId,
       triggerType: "manual" as const,

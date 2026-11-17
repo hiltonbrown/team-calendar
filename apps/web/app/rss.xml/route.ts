@@ -7,7 +7,7 @@ const feedDescription =
 
 export const dynamic = "force-static";
 
-export const escapeXml = (value: string): string =>
+const escapeXml = (value: string): string =>
   value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

@@ -26,7 +26,11 @@ export const config: NextConfig = {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
-        hostname: "img.clerk.com",
+        hostname: "lh3.googleusercontent.com",
+        protocol: "https",
+      },
+      {
+        hostname: "avatars.githubusercontent.com",
         protocol: "https",
       },
     ],

@@ -1,7 +1,8 @@
 import { resolvePlanKey, retrieveStripeSubscription } from "@repo/billing";
+import { currentJobIdentityGeneration } from "@repo/core";
 import {
-  getFirstActiveOrganisationIdForClerkOrg,
-  getSubscriptionForOrg,
+  getFirstActiveOrganisationIdForAccount,
+  getSubscriptionForAccount,
   getSubscriptionForStripeCustomer,
   getSubscriptionForStripeSubscription,
   isStripeEventProcessed,
@@ -16,8 +17,12 @@ import { inngest } from "@repo/jobs/src/client";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 
+// Stripe metadata uses neutral account_id with backward-compatible clerk_org_id fallback.
 const MetadataSchema = z
-  .object({ clerk_org_id: z.string().min(1).optional() })
+  .object({
+    account_id: z.string().min(1).optional(),
+    clerk_org_id: z.string().min(1).optional(),
+  })
   .nullable();
 const StripeRef = z.union([z.string(), z.object({ id: z.string() })]);
 const SessionSchema = z.object({
@@ -68,26 +73,19 @@ const dateFromSeconds = (value: number | null | undefined) =>
   value ? new Date(value * 1000) : null;
 
 interface EventIdentity {
-  clerkOrgId?: string;
+  accountId?: string;
   conflict: boolean;
   stripeCustomerId?: string | null;
 }
 
-async function resolveEventIdentity(
+function extractSubscriptionId(
   value: unknown,
-  subscriptionId?: string | null
-): Promise<EventIdentity> {
+  explicitSubscriptionId?: string | null
+): string | null {
+  if (explicitSubscriptionId) {
+    return explicitSubscriptionId;
+  }
   const loose = z
-    .object({
-      customer: StripeRef.nullable().optional(),
-      metadata: MetadataSchema.optional(),
-    })
-    .safeParse(value);
-  const stripeCustomerId = loose.success ? objectId(loose.data.customer) : null;
-  const metadataOrgId = loose.success
-    ? loose.data.metadata?.clerk_org_id
-    : undefined;
-  const looseSubscription = z
     .object({
       id: z.string().optional(),
       parent: z
@@ -102,17 +100,34 @@ async function resolveEventIdentity(
       subscription: StripeRef.nullable().optional(),
     })
     .safeParse(value);
-  const resolvedSubscriptionId =
-    subscriptionId ??
-    (looseSubscription.success
-      ? (objectId(
-          looseSubscription.data.subscription ??
-            looseSubscription.data.parent?.subscription_details?.subscription
-        ) ??
-        (looseSubscription.data.id?.startsWith("sub_")
-          ? looseSubscription.data.id
-          : null))
-      : null);
+  if (!loose.success) {
+    return null;
+  }
+  const sub = objectId(
+    loose.data.subscription ??
+      loose.data.parent?.subscription_details?.subscription
+  );
+  if (sub) {
+    return sub;
+  }
+  return loose.data.id?.startsWith("sub_") ? loose.data.id : null;
+}
+
+async function resolveEventIdentity(
+  value: unknown,
+  subscriptionId?: string | null
+): Promise<EventIdentity> {
+  const loose = z
+    .object({
+      customer: StripeRef.nullable().optional(),
+      metadata: MetadataSchema.optional(),
+    })
+    .safeParse(value);
+  const stripeCustomerId = loose.success ? objectId(loose.data.customer) : null;
+  const metadataOrgId = loose.success
+    ? (loose.data.metadata?.account_id ?? loose.data.metadata?.clerk_org_id)
+    : undefined;
+  const resolvedSubscriptionId = extractSubscriptionId(value, subscriptionId);
   const [customerBinding, subscriptionBinding] = await Promise.all([
     stripeCustomerId
       ? getSubscriptionForStripeCustomer(stripeCustomerId)
@@ -125,7 +140,7 @@ async function resolveEventIdentity(
   if (
     customerBinding &&
     subscriptionBinding &&
-    customerBinding.clerk_org_id !== subscriptionBinding.clerk_org_id
+    customerBinding.account_id !== subscriptionBinding.account_id
   ) {
     return {
       conflict: true,
@@ -134,10 +149,8 @@ async function resolveEventIdentity(
   }
   if (binding) {
     return {
-      clerkOrgId: binding.clerk_org_id,
-      conflict: Boolean(
-        metadataOrgId && metadataOrgId !== binding.clerk_org_id
-      ),
+      accountId: binding.account_id,
+      conflict: Boolean(metadataOrgId && metadataOrgId !== binding.account_id),
       stripeCustomerId: binding.stripe_customer_id ?? stripeCustomerId,
     };
   }
@@ -145,7 +158,7 @@ async function resolveEventIdentity(
     return { conflict: false, stripeCustomerId };
   }
   const orgBinding = await withTenantDb(metadataOrgId, (db) =>
-    getSubscriptionForOrg(metadataOrgId, db)
+    getSubscriptionForAccount(metadataOrgId, db)
   );
   const conflict = Boolean(
     orgBinding?.stripe_customer_id &&
@@ -153,14 +166,14 @@ async function resolveEventIdentity(
       orgBinding.stripe_customer_id !== stripeCustomerId
   );
   return {
-    clerkOrgId: conflict ? undefined : metadataOrgId,
+    accountId: conflict ? undefined : metadataOrgId,
     conflict,
     stripeCustomerId,
   };
 }
 
 export interface MirrorResult {
-  clerkOrgId?: string;
+  accountId?: string;
   disposition?: "ignored" | "processed";
   error?: string;
   errorCategory?: string;
@@ -175,17 +188,18 @@ async function mirrorSubscription(
   authoritativeTie = false
 ): Promise<MirrorResult> {
   const identity = await resolveEventIdentity(data, data.id);
-  const { clerkOrgId } = identity;
-  const metadataOrgId = data.metadata?.clerk_org_id;
+  const { accountId } = identity;
+  const metadataOrgId =
+    data.metadata?.account_id ?? data.metadata?.clerk_org_id;
   if (identity.conflict) {
     log.error("Stripe subscription tenant cross-check conflict detected.", {
       metadataOrgId: metadataOrgId ?? null,
-      resolvedClerkOrgId: clerkOrgId ?? null,
+      resolvedAccountId: accountId ?? null,
       stripeCustomerId: identity.stripeCustomerId ?? null,
       stripeSubscriptionId: data.id,
     });
     return {
-      clerkOrgId,
+      accountId,
       error: "Stripe customer and organisation identity conflict",
       errorCategory: "tenant_conflict",
       ok: false,
@@ -193,7 +207,7 @@ async function mirrorSubscription(
       stripeCustomerId: identity.stripeCustomerId,
     };
   }
-  if (!clerkOrgId) {
+  if (!accountId) {
     log.error(
       "Stripe subscription event missing trusted organisation identity.",
       { stripeSubscriptionId: data.id }
@@ -214,7 +228,7 @@ async function mirrorSubscription(
       stripeSubscriptionId: data.id,
     });
     return {
-      clerkOrgId,
+      accountId,
       error: "Billing price is not recognised",
       errorCategory: "unknown_price",
       ok: false,
@@ -224,13 +238,13 @@ async function mirrorSubscription(
   }
   const stripeCustomerId = identity.stripeCustomerId ?? objectId(data.customer);
   const { affected, organisationId } = await withTenantDb(
-    clerkOrgId,
+    accountId,
     async (db) => {
       const preparedAffected = await upsertSubscriptionFromWebhook(
         {
+          accountId,
           authoritativeTie,
           cancelAtPeriodEnd: data.cancel_at_period_end,
-          clerkOrgId,
           currentPeriodEnd: dateFromSeconds(data.current_period_end),
           endedAt: dateFromSeconds(data.ended_at),
           planKey: plan.value,
@@ -244,7 +258,7 @@ async function mirrorSubscription(
       const scopedOrganisationId =
         Number(preparedAffected) === 0
           ? null
-          : await getFirstActiveOrganisationIdForClerkOrg(clerkOrgId, db);
+          : await getFirstActiveOrganisationIdForAccount(accountId, db);
       return {
         affected: preparedAffected,
         organisationId: scopedOrganisationId,
@@ -254,7 +268,7 @@ async function mirrorSubscription(
   if (Number(affected) === 0) {
     if (authoritativeTie) {
       return {
-        clerkOrgId,
+        accountId,
         error: "Authoritative Stripe subscription could not be mirrored",
         errorCategory: "equal_time_conflict",
         ok: false,
@@ -265,7 +279,7 @@ async function mirrorSubscription(
     const retrieved = await retrieveStripeSubscription(data.id);
     if (!retrieved.ok) {
       return {
-        clerkOrgId,
+        accountId,
         error: "Equal-time Stripe subscription reconciliation failed",
         errorCategory: "provider_fetch",
         ok: false,
@@ -276,7 +290,7 @@ async function mirrorSubscription(
     const authoritative = SubscriptionSchema.safeParse(retrieved.value);
     if (!authoritative.success) {
       return {
-        clerkOrgId,
+        accountId,
         error: "Authoritative Stripe subscription payload is invalid",
         errorCategory: "invalid_payload",
         ok: false,
@@ -289,15 +303,19 @@ async function mirrorSubscription(
   if (!organisationId) {
     log.error(
       "Stripe subscription mirror skipped recount-usage because no active organisation was found.",
-      { clerkOrgId, stripeSubscriptionId: data.id }
+      { accountId, stripeSubscriptionId: data.id }
     );
-    return { clerkOrgId, disposition: "processed", ok: true, stripeCustomerId };
+    return { accountId, disposition: "processed", ok: true, stripeCustomerId };
   }
   await inngest.send({
-    data: { clerkOrgId, organisationId },
+    data: {
+      account_id: accountId,
+      identity_generation: currentJobIdentityGeneration(),
+      organisation_id: organisationId,
+    },
     name: "recount-usage",
   });
-  return { clerkOrgId, disposition: "processed", ok: true, stripeCustomerId };
+  return { accountId, disposition: "processed", ok: true, stripeCustomerId };
 }
 
 const SUBSCRIPTION_EVENT_TYPES = new Set([
@@ -335,7 +353,7 @@ async function handleSubscriptionEvent(
         parsed.data.id
       );
       return {
-        clerkOrgId: identity.clerkOrgId,
+        accountId: identity.accountId,
         error: "Stripe subscription retrieval failed",
         errorCategory: "provider_fetch",
         ok: false,
@@ -350,7 +368,7 @@ async function handleSubscriptionEvent(
         parsed.data.id
       );
       return {
-        clerkOrgId: identity.clerkOrgId,
+        accountId: identity.accountId,
         error: "Stripe authoritative subscription payload is invalid",
         errorCategory: "invalid_payload",
         ok: false,
@@ -367,7 +385,7 @@ async function handleSubscriptionEvent(
   });
   const identity = await resolveEventIdentity(event.data.object);
   return {
-    clerkOrgId: identity.clerkOrgId,
+    accountId: identity.accountId,
     error: "Stripe subscription payload is invalid",
     errorCategory: "invalid_payload",
     ok: false,
@@ -388,7 +406,7 @@ async function handleInvoiceEvent(
     });
     const identity = await resolveEventIdentity(event.data.object);
     return {
-      clerkOrgId: identity.clerkOrgId,
+      accountId: identity.accountId,
       error: "Stripe invoice payload is invalid",
       errorCategory: "invalid_payload",
       ok: false,
@@ -417,7 +435,7 @@ async function handleInvoiceEvent(
         subscriptionId
       );
       return {
-        clerkOrgId: identity.clerkOrgId,
+        accountId: identity.accountId,
         error: "Stripe subscription retrieval failed",
         errorCategory: "provider_fetch",
         ok: false,
@@ -432,7 +450,7 @@ async function handleInvoiceEvent(
         subscriptionId
       );
       return {
-        clerkOrgId: identity.clerkOrgId,
+        accountId: identity.accountId,
         error: "Stripe subscription payload is invalid",
         errorCategory: "invalid_payload",
         ok: false,
@@ -456,7 +474,7 @@ async function handleCheckoutSession(
   if (!parsed.success) {
     const identity = await resolveEventIdentity(event.data.object);
     return {
-      clerkOrgId: identity.clerkOrgId,
+      accountId: identity.accountId,
       error: "Stripe checkout payload is invalid",
       errorCategory: "invalid_payload",
       ok: false,
@@ -475,7 +493,7 @@ async function handleCheckoutSession(
       subscriptionId
     );
     return {
-      clerkOrgId: identity.clerkOrgId,
+      accountId: identity.accountId,
       error: "Stripe subscription retrieval failed",
       errorCategory: "provider_fetch",
       ok: false,
@@ -490,7 +508,7 @@ async function handleCheckoutSession(
       subscriptionId
     );
     return {
-      clerkOrgId: identity.clerkOrgId,
+      accountId: identity.accountId,
       error: "Stripe subscription payload is invalid",
       errorCategory: "invalid_payload",
       ok: false,
@@ -544,7 +562,7 @@ export async function deliverStripeEvent(
   } catch {
     const identity = await resolveEventIdentity(event.data.object);
     const shouldAlert = await recordStripeEventFailure({
-      clerkOrgId: identity.clerkOrgId ?? null,
+      accountId: identity.accountId ?? null,
       errorCategory: "processing_exception",
       eventCreatedAt: dateFromSeconds(event.created),
       eventId: event.id,
@@ -561,7 +579,7 @@ export async function deliverStripeEvent(
   }
   if (!result.ok) {
     const shouldAlert = await recordStripeEventFailure({
-      clerkOrgId: result.clerkOrgId ?? null,
+      accountId: result.accountId ?? null,
       errorCategory: result.errorCategory ?? "processing_failure",
       eventCreatedAt: dateFromSeconds(event.created),
       eventId: event.id,
@@ -584,7 +602,7 @@ export async function deliverStripeEvent(
     );
   } else {
     await recordStripeEvent(event.id, event.type, {
-      clerkOrgId: result.clerkOrgId ?? null,
+      accountId: result.accountId ?? null,
       eventCreatedAt: dateFromSeconds(event.created),
       stripeCustomerId: result.stripeCustomerId ?? null,
     });

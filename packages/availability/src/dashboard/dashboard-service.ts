@@ -1,7 +1,7 @@
 import { getAccountApprovalSettings } from "../settings/account-approval-settings-service";
 import "server-only";
 import {
-  type ClerkOrgId,
+  type AccountId,
   dateKeyInTimeZone,
   type OrganisationId,
   type Result,
@@ -161,14 +161,14 @@ export interface AdminDashboardView extends DashboardBaseView {
   };
 }
 const ResolveRoleSchema = z.object({
-  clerkOrgId: z.string().min(1),
+  accountId: z.string().min(1),
   organisationId: z.string().uuid(),
-  orgRole: z.string().nullable().optional(),
+  role: z.string().nullable().optional(),
   userId: z.string().min(1),
 });
 const ViewSchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.enum(["admin", "employee", "manager", "owner", "viewer"]),
-  clerkOrgId: z.string().min(1),
   companyIds: z.array(z.string().uuid()).optional(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
@@ -199,9 +199,9 @@ export async function resolveDashboardRole(
   input: z.input<typeof ResolveRoleSchema>,
   db: TenantDb
 ): Promise<Result<DashboardRole, DashboardServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = ResolveRoleSchema.safeParse(input);
@@ -211,19 +211,19 @@ export async function resolveDashboardRole(
     const person = await client.person.findFirst({
       select: { id: true },
       where: {
+        account_id: parsed.data.accountId,
         archived_at: null,
-        clerk_org_id: parsed.data.clerkOrgId,
-        clerk_user_id: parsed.data.userId,
         organisation: {
+          account_id: parsed.data.accountId,
           archived_at: null,
-          clerk_org_id: parsed.data.clerkOrgId,
         },
+        user_id: parsed.data.userId,
       },
     });
-    if (parsed.data.orgRole === "org:owner") {
+    if (parsed.data.role === "owner") {
       return { ok: true, value: "owner" };
     }
-    if (parsed.data.orgRole === "org:admin") {
+    if (parsed.data.role === "admin") {
       return { ok: true, value: "admin" };
     }
     if (!person) {
@@ -231,12 +231,12 @@ export async function resolveDashboardRole(
     }
     const directReportCount = await client.person.count({
       where: {
+        account_id: parsed.data.accountId,
         archived_at: null,
-        clerk_org_id: parsed.data.clerkOrgId,
         manager_person_id: person.id,
         organisation: {
+          account_id: parsed.data.accountId,
           archived_at: null,
-          clerk_org_id: parsed.data.clerkOrgId,
         },
       },
     });
@@ -251,9 +251,9 @@ export async function getEmployeeView(
   _cache: DashboardCache | undefined,
   db: TenantDb
 ): Promise<Result<EmployeeDashboardView, DashboardServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const cache = dashboardCacheForClient(client);
@@ -273,9 +273,9 @@ export async function getManagerView(
   _cache: DashboardCache | undefined,
   db: TenantDb
 ): Promise<Result<ManagerDashboardView, DashboardServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const cache = dashboardCacheForClient(client);
@@ -325,22 +325,22 @@ export async function getManagerView(
       coverage,
     ] = [
       await loadBaseView(data, cache, client),
-      await getAccountApprovalSettings({ clerkOrgId: data.clerkOrgId }, client),
+      await getAccountApprovalSettings({ accountId: data.accountId }, client),
       await client.person.count({
         where: {
+          account_id: data.accountId,
           archived_at: null,
-          clerk_org_id: data.clerkOrgId,
           manager_person_id: data.personId,
           organisation: {
+            account_id: data.accountId,
             archived_at: null,
-            clerk_org_id: data.clerkOrgId,
           },
         },
       }),
       await managerScopePersonIds(
         {
+          accountId: data.accountId,
           actingPersonId: data.personId,
-          clerkOrgId: data.clerkOrgId,
         },
         client
       ),
@@ -384,9 +384,9 @@ export async function getAdminView(
   _cache: DashboardCache | undefined,
   db: TenantDb
 ): Promise<Result<AdminDashboardView, DashboardServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const cache = dashboardCacheForClient(client);
@@ -409,7 +409,7 @@ export async function getAdminView(
       await client.organisation.findFirst({
         select: { name: true },
         where: {
-          clerk_org_id: data.clerkOrgId,
+          account_id: data.accountId,
           id:
             data.companyIds?.length === 1
               ? data.companyIds[0]
@@ -418,10 +418,10 @@ export async function getAdminView(
       }),
       await client.person.count({
         where: {
-          clerk_org_id: data.clerkOrgId,
+          account_id: data.accountId,
           organisation: {
+            account_id: data.accountId,
             archived_at: null,
-            clerk_org_id: data.clerkOrgId,
           },
           ...(data.companyIds
             ? { organisation_id: { in: data.companyIds } }
@@ -536,9 +536,9 @@ async function buildBaseView(
   const [profileResult, xeroStateResult] = [
     await getPersonProfile(
       {
+        accountId: input.accountId,
         actingPersonId: input.personId,
         actingUserId: input.userId,
-        clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
         personId: input.personId,
         role: peopleRole(input.actingRole),
@@ -547,7 +547,7 @@ async function buildBaseView(
     ),
     await getXeroConnectionStateForScope(
       {
-        clerkOrgId: input.clerkOrgId,
+        accountId: input.accountId,
         organisationId: input.organisationId,
       },
       db
@@ -573,7 +573,7 @@ async function buildBaseView(
       async () =>
         await loadPublicHolidayCard(
           {
-            clerkOrgId: input.clerkOrgId,
+            accountId: input.accountId,
             locationId: profile.header.location?.id ?? null,
             organisationId: input.organisationId,
           },
@@ -608,7 +608,7 @@ async function loadActionItemsCard(
 ): Promise<DashboardBaseView["actionItems"]> {
   const notificationsResult = await listForUser(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       filters: {
         type: ["leave_info_requested"],
         unreadOnly: true,
@@ -649,7 +649,7 @@ async function loadMyRequests(
   );
   const recordsResult = await listMyRecords(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       filters: {
         approvalStatus: MY_REQUEST_STATUSES,
         dateRange: { from: todayStart },
@@ -672,8 +672,8 @@ async function loadMyRequests(
     )
     .slice(0, LIST_ROW_LIMIT);
   const durationInputs = records.map((record) => ({
+    accountId: input.accountId,
     allDay: record.allDay,
-    clerkOrgId: input.clerkOrgId,
     endsAt: record.endsAt,
     locationId: record.person.locationId,
     organisationId: input.organisationId,
@@ -714,16 +714,16 @@ function toMyRequest(
 }
 type ApprovalQueueInput = Pick<
   ViewInput,
-  "clerkOrgId" | "userId" | "companyIds"
+  "accountId" | "userId" | "companyIds"
 > & { personId: string | null };
 
 export async function getDashboardApprovalQueue(
   input: ApprovalQueueInput & { actingRole: ApprovalRole },
   db: TenantDb
 ): Promise<DashboardSection<DashboardApprovalQueue>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
     return await loadApprovalQueue(input, input.actingRole, client);
   }
@@ -734,7 +734,7 @@ async function loadApprovalQueue(
   role: ApprovalRole,
   db: TenantDb
 ): Promise<DashboardSection<DashboardApprovalQueue>> {
-  const companies = await resolveAccountCompanies(input.clerkOrgId, db);
+  const companies = await resolveAccountCompanies(input.accountId, db);
   const selection = selectCalendarCompanies(
     { companyIds: input.companyIds },
     companies
@@ -747,9 +747,9 @@ async function loadApprovalQueue(
   do {
     const result = await listForApprover(
       {
+        accountId: input.accountId,
         actingPersonId: input.personId,
         actingUserId: input.userId,
-        clerkOrgId: input.clerkOrgId,
         cursor,
         filters: { status: ["submitted"] },
         pageSize: 200,
@@ -803,10 +803,10 @@ async function loadCalendarWeek(
 ): Promise<CalendarWeekResult> {
   return await getCalendarRange(
     {
+      accountId: input.accountId,
       actingPersonId: input.personId,
       actingUserId: input.userId,
       anchorDate: options.anchorDate,
-      clerkOrgId: input.clerkOrgId,
       companyIds: input.companyIds,
       filters: {
         approvalStatus: ["approved"],
@@ -853,7 +853,7 @@ async function loadCoverageSection(
   }
   const coverage = await loadManagerCoverage(
     {
-      clerkOrgId: input.clerkOrgId,
+      accountId: input.accountId,
       companyIds: input.companyIds,
       organisationId: input.organisationId,
       ranges,
@@ -867,7 +867,7 @@ async function loadCoverageSection(
 }
 async function loadPublicHolidayCard(
   input: {
-    clerkOrgId: string;
+    accountId: string;
     locationId: string | null;
     organisationId: string;
   },
@@ -876,7 +876,7 @@ async function loadPublicHolidayCard(
   const today = startOfDay(new Date());
   const holidayResult = await resolvePublicHolidays(
     {
-      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      accountId: input.accountId as AccountId,
       from: toDateOnly(today),
       organisationId: input.organisationId as OrganisationId,
       to: toDateOnly(addDays(today, 400)),
@@ -971,7 +971,7 @@ function unknownError(message: string): Result<never, DashboardServiceError> {
 }
 function cacheKey(scope: string, input: ViewInput) {
   const week = input.weekAnchor ? toDateOnly(input.weekAnchor) : "current";
-  return `${scope}:${input.clerkOrgId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}:${input.companyIds?.slice().sort().join(",") ?? "all"}:${week}`;
+  return `${scope}:${input.accountId}:${input.organisationId}:${input.personId}:${input.userId}:${input.actingRole}:${input.companyIds?.slice().sort().join(",") ?? "all"}:${week}`;
 }
 
 const dashboardCaches = new WeakMap<TenantDb, DashboardCache>();

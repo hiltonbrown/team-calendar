@@ -5,14 +5,14 @@ import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  getSession: vi.fn(),
   redirect: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/auth/server")>();
-  return { ...original, auth: mocks.auth };
+  return { ...original, getSession: mocks.getSession };
 });
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
@@ -24,18 +24,18 @@ const [tenant] = fixture.tenants;
 if (!tenant) {
   throw new Error("App live fixture tenant was not allocated");
 }
-const { clerkOrgId, organisationId } = tenant;
+const { accountId, organisationId } = tenant;
 const { createManualPersonAction } = await import("./_actions");
 const { systemDatabase: database } = await import("@repo/database");
 
 describe("manual person plan-limit enforcement", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ orgId: clerkOrgId, orgRole: "org:admin" });
+    mocks.getSession.mockResolvedValue({ accountId, role: "admin" });
     await cleanTestData();
     await database.organisation.create({
       data: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         country_code: "AU",
         id: organisationId,
         name: "Manual person limit test",
@@ -46,7 +46,7 @@ describe("manual person plan-limit enforcement", () => {
   afterAll(async () => {
     await cleanTestData();
     await expect(
-      database.organisation.count({ where: { clerk_org_id: clerkOrgId } })
+      database.organisation.count({ where: { account_id: accountId } })
     ).resolves.toBe(0);
     await database.$disconnect();
   });
@@ -55,7 +55,7 @@ describe("manual person plan-limit enforcement", () => {
     await createPeople(9);
     await database.usageCounter.create({
       data: {
-        clerk_org_id: clerkOrgId,
+        account_id: accountId,
         counter_type: "seats",
         current_value: 0,
         metric_key: "seats",
@@ -109,7 +109,7 @@ function createPerson(email: string) {
 async function createPeople(count: number) {
   await database.person.createMany({
     data: Array.from({ length: count }, (_, index) => ({
-      clerk_org_id: clerkOrgId,
+      account_id: accountId,
       email: `existing-${index}@example.com`,
       employment_type: employment_type.employee,
       first_name: "Existing",
@@ -124,22 +124,22 @@ async function createPeople(count: number) {
 function activePersonCount() {
   return database.person.count({
     where: {
+      account_id: accountId,
       archived_at: null,
-      clerk_org_id: clerkOrgId,
       is_active: true,
     },
   });
 }
 
 async function cleanTestData() {
-  await database.clerkOrgSubscription.deleteMany({
-    where: { clerk_org_id: clerkOrgId },
+  await database.accountSubscription.deleteMany({
+    where: { account_id: accountId },
   });
   await database.usageCounter.deleteMany({
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
-  await database.person.deleteMany({ where: { clerk_org_id: clerkOrgId } });
+  await database.person.deleteMany({ where: { account_id: accountId } });
   await database.organisation.deleteMany({
-    where: { clerk_org_id: clerkOrgId },
+    where: { account_id: accountId },
   });
 }

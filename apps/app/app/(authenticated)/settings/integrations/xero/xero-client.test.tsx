@@ -405,8 +405,13 @@ describe("XeroClient component", () => {
       expect(screen.queryByText("Disconnected from Xero.")).toBeNull();
       expect(mocks.toastMessage).not.toHaveBeenCalled();
       expect(mocks.refresh).not.toHaveBeenCalled();
-      const retry = within(dialog).getByRole("button", { name: confirmLabel });
-      expect(retry.hasAttribute("disabled")).toBe(false);
+      const retry = await waitFor(() => {
+        const button = within(dialog).getByRole("button", {
+          name: confirmLabel,
+        });
+        expect(button.hasAttribute("disabled")).toBe(false);
+        return button;
+      });
       mocks.disconnectXeroAction.mockResolvedValueOnce({
         ok: true,
         value: {

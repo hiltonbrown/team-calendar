@@ -14,6 +14,6 @@ export async function getXeroConnectionStateForScope(
   input: XeroConnectionStateInput,
   db: TenantDb
 ): Promise<Result<XeroConnectionStateResult, XeroConnectionStateError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   return await getXeroConnectionState(input, db);
 }

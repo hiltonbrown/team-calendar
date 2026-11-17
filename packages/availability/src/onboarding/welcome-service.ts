@@ -9,8 +9,8 @@ import {
 import { isOnboardingAdmin } from "./wizard-service";
 
 export interface WelcomeActor {
+  accountId: string;
   actingRole: string | null | undefined;
-  clerkOrgId: string;
   organisationId: string;
   userId: string;
 }
@@ -21,7 +21,7 @@ export async function loadWelcomeEligibility(
   actor: WelcomeActor,
   db: TenantDb
 ): Promise<Result<{ eligible: boolean; personId: string | null }>> {
-  assertTenantDb(db, actor.clerkOrgId);
+  assertTenantDb(db, actor.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof loadWelcomeEligibility> => {
@@ -29,7 +29,7 @@ export async function loadWelcomeEligibility(
       return { ok: true, value: { eligible: false, personId: null } };
     }
     const state = await getWelcomeState(
-      actor.clerkOrgId,
+      actor.accountId,
       actor.organisationId,
       actor.userId,
       client
@@ -46,7 +46,7 @@ export async function loadWelcomeEligibility(
     };
   };
   return await (async () => {
-    assertTenantDb(db, actor.clerkOrgId);
+    assertTenantDb(db, actor.accountId);
     return await run(db);
   })();
 }
@@ -55,12 +55,12 @@ export async function completeMemberWelcome(
   actor: WelcomeActor,
   db: TenantDb
 ): Promise<Result<void>> {
-  assertTenantDb(db, actor.clerkOrgId);
+  assertTenantDb(db, actor.accountId);
   const run = async (
     client: TenantDb
   ): ReturnType<typeof completeMemberWelcome> => {
     const state = await getWelcomeState(
-      actor.clerkOrgId,
+      actor.accountId,
       actor.organisationId,
       actor.userId,
       client
@@ -78,7 +78,7 @@ export async function completeMemberWelcome(
       };
     }
     return await completeWelcome(
-      actor.clerkOrgId,
+      actor.accountId,
       actor.organisationId,
       state.value.personId,
       actor.userId,
@@ -86,7 +86,7 @@ export async function completeMemberWelcome(
     );
   };
   return await (async () => {
-    assertTenantDb(db, actor.clerkOrgId);
+    assertTenantDb(db, actor.accountId);
     return await run(db);
   })();
 }

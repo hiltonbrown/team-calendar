@@ -112,6 +112,13 @@ export function roleEmail(role: ReleaseRole): string {
     .parse(process.env[`TC_E2E_${role.toUpperCase()}_EMAIL`]);
 }
 
+export function rolePassword(role: ReleaseRole): string {
+  return z
+    .string()
+    .min(1)
+    .parse(process.env[`TC_E2E_${role.toUpperCase()}_PASSWORD`]);
+}
+
 export function requiredFixture(name: string): string {
   return z.string().min(1).parse(process.env[name]);
 }

@@ -1,11 +1,11 @@
-import { requireOrg } from "@repo/auth/helpers";
-import { auth, currentUser } from "@repo/auth/server";
-import type { ClerkOrgId } from "@repo/core";
+import { requireAccount } from "@repo/auth/helpers";
+import { getCurrentUser, getSession } from "@repo/auth/server";
+import type { AccountId } from "@repo/core";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-skeleton";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
-import { requirePageRole } from "@/lib/auth/require-page-role";
+import { requirePagePermission } from "@/lib/auth/require-page-permission";
 import { Header } from "./components/header";
 import { DashboardBody } from "./dashboard-body";
 import { parseDashboardWeekParam } from "./dashboard-week-param";
@@ -22,19 +22,27 @@ interface DashboardPageProps {
 export default async function DashboardPage({
   searchParams,
 }: DashboardPageProps) {
-  await requirePageRole("org:viewer");
+  await requirePagePermission({ calendar: ["read"] });
 
   const params = await searchParams;
   const orgParam = typeof params.org === "string" ? params.org : undefined;
-  // Clerk authentication finishes before dashboard preparation opens its tenant scope.
-  const clerkOrgId = (await requireOrg()) as ClerkOrgId;
+  // Authentication finishes before dashboard preparation opens its tenant scope.
+  const accountId = (await requireAccount()) as AccountId;
   const companyIds =
     typeof params.companyIds === "string"
       ? params.companyIds.split(",").filter(Boolean)
       : params.companyIds;
-  const [{ orgRole, userId }, user] = await Promise.all([
-    auth(),
-    currentUser(),
+  const [{ role: sessionRole, userId }, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
   ]);
 
   return (
@@ -44,10 +52,10 @@ export default async function DashboardPage({
         {userId && user ? (
           <Suspense fallback={<DashboardSkeleton />}>
             <DashboardBody
-              clerkOrgId={clerkOrgId}
+              accountId={accountId}
               companyIds={companyIds}
               orgParam={orgParam}
-              orgRole={orgRole}
+              role={sessionRole}
               userId={userId}
               weekAnchor={parseDashboardWeekParam(params.week)}
             />

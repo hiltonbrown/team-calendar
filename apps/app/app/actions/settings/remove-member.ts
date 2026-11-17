@@ -1,6 +1,9 @@
 "use server";
 
-import { auth, clerkClient } from "@repo/auth/server";
+import { listAccountMembers, removeAccountMember } from "@repo/auth/accounts";
+import { hasPermission as can, isAuthRole } from "@repo/auth/permissions";
+
+import { getSession } from "@repo/auth/server";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
 import { z } from "zod";
 
@@ -12,12 +15,18 @@ type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 
 export const removeMember = async (input: unknown): Promise<Result<void>> => {
   assertNoTenantTransaction("removeMember");
-  const { orgId, orgRole } = await auth();
+  const { accountId: sessionAccountId, role: sessionRole } =
+    (await getSession()) ?? {
+      accountId: null,
+      role: null,
+      sessionId: null,
+      userId: null,
+    };
 
-  if (!orgId) {
+  if (!sessionAccountId) {
     return { error: "Not authenticated", ok: false };
   }
-  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+  if (!can(sessionRole, { member: ["delete"] })) {
     return { error: "You do not have permission to manage members", ok: false };
   }
 
@@ -30,27 +39,31 @@ export const removeMember = async (input: unknown): Promise<Result<void>> => {
   }
 
   try {
-    const clerk = await clerkClient();
-    const memberships = await clerk.organizations.getOrganizationMembershipList(
-      {
-        organizationId: orgId,
-        userId: [parsed.data.userId],
-      }
-    );
+    const memberships = await listAccountMembers({
+      accountId: sessionAccountId,
+      userIds: [parsed.data.userId],
+    });
 
     if (memberships.data.length !== 1) {
       return { error: "Member not found", ok: false };
     }
 
-    if (memberships.data[0]?.role === "org:owner" && orgRole !== "org:owner") {
+    if (!isAuthRole(memberships.data[0]?.role)) {
+      return { error: "Member role could not be verified", ok: false };
+    }
+
+    if (
+      memberships.data[0]?.role === "owner" &&
+      !can(sessionRole, { ownership: ["manage"] })
+    ) {
       return {
         error: "Only owners can remove another owner",
         ok: false,
       };
     }
 
-    await clerk.organizations.deleteOrganizationMembership({
-      organizationId: orgId,
+    await removeAccountMember({
+      accountId: sessionAccountId,
       userId: parsed.data.userId,
     });
     return { ok: true, value: undefined };

@@ -1,3 +1,4 @@
+import { hasPermission } from "@repo/auth/permissions";
 import "server-only";
 
 import { type PlanKey, planKeys, type Result } from "@repo/core";
@@ -6,7 +7,7 @@ import {
   getAuthoritativeUsageCount,
   getPlanDefinition,
   getPlanLimits,
-  getSubscriptionForOrg,
+  getSubscriptionForAccount,
   limitTypes,
   type TenantDb,
 } from "@repo/database";
@@ -44,9 +45,9 @@ export type BillingServiceError =
   | { code: "unknown_error"; message: string };
 
 const SummarySchema = z.object({
+  accountId: z.string().min(1),
   actingRole: z.enum(["admin", "manager", "owner", "viewer"]),
   actingUserId: z.string().min(1),
-  clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
 });
 
@@ -54,19 +55,16 @@ export async function getBillingSummary(
   input: z.input<typeof SummarySchema>,
   db: TenantDb
 ): Promise<Result<BillingSummary, BillingServiceError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     const client = db;
 
     const parsed = SummarySchema.safeParse(input);
     if (!parsed.success) {
       return unknownError("Failed to load billing summary.");
     }
-    if (
-      parsed.data.actingRole !== "owner" &&
-      parsed.data.actingRole !== "admin"
-    ) {
+    if (!hasPermission(parsed.data.actingRole, { billing: ["read"] })) {
       return {
         error: {
           code: "not_authorised",
@@ -96,7 +94,7 @@ async function loadBillingSummary(
   input: z.infer<typeof SummarySchema>,
   db: TenantDb
 ): Promise<Result<BillingSummaryCore, BillingServiceError>> {
-  const subscription = await getSubscriptionForOrg(input.clerkOrgId, db);
+  const subscription = await getSubscriptionForAccount(input.accountId, db);
   const usage: Array<{
     currentValue: number;
     limitType: (typeof limitTypes)[number];
@@ -104,7 +102,7 @@ async function loadBillingSummary(
   for (const limitType of limitTypes) {
     usage.push({
       currentValue: await getAuthoritativeUsageCount(
-        input.clerkOrgId,
+        input.accountId,
         limitType,
         db
       ),

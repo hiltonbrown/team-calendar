@@ -1,4 +1,4 @@
-import type { ClerkOrgId, FeedId, OrganisationId } from "@repo/core";
+import type { AccountId, FeedId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withTenantResult as withTestTenantResult } from "../tenant-db";
 import { tenantTestAccount } from "../test-fixtures/tenant-scope";
@@ -26,7 +26,7 @@ vi.mock("../tenant-client", () => ({
 const { listFeedsForOrganisation, getFeedDetail } = await import("./feeds");
 
 describe("feeds queries", () => {
-  const clerkOrgId = "org_test_feeds" as ClerkOrgId;
+  const accountId = "org_test_feeds" as AccountId;
   const organisationId =
     "22222222-2222-4222-8222-222222222222" as OrganisationId;
   const feedId = "33333333-3333-4333-8333-333333333333" as FeedId;
@@ -35,19 +35,19 @@ describe("feeds queries", () => {
     vi.clearAllMocks();
   });
 
-  it("listFeedsForOrganisation carries clerk_org_id and organisation_id", async () => {
+  it("listFeedsForOrganisation carries account_id and organisation_id", async () => {
     mocks.findMany.mockResolvedValue([]);
 
     const result = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
-      (db) => listFeedsForOrganisation(clerkOrgId, organisationId, db)
+      tenantTestAccount(accountId),
+      (db) => listFeedsForOrganisation(accountId, organisationId, db)
     );
 
     expect(result).toEqual({ ok: true, value: [] });
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           organisation_id: organisationId,
         },
       })
@@ -58,15 +58,15 @@ describe("feeds queries", () => {
     mocks.findFirst.mockResolvedValue(null);
 
     const result = await withTestTenantResult(
-      tenantTestAccount(clerkOrgId),
-      (db) => getFeedDetail(clerkOrgId, organisationId, feedId, db)
+      tenantTestAccount(accountId),
+      (db) => getFeedDetail(accountId, organisationId, feedId, db)
     );
 
     expect(result.ok).toBe(false);
     expect(mocks.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          clerk_org_id: clerkOrgId,
+          account_id: accountId,
           id: feedId,
           organisation_id: organisationId,
         },

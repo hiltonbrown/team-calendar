@@ -49,19 +49,18 @@ vi.mock("@repo/database", async () => {
   };
 });
 
-const { canViewFeed, resolvePeopleForFeed, resolveScopeRows } = await import(
-  "./feed-scope"
-);
+const { canViewFeed, normaliseRole, resolvePeopleForFeed, resolveScopeRows } =
+  await import("./feed-scope");
 
 const baseInput = {
+  accountId: "org_1",
   actingPersonId: "00000000-0000-4000-8000-000000000001",
-  clerkOrgId: "org_1",
   createdByUserId: null,
   organisationId: "10000000-0000-4000-8000-000000000001",
 };
 
 function buildPerson(input: {
-  clerkUserId?: string | null;
+  userId?: string | null;
   displayName: string;
   firstName: string;
   id: string;
@@ -71,8 +70,7 @@ function buildPerson(input: {
   teamId?: string | null;
 }) {
   return {
-    clerk_org_id: baseInput.clerkOrgId,
-    clerk_user_id: input.clerkUserId ?? null,
+    account_id: baseInput.accountId,
     display_name: input.displayName,
     first_name: input.firstName,
     id: input.id,
@@ -84,6 +82,7 @@ function buildPerson(input: {
     organisation_id: baseInput.organisationId,
     team: input.teamId ? { id: input.teamId, name: "Operations" } : null,
     team_id: input.teamId ?? null,
+    user_id: input.userId ?? null,
   };
 }
 
@@ -113,8 +112,8 @@ const activePeople = [
 ];
 
 const broadPeopleWhere = {
+  account_id: baseInput.accountId,
   archived_at: null,
-  clerk_org_id: baseInput.clerkOrgId,
   is_active: true,
   organisation_id: baseInput.organisationId,
 };
@@ -653,7 +652,7 @@ describe("resolveScopeRows", () => {
   it("uses inactive unarchived preloaded people for labels", async () => {
     const result = await withTestTenantResult(
       tenantTestAccount({
-        clerkOrgId: baseInput.clerkOrgId,
+        accountId: baseInput.accountId,
         organisationId: baseInput.organisationId,
         preloaded: {
           people: [
@@ -678,7 +677,7 @@ describe("resolveScopeRows", () => {
       (db) =>
         resolveScopeRows(
           {
-            clerkOrgId: baseInput.clerkOrgId,
+            accountId: baseInput.accountId,
             organisationId: baseInput.organisationId,
             preloaded: {
               people: [
@@ -730,38 +729,38 @@ describe("account feed scopes", () => {
   const accountPeople = [
     {
       ...activePeople[0],
-      clerk_org_id: "org_1",
-      clerk_user_id: "manager",
+      account_id: "org_1",
       id: "manager-a",
       organisation_id: "company-a",
+      user_id: "manager",
     },
     {
       ...activePeople[0],
-      clerk_org_id: "org_1",
-      clerk_user_id: "manager",
+      account_id: "org_1",
       id: "manager-b",
       organisation_id: "company-b",
+      user_id: "manager",
     },
     {
       ...activePeople[2],
-      clerk_org_id: "org_1",
+      account_id: "org_1",
       id: "report-a",
       manager_person_id: "manager-a",
       organisation_id: "company-a",
     },
     {
       ...activePeople[2],
-      clerk_org_id: "org_1",
+      account_id: "org_1",
       id: "report-b",
       manager_person_id: "manager-b",
       organisation_id: "company-b",
     },
     {
       ...activePeople[0],
-      clerk_org_id: "org_other",
-      clerk_user_id: "manager",
+      account_id: "org_other",
       id: "foreign-manager",
       organisation_id: "company-other",
+      user_id: "manager",
     },
   ];
   it("resolves self in every owned company and excludes another account", async () => {
@@ -790,7 +789,7 @@ describe("account feed scopes", () => {
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          clerk_org_id: "org_1",
+          account_id: "org_1",
           organisation_id: { in: ["company-a", "company-b"] },
         }),
       })
@@ -820,4 +819,20 @@ describe("account feed scopes", () => {
       ["manager-a", "manager-b", "report-a", "report-b"]
     );
   });
+});
+
+describe("neutral feed role validation", () => {
+  it.each(["owner", "admin", "manager", "viewer"])(
+    "keeps the recognised %s role",
+    (role) => {
+      expect(normaliseRole(role)).toBe(role);
+    }
+  );
+
+  it.each([null, undefined, "", "unexpected"])(
+    "does not grant a viewer role for %s",
+    (role) => {
+      expect(normaliseRole(role)).toBeNull();
+    }
+  );
 });

@@ -170,10 +170,10 @@ export type Plan = Prisma.PlanModel
  */
 export type PlanLimit = Prisma.PlanLimitModel
 /**
- * Model ClerkOrgSubscription
+ * Model AccountSubscription
  * 
  */
-export type ClerkOrgSubscription = Prisma.ClerkOrgSubscriptionModel
+export type AccountSubscription = Prisma.AccountSubscriptionModel
 /**
  * Model UsageCounter
  * 
@@ -184,3 +184,48 @@ export type UsageCounter = Prisma.UsageCounterModel
  * 
  */
 export type StripeEvent = Prisma.StripeEventModel
+/**
+ * Model AuthUser
+ * 
+ */
+export type AuthUser = Prisma.AuthUserModel
+/**
+ * Model AuthSession
+ * 
+ */
+export type AuthSession = Prisma.AuthSessionModel
+/**
+ * Model AuthIdentity
+ * 
+ */
+export type AuthIdentity = Prisma.AuthIdentityModel
+/**
+ * Model AuthVerification
+ * 
+ */
+export type AuthVerification = Prisma.AuthVerificationModel
+/**
+ * Model AuthOrganization
+ * 
+ */
+export type AuthOrganization = Prisma.AuthOrganizationModel
+/**
+ * Model AuthMember
+ * 
+ */
+export type AuthMember = Prisma.AuthMemberModel
+/**
+ * Model AuthInvitation
+ * 
+ */
+export type AuthInvitation = Prisma.AuthInvitationModel
+/**
+ * Model AuthRateLimit
+ * 
+ */
+export type AuthRateLimit = Prisma.AuthRateLimitModel
+/**
+ * Model AuthAuditEvent
+ * 
+ */
+export type AuthAuditEvent = Prisma.AuthAuditEventModel

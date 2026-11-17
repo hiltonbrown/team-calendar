@@ -6,25 +6,26 @@
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "test": "NODE_ENV=test vitest run --exclude '**/*.integration.test.ts'",
-    "test:integration": "ALLOW_LOCAL_DATABASE_TESTS=1 NODE_ENV=test vitest run .integration.test.ts --maxWorkers=1 --hookTimeout=30000 --testTimeout=30000",
+    "test:integration": "ALLOW_LOCAL_DATABASE_TESTS=1 NODE_ENV=test vitest run .integration.test.ts --no-file-parallelism --maxWorkers=1 --hookTimeout=30000 --testTimeout=30000",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
     "@repo/analytics": "*",
+    "@repo/auth": "*",
     "@repo/availability": "*",
     "@repo/core": "*",
     "@repo/database": "*",
     "@repo/feeds": "*",
     "@repo/observability": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "jose": "6.2.13",
+    "jose": "6.2.17",
     "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }

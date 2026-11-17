@@ -23,9 +23,9 @@ export interface OnboardingRecord {
   xeroSkippedAt: Date | null;
 }
 
-const scope = (clerkOrgId: string, organisationId: string) => ({
+const scope = (accountId: string, organisationId: string) => ({
+  account_id: accountId,
   archived_at: null,
-  clerk_org_id: clerkOrgId,
   id: organisationId,
 });
 
@@ -40,12 +40,12 @@ const internal = <T>(message: string): Result<T> => ({
 });
 
 export async function getOnboardingRecord(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   db: TenantDb
 ): Promise<Result<OnboardingRecord>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb = db;
 
     try {
@@ -55,7 +55,7 @@ export async function getOnboardingRecord(
           onboarding_step: true,
           xero_setup_skipped_at: true,
         },
-        where: scope(clerkOrgId, organisationId),
+        where: scope(accountId, organisationId),
       });
       if (!organisation) {
         return notFound();
@@ -80,21 +80,21 @@ export async function getOnboardingRecord(
 // Conditional on the stored step, so two tabs or admins advancing at once
 // move the wizard forward exactly once.
 export async function advanceOnboardingStep(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   from: OnboardingStep,
   to: OnboardingStep,
   db: TenantDb
 ): Promise<Result<{ advanced: boolean }>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb2 = db;
 
     try {
       const updated = await tenantDb2.organisation.updateMany({
         data: { onboarding_step: to },
         where: {
-          ...scope(clerkOrgId, organisationId),
+          ...scope(accountId, organisationId),
           onboarding_step: from,
         },
       });
@@ -109,19 +109,19 @@ export async function advanceOnboardingStep(
 }
 
 export async function setXeroSetupSkipped(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   skipped: boolean,
   db: TenantDb
 ): Promise<Result<void>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb3 = db;
 
     try {
       await tenantDb3.organisation.updateMany({
         data: { xero_setup_skipped_at: skipped ? new Date() : null },
-        where: scope(clerkOrgId, organisationId),
+        where: scope(accountId, organisationId),
       });
       return { ok: true, value: undefined };
     } catch (error) {
@@ -134,12 +134,12 @@ export async function setXeroSetupSkipped(
 }
 
 export async function completeOnboarding(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   db: TenantDb
 ): Promise<Result<{ completedAt: Date }>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb4 = db;
 
     try {
@@ -149,12 +149,12 @@ export async function completeOnboarding(
           onboarding_step: "finish",
         },
         where: {
-          ...scope(clerkOrgId, organisationId),
+          ...scope(accountId, organisationId),
           onboarding_completed_at: null,
         },
       });
       const record = await getOnboardingRecord(
-        clerkOrgId,
+        accountId,
         organisationId,
         tenantDb4
       );
@@ -175,23 +175,23 @@ export async function completeOnboarding(
 }
 
 export async function getWelcomeState(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
-  clerkUserId: string,
+  userId: string,
   db: TenantDb
 ): Promise<Result<{ completedAt: Date | null; personId: string } | null>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb5 = db;
 
     try {
       const person = await tenantDb5.person.findFirst({
         select: { id: true, welcome_completed_at: true },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: clerkUserId,
           organisation_id: organisationId,
+          user_id: userId,
         },
       });
       return {
@@ -210,25 +210,25 @@ export async function getWelcomeState(
 }
 
 export async function completeWelcome(
-  clerkOrgId: string,
+  accountId: string,
   organisationId: string,
   personId: string,
-  clerkUserId: string,
+  userId: string,
   db: TenantDb
 ): Promise<Result<void>> {
   {
-    assertTenantDb(db, clerkOrgId);
+    assertTenantDb(db, accountId);
     const tenantDb6 = db;
 
     try {
       const updated = await tenantDb6.person.updateMany({
         data: { welcome_completed_at: new Date() },
         where: {
+          account_id: accountId,
           archived_at: null,
-          clerk_org_id: clerkOrgId,
-          clerk_user_id: clerkUserId,
           id: personId,
           organisation_id: organisationId,
+          user_id: userId,
           welcome_completed_at: null,
         },
       });
@@ -236,9 +236,9 @@ export async function completeWelcome(
         return { ok: true, value: undefined };
       }
       const state = await getWelcomeState(
-        clerkOrgId,
+        accountId,
         organisationId,
-        clerkUserId,
+        userId,
         tenantDb6
       );
       if (state.ok && state.value?.personId === personId) {

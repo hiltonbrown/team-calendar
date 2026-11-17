@@ -1,6 +1,6 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import {
   afterTenantCommit,
@@ -22,7 +22,7 @@ import {
 } from "@repo/notifications";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { hasPageRole } from "@/lib/auth/require-page-role";
+import { hasPagePermission } from "@/lib/auth/require-page-permission";
 
 type ActionError =
   | NotificationServiceError
@@ -30,7 +30,7 @@ type ActionError =
   | { code: "not_authorised"; message: string }
   | { code: "validation_error"; message: string };
 interface NotificationActor {
-  clerkOrgId: string;
+  accountId: string;
   userId: string;
 }
 const MarkReadSchema = z.object({ notificationId: z.string().uuid() });
@@ -101,7 +101,7 @@ export async function updatePreferenceAction(input: {
   return await runAccountNotification(async (actor, db) => {
     const company = await db.organisation.findFirst({
       select: { id: true },
-      where: { clerk_org_id: actor.clerkOrgId, id: parsed.data.organisationId },
+      where: { account_id: actor.accountId, id: parsed.data.organisationId },
     });
     if (!company) {
       return {
@@ -119,14 +119,25 @@ export async function updatePreferenceAction(input: {
 async function notificationActor(): Promise<
   Result<NotificationActor, ActionError>
 > {
-  const [authObject, user] = await Promise.all([auth(), currentUser()]);
-  if (!(authObject.isAuthenticated && authObject.orgId && user)) {
+  const [authObject, user] = await Promise.all([
+    getSession().then(
+      (currentSession) =>
+        currentSession ?? {
+          accountId: null,
+          role: null,
+          sessionId: null,
+          userId: null,
+        }
+    ),
+    getCurrentUser(),
+  ]);
+  if (!(authObject.userId && authObject.accountId && user)) {
     return {
       error: { code: "not_authorised", message: "You need to sign in again." },
       ok: false,
     };
   }
-  if (!(await hasPageRole("org:viewer"))) {
+  if (!(await hasPagePermission({ notifications: ["read"] }))) {
     return {
       error: {
         code: "not_authorised",
@@ -135,7 +146,10 @@ async function notificationActor(): Promise<
       ok: false,
     };
   }
-  return { ok: true, value: { clerkOrgId: authObject.orgId, userId: user.id } };
+  return {
+    ok: true,
+    value: { accountId: authObject.accountId, userId: user.id },
+  };
 }
 async function runAccountNotification<T>(
   operation: (
@@ -149,7 +163,7 @@ async function runAccountNotification<T>(
     return actor;
   }
   try {
-    return await withTenantResult(actor.value.clerkOrgId, async (db) => {
+    return await withTenantResult(actor.value.accountId, async (db) => {
       const result = await operation(actor.value, db);
       if (result.ok && invalidate) {
         afterTenantCommit(db, () => {

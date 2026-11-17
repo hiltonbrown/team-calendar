@@ -23,7 +23,8 @@ const envelopeSchema = z.object({
 const environmentSchema = z.object({
   createdAt: z.string().datetime(),
   id: z.string(),
-  name: z.literal("production"),
+  name: z.string(),
+  type: z.enum(["BRANCH", "PRODUCTION"]).optional(),
 });
 
 const assertFresh = (timestamp: string, now: number) => {
@@ -33,19 +34,49 @@ const assertFresh = (timestamp: string, now: number) => {
   }
 };
 
-/** Revalidate the special case where production has never registered workers. */
+const assertAdmissionSample = (
+  observedAt: string,
+  runId: string,
+  ownershipVerifiedForRunId: string | undefined
+) => {
+  const currentTime = Date.now();
+  if (ownershipVerifiedForRunId !== runId) {
+    assertFresh(observedAt, currentTime);
+    return;
+  }
+  // Ownership lets cleanup revisit an older admission sample. Every provider
+  // response still has to prove fresh, exact, empty consumer state.
+  const observedTime = Date.parse(observedAt);
+  if (!Number.isFinite(observedTime) || observedTime > currentTime) {
+    throw new Error("Consumer isolation evidence is invalid or future-dated");
+  }
+};
+
+/** Revalidate the selected environment's absence of registered workers. */
 export const assertConsumerIsolationReadBack = async (
   manifest: ReleaseManifest,
-  input: { signingKey?: string }
+  input: { ownershipVerifiedForRunId?: string; signingKey?: string }
 ): Promise<void> => {
   const evidence = manifest.consumerIsolation;
   if (!evidence) {
     return;
   }
-  assertFresh(evidence.observedAt, Date.now());
-  if (!input.signingKey?.startsWith("signkey-prod-")) {
+  assertAdmissionSample(
+    evidence.observedAt,
+    manifest.runId,
+    input.ownershipVerifiedForRunId
+  );
+  const environmentType = evidence.environmentType ?? "PRODUCTION";
+  const branchFixture = environmentType === "BRANCH";
+  if (branchFixture && manifest.mode !== "database-fixture") {
+    throw new Error("Branch consumer isolation requires database-fixture mode");
+  }
+  // Branch signing keys are shared across branch environments. The authenticated
+  // response must still bind this run to one exact environment ID and type.
+  const keyPrefix = branchFixture ? "signkey-branch-" : "signkey-prod-";
+  if (!input.signingKey?.startsWith(keyPrefix)) {
     throw new Error(
-      "Production Inngest signing key is required for consumer isolation"
+      `${branchFixture ? "Branch" : "Production"} Inngest signing key is required for consumer isolation`
     );
   }
   const request = async (path: string) => {
@@ -66,11 +97,15 @@ export const assertConsumerIsolationReadBack = async (
   const environments = await request("envs?limit=100");
   if (environments.data.length !== 1) {
     throw new Error(
-      "Consumer isolation requires exactly one production environment"
+      `Consumer isolation requires exactly one ${branchFixture ? "branch" : "production"} environment`
     );
   }
   const environment = environmentSchema.parse(environments.data[0]);
-  if (environment.id !== evidence.environmentId) {
+  if (
+    environment.id !== evidence.environmentId ||
+    (environment.type ?? "PRODUCTION") !== environmentType ||
+    (!branchFixture && environment.name !== "production")
+  ) {
     throw new Error(
       "Inngest environment does not match protected consumer evidence"
     );

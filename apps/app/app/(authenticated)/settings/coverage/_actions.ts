@@ -1,8 +1,8 @@
 "use server";
 
-import { auth, currentUser } from "@repo/auth/server";
+import { getCurrentUser, getSession } from "@repo/auth/server";
 import { updateTeamCoverageMinimum } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { afterTenantCommit, withTenantResult } from "@repo/database";
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { assertNoTenantTransaction } from "@repo/database/tenant-guard";
@@ -52,10 +52,10 @@ export async function updateTeamCoverageMinimumAction(input: {
 
   try {
     return await withTenantResult(
-      context.value.clerkOrgId,
+      context.value.accountId,
       async (db): ReturnType<typeof updateTeamCoverageMinimumAction> => {
         const company = await getOrganisationById(
-          context.value.clerkOrgId as ClerkOrgId,
+          context.value.accountId as AccountId,
           context.value.organisationId as OrganisationId,
           db
         );
@@ -67,9 +67,9 @@ export async function updateTeamCoverageMinimumAction(input: {
         }
         const result = await updateTeamCoverageMinimum(
           {
+            accountId: context.value.accountId,
             actingRole: context.value.role,
             actingUserId: context.value.actingUserId,
-            clerkOrgId: context.value.clerkOrgId,
             minimum: parsed.data.minimum,
             organisationId: context.value.organisationId,
             teamId: parsed.data.teamId,
@@ -123,19 +123,31 @@ function coverageReceipt(teamName: string, minimum: number | null): string {
 async function resolveAdminContext(organisationId: string): Promise<
   ActionResult<{
     actingUserId: string;
-    clerkOrgId: string;
+    accountId: string;
     organisationId: string;
     role: "admin" | "owner";
   }>
 > {
-  const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
+  const [{ accountId: sessionAccountId, role: sessionRole }, user] =
+    await Promise.all([
+      getSession().then(
+        (currentSession) =>
+          currentSession ?? {
+            accountId: null,
+            role: null,
+            sessionId: null,
+            userId: null,
+          }
+      ),
+      getCurrentUser(),
+    ]);
   let role: "admin" | "owner" | null = null;
-  if (orgRole === "org:owner") {
+  if (sessionRole === "owner") {
     role = "owner";
-  } else if (orgRole === "org:admin") {
+  } else if (sessionRole === "admin") {
     role = "admin";
   }
-  if (!(orgId && user && role)) {
+  if (!(sessionAccountId && user && role)) {
     return {
       error: {
         code: "not_authorised",
@@ -148,8 +160,8 @@ async function resolveAdminContext(organisationId: string): Promise<
   return {
     ok: true,
     value: {
+      accountId: sessionAccountId,
       actingUserId: user.id,
-      clerkOrgId: orgId,
       organisationId,
       role,
     },

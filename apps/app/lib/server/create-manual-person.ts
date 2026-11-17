@@ -2,7 +2,7 @@ import type { TenantDb } from "@repo/database";
 import "server-only";
 
 import { withinLimit } from "@repo/auth/server";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { AccountId, OrganisationId, Result } from "@repo/core";
 import { assertTenantDb, lockPlanLimitMutations } from "@repo/database";
 
 export type CreateManualPersonError =
@@ -13,7 +13,7 @@ export type CreateManualPersonError =
 // within the plan's seat limit, serialised with other plan-limited changes.
 export async function createManualPerson(
   input: {
-    clerkOrgId: ClerkOrgId;
+    accountId: AccountId;
     email: string;
     employmentType: "contractor" | "director" | "employee" | "offshore";
     firstName: string;
@@ -23,13 +23,13 @@ export async function createManualPerson(
   },
   db: TenantDb
 ): Promise<Result<{ personId: string }, CreateManualPersonError>> {
-  assertTenantDb(db, input.clerkOrgId);
+  assertTenantDb(db, input.accountId);
   const run = async (tx: TenantDb): ReturnType<typeof createManualPerson> => {
     const company = await tx.organisation.findFirst({
       select: { id: true },
       where: {
+        account_id: input.accountId,
         archived_at: null,
-        clerk_org_id: input.clerkOrgId,
         id: input.organisationId,
       },
     });
@@ -42,9 +42,9 @@ export async function createManualPerson(
         ok: false,
       };
     }
-    await lockPlanLimitMutations(input.clerkOrgId, tx);
+    await lockPlanLimitMutations(input.accountId, tx);
     const entitlement = await withinLimit(
-      input.clerkOrgId,
+      input.accountId,
       input.organisationId,
       "seats",
       tx
@@ -69,7 +69,7 @@ export async function createManualPerson(
     }
     const person = await tx.person.create({
       data: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         email: input.email.toLowerCase(),
         employment_type: input.employmentType,
         first_name: input.firstName,
@@ -83,7 +83,7 @@ export async function createManualPerson(
     return { ok: true as const, value: { personId: person.id } };
   };
   return await (async () => {
-    assertTenantDb(db, input.clerkOrgId);
+    assertTenantDb(db, input.accountId);
     return await run(db);
   })();
 }

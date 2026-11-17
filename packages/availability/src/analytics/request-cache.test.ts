@@ -9,7 +9,7 @@ describe("createAggregationCache", () => {
     const cache = createAggregationCache();
     const loader = vi.fn().mockResolvedValue({ value: 1 });
     const key = aggregationFingerprint({
-      clerkOrgId: "org_1",
+      accountId: "org_1",
       dateRangeKey: "2026",
       filterKey: { teamId: ["team_1"] },
       organisationId: "organisation_1",

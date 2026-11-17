@@ -10,8 +10,8 @@ const mocks = vi.hoisted(() => ({
   leaveBalanceFindFirst: vi.fn(),
   leaveBalanceUpdateMany: vi.fn(),
   personFindFirst: vi.fn(),
-  scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
-    clerk_org_id: clerkOrgId,
+  scopedQuery: vi.fn((accountId: string, organisationId: string) => ({
+    account_id: accountId,
     organisation_id: organisationId,
   })),
 }));
@@ -54,11 +54,11 @@ vi.mock("../xero-connection-state", () => ({
 }));
 const { setManualLeaveBalance } = await import("./manual-balance-service");
 const input = {
+  accountId: "org_1",
   actingRole: "admin" as const,
   actingUserId: "user_1",
   balance: 76,
   balanceUnit: "hours" as const,
-  clerkOrgId: "org_1",
   leaveTypeName: "Annual Leave",
   leaveTypeXeroId: "annual",
   organisationId: "00000000-0000-4000-8000-000000000001",
@@ -123,8 +123,8 @@ describe("manual balance service", () => {
     expect(result).toEqual({ ok: true, value: { id: "balance_1" } });
     expect(mocks.leaveBalanceCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        account_id: input.accountId,
         balance: "76.0000",
-        clerk_org_id: input.clerkOrgId,
         currency_code: null,
         leave_type_xero_id: input.leaveTypeXeroId,
         organisation_id: input.organisationId,
@@ -147,7 +147,7 @@ describe("manual balance service", () => {
     expect(mocks.leaveBalanceFindFirst).toHaveBeenCalledWith({
       select: { id: true },
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         leave_type_xero_id: input.leaveTypeXeroId,
         organisation_id: input.organisationId,
         person_id: input.personId,
@@ -161,7 +161,7 @@ describe("manual balance service", () => {
         source_payload_json: Prisma.DbNull,
       }),
       where: {
-        clerk_org_id: input.clerkOrgId,
+        account_id: input.accountId,
         id: "balance_existing",
         organisation_id: input.organisationId,
       },

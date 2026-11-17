@@ -19,7 +19,8 @@ import {
   supportEmail,
   supportHoursLong,
 } from "@/src/data/support";
-import { metadata, StatusContent } from "./page";
+import { metadata } from "./page";
+import { StatusContent } from "./status-content";
 
 const snapshot: PublicStatusSnapshot = {
   activeIncidents: [],

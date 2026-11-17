@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   acquire: vi.fn(),
   authority: vi.fn(),
+  consumer: vi.fn(),
   durable: vi.fn(),
   manifest: {
     runId: "fixture-run",
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
       role: "fixture",
     },
   },
+  owner: vi.fn(),
   readDigest: vi.fn(),
   release: vi.fn(),
   spawn: vi.fn(),
@@ -22,13 +24,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("node:child_process", () => ({ spawnSync: mocks.spawn }));
 vi.mock("./active-run-registry.js", () => ({
   acquireActiveRun: mocks.acquire,
-  assertActiveRunOwner: vi.fn(),
+  assertActiveRunOwner: mocks.owner,
   persistCatalogueDigest: vi.fn(),
   readCatalogueDigest: mocks.readDigest,
   releaseActiveRun: mocks.release,
 }));
 vi.mock("./consumer-isolation.js", () => ({
-  assertConsumerIsolationReadBack: vi.fn(),
+  assertConsumerIsolationReadBack: mocks.consumer,
 }));
 vi.mock("./database-guard.js", () => ({
   assertDurableManifestReadBack: mocks.durable,
@@ -59,6 +61,8 @@ beforeEach(() => {
   mocks.acquire.mockReset().mockResolvedValue("acquired");
   mocks.authority.mockReset().mockReturnValue(mocks.manifest);
   mocks.durable.mockReset().mockResolvedValue(undefined);
+  mocks.consumer.mockReset().mockResolvedValue(undefined);
+  mocks.owner.mockReset().mockResolvedValue(undefined);
   mocks.readDigest.mockReset().mockResolvedValue("catalogue");
   mocks.spawn.mockReset().mockImplementation((command: string) => {
     if (command === "git") {
@@ -94,6 +98,69 @@ function results(cleanupStatus: number, testStatus = 0) {
     });
 }
 describe("protected integration child boundary", () => {
+  it.each([undefined, "--preacquired"])(
+    "never waives admission freshness for a new inventory run: %s",
+    async (argument) => {
+      if (argument) {
+        process.argv.push(argument);
+      }
+      results(0);
+      await expect(import("./run-live-integration.js")).rejects.toThrow(
+        "intercepted process exit"
+      );
+      expect(mocks.consumer).toHaveBeenCalled();
+      for (const call of mocks.consumer.mock.calls) {
+        expect(call[1].ownershipVerifiedForRunId).toBeUndefined();
+      }
+    }
+  );
+
+  it("supplies recovery proof only after a fresh active-owner read-back", async () => {
+    process.argv.push("--recover");
+    mocks.acquire.mockResolvedValue("interrupted");
+    mocks.spawn.mockReturnValueOnce({
+      status: 0,
+      stdout: JSON.stringify({ outsideOwnedCatalogueDigest: "catalogue" }),
+    });
+    await expect(import("./run-live-integration.js")).rejects.toThrow(
+      "intercepted process exit"
+    );
+    expect(mocks.owner).toHaveBeenCalledOnce();
+    expect(mocks.consumer).toHaveBeenCalledWith(mocks.manifest, {
+      ownershipVerifiedForRunId: mocks.manifest.runId,
+      signingKey: "synthetic-signing-key",
+    });
+    expect(mocks.owner.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.consumer.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("denies recovery before consumer checks if fresh ownership fails", async () => {
+    process.argv.push("--recover");
+    mocks.acquire.mockResolvedValue("interrupted");
+    const failure = new Error("Active run ownership changed");
+    mocks.owner.mockRejectedValue(failure);
+    await expect(import("./run-live-integration.js")).rejects.toBe(failure);
+    expect(mocks.consumer).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.readDigest).not.toHaveBeenCalled();
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it("finishes every package and serialises files before fixture cleanup", async () => {
+    results(0);
+    await expect(import("./run-live-integration.js")).rejects.toThrow(
+      "intercepted process exit"
+    );
+    expect(mocks.spawn.mock.calls[2][1]).toEqual([
+      "run",
+      "test:integration",
+      "--continue=always",
+      "--concurrency=1",
+      "--",
+      "--no-file-parallelism",
+    ]);
+  });
   it("keeps guard KV credentials in cleanup while isolating the integration test child", async () => {
     results(0);
     await expect(import("./run-live-integration.js")).rejects.toThrow(
@@ -106,7 +173,14 @@ describe("protected integration child boundary", () => {
         "synthetic-guard-token"
       );
     }
-    expect(calls[2][1]).toEqual(["run", "test:integration"]);
+    expect(calls[2][1]).toEqual([
+      "run",
+      "test:integration",
+      "--continue=always",
+      "--concurrency=1",
+      "--",
+      "--no-file-parallelism",
+    ]);
     expect(calls[2][2].env.KV_REST_API_TOKEN).toBeUndefined();
     expect(calls[2][2].env.TC_TEST_KV_REST_API_TOKEN).toBe(
       "synthetic-guard-token"

@@ -43,22 +43,25 @@ await assertDurableManifestReadBack(manifest, {
   token: process.env.KV_REST_API_TOKEN,
   url: process.env.KV_REST_API_URL,
 });
+let ownershipVerifiedForRunId: string | undefined;
 if (mode !== "--dry-run") {
   await assertActiveRunOwner(manifest, {
     token: process.env.KV_REST_API_TOKEN,
     url: process.env.KV_REST_API_URL,
   });
+  ownershipVerifiedForRunId = manifest.runId;
   process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED = manifest.runId;
 }
 process.env.TC_RELEASE_DURABLE_VERIFIED = manifest.runId;
 await assertConsumerIsolationReadBack(manifest, {
+  ownershipVerifiedForRunId,
   signingKey: process.env.INNGEST_SIGNING_KEY,
 });
 if (manifest.consumerIsolation) {
   process.env.TC_RELEASE_CONSUMERS_VERIFIED = manifest.runId;
 }
 if (
-  !(manifest.owned.clerkOrgIds.length && manifest.owned.organisationIds.length)
+  !(manifest.owned.accountIds.length && manifest.owned.organisationIds.length)
 ) {
   throw new Error("Cleanup requires both manifest-owned tenancy keys");
 }
@@ -80,9 +83,8 @@ const scopedTables = [
   "feed_tokens",
   "feed_scopes",
   "feeds",
-  "public_holiday_assignments",
+  "public_holiday_preferences",
   "public_holidays",
-  "public_holiday_jurisdictions",
   "leave_balances",
   "xero_person_matches",
   "alternative_contacts",
@@ -95,10 +97,11 @@ const scopedTables = [
   "organisation_settings",
   "audit_events",
 ] as const;
-const clerkTables = [
+const accountTables = [
+  "account_settings",
   "xero_oauth_sessions",
   "usage_counters",
-  "clerk_org_subscriptions",
+  "account_subscriptions",
 ] as const;
 const stripeEventIds = manifest.owned.globalKeys
   .filter((key) => key.startsWith("stripe_event:"))
@@ -118,18 +121,21 @@ if (unknownGlobalKeys.length > 0) {
 const placeholders = (offset: number, count: number) =>
   Array.from({ length: count }, (_, index) => `$${offset + index}`).join(",");
 const scopedValues = [
-  ...manifest.owned.clerkOrgIds,
+  ...manifest.owned.accountIds,
   ...manifest.owned.organisationIds,
 ];
-const scopedSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)}) AND organisation_id IN (${placeholders(1 + manifest.owned.clerkOrgIds.length, manifest.owned.organisationIds.length)})`;
-const clerkSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)})`;
-const organisationSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)}) AND id IN (${placeholders(1 + manifest.owned.clerkOrgIds.length, manifest.owned.organisationIds.length)})`;
+const scopedSql = `account_id IN (${placeholders(1, manifest.owned.accountIds.length)}) AND (organisation_id IS NULL OR organisation_id IN (${placeholders(1 + manifest.owned.accountIds.length, manifest.owned.organisationIds.length)}))`;
+const accountSql = `account_id IN (${placeholders(1, manifest.owned.accountIds.length)})`;
+const organisationSql = `account_id IN (${placeholders(1, manifest.owned.accountIds.length)}) AND id IN (${placeholders(1 + manifest.owned.accountIds.length, manifest.owned.organisationIds.length)})`;
 
 const ownedFeedRows = await database.feed.findMany({
   select: { id: true },
   where: {
-    clerk_org_id: { in: manifest.owned.clerkOrgIds },
-    organisation_id: { in: manifest.owned.organisationIds },
+    account_id: { in: manifest.owned.accountIds },
+    OR: [
+      { organisation_id: null },
+      { organisation_id: { in: manifest.owned.organisationIds } },
+    ],
   },
 });
 const feedCacheInput = {
@@ -180,8 +186,8 @@ counts.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   counts[table] = await countRows(table, scopedSql, scopedValues);
 }
-for (const table of clerkTables) {
-  counts[table] = await countRows(table, clerkSql, manifest.owned.clerkOrgIds);
+for (const table of accountTables) {
+  counts[table] = await countRows(table, accountSql, manifest.owned.accountIds);
 }
 counts.organisations = await countRows(
   "organisations",
@@ -231,7 +237,7 @@ if (mode === "--dry-run") {
 if (mode === "--apply") {
   const activeFixtureRuns = await database.syncRun.count({
     where: {
-      clerk_org_id: { in: manifest.owned.clerkOrgIds },
+      account_id: { in: manifest.owned.accountIds },
       organisation_id: { in: manifest.owned.organisationIds },
       status: "running",
     },
@@ -251,10 +257,10 @@ if (mode === "--apply") {
         ...scopedValues
       );
     }
-    for (const table of clerkTables) {
+    for (const table of accountTables) {
       await transaction.$executeRawUnsafe(
-        `DELETE FROM "${table}" WHERE ${clerkSql}`,
-        ...manifest.owned.clerkOrgIds
+        `DELETE FROM "${table}" WHERE ${accountSql}`,
+        ...manifest.owned.accountIds
       );
     }
     await deleteXeroFixtureInfrastructure(transaction, manifest.owned);
@@ -306,8 +312,12 @@ residue.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   residue[table] = await countRows(table, scopedSql, scopedValues);
 }
-for (const table of clerkTables) {
-  residue[table] = await countRows(table, clerkSql, manifest.owned.clerkOrgIds);
+for (const table of accountTables) {
+  residue[table] = await countRows(
+    table,
+    accountSql,
+    manifest.owned.accountIds
+  );
 }
 residue.organisations = await countRows(
   "organisations",
